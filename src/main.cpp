@@ -110,16 +110,19 @@ int main() {
 	sf::Clock c;
 	gladLoadGL();
 	Renderer renderer;
+	Camera camera(window);
 	Axis axis(10.0f);
+	axis.UpdateProjection(camera.GetProjectionMatrix());
 	Line line;
 	ShaderProgram lineShader;
-	Camera camera(window);
 	std::vector<Object3D> sceneObjects;
 	Object3D* selectedObject = nullptr;
 	sf::Vector2i mouseLast = sf::Mouse::getPosition();
 	
 	sceneObjects.push_back(Object3D("models/Xzibit.fbx", "models/Xzibit.png"));
+	sceneObjects.push_back(Object3D(cubeVertices, cubeFaces));
 	sceneObjects[0].SetScale(glm::vec3(0.01f, 0.01f, 0.01f));
+	sceneObjects[1].Move(glm::vec3(2, 0.5f, 2));
 
 	auto last = c.getElapsedTime();
 	glEnable(GL_DEPTH_TEST);
@@ -134,11 +137,7 @@ int main() {
 			{
 				float aspectRatio = static_cast<float>(window.getSize().x) / window.getSize().y;
 				glViewport(0, 0, window.getSize().x, window.getSize().y);
-
-				// In main/render loop
-				glm::mat4 projection = glm::perspective(glm::radians(45.0f), aspectRatio, 0.1f, 1000.0f);
-
-				axis.UpdateProjection(projection);
+				axis.UpdateProjection(camera.GetProjectionMatrix());
 			}
 
 			if (ev.type == sf::Event::MouseButtonPressed)

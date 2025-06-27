@@ -58,14 +58,6 @@ Axis::Axis(float axisLength) :m_vao(-1), m_vbo(-1)
 	glBindVertexArray(0);
 
 	m_shader.load("shaders/vertexColor.vert", "shaders/vertexColor.frag");
-	m_shader.activate();
-	m_shader.setUniform("projection", glm::perspective(glm::radians(45.0f), static_cast<float>(1200) / 800, 0.1f, 1000.0f));
-}
-
-void Axis::UpdateProjection(glm::mat4 projectionMatrix)
-{
-	m_shader.activate();
-	m_shader.setUniform("projection", projectionMatrix);
 }
 
 void Axis::draw(glm::mat4 viewMatrix)
@@ -76,5 +68,10 @@ void Axis::draw(glm::mat4 viewMatrix)
 	glBindVertexArray(m_vao);
 	glDrawArrays(GL_LINES, 0, m_vertices.size());
 	glBindVertexArray(0);
+}
 
+void Axis::UpdateProjection(glm::mat4 projectionMatrix)
+{
+	m_shader.activate();
+	m_shader.setUniform("projection", projectionMatrix);
 }

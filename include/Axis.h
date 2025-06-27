@@ -12,8 +12,8 @@ class Axis {
 public:
 	Axis();
 	Axis(float axisLength);
-	void UpdateProjection(glm::mat4 projectionMatrix);
 	void draw(glm::mat4 viewMatrix);
+	void UpdateProjection(glm::mat4 projectionMatrix);
 private:
 	std::vector<AxisVertex3D> m_vertices;
 	uint32_t m_vao;
