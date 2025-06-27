@@ -15,6 +15,13 @@ Mesh::Mesh(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 {
 	m_vertices = vertices;
 	m_faces = faces;
+
+	//cube only
+	m_minBounds = glm::vec3(-0.5f, -0.5f, -0.5f);
+	m_maxBounds = glm::vec3(0.5f, 0.5f, 0.5f);
+
+	m_meshMinBounds = m_minBounds;
+	m_meshMaxBounds = m_maxBounds;
 	
 	SetBuffers();
 	SetTexture("models/brick_wall_diff.png");
@@ -24,6 +31,26 @@ Mesh::Mesh(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 Mesh::Mesh(const char* modelFile, const char* textureFile)
 {
 	assimpLoad(modelFile, true);
+
+	m_minBounds = glm::vec3(FLT_MAX);
+	m_maxBounds = glm::vec3(-FLT_MAX);
+
+	for (int i = 0; i < m_vertices.size(); i++)
+	{
+		//find max and min positions
+		const glm::vec3& pos = m_vertices[i].position;
+
+		m_minBounds.x = std::min(m_minBounds.x, pos.x);
+		m_minBounds.y = std::min(m_minBounds.y, pos.y);
+		m_minBounds.z = std::min(m_minBounds.z, pos.z);
+
+		m_maxBounds.x = std::max(m_maxBounds.x, pos.x);
+		m_maxBounds.y = std::max(m_maxBounds.y, pos.y);
+		m_maxBounds.z = std::max(m_maxBounds.z, pos.z);
+	}
+
+	m_meshMinBounds = m_minBounds;
+	m_meshMaxBounds = m_maxBounds;
 
 	SetBuffers();
 	SetTexture(textureFile);
@@ -96,6 +123,14 @@ void fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, std::ve
 		faces.push_back(mesh->mFaces[i].mIndices[0]);
 		faces.push_back(mesh->mFaces[i].mIndices[1]);
 		faces.push_back(mesh->mFaces[i].mIndices[2]);
+	}
+
+	//process bones
+	std::cout << "num bones: " << mesh->mNumBones << std::endl;
+
+	for (size_t i{ 0 }; i < mesh->mNumBones; ++i)
+	{
+		std::cout << "process bone: " << i << std::endl;
 	}
 }
 
@@ -254,4 +289,44 @@ uint32_t Mesh::FacesSize() const
 	return m_faces.size();
 }
 
+void Mesh::updateAABB(glm::vec3 position, glm::vec3 scale)
+{
+	m_minBounds = position + m_meshMinBounds;
+	m_maxBounds = position + m_meshMaxBounds;
+	m_minBounds *= scale;
+	m_maxBounds *= scale;
 
+	// Ensure correct ordering if scale is negative
+	for (int i = 0; i < 3; ++i) {
+		if (m_minBounds[i] > m_maxBounds[i])
+			std::swap(m_minBounds[i], m_maxBounds[i]);
+	}
+}
+
+bool Mesh::intersectsRay(const glm::vec3& rayOrigin, const glm::vec3& rayDir) const
+{
+	float tMin = 0.0f;
+	float tMax = 1e6f;
+
+	for (int i = 0; i < 3; ++i) {
+		if (std::abs(rayDir[i]) < 1e-6f) {
+			// Ray is parallel to slab
+			if (rayOrigin[i] < m_minBounds[i] || rayOrigin[i] > m_maxBounds[i])
+				return false;
+		}
+		else {
+			float ood = 1.0f / rayDir[i];
+			float t1 = (m_minBounds[i] - rayOrigin[i]) * ood;
+			float t2 = (m_maxBounds[i] - rayOrigin[i]) * ood;
+			if (t1 > t2) std::swap(t1, t2);
+
+			tMin = std::max(tMin, t1);
+			tMax = std::min(tMax, t2);
+
+			if (tMin > tMax)
+				return false;
+		}
+	}
+
+	return true;
+}

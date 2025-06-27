@@ -118,13 +118,8 @@ int main() {
 	Object3D* selectedObject = nullptr;
 	sf::Vector2i mouseLast = sf::Mouse::getPosition();
 	
-	sceneObjects.push_back(Object3D(cubeVertices, cubeFaces));
-	sceneObjects.push_back(Object3D(cubeVertices, cubeFaces));
-	sceneObjects.push_back(Object3D(cubeVertices, cubeFaces));
-
-	sceneObjects[0].Move(glm::vec3(0, 1, 0));
-	sceneObjects[1].Move(glm::vec3(0, 1, -3));
-	sceneObjects[2].Move(glm::vec3(-3, 0, 0));
+	sceneObjects.push_back(Object3D("models/Xzibit.fbx", "models/Xzibit.png"));
+	sceneObjects[0].SetScale(glm::vec3(0.01f, 0.01f, 0.01f));
 
 	auto last = c.getElapsedTime();
 	glEnable(GL_DEPTH_TEST);
@@ -152,11 +147,11 @@ int main() {
 				{
 					for (int i = 0; i < sceneObjects.size(); i++)
 					{
-						sceneObjects[i].updateAABB();
+						sceneObjects[i].updateMeshAABB();
 						glm::vec3 rayDirection = CastRayFromMouse(window, camera.GetViewMatrix(), camera.GetProjectionMatrix());
 						line = Line(1000.0f, camera.GetPosition(), rayDirection);
 
-						if (sceneObjects[i].intersectsRay(camera.GetPosition(), rayDirection))
+						if (sceneObjects[i].intersectsRayMesh(camera.GetPosition(), rayDirection))
 						{
 							selectedObject = &sceneObjects[i];
 							break;

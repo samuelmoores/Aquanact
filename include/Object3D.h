@@ -14,16 +14,14 @@ public:
 	void Rotate(glm::vec3 delta);
 	void Move(glm::vec3 delta);
 	void Scale(glm::vec3 delta);
-	void updateAABB();
-	bool intersectsRay(const glm::vec3& rayOrigin, const glm::vec3& rayDir) const;
+	void SetScale(glm::vec3 scale);
+	void updateMeshAABB();
+	bool intersectsRayMesh(glm::vec3 origin, glm::vec3& direction);
 private:
 	Mesh m_mesh;
 	ShaderProgram m_shader;
 	glm::vec3 m_position;
 	glm::vec3 m_rotation;
 	glm::vec3 m_scale;
-	glm::vec3 m_minBounds;
-	glm::vec3 m_maxBounds;
-	glm::vec3 m_meshMinBounds;
-	glm::vec3 m_meshMaxBounds;
+
 };

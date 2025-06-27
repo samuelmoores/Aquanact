@@ -26,10 +26,16 @@ class Mesh {
 		void Bind() const;
 		void UnBind() const;
 		uint32_t FacesSize() const;
+		void updateAABB(glm::vec3 position, glm::vec3 scale);
+		bool intersectsRay(const glm::vec3& rayOrigin, const glm::vec3& rayDir) const;
 	private:
 		std::vector<Vertex3D> m_vertices;
 		std::vector<uint32_t> m_faces;
 		uint32_t m_vao;
 		uint32_t m_textureColor;
 		uint32_t m_textureNormal;
+		glm::vec3 m_minBounds;
+		glm::vec3 m_maxBounds;
+		glm::vec3 m_meshMinBounds;
+		glm::vec3 m_meshMaxBounds;
 };
