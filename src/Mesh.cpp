@@ -1,9 +1,6 @@
 #include <Mesh.h>
 #include <iostream>
 #include <glm/gtc/matrix_transform.hpp>
-#include <assimp/Importer.hpp> 
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>
 
 const int VERTICES_PER_FACE = 3;
 
@@ -31,6 +28,32 @@ Mesh::Mesh(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 Mesh::Mesh(const char* modelFile, const char* textureFile)
 {
 	assimpLoad(modelFile, true);
+
+	//debug skeleton code
+	if (false)
+	{
+		for (int i = 0; i < 5; ++i) {
+			const auto& v = m_vertices[i];
+			std::cout << "Vertex " << i << ": Pos(" << v.position.x << ", " << v.position.y << ", " << v.position.z << ")";
+			std::cout << " Bones: [" << v.boneIDs[0] << ", " << v.boneIDs[1] << ", " << v.boneIDs[2] << ", " << v.boneIDs[3] << "]";
+			std::cout << " Weights: [" << v.weights[0] << ", " << v.weights[1] << ", " << v.weights[2] << ", " << v.weights[3] << "]" << std::endl;
+		}
+
+		for (const auto& pair : m_boneMapping) {
+			std::cout << "Bone name: " << pair.first << ", Index: " << pair.second << std::endl;
+		}
+
+		for (size_t i = 0; i < m_boneOffsetMatrices.size(); ++i) {
+			const aiMatrix4x4& mat = m_boneOffsetMatrices[i];
+			std::cout << "Bone " << i << " offset matrix:\n";
+			for (int row = 0; row < 4; ++row) {
+				for (int col = 0; col < 4; ++col) {
+					std::cout << mat[row][col] << " ";
+				}
+				std::cout << std::endl;
+			}
+		}
+	}
 
 	m_minBounds = glm::vec3(FLT_MAX);
 	m_maxBounds = glm::vec3(-FLT_MAX);
@@ -65,18 +88,19 @@ Mesh::Mesh(const char* modelFile, const char* textureFile, const char* normalMap
 	SetNormalMap(normalMap);
 }
 
-void fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, std::vector<uint32_t>& faces) {
-	for (size_t i{ 0 }; i < mesh->mNumVertices; ++i) {
-		if (mesh->HasTangentsAndBitangents()) {
-			aiVector3D t = mesh->mTangents[i];
-			aiVector3D b = mesh->mBitangents[i];
-			if (isnan(t.x) || isnan(b.x)) std::cout << "Bad tangent/bitangent!\n";
+void AddBoneData(Vertex3D& vertex, int boneID, float weight) {
+	for (int i = 0; i < 4; i++) {
+		if (vertex.weights[i] == 0.0f) {
+			vertex.boneIDs[i] = boneID;
+			vertex.weights[i] = weight;
+			return;
 		}
-		else
-		{
-			std::cout << "mesh doesn't have tangents or bitangents\n";
-		}
+	}
+	// If you get here, you exceeded 4 bones per vertex — consider normalizing or pruning
+}
 
+void Mesh::fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, std::vector<uint32_t>& faces) {
+	for (size_t i{ 0 }; i < mesh->mNumVertices; ++i) {
 		glm::vec3 position = { mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z };
 
 		glm::vec2 texCoord = glm::vec2(0.0f); // Default if no texcoords
@@ -126,11 +150,31 @@ void fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, std::ve
 	}
 
 	//process bones
-	std::cout << "num bones: " << mesh->mNumBones << std::endl;
+	int boneCount = 0;
 
 	for (size_t i{ 0 }; i < mesh->mNumBones; ++i)
 	{
-		std::cout << "process bone: " << i << std::endl;
+		std::string boneName(mesh->mBones[i]->mName.C_Str());
+
+		int boneIndex = 0;
+		if (m_boneMapping.find(boneName) == m_boneMapping.end()) {
+			boneIndex = boneCount++;
+			m_boneMapping[boneName] = boneIndex;
+			m_boneOffsetMatrices.push_back(mesh->mBones[i]->mOffsetMatrix);
+		}
+		else {
+			boneIndex = m_boneMapping[boneName];
+		}
+
+		// Assign bone weights to vertices
+		aiBone* bone = mesh->mBones[i];
+		for (unsigned int j = 0; j < bone->mNumWeights; j++) 
+		{
+			unsigned int vertexID = bone->mWeights[j].mVertexId;
+			float weight = bone->mWeights[j].mWeight;
+
+			AddBoneData(vertices[vertexID], boneIndex, weight);
+		}
 	}
 }
 
@@ -160,7 +204,6 @@ void Mesh::assimpLoad(const std::string& path, bool flipUvs) {
 		m_faces = faces;
 	}
 }
-
 
 void Mesh::SetBuffers()
 {
@@ -196,6 +239,12 @@ void Mesh::SetBuffers()
 
 	glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex3D), (void*)offsetof(Vertex3D, bitangent));
 	glEnableVertexAttribArray(4);
+
+	glEnableVertexAttribArray(5); // boneIDs
+	glVertexAttribIPointer(5, 4, GL_INT, sizeof(Vertex3D), (void*)56);
+
+	glEnableVertexAttribArray(6); // weights
+	glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex3D), (void*)72);
 
 
 	// Generate a second buffer, to store the indices of each triangle in the mesh.
