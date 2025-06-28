@@ -19,6 +19,11 @@ struct Vertex3D {
 	float weights[4];       // 16 bytes (4 floats)
 };
 
+struct Skeleton {
+	std::map<std::string, int> boneMapping;
+	std::vector<aiMatrix4x4> boneOffsetMatrices;
+};
+
 class Mesh {
 	public:
 		Mesh();
@@ -35,6 +40,7 @@ class Mesh {
 		uint32_t FacesSize() const;
 		void updateAABB(glm::vec3 position, glm::vec3 scale);
 		bool intersectsRay(const glm::vec3& rayOrigin, const glm::vec3& rayDir) const;
+		const Skeleton& GetSkeleton() const;
 	private:
 		std::vector<Vertex3D> m_vertices;
 		std::vector<uint32_t> m_faces;
@@ -45,7 +51,5 @@ class Mesh {
 		glm::vec3 m_maxBounds;
 		glm::vec3 m_meshMinBounds;
 		glm::vec3 m_meshMaxBounds;
-		std::map<std::string, int> m_boneMapping;
-		std::vector<aiMatrix4x4> m_boneOffsetMatrices;
-		std::vector<glm::mat4> m_finalBoneMatrices;
+		Skeleton m_skeleton;
 };

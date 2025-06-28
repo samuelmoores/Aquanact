@@ -6,7 +6,7 @@
 #include <Camera.h>
 #include <Renderer.h>
 #include <Object3D.h>
-#include <Animation.h>
+#include <Animator.h>
 
 std::vector<Vertex3D> cubeVertices = {
 	// back face (z = -0.5)
@@ -125,7 +125,8 @@ int main() {
 	sceneObjects[0].SetScale(glm::vec3(0.01f, 0.01f, 0.01f));
 	sceneObjects[1].Move(glm::vec3(2, 0.5f, 2));
 
-	Animation XzibitIdle("models/Idle.fbx");
+	Animation XzibitIdle("models/Idle.fbx", *sceneObjects[0].GetMesh());
+	Animator XzibitAnimator(&XzibitIdle);
 
 	auto last = c.getElapsedTime();
 	glEnable(GL_DEPTH_TEST);
@@ -172,11 +173,13 @@ int main() {
 		auto diff = now - last;
 		last = now;
 
-		std::cout << 1 / diff.asSeconds() << " FPS " << std::endl;
+		//std::cout << 1 / diff.asSeconds() << " FPS " << std::endl;
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		camera.CameraControl(mouseLast, diff);
 		axis.draw(camera.GetViewMatrix());
+
+		XzibitAnimator.Update(diff.asSeconds());
 
 		if (selectedObject != nullptr)
 		{

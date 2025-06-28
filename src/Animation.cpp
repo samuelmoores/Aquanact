@@ -1,7 +1,8 @@
 #include "Animation.h"
 
-Animation::Animation(const char* file)
+Animation::Animation(const char* file, Mesh& mesh)
 {
+    m_mesh = mesh;
     assimpLoad(file, true);
 }
 
@@ -51,14 +52,34 @@ std::map<std::string, BoneAnimChannel> ExtractAnimationChannels(const aiAnimatio
     return boneChannels;
 }
 
+aiNode* FindSkeletonRoot(aiNode* node, const std::unordered_set<std::string>& boneNames)
+{
+    if (boneNames.count(node->mName.C_Str()) > 0)
+    {
+        if (node->mParent == nullptr || boneNames.count(node->mParent->mName.C_Str()) == 0)
+        {
+            return node; // This is a root bone (has no parent that's also a bone)
+        }
+    }
+
+    for (unsigned int i = 0; i < node->mNumChildren; ++i)
+    {
+        aiNode* result = FindSkeletonRoot(node->mChildren[i], boneNames);
+        if (result)
+            return result;
+    }
+
+    return nullptr;
+}
+
+
 void Animation::assimpLoad(const std::string& path, bool flipUvs) {
     int flags = (aiPostProcessSteps)aiProcessPreset_TargetRealtime_MaxQuality;
     if (flipUvs) {
         flags |= aiProcess_FlipUVs;
     }
 
-    Assimp::Importer importer;
-    const aiScene* scene = importer.ReadFile(path,
+    const aiScene* scene = m_importer.ReadFile(path,
         aiProcess_Triangulate |
         aiProcess_GenSmoothNormals |
         aiProcess_CalcTangentSpace |  // <-- This one is needed!
@@ -66,9 +87,24 @@ void Animation::assimpLoad(const std::string& path, bool flipUvs) {
 
     // If the import failed, report it
     if (nullptr == scene) {
-        std::cout << "ASSIMP ERROR: " << importer.GetErrorString() << std::endl;
+        std::cout << "ASSIMP ERROR: " << m_importer.GetErrorString() << std::endl;
         exit(1);
     }
+
+    aiMesh* mesh = scene->mMeshes[0];
+
+    // Step 1: Collect all bone names from the mesh
+    m_numBones = 0;
+    std::unordered_set<std::string> boneNames;
+    for (unsigned int i = 0; i < mesh->mNumBones; ++i)\
+    {
+        boneNames.insert(mesh->mBones[i]->mName.C_Str());
+        m_numBones++;
+    }
+
+    
+    // Step 2: Traverse the scene graph to find the highest bone node
+    m_root = FindSkeletonRoot(scene->mRootNode, boneNames);
 
     if (scene->HasAnimations())
     {
@@ -87,4 +123,34 @@ void Animation::assimpLoad(const std::string& path, bool flipUvs) {
     {
         std::cout << "Error: no animation in file\n";
     }
+}
+
+float Animation::duration()
+{
+    return m_duration;
+}
+
+float Animation::ticksPerSecond()
+{
+    return m_ticksPerSecond;
+}
+
+const std::map<std::string, BoneAnimChannel>& Animation::boneAnimChannels() const
+{
+    return m_boneAnimChannels;
+}
+
+const Mesh& Animation::mesh() const
+{
+    return m_mesh;
+}
+
+const aiNode* Animation::root()
+{
+    return m_root;
+}
+
+int Animation::numBones()
+{
+    return m_numBones;
 }

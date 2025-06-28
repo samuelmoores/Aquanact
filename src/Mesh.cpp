@@ -39,12 +39,12 @@ Mesh::Mesh(const char* modelFile, const char* textureFile)
 			std::cout << " Weights: [" << v.weights[0] << ", " << v.weights[1] << ", " << v.weights[2] << ", " << v.weights[3] << "]" << std::endl;
 		}
 
-		for (const auto& pair : m_boneMapping) {
+		for (const auto& pair : m_skeleton.boneMapping) {
 			std::cout << "Bone name: " << pair.first << ", Index: " << pair.second << std::endl;
 		}
 
-		for (size_t i = 0; i < m_boneOffsetMatrices.size(); ++i) {
-			const aiMatrix4x4& mat = m_boneOffsetMatrices[i];
+		for (size_t i = 0; i < m_skeleton.boneOffsetMatrices.size(); ++i) {
+			const aiMatrix4x4& mat = m_skeleton.boneOffsetMatrices[i];
 			std::cout << "Bone " << i << " offset matrix:\n";
 			for (int row = 0; row < 4; ++row) {
 				for (int col = 0; col < 4; ++col) {
@@ -157,13 +157,13 @@ void Mesh::fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, s
 		std::string boneName(mesh->mBones[i]->mName.C_Str());
 
 		int boneIndex = 0;
-		if (m_boneMapping.find(boneName) == m_boneMapping.end()) {
+		if (m_skeleton.boneMapping.find(boneName) == m_skeleton.boneMapping.end()) {
 			boneIndex = boneCount++;
-			m_boneMapping[boneName] = boneIndex;
-			m_boneOffsetMatrices.push_back(mesh->mBones[i]->mOffsetMatrix);
+			m_skeleton.boneMapping[boneName] = boneIndex;
+			m_skeleton.boneOffsetMatrices.push_back(mesh->mBones[i]->mOffsetMatrix);
 		}
 		else {
-			boneIndex = m_boneMapping[boneName];
+			boneIndex = m_skeleton.boneMapping[boneName];
 		}
 
 		// Assign bone weights to vertices
@@ -378,4 +378,9 @@ bool Mesh::intersectsRay(const glm::vec3& rayOrigin, const glm::vec3& rayDir) co
 	}
 
 	return true;
+}
+
+const Skeleton& Mesh::GetSkeleton() const
+{
+	return m_skeleton;
 }
