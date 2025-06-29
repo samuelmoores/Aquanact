@@ -1,6 +1,8 @@
 #pragma once
 #include <glm/ext.hpp>
 #include <string>
+#include <vector>
+
 class ShaderProgram {
 	uint32_t m_programId;
 
@@ -21,4 +23,5 @@ public:
 	void setUniform(const std::string& uniformName, const glm::mat2& value) const;
 	void setUniform(const std::string& uniformName, const glm::mat3& value) const;
 	void setUniform(const std::string& uniformName, const glm::mat4& value) const;
+	void setUniform(const std::string& uniformName, const std::vector<glm::mat4>& values) const;
 };

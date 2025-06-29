@@ -107,15 +107,13 @@ int main() {
 	settings.antialiasingLevel = 2;  // Request 2 levels of antialiasing
 	settings.majorVersion = 3;
 	settings.minorVersion = 3;
-	sf::Window window(sf::VideoMode{ 1200, 800 }, "Modern OpenGL", sf::Style::Resize | sf::Style::Close, settings);
+	sf::Window window(sf::VideoMode{ 1280, 720 }, "Modern OpenGL", sf::Style::Resize | sf::Style::Close, settings);
 	sf::Clock c;
 	gladLoadGL();
 	Renderer renderer;
 	Camera camera(window);
 	Axis axis(10.0f);
 	axis.UpdateProjection(camera.GetProjectionMatrix());
-	Line line;
-	ShaderProgram lineShader;
 	std::vector<Object3D> sceneObjects;
 	Object3D* selectedObject = nullptr;
 	sf::Vector2i mouseLast = sf::Mouse::getPosition();
@@ -123,10 +121,15 @@ int main() {
 	sceneObjects.push_back(Object3D("models/Xzibit.fbx", "models/Xzibit.png"));
 	sceneObjects.push_back(Object3D(cubeVertices, cubeFaces));
 	sceneObjects[0].SetScale(glm::vec3(0.01f, 0.01f, 0.01f));
-	sceneObjects[1].Move(glm::vec3(2, 0.5f, 2));
+	sceneObjects[1].Move(glm::vec3(0, -0.5f, 0));
+	sceneObjects[1].Scale(glm::vec3(20, 20, 20));
 
-	Animation XzibitIdle("models/Idle.fbx", *sceneObjects[0].GetMesh());
+	Animation XzibitIdle("models/Idle.fbx");
 	Animator XzibitAnimator(&XzibitIdle);
+	int index = 0;
+	sceneObjects[0].GetShader()->activate();
+	sceneObjects[0].GetShader()->setUniform("bone", index);
+
 
 	auto last = c.getElapsedTime();
 	glEnable(GL_DEPTH_TEST);
@@ -152,7 +155,6 @@ int main() {
 					{
 						sceneObjects[i].updateMeshAABB();
 						glm::vec3 rayDirection = CastRayFromMouse(window, camera.GetViewMatrix(), camera.GetProjectionMatrix());
-						line = Line(1000.0f, camera.GetPosition(), rayDirection);
 
 						if (sceneObjects[i].intersectsRayMesh(camera.GetPosition(), rayDirection))
 						{
@@ -166,14 +168,21 @@ int main() {
 					}
 
 				}
+				else if(ev.mouseButton.button == sf::Mouse::Middle)
+				{
+					sceneObjects[0].GetShader()->activate();
+					sceneObjects[0].GetShader()->setUniform("bone", index++ % 52);
+				}
 			}
+
+
 		}
 
 		auto now = c.getElapsedTime();
 		auto diff = now - last;
 		last = now;
 
-		//std::cout << 1 / diff.asSeconds() << " FPS " << std::endl;
+		std::cout << 1 / diff.asSeconds() << " FPS " << std::endl;
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		camera.CameraControl(mouseLast, diff);

@@ -1,10 +1,12 @@
-#version 330 
+#version 330 core
 layout (location=0) out vec4 FragColor;
 
 in vec3 FragWorldPos;
 in vec3 Normal;
 in vec2 TexCoord;
 in mat3 TBN;
+flat in ivec4 BoneIDs;
+in vec4 Weights;
 
 uniform sampler2D baseTexture;
 uniform sampler2D normalMap;
@@ -14,13 +16,26 @@ uniform vec3 ambientColor;
 uniform vec3 directionalLight;
 uniform vec3 directionalColor;
 uniform vec3 viewPos;
+uniform int bone;
 
 void main()
 {
-	//vec3 sampledNormal = texture(normalMap, TexCoord).rgb;
-	//sampledNormal = normalize(sampledNormal * 2.0 - 1.0);
+	bool found = false;
 
-	//vec3 norm = normalize(TBN * sampledNormal);
+	for(int i = 0; i < 4; i++)
+	{
+		if(BoneIDs[i] == bone)
+		{
+			FragColor = vec4(1.0, 1.0, 1.0, 0.0) * Weights[i];
+			found = true;
+			break;
+		}
+	}
+
+	if(!found)
+		FragColor = vec4(0.0, 0.0, 0.0, 0.0);
+
+	return;
 
 	vec3 norm = normalize(Normal);
 

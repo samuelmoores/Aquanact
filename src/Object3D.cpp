@@ -2,8 +2,8 @@
 
 Object3D::Object3D(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 {
-	//m_shader.load("shaders/texture_perspective.vert", "shaders/texturing.frag");
-	m_shader.load("shaders/phong.vert", "shaders/phong.frag");
+	m_shader.load("shaders/texture_perspective.vert", "shaders/texturing.frag");
+	//m_shader.load("shaders/phong.vert", "shaders/phong.frag");
 	m_shader.activate();
 	//  | Description      | Values: ambient,diffuse,specular,shin |
 	//	| ---------------- | ------------------------------------- |
@@ -13,10 +13,10 @@ Object3D::Object3D(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 	//	| Only diffuse     | `glm::vec4(0.0f, 1.0f, 0.0f, 1.0f)`   |
 	//	| Only specular    | `glm::vec4(0.0f, 0.0f, 1.0f, 64.0f)`  |
 	//                         
-	m_shader.setUniform("material", glm::vec4(1.0f, 0.5f, 0.9f, 228.0f));
-	m_shader.setUniform("ambientColor", glm::vec3(0.2f, 0.2f, 0.2f));
-	m_shader.setUniform("directionalColor", glm::vec3(1, 1, 1));
-	m_shader.setUniform("directionalLight", glm::vec3(0, -1, 0));
+	//m_shader.setUniform("material", glm::vec4(1.0f, 0.5f, 0.9f, 228.0f));
+	//m_shader.setUniform("ambientColor", glm::vec3(0.2f, 0.2f, 0.2f));
+	//m_shader.setUniform("directionalColor", glm::vec3(1, 1, 1));
+	//m_shader.setUniform("directionalLight", glm::vec3(0, -1, 0));
 
 	Mesh mesh(vertices, faces);
 	m_mesh = mesh;

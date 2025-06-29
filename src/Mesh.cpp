@@ -152,30 +152,58 @@ void Mesh::fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, s
 	//process bones
 	int boneCount = 0;
 
+	std::cout << mesh->mName.C_Str() << ": " << mesh->mNumBones << " bones | ";
+	std::cout << mesh->mNumVertices << " vertices\n";
+
 	for (size_t i{ 0 }; i < mesh->mNumBones; ++i)
 	{
 		std::string boneName(mesh->mBones[i]->mName.C_Str());
 
+		std::cout << "\tbone " << i << ": " << boneName << std::endl;
+
 		int boneIndex = 0;
-		if (m_skeleton.boneMapping.find(boneName) == m_skeleton.boneMapping.end()) {
+		if (m_skeleton.boneMapping.find(boneName) == m_skeleton.boneMapping.end()) 
+		{
 			boneIndex = boneCount++;
+			std::cout << "\t\tadding bone to skeleton...\n";
 			m_skeleton.boneMapping[boneName] = boneIndex;
+			std::cout << "\t\tskeleton bone mapping[" << boneName << "] = " << boneIndex << std::endl;
 			m_skeleton.boneOffsetMatrices.push_back(mesh->mBones[i]->mOffsetMatrix);
+			std::cout << "\t\toffset matrix added to skeleton\n";
 		}
-		else {
+		else 
+		{
+			std::cout << "\t\talready in mapping!\n";
+			std::cout << "\t\t" << boneIndex << " = skeleton bon mapping[" << boneName << "]\n";
 			boneIndex = m_skeleton.boneMapping[boneName];
 		}
 
 		// Assign bone weights to vertices
 		aiBone* bone = mesh->mBones[i];
+		std::cout << "\t\tparsing " << bone->mNumWeights << " weights for " << boneName << "...\n";
+
 		for (unsigned int j = 0; j < bone->mNumWeights; j++) 
 		{
 			unsigned int vertexID = bone->mWeights[j].mVertexId;
 			float weight = bone->mWeights[j].mWeight;
-
 			AddBoneData(vertices[vertexID], boneIndex, weight);
 		}
 	}
+
+	std::cout << "parsed all bones in mesh for " << vertices.size() << " vertices\n";
+
+	std::cout << "data for first 10 vertices\n";
+
+	for (int i = 0; i < 10; i++)
+	{
+		std::cout << "vertex " << i <<  " is influenced by bones...\n";
+		
+		for (int j = 0; j < 4; j++)
+		{
+			std::cout << "\t" << vertices[i].boneIDs[j] << " | weight: " << vertices[i].weights[j] << std::endl;
+		}
+	}
+
 }
 
 void Mesh::assimpLoad(const std::string& path, bool flipUvs) {
@@ -189,7 +217,8 @@ void Mesh::assimpLoad(const std::string& path, bool flipUvs) {
 		aiProcess_Triangulate |
 		aiProcess_GenSmoothNormals |
 		aiProcess_CalcTangentSpace |  // <-- This one is needed!
-		aiProcess_FlipUVs);
+		aiProcess_FlipUVs |
+		aiProcess_JoinIdenticalVertices);
 
 	// If the import failed, report it
 	if (nullptr == scene) {
@@ -199,6 +228,9 @@ void Mesh::assimpLoad(const std::string& path, bool flipUvs) {
 	else {
 		std::vector<Vertex3D> vertices;
 		std::vector<uint32_t> faces;
+		
+		std::cout << "scene " << scene->mName.C_Str() << ": " << scene->mNumMeshes << " meshes\n";
+		std::cout << "loading first mesh...\n";
 		fromAssimpMesh(scene->mMeshes[0], vertices, faces);
 		m_vertices = vertices;
 		m_faces = faces;
