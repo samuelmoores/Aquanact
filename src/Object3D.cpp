@@ -2,6 +2,9 @@
 
 Object3D::Object3D(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 {
+	m_skinned = false;
+	m_mesh = new Mesh(vertices, faces);
+
 	m_shader.load("shaders/texture_perspective.vert", "shaders/texturing.frag");
 	//m_shader.load("shaders/phong.vert", "shaders/phong.frag");
 	m_shader.activate();
@@ -18,18 +21,15 @@ Object3D::Object3D(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 	//m_shader.setUniform("directionalColor", glm::vec3(1, 1, 1));
 	//m_shader.setUniform("directionalLight", glm::vec3(0, -1, 0));
 
-	Mesh mesh(vertices, faces);
-	m_mesh = mesh;
-
 	m_position = glm::vec3(0);
 	m_rotation = glm::vec3(0);
 	m_scale = glm::vec3(1);
 }
 
-Object3D::Object3D(const char* modelFile, const char* textureFile)
+Object3D::Object3D(const char* modelFile, const char* textureFile, bool skinned)
 {
-	Mesh mesh(modelFile, textureFile);
-	m_mesh = mesh;
+	m_mesh = new Mesh(modelFile, textureFile);
+	m_skinned = skinned;
 
 	//  | Description      | Values: ambient,diffuse,specular,shin |
 	//	| ---------------- | ------------------------------------- |
@@ -54,8 +54,7 @@ Object3D::Object3D(const char* modelFile, const char* textureFile)
 
 Object3D::Object3D(const char* modelFile, const char* textureFile, const char* normalMap)
 {
-	Mesh mesh(modelFile, textureFile, normalMap);
-	m_mesh = mesh;
+	m_mesh = new Mesh(modelFile, textureFile, normalMap);
 
 	m_shader.load("shaders/phong.vert", "shaders/phong.frag");
 	m_shader.activate();
@@ -77,9 +76,13 @@ Object3D::Object3D(const char* modelFile, const char* textureFile, const char* n
 	m_scale = glm::vec3(1);
 }
 
+Object3D::~Object3D()
+{
+}
+
 Mesh* Object3D::GetMesh()
 {
-	return &m_mesh;
+	return m_mesh;
 }
 
 ShaderProgram* Object3D::GetShader()
@@ -120,10 +123,15 @@ void Object3D::SetScale(glm::vec3 scale)
 
 void Object3D::updateMeshAABB()
 {
-	m_mesh.updateAABB(m_position, m_scale);
+	m_mesh->updateAABB(m_position, m_scale);
 }
 
 bool Object3D::intersectsRayMesh(glm::vec3 origin, glm::vec3& direction)
 {
-	return m_mesh.intersectsRay(origin, direction);
+	return m_mesh->intersectsRay(origin, direction);
+}
+
+bool Object3D::skinned()
+{
+	return m_skinned;
 }

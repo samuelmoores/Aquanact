@@ -1,6 +1,5 @@
 #include <Mesh.h>
-#include <iostream>
-#include <glm/gtc/matrix_transform.hpp>
+
 
 const int VERTICES_PER_FACE = 3;
 
@@ -32,7 +31,7 @@ Mesh::Mesh(const char* modelFile, const char* textureFile)
 	//debug skeleton code
 	if (false)
 	{
-		for (int i = 0; i < 5; ++i) {
+		for (int i = 0; i < 100; ++i) {
 			const auto& v = m_vertices[i];
 			std::cout << "Vertex " << i << ": Pos(" << v.position.x << ", " << v.position.y << ", " << v.position.z << ")";
 			std::cout << " Bones: [" << v.boneIDs[0] << ", " << v.boneIDs[1] << ", " << v.boneIDs[2] << ", " << v.boneIDs[3] << "]";
@@ -88,122 +87,110 @@ Mesh::Mesh(const char* modelFile, const char* textureFile, const char* normalMap
 	SetNormalMap(normalMap);
 }
 
-void AddBoneData(Vertex3D& vertex, int boneID, float weight) {
-	for (int i = 0; i < 4; i++) {
-		if (vertex.weights[i] == 0.0f) {
+void AddBoneData(Vertex3D& vertex, int boneID, float weight) 
+{
+	for (int i = 0; i < 4; i++) 
+	{
+		if (vertex.weights[i] == 0.0f) 
+		{
 			vertex.boneIDs[i] = boneID;
 			vertex.weights[i] = weight;
 			return;
 		}
 	}
-	// If you get here, you exceeded 4 bones per vertex — consider normalizing or pruning
 }
 
-void Mesh::fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, std::vector<uint32_t>& faces) {
-	for (size_t i{ 0 }; i < mesh->mNumVertices; ++i) {
+void Mesh::ReadNodeHeirarchy(const aiNode* node, const aiMatrix4x4& ParentTransform)
+{
+	const std::string name = node->mName.C_Str();
+	
+	aiMatrix4x4 NodeTransformation(node->mTransformation);
+	aiMatrix4x4 GlobalTransform = ParentTransform * NodeTransformation;
+
+	if (m_skeleton.boneMapping.find(name) != m_skeleton.boneMapping.end())
+	{
+		int boneIndex = m_skeleton.boneMapping[name];
+		m_skeleton.finalTransformations[boneIndex] = (GlobalTransform * m_skeleton.boneOffsetMatrices[boneIndex]);
+	}
+
+	for (int i = 0; i < node->mNumChildren; i++)
+	{
+		ReadNodeHeirarchy(node->mChildren[i], GlobalTransform);
+	}
+}
+
+void Mesh::fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, std::vector<uint32_t>& faces)
+{
+	int numVertices = mesh->mNumVertices;
+	int numIndices = mesh->mNumFaces * 3;
+	int numBones = mesh->mNumBones;
+
+	//-------------------process vertices--------------------
+	for (size_t i{ 0 }; i < numVertices; ++i)
+	{
 		glm::vec3 position = { mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z };
 
 		glm::vec2 texCoord = glm::vec2(0.0f); // Default if no texcoords
 		if (mesh->mTextureCoords[0]) {
-			texCoord = {
-				mesh->mTextureCoords[0][i].x,
-				mesh->mTextureCoords[0][i].y
-			};
-		}
+		texCoord = {
+			mesh->mTextureCoords[0][i].x,
+			mesh->mTextureCoords[0][i].y
+		};
+	}
 
 		glm::vec3 normal = glm::vec3(0.0f);
 		if (mesh->HasNormals()) {
-			normal = {
-				mesh->mNormals[i].x,
-				mesh->mNormals[i].y,
-				mesh->mNormals[i].z
-			};
-		}
-
-		glm::vec3 tangent = glm::vec3(0.0f);
-		if (mesh->HasTangentsAndBitangents()) {
-			tangent = {
-				mesh->mTangents[i].x,
-				mesh->mTangents[i].y,
-				mesh->mTangents[i].z
-			};
-		}
-
-		glm::vec3 bitangent = glm::vec3(0.0f);
-		if (mesh->HasTangentsAndBitangents()) {
-			bitangent = {
-				mesh->mBitangents[i].x,
-				mesh->mBitangents[i].y,
-				mesh->mBitangents[i].z
-			};
-		}
-
-		vertices.push_back({ position, texCoord, normal, tangent, bitangent });
+		normal = {
+			mesh->mNormals[i].x,
+			mesh->mNormals[i].y,
+			mesh->mNormals[i].z
+		};
 	}
 
+		vertices.push_back({ position, texCoord, normal });
+	}
+	
+	//-------------process faces---------------------------
 	faces.reserve(mesh->mNumFaces * VERTICES_PER_FACE);
-	for (size_t i{ 0 }; i < mesh->mNumFaces; ++i) {
+	for (size_t i{ 0 }; i < mesh->mNumFaces; ++i) 
+	{
 		// We assume the faces are triangular, so we push three face indexes at a time into our faces list.
 		faces.push_back(mesh->mFaces[i].mIndices[0]);
 		faces.push_back(mesh->mFaces[i].mIndices[1]);
 		faces.push_back(mesh->mFaces[i].mIndices[2]);
 	}
 
-	//process bones
-	int boneCount = 0;
-
-	std::cout << mesh->mName.C_Str() << ": " << mesh->mNumBones << " bones | ";
-	std::cout << mesh->mNumVertices << " vertices\n";
-
-	for (size_t i{ 0 }; i < mesh->mNumBones; ++i)
+	//-------------process bones-------------------
+	int boneID = 0;
+	std::map<std::string, int> boneMap = m_skeleton.boneMapping;
+	for (int j = 0; j < numBones; j++)
 	{
-		std::string boneName(mesh->mBones[i]->mName.C_Str());
+		aiBone* bone = mesh->mBones[j];
+		std::string boneName = bone->mName.C_Str();
+		m_skeleton.boneOffsetMatrices.resize(numBones);
 
-		std::cout << "\tbone " << i << ": " << boneName << std::endl;
-
-		int boneIndex = 0;
-		if (m_skeleton.boneMapping.find(boneName) == m_skeleton.boneMapping.end()) 
+		if (boneMap.find(boneName) == boneMap.end())
 		{
-			boneIndex = boneCount++;
-			std::cout << "\t\tadding bone to skeleton...\n";
-			m_skeleton.boneMapping[boneName] = boneIndex;
-			std::cout << "\t\tskeleton bone mapping[" << boneName << "] = " << boneIndex << std::endl;
-			m_skeleton.boneOffsetMatrices.push_back(mesh->mBones[i]->mOffsetMatrix);
-			std::cout << "\t\toffset matrix added to skeleton\n";
+			boneID = boneMap.size();
+			boneMap[boneName] = boneID;
+			m_skeleton.boneOffsetMatrices[boneID] = bone->mOffsetMatrix;
 		}
-		else 
+		else
 		{
-			std::cout << "\t\talready in mapping!\n";
-			std::cout << "\t\t" << boneIndex << " = skeleton bon mapping[" << boneName << "]\n";
-			boneIndex = m_skeleton.boneMapping[boneName];
+			boneID = boneMap[boneName];
 		}
 
-		// Assign bone weights to vertices
-		aiBone* bone = mesh->mBones[i];
-		std::cout << "\t\tparsing " << bone->mNumWeights << " weights for " << boneName << "...\n";
+		const aiMatrix4x4& mat = m_skeleton.boneOffsetMatrices[boneID];
 
-		for (unsigned int j = 0; j < bone->mNumWeights; j++) 
+		for (int k = 0; k < bone->mNumWeights; k++)
 		{
-			unsigned int vertexID = bone->mWeights[j].mVertexId;
-			float weight = bone->mWeights[j].mWeight;
-			AddBoneData(vertices[vertexID], boneIndex, weight);
+			const aiVertexWeight& vw = bone->mWeights[k];
+			float weight = vw.mWeight;
+			int globalVertexID = vw.mVertexId;
+			AddBoneData(vertices[globalVertexID], boneID, weight);
 		}
 	}
-
-	std::cout << "parsed all bones in mesh for " << vertices.size() << " vertices\n";
-
-	std::cout << "data for first 10 vertices\n";
-
-	for (int i = 0; i < 10; i++)
-	{
-		std::cout << "vertex " << i <<  " is influenced by bones...\n";
-		
-		for (int j = 0; j < 4; j++)
-		{
-			std::cout << "\t" << vertices[i].boneIDs[j] << " | weight: " << vertices[i].weights[j] << std::endl;
-		}
-	}
-
+	m_skeleton.boneMapping = boneMap;
 }
 
 void Mesh::assimpLoad(const std::string& path, bool flipUvs) {
@@ -212,26 +199,26 @@ void Mesh::assimpLoad(const std::string& path, bool flipUvs) {
 		flags |= aiProcess_FlipUVs;
 	}
 
-	Assimp::Importer importer;
-	const aiScene* scene = importer.ReadFile(path,
-		aiProcess_Triangulate |
-		aiProcess_GenSmoothNormals |
-		aiProcess_CalcTangentSpace |  // <-- This one is needed!
-		aiProcess_FlipUVs |
-		aiProcess_JoinIdenticalVertices);
+	m_scene = m_importer.ReadFile(path, flags | aiProcess_Triangulate | aiProcess_JoinIdenticalVertices);
 
 	// If the import failed, report it
-	if (nullptr == scene) {
-		std::cout << "ASSIMP ERROR: " << importer.GetErrorString() << std::endl;
+	if (nullptr == m_scene) 
+	{
+		std::cout << "ASSIMP ERROR: " << m_importer.GetErrorString() << std::endl;
 		exit(1);
 	}
 	else {
 		std::vector<Vertex3D> vertices;
 		std::vector<uint32_t> faces;
-		
-		std::cout << "scene " << scene->mName.C_Str() << ": " << scene->mNumMeshes << " meshes\n";
-		std::cout << "loading first mesh...\n";
-		fromAssimpMesh(scene->mMeshes[0], vertices, faces);
+
+		//process vertices, faces and bones
+		fromAssimpMesh(m_scene->mMeshes[0], vertices, faces);
+
+		m_skeleton.finalTransformations.resize(m_skeleton.boneOffsetMatrices.size());
+
+		aiMatrix4x4 m = aiMatrix4x4();
+		ReadNodeHeirarchy(m_scene->mRootNode, m);
+
 		m_vertices = vertices;
 		m_faces = faces;
 	}
@@ -257,26 +244,20 @@ void Mesh::SetBuffers()
 	glBufferData(GL_ARRAY_BUFFER, m_vertices.size() * sizeof(Vertex3D), &m_vertices[0], GL_STATIC_DRAW);
 
 	// Use offsetof to get exact offsets instead of hardcoding them
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex3D), (void*)offsetof(Vertex3D, position));
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex3D), 0);
 	glEnableVertexAttribArray(0);
 
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex3D), (void*)offsetof(Vertex3D, texCoord));
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex3D), (void*)12);
 	glEnableVertexAttribArray(1);
 
-	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex3D), (void*)offsetof(Vertex3D, normal));
+	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex3D), (void*)20);
 	glEnableVertexAttribArray(2);
 
-	glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex3D), (void*)offsetof(Vertex3D, tangent));
-	glEnableVertexAttribArray(3);
+	glVertexAttribIPointer(3, 4, GL_INT, sizeof(Vertex3D), (void*)32);
+	glEnableVertexAttribArray(3); // boneIDs
 
-	glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex3D), (void*)offsetof(Vertex3D, bitangent));
-	glEnableVertexAttribArray(4);
-
-	glEnableVertexAttribArray(5); // boneIDs
-	glVertexAttribIPointer(5, 4, GL_INT, sizeof(Vertex3D), (void*)56);
-
-	glEnableVertexAttribArray(6); // weights
-	glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex3D), (void*)72);
+	glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex3D), (void*)48);
+	glEnableVertexAttribArray(4); // weights
 
 
 	// Generate a second buffer, to store the indices of each triangle in the mesh.

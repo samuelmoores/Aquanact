@@ -1,4 +1,5 @@
 #pragma once
+#include <iostream>
 #include <vector>
 #include <glad/glad.h>
 #include <StbImage.h>
@@ -7,13 +8,12 @@
 #include <assimp/Importer.hpp> 
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include <glm/gtc/matrix_transform.hpp>
 
 struct Vertex3D {
 	glm::vec3 position;   // offset 0  (3 floats)
 	glm::vec2 texCoord;   // offset 12 (2 floats)
 	glm::vec3 normal;     // offset 20 (3 floats)
-	glm::vec3 tangent;    // offset 32 (3 floats)
-	glm::vec3 bitangent;  // offset 44 (3 floats)
 
 	int boneIDs[4];         // 16 bytes (4 ints)
 	float weights[4];       // 16 bytes (4 floats)
@@ -22,6 +22,7 @@ struct Vertex3D {
 struct Skeleton {
 	std::map<std::string, int> boneMapping;
 	std::vector<aiMatrix4x4> boneOffsetMatrices;
+	std::vector<aiMatrix4x4> finalTransformations;
 };
 
 class Mesh {
@@ -41,6 +42,7 @@ class Mesh {
 		void updateAABB(glm::vec3 position, glm::vec3 scale);
 		bool intersectsRay(const glm::vec3& rayOrigin, const glm::vec3& rayDir) const;
 		const Skeleton& GetSkeleton() const;
+		void ReadNodeHeirarchy(const aiNode* node, const aiMatrix4x4& ParentTransform);
 	private:
 		std::vector<Vertex3D> m_vertices;
 		std::vector<uint32_t> m_faces;
@@ -52,4 +54,6 @@ class Mesh {
 		glm::vec3 m_meshMinBounds;
 		glm::vec3 m_meshMaxBounds;
 		Skeleton m_skeleton;
+		Assimp::Importer m_importer;
+		const aiScene* m_scene;
 };

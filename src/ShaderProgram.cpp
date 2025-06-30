@@ -145,12 +145,8 @@ void ShaderProgram::setUniform(const std::string& uniformName, const glm::mat4& 
 
 void ShaderProgram::setUniform(const std::string& uniformName, const std::vector<glm::mat4>& values) const
 {
-    GLint location = glGetUniformLocation(m_programId, uniformName.c_str());
-    if (location == -1) {
-        std::cerr << "Warning: uniform '" << uniformName << "' not found in shader.\n";
-        return;
-    }
-
-    glUniformMatrix4fv(location, static_cast<GLsizei>(values.size()), GL_FALSE, glm::value_ptr(values[0]));
+    GLint boneUniformLocation = glGetUniformLocation(m_programId, uniformName.c_str());
+    glUniformMatrix4fv(boneUniformLocation, values.size(), GL_FALSE, glm::value_ptr(values[0]));
 }
+
 

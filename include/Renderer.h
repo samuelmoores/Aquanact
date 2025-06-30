@@ -5,6 +5,7 @@ struct RenderCommand {
 	const Mesh* mesh;
 	const ShaderProgram* shader;
 	glm::mat4 modelMatrix;
+	bool isSkinned;
 };
 
 class Renderer {

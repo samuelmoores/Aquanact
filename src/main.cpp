@@ -118,18 +118,13 @@ int main() {
 	Object3D* selectedObject = nullptr;
 	sf::Vector2i mouseLast = sf::Mouse::getPosition();
 	
-	sceneObjects.push_back(Object3D("models/Xzibit.fbx", "models/Xzibit.png"));
+	sceneObjects.push_back(Object3D("models/TestDummy.fbx", "models/TestDummy_Diffuse.png", true));
 	sceneObjects.push_back(Object3D(cubeVertices, cubeFaces));
-	sceneObjects[0].SetScale(glm::vec3(0.01f, 0.01f, 0.01f));
-	sceneObjects[1].Move(glm::vec3(0, -0.5f, 0));
-	sceneObjects[1].Scale(glm::vec3(20, 20, 20));
+	sceneObjects[1].Move(glm::vec3(-2, 0, -3));
 
-	Animation XzibitIdle("models/Idle.fbx");
-	Animator XzibitAnimator(&XzibitIdle);
 	int index = 0;
 	sceneObjects[0].GetShader()->activate();
 	sceneObjects[0].GetShader()->setUniform("bone", index);
-
 
 	auto last = c.getElapsedTime();
 	glEnable(GL_DEPTH_TEST);
@@ -158,7 +153,7 @@ int main() {
 
 						if (sceneObjects[i].intersectsRayMesh(camera.GetPosition(), rayDirection))
 						{
-							selectedObject = &sceneObjects[i];
+							//selectedObject = &sceneObjects[i];
 							break;
 						}
 						else
@@ -171,7 +166,8 @@ int main() {
 				else if(ev.mouseButton.button == sf::Mouse::Middle)
 				{
 					sceneObjects[0].GetShader()->activate();
-					sceneObjects[0].GetShader()->setUniform("bone", index++ % 52);
+					std::cout << "bone " << index << " selected\n";
+					sceneObjects[0].GetShader()->setUniform("bone", ++index % 52);
 				}
 			}
 
@@ -182,13 +178,11 @@ int main() {
 		auto diff = now - last;
 		last = now;
 
-		std::cout << 1 / diff.asSeconds() << " FPS " << std::endl;
+		//std::cout << 1 / diff.asSeconds() << " FPS " << std::endl;
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		camera.CameraControl(mouseLast, diff);
 		axis.draw(camera.GetViewMatrix());
-
-		XzibitAnimator.Update(diff.asSeconds());
 
 		if (selectedObject != nullptr)
 		{
@@ -201,6 +195,7 @@ int main() {
 			rc.mesh = sceneObjects[i].GetMesh();
 			rc.shader = sceneObjects[i].GetShader();
 			rc.modelMatrix = sceneObjects[i].BuildModelMatrix();
+			rc.isSkinned = sceneObjects[i].skinned();
 			renderer.Submit(rc);
 		}
 		renderer.Flush(camera);

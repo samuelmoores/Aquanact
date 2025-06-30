@@ -2,6 +2,8 @@
 #include <glm/ext.hpp>
 #include <string>
 #include <vector>
+#include <assimp/matrix4x4.h>
+
 
 class ShaderProgram {
 	uint32_t m_programId;

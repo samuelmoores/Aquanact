@@ -6,8 +6,9 @@
 class Object3D {
 public:
 	Object3D(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces);
-	Object3D(const char* modelFile, const char* textureFile);
+	Object3D(const char* modelFile, const char* textureFile, bool skinned);
 	Object3D(const char* modelFile, const char* textureFile, const char* normalMap);
+	~Object3D();
 	Mesh* GetMesh();
 	ShaderProgram* GetShader();
 	glm::mat4 BuildModelMatrix();
@@ -17,10 +18,12 @@ public:
 	void SetScale(glm::vec3 scale);
 	void updateMeshAABB();
 	bool intersectsRayMesh(glm::vec3 origin, glm::vec3& direction);
+	bool skinned();
 private:
-	Mesh m_mesh;
+	Mesh* m_mesh;
 	ShaderProgram m_shader;
 	glm::vec3 m_position;
 	glm::vec3 m_rotation;
 	glm::vec3 m_scale;
+	bool m_skinned;
 };
