@@ -1,5 +1,5 @@
-#include <Mesh.h>
-
+﻿#include <Mesh.h>
+#include <iomanip>
 
 const int VERTICES_PER_FACE = 3;
 
@@ -98,6 +98,35 @@ void AddBoneData(Vertex3D& vertex, int boneID, float weight)
 			return;
 		}
 	}
+}
+
+void printMatrix(const aiMatrix4x4& m) {
+	// Set precision and fixed notation
+	std::cout << std::fixed << std::setprecision(3);
+
+	// Print each row with proper alignment
+	// Width of 9 accommodates sign, digits, decimal point, and precision
+	std::cout << "[ "
+		<< std::setw(9) << m.a1 << " "
+		<< std::setw(9) << m.a2 << " "
+		<< std::setw(9) << m.a3 << " "
+		<< std::setw(9) << m.a4 << " ]\n";
+	std::cout << "[ "
+		<< std::setw(9) << m.b1 << " "
+		<< std::setw(9) << m.b2 << " "
+		<< std::setw(9) << m.b3 << " "
+		<< std::setw(9) << m.b4 << " ]\n";
+	std::cout << "[ "
+		<< std::setw(9) << m.c1 << " "
+		<< std::setw(9) << m.c2 << " "
+		<< std::setw(9) << m.c3 << " "
+		<< std::setw(9) << m.c4 << " ]\n";
+	std::cout << "[ "
+		<< std::setw(9) << m.d1 << " "
+		<< std::setw(9) << m.d2 << " "
+		<< std::setw(9) << m.d3 << " "
+		<< std::setw(9) << m.d4 << " ]\n";
+	std::cout << "----------------------------------------------\n";
 }
 
 void Mesh::ReadNodeHeirarchy(const aiNode* node, const aiMatrix4x4& ParentTransform)
