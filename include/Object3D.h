@@ -23,6 +23,8 @@ public:
 	bool skinned();
 
 	//primitives
+
+	//cube
 	static inline std::vector<Vertex3D> cubeVertices = {
 		// back face (z = -0.5)
 		{ {  0.5f,  0.5f, -0.5f }, { 1.0f, 1.0f }, { 0.0f,  0.0f, -1.0f }, {}, {} },
@@ -85,6 +87,8 @@ public:
 		20,21,22,
 		20,22,23
 	};
+
+	//line
 
 private:
 	Mesh* m_mesh;

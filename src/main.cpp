@@ -42,17 +42,24 @@ int main() {
 	// Initialize the window and OpenGL.
 	sf::ContextSettings settings;
 	settings.depthBits = 24; // Request a 24 bits depth buffer
+	/*
 	settings.stencilBits = 8;  // Request a 8 bits stencil buffer
 	settings.antialiasingLevel = 2;  // Request 2 levels of antialiasing
 	settings.majorVersion = 3;
 	settings.minorVersion = 3;
+	*/
+
+	//create window AND OpenGL context
 	sf::Window window(sf::VideoMode{ 1280, 720 }, "Modern OpenGL", sf::Style::Resize | sf::Style::Close, settings);
-	sf::Clock c;
+
+	//load OpenGL context
 	gladLoadGL();
+
 	Renderer renderer;
 	Camera camera(window);
 	Axis axis(10.0f);
 	axis.UpdateProjection(camera.GetProjectionMatrix());
+
 	std::vector<Object3D> sceneObjects;
 	Object3D* selectedObject = nullptr;
 	sf::Vector2i mouseLast = sf::Mouse::getPosition();
@@ -65,6 +72,7 @@ int main() {
 	sceneObjects[0].GetShader()->activate();
 	sceneObjects[0].GetShader()->setUniform("bone", index);
 
+	sf::Clock c;
 	auto last = c.getElapsedTime();
 	glEnable(GL_DEPTH_TEST);
 	while (window.isOpen()) {

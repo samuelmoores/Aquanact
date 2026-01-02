@@ -274,13 +274,13 @@ void Mesh::SetBuffers()
 
 	// Use offsetof to get exact offsets instead of hardcoding them
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex3D), 0);
-	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(0); // position
 
 	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex3D), (void*)12);
-	glEnableVertexAttribArray(1);
+	glEnableVertexAttribArray(1); // text coords
 
 	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex3D), (void*)20);
-	glEnableVertexAttribArray(2);
+	glEnableVertexAttribArray(2); // normal
 
 	glVertexAttribIPointer(3, 4, GL_INT, sizeof(Vertex3D), (void*)32);
 	glEnableVertexAttribArray(3); // boneIDs
