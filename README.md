@@ -1,3 +1,3 @@
-# SFML Template
+# Aquanact Engine
 
-Please see Homework 0 on Canvas for an overview of this template.
+Navigate the 3D world by holding right click while scrolling mouse and using WASD to move around
