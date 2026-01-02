@@ -8,68 +8,7 @@
 #include <Object3D.h>
 #include <Animator.h>
 
-std::vector<Vertex3D> cubeVertices = {
-	// back face (z = -0.5)
-	{ {  0.5f,  0.5f, -0.5f }, { 1.0f, 1.0f }, { 0.0f,  0.0f, -1.0f }, {}, {} },
-	{ { -0.5f,  0.5f, -0.5f }, { 0.0f, 1.0f }, { 0.0f,  0.0f, -1.0f }, {}, {} },
-	{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f }, { 0.0f,  0.0f, -1.0f }, {}, {} },
-	{ {  0.5f, -0.5f, -0.5f }, { 1.0f, 0.0f }, { 0.0f,  0.0f, -1.0f }, {}, {} },
 
-	// front face (z = +0.5)
-	{ {  0.5f,  0.5f,  0.5f }, { 1.0f, 1.0f }, { 0.0f,  0.0f, 1.0f }, {}, {} },
-	{ { -0.5f,  0.5f,  0.5f }, { 0.0f, 1.0f }, { 0.0f,  0.0f, 1.0f }, {}, {} },
-	{ { -0.5f, -0.5f,  0.5f }, { 0.0f, 0.0f }, { 0.0f,  0.0f, 1.0f }, {}, {} },
-	{ {  0.5f, -0.5f,  0.5f }, { 1.0f, 0.0f }, { 0.0f,  0.0f, 1.0f }, {}, {} },
-
-	// left face (x = -0.5)
-	{ { -0.5f,  0.5f,  0.5f }, { 1.0f, 1.0f }, { -1.0f,  0.0f, 0.0f }, {}, {} },
-	{ { -0.5f,  0.5f, -0.5f }, { 0.0f, 1.0f }, { -1.0f,  0.0f, 0.0f }, {}, {} },
-	{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f }, { -1.0f,  0.0f, 0.0f }, {}, {} },
-	{ { -0.5f, -0.5f,  0.5f }, { 1.0f, 0.0f }, { -1.0f,  0.0f, 0.0f }, {}, {} },
-
-	// right face (x = +0.5)
-	{ { 0.5f,  0.5f, -0.5f }, { 1.0f, 1.0f }, { 1.0f,  0.0f, 0.0f }, {}, {} },
-	{ { 0.5f,  0.5f,  0.5f }, { 0.0f, 1.0f }, { 1.0f,  0.0f, 0.0f }, {}, {} },
-	{ { 0.5f, -0.5f,  0.5f }, { 0.0f, 0.0f }, { 1.0f,  0.0f, 0.0f }, {}, {} },
-	{ { 0.5f, -0.5f, -0.5f }, { 1.0f, 0.0f }, { 1.0f,  0.0f, 0.0f }, {}, {} },
-
-	// bottom face (y = -0.5)
-	{ {  0.5f, -0.5f, -0.5f }, { 1.0f, 1.0f }, { 0.0f, -1.0f, 0.0f }, {}, {} },
-	{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f }, { 0.0f, -1.0f, 0.0f }, {}, {} },
-	{ { -0.5f, -0.5f,  0.5f }, { 0.0f, 0.0f }, { 0.0f, -1.0f, 0.0f }, {}, {} },
-	{ {  0.5f, -0.5f,  0.5f }, { 1.0f, 0.0f }, { 0.0f, -1.0f, 0.0f }, {}, {} },
-
-	// top face (y = +0.5)
-	{ {  0.5f,  0.5f,  0.5f }, { 1.0f, 1.0f }, { 0.0f,  1.0f, 0.0f }, {}, {} },
-	{ { -0.5f,  0.5f,  0.5f }, { 0.0f, 1.0f }, { 0.0f,  1.0f, 0.0f }, {}, {} },
-	{ { -0.5f,  0.5f, -0.5f }, { 0.0f, 0.0f }, { 0.0f,  1.0f, 0.0f }, {}, {} },
-	{ {  0.5f,  0.5f, -0.5f }, { 1.0f, 0.0f }, { 0.0f,  1.0f, 0.0f }, {}, {} },
-};
-std::vector<uint32_t> cubeFaces = {
-	// back face
-	0, 1, 2,
-	0, 2, 3,
-
-	// front face
-	4, 5, 6,
-	4, 6, 7,
-
-	// left face
-	8, 9,10,
-	8,10,11,
-
-	// right face
-	12,13,14,
-	12,14,15,
-
-	// bottom face
-	16,17,18,
-	16,18,19,
-
-	// top face
-	20,21,22,
-	20,22,23
-};
 
 glm::vec3 CastRayFromMouse(sf::Window& window, const glm::mat4& view, const glm::mat4& projection)
 {
@@ -119,7 +58,7 @@ int main() {
 	sf::Vector2i mouseLast = sf::Mouse::getPosition();
 	
 	sceneObjects.push_back(Object3D("models/TestDummy.fbx", "models/TestDummy_Diffuse.png", true));
-	sceneObjects.push_back(Object3D(cubeVertices, cubeFaces));
+	sceneObjects.push_back(Object3D(Object3D::cubeVertices, Object3D::cubeFaces));
 	sceneObjects[1].Move(glm::vec3(-2, 0, -3));
 
 	int index = 0;
