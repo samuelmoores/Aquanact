@@ -1,5 +1,6 @@
 #include "Object3D.h"
 
+
 Object3D::Object3D(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 {
 	m_skinned = false;

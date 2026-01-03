@@ -1,5 +1,6 @@
 ﻿#include <Mesh.h>
 #include <iomanip>
+#include <glad/glad.h>
 
 const int VERTICES_PER_FACE = 3;
 

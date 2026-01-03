@@ -4,6 +4,7 @@
   "builtin-baseline": "4bee3f5aae7aefbc129ca81c33d6a062b02fcf3b",
   "dependencies": [
     "sfml",
+    "glfw3",
     "assimp",
     "glm",
     "glad"

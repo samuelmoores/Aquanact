@@ -1,6 +1,5 @@
 #pragma once
 #include <vector>
-#include <glad/glad.h>
 #include <ShaderProgram.h>
 
 struct LineVertex3D {

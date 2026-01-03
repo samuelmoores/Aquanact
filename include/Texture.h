@@ -4,6 +4,7 @@
 #include <filesystem>
 #include "StbImage.h"
 
+
 /**
  * @brief Represents a texture that has been loaded into VRAM, and is expected to be bound
  * to a sampler2D with a given sampler name in the fragment shader.

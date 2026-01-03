@@ -1,4 +1,6 @@
 #include "Axis.h"
+#include <glad/glad.h>
+
 
 Axis::Axis(float axisLength) :m_vao(-1), m_vbo(-1)
 {

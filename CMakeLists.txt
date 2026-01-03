@@ -13,13 +13,16 @@ endif()
 project ("AquanactEngine")
 
 add_executable (AquanactEngine "src/main.cpp" "include/ShaderProgram.h" "src/ShaderProgram.cpp" "include/StbImage.h" "src/StbImage.cpp" "include/Mesh.h" "src/Mesh.cpp"
-"include/Camera.h" "src/Camera.cpp" "include/Renderer.h" "src/Renderer.cpp" "include/Object3D.h" "src/Object3D.cpp" "include/Axis.h" "src/Axis.cpp" "include/Texture.h" "include/Line.h" "src/Line.cpp" "include/Animation.h" "src/Animation.cpp" "include/Animator.h" "src/Animator.cpp")
+"include/Camera.h" "src/Camera.cpp" "include/Renderer.h" "src/Renderer.cpp" "include/Object3D.h" "src/Object3D.cpp" "include/Axis.h" "src/Axis.cpp" "include/Texture.h" "include/Line.h" "src/Line.cpp" "include/Animation.h" "src/Animation.cpp" "include/Animator.h" "src/Animator.cpp" "include/Window.h")
 
 
 # Find and link external libraries, like SFML.
 # This only works if Vcpkg has been configured correctly.
 find_package(SFML COMPONENTS system window graphics CONFIG REQUIRED)
 target_link_libraries(AquanactEngine PRIVATE sfml-system sfml-network sfml-graphics sfml-window)
+
+find_package(glfw3 CONFIG REQUIRED)
+target_link_libraries(AquanactEngine PRIVATE glfw)
 
 find_package(assimp CONFIG REQUIRED)
 target_link_libraries(AquanactEngine PRIVATE assimp::assimp)

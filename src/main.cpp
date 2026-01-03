@@ -1,5 +1,5 @@
 ﻿#include <iostream>
-#include <SFML/Graphics.hpp>
+#include <glad/glad.h>
 #include <Axis.h>
 #include <Line.h>
 #include <Mesh.h>
@@ -7,6 +7,9 @@
 #include <Renderer.h>
 #include <Object3D.h>
 #include <Animator.h>
+#include <Window.h>
+
+
 
 glm::vec3 CastRayFromMouse(sf::Window& window, const glm::mat4& view, const glm::mat4& projection)
 {
@@ -36,18 +39,17 @@ glm::vec3 CastRayFromMouse(sf::Window& window, const glm::mat4& view, const glm:
 }
 
 
-int main() {
-	// create settings for openGL context and window.
+int main() 
+{
 	sf::ContextSettings settings;
+
+	// create settings for openGL context and window.
 	settings.depthBits = 24; // Request a 24 bits depth buffer
-	/*
 	settings.stencilBits = 8;  // Request a 8 bits stencil buffer
 	settings.antialiasingLevel = 2;  // Request 2 levels of antialiasing
 	settings.majorVersion = 3;
 	settings.minorVersion = 3;
-	*/
 
-	//create window AND OpenGL context
 	sf::Window window(sf::VideoMode{ 1280, 720 }, "Aquanact Engine", sf::Style::Resize | sf::Style::Close, settings);
 
 	//load OpenGL context

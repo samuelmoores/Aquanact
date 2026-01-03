@@ -1,4 +1,6 @@
 #include "Renderer.h"
+#include <glad/glad.h>
+
 
 void Renderer::Submit(const RenderCommand& command)
 {
