@@ -8,8 +8,6 @@
 #include <Object3D.h>
 #include <Animator.h>
 
-
-
 glm::vec3 CastRayFromMouse(sf::Window& window, const glm::mat4& view, const glm::mat4& projection)
 {
 	// Step 1: Get the mouse position relative to the window
@@ -39,7 +37,7 @@ glm::vec3 CastRayFromMouse(sf::Window& window, const glm::mat4& view, const glm:
 
 
 int main() {
-	// Initialize the window and OpenGL.
+	// create settings for openGL context and window.
 	sf::ContextSettings settings;
 	settings.depthBits = 24; // Request a 24 bits depth buffer
 	/*
@@ -50,16 +48,18 @@ int main() {
 	*/
 
 	//create window AND OpenGL context
-	sf::Window window(sf::VideoMode{ 1280, 720 }, "Modern OpenGL", sf::Style::Resize | sf::Style::Close, settings);
+	sf::Window window(sf::VideoMode{ 1280, 720 }, "Aquanact Engine", sf::Style::Resize | sf::Style::Close, settings);
 
 	//load OpenGL context
 	gladLoadGL();
 
+	// TODO: make global?
 	Renderer renderer;
 	Camera camera(window);
 	Axis axis(10.0f);
 	axis.UpdateProjection(camera.GetProjectionMatrix());
 
+	//******************** setting up the scene *************************
 	std::vector<Object3D> sceneObjects;
 	Object3D* selectedObject = nullptr;
 	sf::Vector2i mouseLast = sf::Mouse::getPosition();
@@ -71,14 +71,20 @@ int main() {
 	int index = 0;
 	sceneObjects[0].GetShader()->activate();
 	sceneObjects[0].GetShader()->setUniform("bone", index);
+	//******************** setting up the scene *************************
 
+	//Start Loop
 	sf::Clock c;
 	auto last = c.getElapsedTime();
 	glEnable(GL_DEPTH_TEST);
-	while (window.isOpen()) {
+	while (window.isOpen()) 
+	{
+		// ========================================= EVENTS ==========================================
 		sf::Event ev;
-		while (window.pollEvent(ev)) {
-			if (ev.type == sf::Event::Closed) {
+		while (window.pollEvent(ev)) 
+		{
+			if (ev.type == sf::Event::Closed) 
+			{
 				window.close();
 			}
 
@@ -108,7 +114,6 @@ int main() {
 							selectedObject = nullptr;
 						}
 					}
-
 				}
 				else if(ev.mouseButton.button == sf::Mouse::Middle)
 				{
@@ -117,16 +122,18 @@ int main() {
 					sceneObjects[0].GetShader()->setUniform("bone", ++index % 52);
 				}
 			}
-
-
 		}
+		// ========================================= EVENTS ==========================================
 
+		// ========================================= TICKS ==========================================
 		auto now = c.getElapsedTime();
 		auto diff = now - last;
 		last = now;
 
-		//std::cout << 1 / diff.asSeconds() << " FPS " << std::endl;
+		std::cout << 1 / diff.asSeconds() << " FPS " << std::endl;
+		// ========================================= TICKS ==========================================
 
+		// ========================================= DRAW ==========================================
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		camera.CameraControl(mouseLast, diff);
 		axis.draw(camera.GetViewMatrix());
@@ -148,6 +155,7 @@ int main() {
 		renderer.Flush(camera);
 		
 		window.display();
+		// ========================================= DRAW ==========================================
 	}
 
 	return 0;
