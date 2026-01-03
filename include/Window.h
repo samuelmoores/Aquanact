@@ -4,10 +4,17 @@
 class Window {
 public:
 	//Delete Copy constructor
-	Window();
+    Window(const Window&) = delete;
+    Window& operator=(const Window&) = delete;
+
+	static Window& Init() {
+		static Window instance;
+		return instance;
+	}
 
 	float getWidth();
 	float getHeight();
+    static GLFWwindow* Engine;
 private:
-
+	Window();
 };

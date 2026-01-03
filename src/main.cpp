@@ -1,7 +1,6 @@
 ﻿#include <iostream>
 #include <glad/glad.h>
 #include <Axis.h>
-#include <Line.h>
 #include <Mesh.h>
 #include <Camera.h>
 #include <Renderer.h>
@@ -41,6 +40,7 @@ glm::vec3 CastRayFromMouse(sf::Window& window, const glm::mat4& view, const glm:
 
 int main() 
 {
+	/*
 	sf::ContextSettings settings;
 
 	// create settings for openGL context and window.
@@ -51,15 +51,18 @@ int main()
 	settings.minorVersion = 3;
 
 	sf::Window window(sf::VideoMode{ 1280, 720 }, "Aquanact Engine", sf::Style::Resize | sf::Style::Close, settings);
+	*/
+
+	Window::Init();
 
 	//load OpenGL context
 	gladLoadGL();
 
 	// TODO: make global?
 	Renderer renderer;
-	Camera camera(window);
-	Axis axis(10.0f);
-	axis.UpdateProjection(camera.GetProjectionMatrix());
+	//Camera camera(window);
+	//Axis axis(10.0f);
+	//axis.UpdateProjection(camera.GetProjectionMatrix());
 
 	//******************** setting up the scene *************************
 	std::vector<Object3D> sceneObjects;
@@ -79,6 +82,22 @@ int main()
 	sf::Clock c;
 	auto last = c.getElapsedTime();
 	glEnable(GL_DEPTH_TEST);
+
+	while (!glfwWindowShouldClose(Window::Engine))
+	{
+		/* Render here */
+		glClear(GL_COLOR_BUFFER_BIT);
+
+		/* Swap front and back buffers */
+		glfwSwapBuffers(Window::Engine);
+
+		/* Poll for and process events */
+		glfwPollEvents();
+	}
+
+	glfwTerminate();
+
+	/*
 	while (window.isOpen()) 
 	{
 		// ========================================= EVENTS ==========================================
@@ -159,7 +178,7 @@ int main()
 		window.display();
 		// ========================================= DRAW ==========================================
 	}
-
+	*/
 	return 0;
 }
 
