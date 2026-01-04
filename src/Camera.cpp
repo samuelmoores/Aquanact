@@ -1,10 +1,13 @@
-#include "Camera.h"
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/ext/matrix_clip_space.hpp>
+#include "Engine.h"
 
-Camera::Camera(sf::Window& window) : m_window(window)
+Camera::Camera()
 {
-	m_projection_matrix = glm::perspective(glm::radians(45.0), static_cast<double>(window.getSize().x) / window.getSize().y, 0.1, 100.0);
+	int width, height;
+	glfwGetWindowSize(Engine::Window, &width, &height);
+
+	m_projection_matrix = glm::perspective(glm::radians(45.0), static_cast<double>(width) / height, 0.1, 100.0);
 
 	m_position = glm::vec3(5.0f, 2.0f, 5.0f);
 	m_front = glm::vec3(-1.0f, -0.5f, -1.0f);
@@ -15,7 +18,9 @@ Camera::Camera(sf::Window& window) : m_window(window)
 
 glm::mat4 Camera::GetProjectionMatrix()
 {
-	m_projection_matrix = glm::perspective(glm::radians(45.0), static_cast<double>(m_window.getSize().x) / m_window.getSize().y, 0.1, 100.0);
+	int width, height;
+	glfwGetWindowSize(Engine::Window, &width, &height);
+	m_projection_matrix = glm::perspective(glm::radians(45.0), static_cast<double>(width) / height, 0.1, 100.0);
 
 	return m_projection_matrix;
 }
@@ -35,10 +40,11 @@ glm::vec3 Camera::GetFacing()
 	return m_front;
 }
 
-void Camera::CameraControl(sf::Vector2i& mouseLast, sf::Time& diff)
+void Camera::CameraControl(glm::vec2 mouseLast, float& diff)
 {
-	sf::Vector2i mouseNow = sf::Mouse::getPosition();
-	sf::Vector2i mouseDiff = mouseNow - mouseLast;
+	/*
+	glm::vec2 mouseNow; //mouse pos
+	glm::vec2 mouseDiff = mouseNow - mouseLast;
 	float cameraSpeed = 3.0f * diff.asSeconds();
 
 	if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Right))
@@ -86,8 +92,10 @@ void Camera::CameraControl(sf::Vector2i& mouseLast, sf::Time& diff)
 		}
 	}
 
+
 	mouseLast = mouseNow;
 
+	*/
 	m_view_matrix = glm::lookAt(m_position, m_position + m_front, m_up);
 }
 

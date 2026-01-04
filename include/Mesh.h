@@ -1,9 +1,9 @@
 #pragma once
 #include <iostream>
+#include <map>
 #include <vector>
 #include <StbImage.h>
 #include <ShaderProgram.h>
-#include <Camera.h>
 #include <assimp/Importer.hpp> 
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>

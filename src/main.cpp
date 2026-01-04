@@ -1,73 +1,33 @@
 ﻿#include <iostream>
 #include <glad/glad.h>
 #include <Axis.h>
-#include <Mesh.h>
-#include <Camera.h>
-#include <Renderer.h>
 #include <Object3D.h>
 #include <Animator.h>
-#include <Window.h>
+#include <Engine.h>
 
-
-
-glm::vec3 CastRayFromMouse(sf::Window& window, const glm::mat4& view, const glm::mat4& projection)
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-	// Step 1: Get the mouse position relative to the window
-	sf::Vector2i mousePos = sf::Mouse::getPosition(window);
-	sf::Vector2u windowSize = window.getSize();
-
-	// Step 2: Convert to Normalized Device Coordinates (NDC)
-	float x = (2.0f * mousePos.x) / windowSize.x - 1.0f;
-	float y = 1.0f - (2.0f * mousePos.y) / windowSize.y; // Flip Y
-	float z = 1.0f; // Assume forward ray (into screen)
-
-	glm::vec3 rayNDC(x, y, z);
-
-	// Step 3: Convert NDC to clip space
-	glm::vec4 rayClip(rayNDC.x, rayNDC.y, -1.0f, 1.0f); // -1.0f for forward direction
-
-	// Step 4: Clip space to eye (camera/view) space
-	glm::vec4 rayEye = glm::inverse(projection) * rayClip;
-	rayEye = glm::vec4(rayEye.x, rayEye.y, -1.0f, 0.0f); // Set w = 0 for direction vector
-
-	// Step 5: Eye space to world space
-	glm::vec4 rayWorld = glm::inverse(view) * rayEye;
-	glm::vec3 rayDirection = glm::normalize(glm::vec3(rayWorld));
-
-	return rayDirection;
+	if (key == GLFW_KEY_E && action == GLFW_PRESS)
+		std::cout << "[E]\n";
 }
 
+void framebuffer_size_callback(GLFWwindow* window, int width, int height) 
+{
+	glfwGetWindowSize(window, &width, &height);
+	glViewport(0, 0, width, height);
+}
 
 int main() 
 {
-	/*
-	sf::ContextSettings settings;
-
-	// create settings for openGL context and window.
-	settings.depthBits = 24; // Request a 24 bits depth buffer
-	settings.stencilBits = 8;  // Request a 8 bits stencil buffer
-	settings.antialiasingLevel = 2;  // Request 2 levels of antialiasing
-	settings.majorVersion = 3;
-	settings.minorVersion = 3;
-
-	sf::Window window(sf::VideoMode{ 1280, 720 }, "Aquanact Engine", sf::Style::Resize | sf::Style::Close, settings);
-	*/
-
-	Window::Init();
+	Engine::Init();
 
 	//load OpenGL context
 	gladLoadGL();
 
-	// TODO: make global?
-	Renderer renderer;
-	//Camera camera(window);
-	//Axis axis(10.0f);
-	//axis.UpdateProjection(camera.GetProjectionMatrix());
-
 	//******************** setting up the scene *************************
+	Axis axis(10.0f);
 	std::vector<Object3D> sceneObjects;
 	Object3D* selectedObject = nullptr;
-	sf::Vector2i mouseLast = sf::Mouse::getPosition();
 	
 	sceneObjects.push_back(Object3D("models/TestDummy.fbx", "models/TestDummy_Diffuse.png", true));
 	sceneObjects.push_back(Object3D(Object3D::cubeVertices, Object3D::cubeFaces));
@@ -78,91 +38,20 @@ int main()
 	sceneObjects[0].GetShader()->setUniform("bone", index);
 	//******************** setting up the scene *************************
 
+	//keyboard events
+	glfwSetKeyCallback(Engine::Window, key_callback);
+
+	//window event
+	glfwSetFramebufferSizeCallback(Engine::Window, framebuffer_size_callback);
+
 	//Start Loop
-	sf::Clock c;
-	auto last = c.getElapsedTime();
 	glEnable(GL_DEPTH_TEST);
 
-	while (!glfwWindowShouldClose(Window::Engine))
+	while (!glfwWindowShouldClose(Engine::Window))
 	{
-		/* Render here */
-		glClear(GL_COLOR_BUFFER_BIT);
-
-		/* Swap front and back buffers */
-		glfwSwapBuffers(Window::Engine);
-
-		/* Poll for and process events */
-		glfwPollEvents();
-	}
-
-	glfwTerminate();
-
-	/*
-	while (window.isOpen()) 
-	{
-		// ========================================= EVENTS ==========================================
-		sf::Event ev;
-		while (window.pollEvent(ev)) 
-		{
-			if (ev.type == sf::Event::Closed) 
-			{
-				window.close();
-			}
-
-			if (ev.type == sf::Event::Resized)
-			{
-				float aspectRatio = static_cast<float>(window.getSize().x) / window.getSize().y;
-				glViewport(0, 0, window.getSize().x, window.getSize().y);
-				axis.UpdateProjection(camera.GetProjectionMatrix());
-			}
-
-			if (ev.type == sf::Event::MouseButtonPressed)
-			{
-				if (ev.mouseButton.button == sf::Mouse::Left)
-				{
-					for (int i = 0; i < sceneObjects.size(); i++)
-					{
-						sceneObjects[i].updateMeshAABB();
-						glm::vec3 rayDirection = CastRayFromMouse(window, camera.GetViewMatrix(), camera.GetProjectionMatrix());
-
-						if (sceneObjects[i].intersectsRayMesh(camera.GetPosition(), rayDirection))
-						{
-							//selectedObject = &sceneObjects[i];
-							break;
-						}
-						else
-						{
-							selectedObject = nullptr;
-						}
-					}
-				}
-				else if(ev.mouseButton.button == sf::Mouse::Middle)
-				{
-					sceneObjects[0].GetShader()->activate();
-					std::cout << "bone " << index << " selected\n";
-					sceneObjects[0].GetShader()->setUniform("bone", ++index % 52);
-				}
-			}
-		}
-		// ========================================= EVENTS ==========================================
-
-		// ========================================= TICKS ==========================================
-		auto now = c.getElapsedTime();
-		auto diff = now - last;
-		last = now;
-
-		std::cout << 1 / diff.asSeconds() << " FPS " << std::endl;
-		// ========================================= TICKS ==========================================
-
-		// ========================================= DRAW ==========================================
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		camera.CameraControl(mouseLast, diff);
-		axis.draw(camera.GetViewMatrix());
-
-		if (selectedObject != nullptr)
-		{
-			selectedObject->Rotate(glm::vec3(0, diff.asSeconds() / 4, 0));
-		}
+		axis.UpdateProjection(Engine::Camera->GetProjectionMatrix());
+		axis.draw(Engine::Camera->GetViewMatrix());
 
 		for (int i = 0; i < sceneObjects.size(); i++)
 		{
@@ -171,14 +60,19 @@ int main()
 			rc.shader = sceneObjects[i].GetShader();
 			rc.modelMatrix = sceneObjects[i].BuildModelMatrix();
 			rc.isSkinned = sceneObjects[i].skinned();
-			renderer.Submit(rc);
+			Engine::Renderer->Submit(rc);
 		}
-		renderer.Flush(camera);
-		
-		window.display();
-		// ========================================= DRAW ==========================================
+		Engine::Renderer->Flush(Engine::Camera);
+
+		/* Swap front and back buffers */
+		glfwSwapBuffers(Engine::Window);
+
+		/* Poll for and process events */
+		glfwPollEvents();
 	}
-	*/
+
+	glfwTerminate();
+
 	return 0;
 }
 

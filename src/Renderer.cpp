@@ -1,5 +1,4 @@
 #include "Renderer.h"
-#include <glad/glad.h>
 
 
 void Renderer::Submit(const RenderCommand& command)
@@ -17,16 +16,16 @@ glm::mat4 AiToGlm(const aiMatrix4x4& aiMat)
 	return result;
 }
 
-void Renderer::Flush(Camera camera)
+void Renderer::Flush(Camera* camera)
 {
 	for (int i = 0; i < commands.size(); i++)
 	{
 		commands[i].shader->activate();
 
 		commands[i].shader->setUniform("model", commands[i].modelMatrix);
-		commands[i].shader->setUniform("view", camera.GetViewMatrix());
-		commands[i].shader->setUniform("projection", camera.GetProjectionMatrix());
-		commands[i].shader->setUniform("viewPos", camera.GetPosition());
+		commands[i].shader->setUniform("view", camera->GetViewMatrix());
+		commands[i].shader->setUniform("projection", camera->GetProjectionMatrix());
+		commands[i].shader->setUniform("viewPos", camera->GetPosition());
 
 		//apply transforms
 		if (commands[i].isSkinned)

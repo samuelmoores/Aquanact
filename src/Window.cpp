@@ -11,6 +11,7 @@ Window::Window()
 
     /* Create a windowed mode window and its OpenGL context */
     Engine = glfwCreateWindow(1280, 720, "Aquanact Engine", NULL, NULL);
+
     if (!Engine)
     {
         glfwTerminate();

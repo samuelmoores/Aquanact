@@ -1,5 +1,7 @@
 #pragma once
+#include <glad/glad.h>
 #include "Mesh.h"
+#include "Camera.h"
 
 struct RenderCommand {
 	const Mesh* mesh;
@@ -11,7 +13,7 @@ struct RenderCommand {
 class Renderer {
 public:
 	void Submit(const RenderCommand& command);
-	void Flush(Camera camera);
+	void Flush(Camera* camera);
 
 private:
 	std::vector<RenderCommand> commands;

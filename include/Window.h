@@ -12,8 +12,6 @@ public:
 		return instance;
 	}
 
-	float getWidth();
-	float getHeight();
     static GLFWwindow* Engine;
 private:
 	Window();
