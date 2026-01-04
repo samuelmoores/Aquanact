@@ -20,8 +20,6 @@ Engine::Engine()
         throw std::runtime_error("Failed to create GLFW window");
     }
 
-    std::cout << "Window Created\n";
-
     /* Make the window's context current */
     glfwMakeContextCurrent(Window);
     
