@@ -7,16 +7,10 @@
 void AquanactLoop()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
 	Engine::UI->Loop();
 	Engine::Renderer->Loop();
-		
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-	/* Swap front and back buffers */
 	glfwSwapBuffers(Engine::Window->GLFW());
-
-	/* Poll for and process events */
 	glfwPollEvents();
 }
 
@@ -25,7 +19,6 @@ void Shutdown()
 	ImGui_ImplOpenGL3_Shutdown();
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
-
 	glfwTerminate();
 }
 

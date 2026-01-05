@@ -14,11 +14,16 @@ std::vector<Object3D> Level::Objects()
 void Level::Load()
 {
 	m_axis = Axis(10.0f);
-	objects.push_back(Object3D(Object3D::cubeVertices, Object3D::cubeFaces));
 }
 
 void Level::DrawAxis()
 {
 	m_axis.UpdateProjection(Engine::Camera->GetProjectionMatrix());
 	m_axis.draw(Engine::Camera->GetViewMatrix());
+}
+
+void Level::LoadObject(char filepath[])
+{
+	std::cout << "filepath: " << filepath << std::endl;
+	objects.push_back(Object3D(Object3D::cubeVertices, Object3D::cubeFaces));
 }

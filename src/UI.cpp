@@ -1,3 +1,4 @@
+#include <filesystem>
 #include <Engine.h>
 #include <UI.h>
 
@@ -16,11 +17,6 @@ UI::UI()
     ImGui_ImplOpenGL3_Init("#version 330");  // or your GLSL version
 }
 
-void UI::Import()
-{
-	std::cout << "Import\n";
-}
-
 void UI::Loop()
 {
 	// Start frame
@@ -28,37 +24,49 @@ void UI::Loop()
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
 
-	// Your UI code here
-	if (ImGui::BeginMainMenuBar()) {
-		if (ImGui::BeginMenu("File")) {
-			if (ImGui::MenuItem("Import")) {
-				Import();
-			}
-			if (ImGui::MenuItem("Open")) {
-				// Open function
-			}
-			if (ImGui::MenuItem("Save")) {
-				// Save function
-			}
-			ImGui::Separator();
-			if (ImGui::MenuItem("Quit")) {
-				glfwSetWindowShouldClose(Engine::Window->GLFW(), true);
-			}
-			ImGui::EndMenu();
-		}
+	
+    bool import = false;
 
-		if (ImGui::BeginMenu("Edit")) {
-			if (ImGui::MenuItem("Undo")) {
-				// Undo function
-			}
-			if (ImGui::MenuItem("Redo")) {
-				// Redo function
-			}
-			ImGui::EndMenu();
-		}
+    if (ImGui::BeginMainMenuBar()) 
+    {
+        if (ImGui::BeginMenu("Menu")) 
+        {
+            if (ImGui::MenuItem("Import"))
+                import = true;
+    
+            ImGui::EndMenu();
+        }
+        ImGui::EndMainMenuBar();
+    }
 
-		ImGui::EndMainMenuBar();
-	}
+    if (import)
+        ImGui::OpenPopup("Import");
+
+    static char inputBuffer[256] = "";
+
+    // Set the size before BeginPopupModal
+
+    // Maybe some other stuff here.
+    if (ImGui::BeginPopupModal("Import")) 
+    {
+        // Draw popup contents.
+        ImGui::Text("Enter text:");
+        ImGui::InputText("##input", inputBuffer, IM_ARRAYSIZE(inputBuffer));
+
+
+        if (ImGui::Button("Import"))
+        {
+            Engine::Level->LoadObject(inputBuffer);
+            ImGui::CloseCurrentPopup();
+        }
+
+        if (ImGui::Button("Cancel"))
+            ImGui::CloseCurrentPopup();
+
+
+        ImGui::EndPopup();
+    }
+
 
 	// Render
 	ImGui::Render();

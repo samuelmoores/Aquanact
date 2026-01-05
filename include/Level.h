@@ -9,6 +9,7 @@ public:
 	std::vector<Object3D> Objects();
 	void Load();
 	void DrawAxis();
+	void LoadObject(char filepath[]);
 
 private:
 	std::vector<Object3D> objects;
