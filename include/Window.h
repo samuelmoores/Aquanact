@@ -3,16 +3,9 @@
 
 class Window {
 public:
-	//Delete Copy constructor
-    Window(const Window&) = delete;
-    Window& operator=(const Window&) = delete;
-
-	static Window& Init() {
-		static Window instance;
-		return instance;
-	}
-
-    static GLFWwindow* Engine;
-private:
 	Window();
+	GLFWwindow* GLFW() { return m_glfwWindow; }
+
+private:
+	GLFWwindow* m_glfwWindow;
 };

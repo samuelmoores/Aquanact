@@ -5,7 +5,7 @@
 Camera::Camera()
 {
 	int width, height;
-	glfwGetWindowSize(Engine::Window, &width, &height);
+	glfwGetWindowSize(Engine::Window->GLFW(), &width, &height);
 
 	m_projection_matrix = glm::perspective(glm::radians(45.0), static_cast<double>(width) / height, 0.1, 100.0);
 
@@ -19,7 +19,7 @@ Camera::Camera()
 glm::mat4 Camera::GetProjectionMatrix()
 {
 	int width, height;
-	glfwGetWindowSize(Engine::Window, &width, &height);
+	glfwGetWindowSize(Engine::Window->GLFW(), &width, &height);
 	m_projection_matrix = glm::perspective(glm::radians(45.0), static_cast<double>(width) / height, 0.1, 100.0);
 
 	return m_projection_matrix;

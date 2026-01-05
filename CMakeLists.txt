@@ -13,7 +13,7 @@ endif()
 project ("AquanactEngine")
 
 add_executable (AquanactEngine "src/main.cpp" "include/ShaderProgram.h" "src/ShaderProgram.cpp" "include/StbImage.h" "src/StbImage.cpp" "include/Mesh.h" "src/Mesh.cpp"
-"include/Camera.h" "src/Camera.cpp" "include/Renderer.h" "src/Renderer.cpp" "include/Object3D.h" "src/Object3D.cpp" "include/Axis.h" "src/Axis.cpp" "include/Texture.h" "include/Line.h" "src/Line.cpp" "include/Animation.h" "src/Animation.cpp" "include/Animator.h" "src/Animator.cpp" "include/Window.h" "src/Window.cpp" "include/Engine.h" "src/Engine.cpp")
+"include/Camera.h" "src/Camera.cpp" "include/Renderer.h" "src/Renderer.cpp" "include/Object3D.h" "src/Object3D.cpp" "include/Axis.h" "src/Axis.cpp" "include/Texture.h" "include/Line.h" "src/Line.cpp" "include/Animation.h" "src/Animation.cpp" "include/Animator.h" "src/Animator.cpp" "include/Window.h" "src/Window.cpp" "include/Engine.h" "src/Engine.cpp" "include/UI.h" "src/UI.cpp")
 
 
 # Find and link external libraries, like SFML.

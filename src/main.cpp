@@ -35,14 +35,36 @@ void AquanactLoop(Axis axis, std::vector<Object3D> sceneObjects)
 	ImGui::NewFrame();
 
 	// Your UI code here
-	ImGui::Begin("Window");
-	
-	if (ImGui::Button("Click"))
-	{
-		Import();
-	}
+	if (ImGui::BeginMainMenuBar()) {
+		if (ImGui::BeginMenu("File")) {
+			if (ImGui::MenuItem("Import")) {
+				Import();
+			}
+			if (ImGui::MenuItem("Open")) {
+				// Open function
+			}
+			if (ImGui::MenuItem("Save")) {
+				// Save function
+			}
+			ImGui::Separator();
+			if (ImGui::MenuItem("Quit")) {
+				glfwSetWindowShouldClose(Engine::Window->GLFW(), true);
+			}
+			ImGui::EndMenu();
+		}
 
-	ImGui::End();
+		if (ImGui::BeginMenu("Edit")) {
+			if (ImGui::MenuItem("Undo")) {
+				// Undo function
+			}
+			if (ImGui::MenuItem("Redo")) {
+				// Redo function
+			}
+			ImGui::EndMenu();
+		}
+
+		ImGui::EndMainMenuBar();
+	}
 
 	// Render
 	ImGui::Render();
@@ -67,22 +89,22 @@ int main()
 {
 	Engine::Init();
 	gladLoadGL();
-	glfwSetKeyCallback(Engine::Window, key_callback);
-	glfwSetFramebufferSizeCallback(Engine::Window, framebuffer_size_callback);
+	glfwSetKeyCallback(Engine::Window->GLFW(), key_callback);
+	glfwSetFramebufferSizeCallback(Engine::Window->GLFW(), framebuffer_size_callback);
 	glEnable(GL_DEPTH_TEST);
 
 	Axis axis(10.0f);
 	std::vector<Object3D> sceneObjects;
 	sceneObjects.push_back(Object3D(Object3D::cubeVertices, Object3D::cubeFaces));
 
-	while (!glfwWindowShouldClose(Engine::Window))
+	while (!glfwWindowShouldClose(Engine::Window->GLFW()))
 	{
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		AquanactLoop(axis, sceneObjects);
 
 		/* Swap front and back buffers */
-		glfwSwapBuffers(Engine::Window);
+		glfwSwapBuffers(Engine::Window->GLFW());
 
 		/* Poll for and process events */
 		glfwPollEvents();

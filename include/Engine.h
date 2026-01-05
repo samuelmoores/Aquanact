@@ -1,10 +1,8 @@
 #pragma once
 #include <Renderer.h>
+#include <Window.h>
+#include <UI.h>
 #include "GLFW/glfw3.h"
-#include "imgui.h"
-#include "imgui_impl_glfw.h"
-#include "imgui_impl_opengl3.h"
-
 
 class Engine {
 public:
@@ -17,10 +15,10 @@ public:
 		return instance;
 	}
 
-	static GLFWwindow* Window;
+	static Window* Window;
 	static Renderer* Renderer;
 	static Camera* Camera;
-	static ImGuiIO* imgui_io;
+	static UI* UI;
 private:
 	Engine();
 };
