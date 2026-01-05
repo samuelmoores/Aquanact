@@ -40,6 +40,8 @@ class Mesh {
 		void UnBind() const;
 		uint32_t FacesSize() const;
 		void updateAABB(glm::vec3 position, glm::vec3 scale);
+		glm::vec3 centerAABB();
+		glm::vec3 dimensionAABB();
 		bool intersectsRay(const glm::vec3& rayOrigin, const glm::vec3& rayDir) const;
 		const Skeleton& GetSkeleton() const;
 		void ReadNodeHeirarchy(const aiNode* node, const aiMatrix4x4& ParentTransform);

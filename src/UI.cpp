@@ -50,7 +50,7 @@ void UI::Loop()
     if (ImGui::BeginPopupModal("Import")) 
     {
         // Draw popup contents.
-        ImGui::Text("Enter text:");
+        ImGui::Text("Paste file path to model (with or without \"\")");
         ImGui::InputText("##input", inputBuffer, IM_ARRAYSIZE(inputBuffer));
 
         if (ImGui::Button("Import"))

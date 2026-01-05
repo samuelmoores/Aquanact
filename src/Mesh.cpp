@@ -223,9 +223,12 @@ void Mesh::fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, s
 	m_skeleton.boneMapping = boneMap;
 }
 
-void Mesh::assimpLoad(const std::string& path, bool flipUvs) {
+void Mesh::assimpLoad(const std::string& path, bool flipUvs) 
+{
 	int flags = (aiPostProcessSteps)aiProcessPreset_TargetRealtime_MaxQuality;
-	if (flipUvs) {
+	
+	if (flipUvs) 
+	{
 		flags |= aiProcess_FlipUVs;
 	}
 
@@ -237,7 +240,8 @@ void Mesh::assimpLoad(const std::string& path, bool flipUvs) {
 		std::cout << "ASSIMP ERROR: " << m_importer.GetErrorString() << std::endl;
 		exit(1);
 	}
-	else {
+	else 
+	{
 		std::vector<Vertex3D> vertices;
 		std::vector<uint32_t> faces;
 
@@ -252,10 +256,10 @@ void Mesh::assimpLoad(const std::string& path, bool flipUvs) {
 		m_vertices = vertices;
 		m_faces = faces;
 
+		//================== Materials =================================
+
 		aiMaterial* mat = m_scene->mMaterials[0];
 		unsigned int textureCount = mat->GetTextureCount(aiTextureType_DIFFUSE);
-
-		std::cout << "num textures: " << m_scene->mNumTextures << std::endl;
 
 		if (textureCount > 0)
 		{
@@ -265,30 +269,35 @@ void Mesh::assimpLoad(const std::string& path, bool flipUvs) {
 			// Extract just the filename
 			std::string textureFile = texturePath.C_Str();
 			size_t lastSlash = textureFile.find_last_of("/\\");
-			if (lastSlash != std::string::npos) {
+			if (lastSlash != std::string::npos) 
+			{
 				textureFile = textureFile.substr(lastSlash + 1);
 			}
-			// textureFile is now "bear_diffuse.png"
 
 			// Search embedded textures for a matching name
 			aiTexture* embeddedTexture = nullptr;
-			for (unsigned int i = 0; i < m_scene->mNumTextures; i++) {
+			for (unsigned int i = 0; i < m_scene->mNumTextures; i++) 
+			{
 				std::string embeddedName = m_scene->mTextures[i]->mFilename.C_Str();
 				size_t lastSlash2 = embeddedName.find_last_of("/\\");
-				if (lastSlash2 != std::string::npos) {
+			
+				if (lastSlash2 != std::string::npos) 
+				{
 					embeddedName = embeddedName.substr(lastSlash2 + 1);
 				}
 
-				if (embeddedName == textureFile) {
+				if (embeddedName == textureFile) 
+				{
 					embeddedTexture = m_scene->mTextures[i];
 					break;
 				}
 			}
 
-			if (embeddedTexture) {
+			if (embeddedTexture) 
+			{
 				// Load from memory as I showed before
-				if (embeddedTexture->mHeight == 0) {
-					// Compressed
+				if (embeddedTexture->mHeight == 0) 
+				{
 					SetTextureMemory(embeddedTexture);
 				}
 			}
@@ -376,8 +385,6 @@ void Mesh::SetTextureMemory(aiTexture* text)
 {
 	StbImage stb_image_color;
 
-	//stb_image_color.loadFromFile(colorFile);
-
 	stb_image_color.loadFromMemory(text);
 
 	glGenTextures(1, &m_textureColor);
@@ -462,10 +469,29 @@ void Mesh::updateAABB(glm::vec3 position, glm::vec3 scale)
 	m_maxBounds *= scale;
 
 	// Ensure correct ordering if scale is negative
-	for (int i = 0; i < 3; ++i) {
+	for (int i = 0; i < 3; ++i) 
+	{
 		if (m_minBounds[i] > m_maxBounds[i])
 			std::swap(m_minBounds[i], m_maxBounds[i]);
 	}
+}
+
+glm::vec3 Mesh::centerAABB()
+{
+	glm::vec3 center;
+	center.x = (m_minBounds.x + m_maxBounds.x) / 2;
+	center.y = (m_minBounds.y + m_maxBounds.y) / 2;
+	center.z = (m_minBounds.z + m_maxBounds.z) / 2;
+	return center;
+}
+
+glm::vec3 Mesh::dimensionAABB()
+{
+	glm::vec3 dimensions;
+	dimensions.x = m_maxBounds.x - m_minBounds.x;
+	dimensions.x = m_maxBounds.y - m_minBounds.y;
+	dimensions.x = m_maxBounds.z - m_minBounds.z;
+	return dimensions;
 }
 
 bool Mesh::intersectsRay(const glm::vec3& rayOrigin, const glm::vec3& rayDir) const
@@ -473,13 +499,16 @@ bool Mesh::intersectsRay(const glm::vec3& rayOrigin, const glm::vec3& rayDir) co
 	float tMin = 0.0f;
 	float tMax = 1e6f;
 
-	for (int i = 0; i < 3; ++i) {
-		if (std::abs(rayDir[i]) < 1e-6f) {
+	for (int i = 0; i < 3; ++i) 
+	{
+		if (std::abs(rayDir[i]) < 1e-6f) 
+		{
 			// Ray is parallel to slab
 			if (rayOrigin[i] < m_minBounds[i] || rayOrigin[i] > m_maxBounds[i])
 				return false;
 		}
-		else {
+		else 
+		{
 			float ood = 1.0f / rayDir[i];
 			float t1 = (m_minBounds[i] - rayOrigin[i]) * ood;
 			float t2 = (m_maxBounds[i] - rayOrigin[i]) * ood;
