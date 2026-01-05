@@ -4,6 +4,8 @@
 GLFWwindow* Engine::Window = nullptr;
 Renderer* Engine::Renderer = nullptr;
 Camera* Engine::Camera = nullptr;
+ImGuiIO* Engine::imgui_io = nullptr;
+
 
 Engine::Engine()
 {
@@ -22,6 +24,19 @@ Engine::Engine()
 
     /* Make the window's context current */
     glfwMakeContextCurrent(Window);
+
+    // 1. Create ImGui context
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    Engine::imgui_io = &io;
+
+    // 2. Setup style (optional)
+    ImGui::StyleColorsDark();
+
+    // 3. Initialize backends
+    ImGui_ImplGlfw_InitForOpenGL(Window, true);
+    ImGui_ImplOpenGL3_Init("#version 330");  // or your GLSL version
     
     // Initialize Camera and Renderer
     Camera = new ::Camera(/* constructor arguments if needed */);

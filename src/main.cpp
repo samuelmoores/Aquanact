@@ -17,10 +17,38 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 	glViewport(0, 0, width, height);
 }
 
+void Import()
+{
+	std::cout << "Import\n";
+}
+
 void AquanactLoop(Axis axis, std::vector<Object3D> sceneObjects)
 {
 	axis.UpdateProjection(Engine::Camera->GetProjectionMatrix());
 	axis.draw(Engine::Camera->GetViewMatrix());
+
+	//========================== ImGUI ===================================
+
+	// Start frame
+	ImGui_ImplOpenGL3_NewFrame();
+	ImGui_ImplGlfw_NewFrame();
+	ImGui::NewFrame();
+
+	// Your UI code here
+	ImGui::Begin("Window");
+	
+	if (ImGui::Button("Click"))
+	{
+		Import();
+	}
+
+	ImGui::End();
+
+	// Render
+	ImGui::Render();
+
+	//========================== ImGUI ===================================
+
 
 	for (int i = 0; i < sceneObjects.size(); i++)
 	{
@@ -32,6 +60,7 @@ void AquanactLoop(Axis axis, std::vector<Object3D> sceneObjects)
 		Engine::Renderer->Submit(rc);
 	}
 	Engine::Renderer->Flush(Engine::Camera);
+	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
 int main() 
@@ -58,6 +87,10 @@ int main()
 		/* Poll for and process events */
 		glfwPollEvents();
 	}
+
+	ImGui_ImplOpenGL3_Shutdown();
+	ImGui_ImplGlfw_Shutdown();
+	ImGui::DestroyContext();
 
 	glfwTerminate();
 

@@ -30,6 +30,9 @@ target_link_libraries(AquanactEngine PRIVATE assimp::assimp)
 find_package(glad CONFIG REQUIRED)
 target_link_libraries(AquanactEngine PRIVATE glad::glad)
 
+find_package(imgui CONFIG REQUIRED)
+target_link_libraries(AquanactEngine PRIVATE imgui::imgui)
+
 target_include_directories(AquanactEngine PUBLIC "./include")
 
 
