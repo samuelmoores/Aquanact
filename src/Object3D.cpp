@@ -27,9 +27,9 @@ Object3D::Object3D(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 	m_scale = glm::vec3(1);
 }
 
-Object3D::Object3D(const char* modelFile, const char* textureFile, bool skinned)
+Object3D::Object3D(char modelFile[], bool skinned)
 {
-	m_mesh = new Mesh(modelFile, textureFile);
+	m_mesh = new Mesh(modelFile);
 	m_skinned = skinned;
 
 	//  | Description      | Values: ambient,diffuse,specular,shin |
@@ -50,7 +50,7 @@ Object3D::Object3D(const char* modelFile, const char* textureFile, bool skinned)
 
 	m_position = glm::vec3(0);
 	m_rotation = glm::vec3(0);
-	m_scale = glm::vec3(1);
+	m_scale = glm::vec3(0.1);
 }
 
 Object3D::Object3D(const char* modelFile, const char* textureFile, const char* normalMap)

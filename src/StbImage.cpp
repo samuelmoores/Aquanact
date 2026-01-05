@@ -4,6 +4,8 @@
 #include <string>
 #include <iostream>
 
+
+
 StbImage::StbImage() : m_width(0), m_height(0), m_bpp(0) {
 }
 
@@ -12,6 +14,20 @@ void StbImage::loadFromFile(const std::string& filepath) {
 
     if (data == nullptr)
         throw std::runtime_error("Could not load file " + filepath);
+
+    m_data = std::unique_ptr<unsigned char[]>(data);
+}
+
+void StbImage::loadFromMemory(aiTexture* embeddedTexture)
+{
+    unsigned char* data = stbi_load_from_memory(
+        (unsigned char*)embeddedTexture->pcData,
+        embeddedTexture->mWidth,
+        &m_width, &m_height, &m_bpp, 4
+    );
+
+    if (data == nullptr)
+        throw std::runtime_error("Could not load file from memory");
 
     m_data = std::unique_ptr<unsigned char[]>(data);
 }

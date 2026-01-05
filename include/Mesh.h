@@ -28,12 +28,13 @@ class Mesh {
 	public:
 		Mesh();
 		Mesh(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces);
-		Mesh(const char* modelFile, const char* textureFile);
+		Mesh(char modelFile[]);
 		Mesh(const char* modelFile, const char* textureFile, const char* normalMap);
 		void assimpLoad(const std::string& path, bool flipUvs);
 		void fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, std::vector<uint32_t>& faces);
 		void SetBuffers();
 		void SetTexture(const char* colorFile);
+		void SetTextureMemory(aiTexture* text);
 		void SetNormalMap(const char* normalMap);
 		void Bind() const;
 		void UnBind() const;

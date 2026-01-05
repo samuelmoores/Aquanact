@@ -53,7 +53,6 @@ void UI::Loop()
         ImGui::Text("Enter text:");
         ImGui::InputText("##input", inputBuffer, IM_ARRAYSIZE(inputBuffer));
 
-
         if (ImGui::Button("Import"))
         {
             Engine::Level->LoadObject(inputBuffer);
@@ -63,10 +62,8 @@ void UI::Loop()
         if (ImGui::Button("Cancel"))
             ImGui::CloseCurrentPopup();
 
-
         ImGui::EndPopup();
     }
-
 
 	// Render
 	ImGui::Render();

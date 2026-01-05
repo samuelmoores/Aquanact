@@ -1,6 +1,7 @@
 ﻿#include <Mesh.h>
 #include <iomanip>
 #include <glad/glad.h>
+#include <stb_image.h>
 
 const int VERTICES_PER_FACE = 3;
 
@@ -25,7 +26,7 @@ Mesh::Mesh(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 	SetNormalMap("models/brick_wall_norm.png");
 }
 
-Mesh::Mesh(const char* modelFile, const char* textureFile)
+Mesh::Mesh(char modelFile[])
 {
 	assimpLoad(modelFile, true);
 
@@ -76,7 +77,6 @@ Mesh::Mesh(const char* modelFile, const char* textureFile)
 	m_meshMaxBounds = m_maxBounds;
 
 	SetBuffers();
-	SetTexture(textureFile);
 }
 
 Mesh::Mesh(const char* modelFile, const char* textureFile, const char* normalMap)
@@ -251,6 +251,49 @@ void Mesh::assimpLoad(const std::string& path, bool flipUvs) {
 
 		m_vertices = vertices;
 		m_faces = faces;
+
+		aiMaterial* mat = m_scene->mMaterials[0];
+		unsigned int textureCount = mat->GetTextureCount(aiTextureType_DIFFUSE);
+
+		std::cout << "num textures: " << m_scene->mNumTextures << std::endl;
+
+		if (textureCount > 0)
+		{
+			aiString texturePath;
+			mat->GetTexture(aiTextureType_DIFFUSE, 0, &texturePath);
+
+			// Extract just the filename
+			std::string textureFile = texturePath.C_Str();
+			size_t lastSlash = textureFile.find_last_of("/\\");
+			if (lastSlash != std::string::npos) {
+				textureFile = textureFile.substr(lastSlash + 1);
+			}
+			// textureFile is now "bear_diffuse.png"
+
+			// Search embedded textures for a matching name
+			aiTexture* embeddedTexture = nullptr;
+			for (unsigned int i = 0; i < m_scene->mNumTextures; i++) {
+				std::string embeddedName = m_scene->mTextures[i]->mFilename.C_Str();
+				size_t lastSlash2 = embeddedName.find_last_of("/\\");
+				if (lastSlash2 != std::string::npos) {
+					embeddedName = embeddedName.substr(lastSlash2 + 1);
+				}
+
+				if (embeddedName == textureFile) {
+					embeddedTexture = m_scene->mTextures[i];
+					break;
+				}
+			}
+
+			if (embeddedTexture) {
+				// Load from memory as I showed before
+				if (embeddedTexture->mHeight == 0) {
+					// Compressed
+					SetTextureMemory(embeddedTexture);
+				}
+			}
+
+		}
 	}
 }
 
@@ -327,6 +370,36 @@ void Mesh::SetTexture(const char* colorFile)
 	);
 	glGenerateMipmap(GL_TEXTURE_2D);
 
+}
+
+void Mesh::SetTextureMemory(aiTexture* text)
+{
+	StbImage stb_image_color;
+
+	//stb_image_color.loadFromFile(colorFile);
+
+	stb_image_color.loadFromMemory(text);
+
+	glGenTextures(1, &m_textureColor);
+
+	glBindTexture(GL_TEXTURE_2D, m_textureColor);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	glTexImage2D(
+		GL_TEXTURE_2D,
+		0,
+		GL_RGBA,
+		stb_image_color.getWidth(),
+		stb_image_color.getHeight(),
+		0,
+		GL_RGBA,
+		GL_UNSIGNED_BYTE,
+		stb_image_color.getData()
+	);
+	glGenerateMipmap(GL_TEXTURE_2D);
 }
 
 void Mesh::SetNormalMap(const char* normalMap)

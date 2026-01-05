@@ -8,7 +8,7 @@
 class Object3D {
 public:
 	Object3D(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces);
-	Object3D(const char* modelFile, const char* textureFile, bool skinned);
+	Object3D(char modelFile[], bool skinned);
 	Object3D(const char* modelFile, const char* textureFile, const char* normalMap);
 	~Object3D();
 	Mesh* GetMesh();
