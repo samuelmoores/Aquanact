@@ -1,5 +1,4 @@
-#include "Renderer.h"
-
+#include "Engine.h"
 
 void Renderer::Submit(const RenderCommand& command)
 {
@@ -49,4 +48,22 @@ void Renderer::Flush(Camera* camera)
 	}
 
 	commands.clear();
+}
+
+void Renderer::Loop()
+{
+	std::vector<Object3D> objects = Engine::Level->Objects();
+	Engine::Level->DrawAxis();
+
+	//only loops through the objects of one default level
+	for (int i = 0; i < objects.size(); i++)
+	{
+		RenderCommand rc;
+		rc.mesh = objects[i].GetMesh();
+		rc.shader = objects[i].GetShader();
+		rc.modelMatrix = objects[i].BuildModelMatrix();
+		rc.isSkinned = objects[i].skinned();
+		Submit(rc);
+	}
+	Flush(Engine::Camera);
 }

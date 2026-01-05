@@ -2,6 +2,7 @@
 #include <Renderer.h>
 #include <Window.h>
 #include <UI.h>
+#include <Level.h>
 #include "GLFW/glfw3.h"
 
 class Engine {
@@ -9,6 +10,7 @@ public:
 	//Delete Copy constructor
 	Engine(const Engine&) = delete;
 	Engine& operator=(const Engine&) = delete;
+	static bool Running();
 
 	static Engine& Init() {
 		static Engine instance;
@@ -19,6 +21,7 @@ public:
 	static Renderer* Renderer;
 	static Camera* Camera;
 	static UI* UI;
+	static Level* Level;
 private:
 	Engine();
 };

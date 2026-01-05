@@ -2,6 +2,10 @@
 #include <glad/glad.h>
 
 
+Axis::Axis()
+{
+}
+
 Axis::Axis(float axisLength) :m_vao(-1), m_vbo(-1)
 {
 	m_vertices = {

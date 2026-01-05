@@ -6,6 +6,8 @@
 class UI {
 public:
 	UI();
+	void Loop();
+	void Import();
 private:
 	static ImGuiIO* imgui_io;
 
