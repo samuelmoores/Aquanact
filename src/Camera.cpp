@@ -7,7 +7,7 @@ Camera::Camera()
 	int width, height;
 	glfwGetWindowSize(Engine::Window->GLFW(), &width, &height);
 
-	m_projection_matrix = glm::perspective(glm::radians(45.0), static_cast<double>(width) / height, 0.1, 100.0);
+	m_projection_matrix = glm::perspective(glm::radians(45.0), static_cast<double>(width) / height, 0.1, 10000.0);
 
 	m_position = glm::vec3(5.0f, 2.0f, 5.0f);
 	m_front = glm::vec3(-1.0f, -0.5f, -1.0f);
@@ -20,7 +20,7 @@ glm::mat4 Camera::GetProjectionMatrix()
 {
 	int width, height;
 	glfwGetWindowSize(Engine::Window->GLFW(), &width, &height);
-	m_projection_matrix = glm::perspective(glm::radians(45.0), static_cast<double>(width) / height, 0.1, 100.0);
+	m_projection_matrix = glm::perspective(glm::radians(45.0), static_cast<double>(width) / height, 0.1, 10000.0);
 
 	return m_projection_matrix;
 }
@@ -99,3 +99,25 @@ void Camera::CameraControl(glm::vec2 mouseLast, float& diff)
 	m_view_matrix = glm::lookAt(m_position, m_position + m_front, m_up);
 }
 
+void Camera::Focus(glm::vec3 min, glm::vec3 max)
+{
+	std::cout << "max: " << min.x << ", " << min.y << ", " << min.z << std::endl;
+	std::cout << "min: " << max.x << ", " << max.y << ", " << max.z << std::endl;
+
+	glm::vec3 center = (min + max) / 2.0f;
+	glm::vec3 size = max - min;
+	float radius = glm::length(size) / 2.0f;
+
+	float fovRadians = glm::radians(45.0f); // Convert degrees to radians
+	float distance = radius / std::sin(fovRadians / 2.0f);
+
+	std::cout << "distance: " << distance << std::endl;
+	std::cout << "center of object: " << center.x << ", " << center.y << ", " << center.z << std::endl;
+
+	// Position camera
+	m_position = center + glm::vec3(max.x, center.y, distance/2);
+	std::cout << "new position: " << m_position.x << ", " << m_position.y << ", " << m_position.z << std::endl;
+
+
+	m_view_matrix = glm::lookAt(m_position, center, m_up);
+}

@@ -39,4 +39,5 @@ void Level::LoadObject(char filepath[])
 	std::cout << "filepath: " << filepath << std::endl;
 	//objects.push_back(Object3D(Object3D::cubeVertices, Object3D::cubeFaces));
 	objects.push_back(Object3D(filepath, true));
+    Engine::Camera->Focus(objects[0].GetMesh()->minBounds(), objects[0].GetMesh()->maxBounds());
 }

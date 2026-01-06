@@ -12,6 +12,7 @@ class Camera {
 		glm::vec3 GetPosition();
 		glm::vec3 GetFacing();
 		void CameraControl(glm::vec2 mouseLast, float& diff);
+		void Focus(glm::vec3 min, glm::vec3 max);
 	private:
 		glm::mat4 m_projection_matrix;
 		glm::mat4 m_view_matrix;

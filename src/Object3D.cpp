@@ -50,7 +50,7 @@ Object3D::Object3D(char modelFile[], bool skinned)
 
 	m_position = glm::vec3(0);
 	m_rotation = glm::vec3(0);
-	m_scale = glm::vec3(0.1);
+	m_scale = glm::vec3(1);
 }
 
 Object3D::Object3D(const char* modelFile, const char* textureFile, const char* normalMap)

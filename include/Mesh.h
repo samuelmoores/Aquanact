@@ -43,6 +43,8 @@ class Mesh {
 		bool intersectsRay(const glm::vec3& rayOrigin, const glm::vec3& rayDir) const;
 		const Skeleton& GetSkeleton() const;
 		void ReadNodeHeirarchy(const aiNode* node, const aiMatrix4x4& ParentTransform);
+		glm::vec3 minBounds();
+		glm::vec3 maxBounds();
 	private:
 		std::vector<Vertex3D> m_vertices;
 		std::vector<uint32_t> m_faces;

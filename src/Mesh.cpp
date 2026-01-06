@@ -149,6 +149,16 @@ void Mesh::ReadNodeHeirarchy(const aiNode* node, const aiMatrix4x4& ParentTransf
 	}
 }
 
+glm::vec3 Mesh::minBounds()
+{
+	return m_meshMinBounds;
+}
+
+glm::vec3 Mesh::maxBounds()
+{
+	return m_meshMaxBounds;
+}
+
 void Mesh::fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, std::vector<uint32_t>& faces)
 {
 	int numVertices = mesh->mNumVertices;
