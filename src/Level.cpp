@@ -26,8 +26,10 @@ void Level::LoadObject(char filepath[])
 {
     int i = 0, j = 0;
 
-    while (filepath[i] != '\0') {
-        if (filepath[i] != '"') {
+    while (filepath[i] != '\0') 
+    {
+        if (filepath[i] != '"') 
+        {
             filepath[j] = filepath[i];
             j++;
         }

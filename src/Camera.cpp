@@ -112,12 +112,17 @@ void Camera::Focus(glm::vec3 min, glm::vec3 max)
 	float distance = radius / std::sin(fovRadians / 2.0f);
 
 	std::cout << "distance: " << distance << std::endl;
-	std::cout << "center of object: " << center.x << ", " << center.y << ", " << center.z << std::endl;
+	std::cout << "center: " << center.x << ", " << center.y << ", " << center.z << std::endl;
+	//std::cout << "center of miximo object: -3.05176e-05, 119.131, 1.79399\n";
 
 	// Position camera
 	m_position = center + glm::vec3(max.x, center.y, distance/2);
-	std::cout << "new position: " << m_position.x << ", " << m_position.y << ", " << m_position.z << std::endl;
 
 
+	//m_position = glm::vec3(164.494, 238.263, 275.224 + 100);
+	//glm::vec3 lookAt(-3.05176e-05, 119.131, 1.79399);
+
+	std::cout << "current position: " << m_position.x << ", " << m_position.y << ", " << m_position.z << std::endl;
+	std::cout << "look at: " << center.x << ", " << center.y << ", " << center.z << std::endl;
 	m_view_matrix = glm::lookAt(m_position, center, m_up);
 }

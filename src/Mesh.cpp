@@ -277,12 +277,23 @@ void Mesh::assimpLoad(const std::string& path, bool flipUvs)
 			mat->GetTexture(aiTextureType_DIFFUSE, 0, &texturePath);
 
 			// Extract just the filename
+			std::string matPath = "";
 			std::string textureFile = texturePath.C_Str();
+
 			size_t lastSlash = textureFile.find_last_of("/\\");
 			if (lastSlash != std::string::npos) 
 			{
 				textureFile = textureFile.substr(lastSlash + 1);
 			}
+
+			lastSlash = path.find_last_of("/\\");
+			if (lastSlash != std::string::npos)
+			{
+				matPath = path.substr(0, lastSlash+1);
+			}
+
+			std::string texturePath_string = matPath + textureFile;
+
 
 			// Search embedded textures for a matching name
 			aiTexture* embeddedTexture = nullptr;
@@ -303,13 +314,17 @@ void Mesh::assimpLoad(const std::string& path, bool flipUvs)
 				}
 			}
 
-			if (embeddedTexture) 
+			if (embeddedTexture && false) 
 			{
 				// Load from memory as I showed before
 				if (embeddedTexture->mHeight == 0) 
 				{
 					SetTextureMemory(embeddedTexture);
 				}
+			}
+			else
+			{
+				SetTexture(texturePath_string.c_str());
 			}
 
 		}
