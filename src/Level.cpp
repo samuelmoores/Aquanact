@@ -13,7 +13,7 @@ std::vector<Object3D> Level::Objects()
 
 void Level::Load()
 {
-	m_axis = Axis(10000.0f, 1000.0f);
+	m_axis = Axis(1000.0f, 100.0f);
 }
 
 void Level::DrawAxis()
