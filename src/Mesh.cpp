@@ -314,7 +314,7 @@ void Mesh::assimpLoad(const std::string& path, bool flipUvs)
 				}
 			}
 
-			if (embeddedTexture && false) 
+			if (embeddedTexture) 
 			{
 				// Load from memory as I showed before
 				if (embeddedTexture->mHeight == 0) 
@@ -322,11 +322,17 @@ void Mesh::assimpLoad(const std::string& path, bool flipUvs)
 					SetTextureMemory(embeddedTexture);
 				}
 			}
-			else
+		}
+		else
+		{
+			std::string texturePath = path;
+
+			if (texturePath.size() >= 3)
 			{
-				SetTexture(texturePath_string.c_str());
+				texturePath.replace(texturePath.size() - 3, 3, "png");
 			}
 
+			SetTexture(texturePath.c_str());
 		}
 	}
 }
