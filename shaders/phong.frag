@@ -24,7 +24,7 @@ void main()
 
 	for(int i = 0; i < 4; i++)
 	{
-		if(BoneIDs[i] == bone)
+		if(BoneIDs[i] == 0)
 		{
 			FragColor = vec4(1.0, 1.0, 1.0, 0.0) * Weights[i];
 			found = true;
@@ -35,7 +35,7 @@ void main()
 	if(!found)
 		FragColor = vec4(0.0, 0.0, 0.0, 0.0);
 
-	//return;
+	return;
 
 	vec3 norm = normalize(Normal);
 

@@ -201,35 +201,42 @@ void Mesh::fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, s
 	}
 
 	//-------------process bones-------------------
-	int boneID = 0;
 	std::map<std::string, int> boneMap = m_skeleton.boneMapping;
+	m_skeleton.boneOffsetMatrices.resize(numBones);
 	for (int j = 0; j < numBones; j++)
 	{
+		int boneID = 0;
 		aiBone* bone = mesh->mBones[j];
 		std::string boneName = bone->mName.C_Str();
-		m_skeleton.boneOffsetMatrices.resize(numBones);
+
 
 		if (boneMap.find(boneName) == boneMap.end())
 		{
 			boneID = boneMap.size();
+		
+			if (boneID == 0)
+				int titMilk = 69;
+			
 			boneMap[boneName] = boneID;
 			m_skeleton.boneOffsetMatrices[boneID] = bone->mOffsetMatrix;
 		}
 		else
 		{
-			boneID = boneMap[boneName];
+			boneID = boneMap.find(boneName)->second;
 		}
-
-		const aiMatrix4x4& mat = m_skeleton.boneOffsetMatrices[boneID];
 
 		for (int k = 0; k < bone->mNumWeights; k++)
 		{
 			const aiVertexWeight& vw = bone->mWeights[k];
 			float weight = vw.mWeight;
 			int globalVertexID = vw.mVertexId;
+			if (globalVertexID == 0)
+				std::cout << "vertex[0] is affected by bone: " << boneName << std::endl;
 			AddBoneData(vertices[globalVertexID], boneID, weight);
 		}
 	}
+
+	
 	m_skeleton.boneMapping = boneMap;
 }
 
