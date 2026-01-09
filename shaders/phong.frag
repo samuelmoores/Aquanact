@@ -33,9 +33,9 @@ void main()
 	}
 
 	//if(!found)
-		FragColor = vec4(0.0, 0.5, 1.0, 0.0);
+		//FragColor = vec4(0.0, 0.5, 1.0, 0.0);
 
-	return;
+	//return;
 
 	vec3 norm = normalize(Normal);
 

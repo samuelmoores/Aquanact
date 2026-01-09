@@ -31,6 +31,7 @@ Mesh::Mesh(char modelFile[])
 {
 	assimpLoad(modelFile, true);
 
+
 	//debug skeleton code
 	if (false)
 	{
@@ -171,6 +172,7 @@ void Mesh::RunAnimation(float animTime)
 	float animTimeTicks = fmod(timeTicks, (float)m_scene->mAnimations[0]->mDuration);
 
 	ReadNodeHeirarchy(animTimeTicks, m_scene->mRootNode, I);
+	int tit = 9;
 }
 
 const aiNodeAnim* Mesh::FindNodeAnim(const aiAnimation* pAnimation, const std::string& NodeName)
@@ -332,16 +334,24 @@ void Mesh::CalcInterpolatedScaling(aiVector3D& Out, float AnimationTimeTicks, co
 void Mesh::ReadNodeHeirarchy(float animTimeTicks, const aiNode* node, const aiMatrix4x4& ParentTransform)
 {
 	bool debugMatrices = false;
-	
+
 	const std::string name = node->mName.C_Str();
+
 	const aiAnimation* anim = m_scene->mAnimations[0];
 	aiMatrix4x4 NodeTransformation(node->mTransformation);
+
+	if (name.find("$AssimpFbx$") != std::string::npos)
+		NodeTransformation = aiMatrix4x4();
+
+	if (name.find("Leg") != std::string::npos)
+		int tit = 00;
 
 	if (debugMatrices)
 	{
 		std::cout << "********** node: " << name << " ***********************\n";
 		std::cout << "NodeTransformation Matrix: \n";
 		printMatrix(NodeTransformation);
+
 	}
 
 	const aiNodeAnim* animNode = FindNodeAnim(anim, name);
@@ -375,7 +385,7 @@ void Mesh::ReadNodeHeirarchy(float animTimeTicks, const aiNode* node, const aiMa
 			printMatrix(RotationM);
 			std::cout << "translation mat: \n";
 			printMatrix(TranslationM);
-			std::cout << "final node transformation mat: \n";
+			std::cout << "NodeTransformation mat after anim: \n";
 			printMatrix(NodeTransformation);
 		}
 
@@ -385,27 +395,29 @@ void Mesh::ReadNodeHeirarchy(float animTimeTicks, const aiNode* node, const aiMa
 	aiMatrix4x4 GlobalTransform = ParentTransform * NodeTransformation;
 	std::string parentName = "no parent (identity matrix)";
 
-
-	if (node->mParent)
-		parentName = node->mParent->mName.C_Str();
-
 	if (debugMatrices)
 	{
-		std::cout << "--- GlobalTransform Matrix: " << parentName << " * " << node->mName.C_Str() << " ----\n";
+		std::cout << "ParentTransform Matrix: \n";
+		printMatrix(ParentTransform);
+		std::cout << "ChildTransform Matrix (current)\n";
+		printMatrix(NodeTransformation);
+		std::cout << "--- GlobalTransform Matrix: Parent * Child ----\n";
 		printMatrix(GlobalTransform);
 	}
 
 	if (m_skeleton.boneMapping.find(name) != m_skeleton.boneMapping.end())
 	{
+		numBoneUpdates++;
 		int boneIndex = m_skeleton.boneMapping[name];
-		m_skeleton.finalTransformations[boneIndex] = (m_GlobalInverseTransform * GlobalTransform * m_skeleton.boneOffsetMatrices[boneIndex]);
-		
+		m_skeleton.finalTransformations[boneIndex] = (GlobalTransform * m_skeleton.boneOffsetMatrices[boneIndex]);
+
 		if (debugMatrices)
 		{
 			std::cout << "node in skeleton at bone: " << name << " index: " << boneIndex << std::endl;
 			std::cout << "Offset matrix\n";
 			printMatrix(m_skeleton.boneOffsetMatrices[boneIndex]);
 			std::cout << "skeleton bone final transorm: GlobInv * Glob * Offset: \n";
+			
 			printMatrix(m_skeleton.finalTransformations[boneIndex]);
 		}
 	}
@@ -417,6 +429,7 @@ void Mesh::ReadNodeHeirarchy(float animTimeTicks, const aiNode* node, const aiMa
 
 	for (int i = 0; i < node->mNumChildren; i++)
 	{
+		//std::cout << "ReadNodeHeirarchy() parent: " << name << " | child: " << node->mChildren[i]->mName.C_Str() << std::endl;
 		ReadNodeHeirarchy(animTimeTicks, node->mChildren[i], GlobalTransform);
 	}
 }

@@ -66,10 +66,10 @@ void AquanactLoop()
 
 	animTime += Engine::DeltaFrameTime();
 
-	std::cout << "fps: " << 1.0f / Engine::DeltaFrameTime() << std::endl;
-
-	if(Engine::Level->Objects().size() > 0)
+	if (Engine::Level->Objects().size() > 0)
+	{
 		Engine::Level->Objects()[0].GetMesh()->RunAnimation(animTime);
+	}
 
 	Engine::UI->Loop();
 	Engine::Renderer->Loop();

@@ -24,6 +24,8 @@ struct Skeleton {
 	std::vector<aiMatrix4x4> finalTransformations;
 };
 
+static int numBoneUpdates = 0;
+
 class Mesh {
 	public:
 		Mesh();
