@@ -45,7 +45,7 @@ void Camera::CameraControl(glm::vec2 mouseDiff)
 {
 	float x = m_position.x;
 	float z = m_position.z;
-	float angle = glm::radians(3.0f);
+	float angle = glm::radians(90.0f) * Engine::DeltaFrameTime();
 
 	if (mouseDiff.x > 2.0f)
 		angle = angle;
@@ -67,9 +67,9 @@ void Camera::CameraControl(glm::vec2 mouseDiff)
 void Camera::CameraControl(float scroll)
 {
 	if (scroll > 0)
-		m_position /= 1.1f;
+		m_position /= (1.1f + Engine::DeltaFrameTime());
 	else
-		m_position *= 1.1f;
+		m_position *= (1.1f + Engine::DeltaFrameTime());
 
 	m_view_matrix = glm::lookAt(m_position, m_lookAt, m_up);
 

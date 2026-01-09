@@ -4,6 +4,7 @@
 #include <UI.h>
 #include <Level.h>
 #include "GLFW/glfw3.h"
+#include <chrono>
 
 class Engine {
 public:
@@ -11,6 +12,7 @@ public:
 	Engine(const Engine&) = delete;
 	Engine& operator=(const Engine&) = delete;
 	static bool Running();
+	static float DeltaFrameTime();
 
 	static Engine& Init() {
 		static Engine instance;
@@ -22,6 +24,8 @@ public:
 	static Camera* Camera;
 	static UI* UI;
 	static Level* Level;
+	static float m_deltaFrameTime;
+	static std::chrono::steady_clock::time_point m_prevFrameTime;
 private:
 	Engine();
 };

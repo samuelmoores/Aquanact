@@ -3,6 +3,8 @@
 #include <Object3D.h>
 #include <Animator.h>
 #include <Engine.h>
+#include <Windows.h>
+#include <chrono>
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
@@ -42,6 +44,8 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 
 }
 
+float animTime = 0.0f;
+
 void AquanactLoop()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -59,6 +63,13 @@ void AquanactLoop()
 		Engine::Camera->CameraControl(mouseDiff);
 		mouseLast = mouseCurr;
 	}
+
+	animTime += Engine::DeltaFrameTime();
+
+	std::cout << "fps: " << 1.0f / Engine::DeltaFrameTime() << std::endl;
+
+	if(Engine::Level->Objects().size() > 0)
+		Engine::Level->Objects()[0].GetMesh()->RunAnimation(animTime);
 
 	Engine::UI->Loop();
 	Engine::Renderer->Loop();

@@ -14,8 +14,8 @@ struct Vertex3D {
 	glm::vec2 texCoord;   // offset 12 (2 floats)
 	glm::vec3 normal;     // offset 20 (3 floats)
 
-	int boneIDs[4];         // 16 bytes (4 ints)
-	float weights[4];       // 16 bytes (4 floats)
+	int boneIDs[4] = {0, 0, 0, 0};         // 16 bytes (4 ints)
+	float weights[4] = { 0.0f, 0.0f, 0.0f, 0.0f };       // 16 bytes (4 floats)
 };
 
 struct Skeleton {
@@ -45,8 +45,18 @@ class Mesh {
 		bool intersectsRay(const glm::vec3& rayOrigin, const glm::vec3& rayDir) const;
 		const Skeleton& GetSkeleton() const;
 		void ReadNodeHeirarchy(const aiNode* node, const aiMatrix4x4& ParentTransform);
+		void ReadNodeHeirarchy(float animTimeTicks, const aiNode* node, const aiMatrix4x4& ParentTransform);
 		glm::vec3 minBounds();
 		glm::vec3 maxBounds();
+		void RunAnimation(float animTime);
+		const aiNodeAnim* FindNodeAnim(const aiAnimation* pAnimation, const std::string& NodeName);
+		int FindScaling(float AnimationTimeTicks, const aiNodeAnim* pNodeAnim);
+		void CalcInterpolatedScaling(aiVector3D& Out, float AnimationTimeTicks, const aiNodeAnim* pNodeAnim);
+		int FindRotation(float AnimationTimeTicks, const aiNodeAnim* pNodeAnim);
+		void CalcInterpolatedRotation(aiQuaternion& Out, float AnimationTimeTicks, const aiNodeAnim* pNodeAnim);
+		int FindPosition(float AnimationTimeTicks, const aiNodeAnim* pNodeAnim);
+		void CalcInterpolatedPosition(aiVector3D& Out, float AnimationTimeTicks, const aiNodeAnim* pNodeAnim);
+
 	private:
 		std::vector<Vertex3D> m_vertices;
 		std::vector<uint32_t> m_faces;
@@ -60,4 +70,5 @@ class Mesh {
 		Skeleton m_skeleton;
 		Assimp::Importer m_importer;
 		const aiScene* m_scene;
+		aiMatrix4x4 m_GlobalInverseTransform;
 };

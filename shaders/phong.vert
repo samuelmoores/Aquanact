@@ -24,7 +24,15 @@ void main()
     BoneIDs = vBoneIDs;
     Weights = vWeights;
 
-    mat4 BoneTransform = finalBones[BoneIDs[0]] * Weights[0];
+    mat4 BoneTransform = mat4(0.0);
+
+    //for (int i = 0; i < 4; i++)
+    //{
+    //    if (BoneIDs[i] >= 0 && Weights[i] > 0.0)
+    //        BoneTransform += finalBones[BoneIDs[i]] * Weights[i];
+    //}
+
+    BoneTransform = finalBones[BoneIDs[0]] * Weights[0];
     BoneTransform     += finalBones[BoneIDs[1]] * Weights[1];
     BoneTransform     += finalBones[BoneIDs[2]] * Weights[2];
     BoneTransform     += finalBones[BoneIDs[3]] * Weights[3];
