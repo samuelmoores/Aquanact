@@ -9,6 +9,7 @@ layout (location = 4) in vec4 vWeights;
 uniform mat4 projection;
 uniform mat4 view;
 uniform mat4 model;
+uniform bool skinned;
 uniform mat4 finalBones[200];
 
 out vec2 TexCoord;
@@ -26,19 +27,16 @@ void main()
 
     mat4 BoneTransform = mat4(0.0);
 
-    //for (int i = 0; i < 4; i++)
-    //{
-    //    if (BoneIDs[i] >= 0 && Weights[i] > 0.0)
-    //        BoneTransform += finalBones[BoneIDs[i]] * Weights[i];
-    //}
-
     BoneTransform = finalBones[BoneIDs[0]] * Weights[0];
     BoneTransform     += finalBones[BoneIDs[1]] * Weights[1];
     BoneTransform     += finalBones[BoneIDs[2]] * Weights[2];
     BoneTransform     += finalBones[BoneIDs[3]] * Weights[3];
+ 
+    vec4 PosL = vec4(vPosition, 1.0);
 
-    vec4 PosL = BoneTransform * vec4(vPosition, 1.0);
-    //vec4 PosL = vec4(vPosition, 1.0);
+    if(skinned)
+        PosL = BoneTransform * vec4(vPosition, 1.0);
+    
 
     // Final vertex position
     gl_Position = projection * view * model * PosL;

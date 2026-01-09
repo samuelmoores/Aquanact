@@ -54,6 +54,7 @@ void Renderer::Flush(Camera* camera)
 		commands[i].shader->setUniform("view", camera->GetViewMatrix());
 		commands[i].shader->setUniform("projection", camera->GetProjectionMatrix());
 		commands[i].shader->setUniform("viewPos", camera->GetPosition());
+		commands[i].shader->setUniform("skinned", commands[i].isSkinned);
 
 		//apply transforms
 		if (commands[i].isSkinned)

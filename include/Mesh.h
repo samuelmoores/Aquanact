@@ -31,25 +31,35 @@ class Mesh {
 		Mesh();
 		Mesh(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces);
 		Mesh(char modelFile[]);
-		Mesh(const char* modelFile, const char* textureFile, const char* normalMap);
+		
+		//loading
 		void assimpLoad(const std::string& path, bool flipUvs);
 		void fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, std::vector<uint32_t>& faces);
-		void SetBuffers();
-		void SetTexture(const char* colorFile);
-		void SetTextureMemory(aiTexture* text);
-		void SetNormalMap(const char* normalMap);
+		void ReadNodeHeirarchy(const aiNode* node, const aiMatrix4x4& ParentTransform);
+		
+		//open gl
 		void Bind() const;
 		void UnBind() const;
 		uint32_t FacesSize() const;
+		
+		//bounding box
 		void updateAABB(glm::vec3 position, glm::vec3 scale);
 		glm::vec3 centerAABB();
 		glm::vec3 dimensionAABB();
 		bool intersectsRay(const glm::vec3& rayOrigin, const glm::vec3& rayDir) const;
-		const Skeleton& GetSkeleton() const;
-		void ReadNodeHeirarchy(const aiNode* node, const aiMatrix4x4& ParentTransform);
-		void ReadNodeHeirarchy(float animTimeTicks, const aiNode* node, const aiMatrix4x4& ParentTransform);
 		glm::vec3 minBounds();
 		glm::vec3 maxBounds();
+
+		//getter setter
+		void SetBuffers();
+		void SetTexture(const char* colorFile);
+		void SetTextureMemory(aiTexture* text);
+		void SetNormalMap(const char* normalMap);
+		const Skeleton& GetSkeleton() const;
+		bool Skinned();
+
+		//animation
+		void ReadNodeHeirarchy(float animTimeTicks, const aiNode* node, const aiMatrix4x4& ParentTransform);
 		void RunAnimation(float animTime);
 		const aiNodeAnim* FindNodeAnim(const aiAnimation* pAnimation, const std::string& NodeName);
 		int FindScaling(float AnimationTimeTicks, const aiNodeAnim* pNodeAnim);
@@ -73,4 +83,5 @@ class Mesh {
 		Assimp::Importer m_importer;
 		const aiScene* m_scene;
 		aiMatrix4x4 m_GlobalInverseTransform;
+		bool m_skinned;
 };

@@ -27,10 +27,10 @@ Object3D::Object3D(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 	m_scale = glm::vec3(1);
 }
 
-Object3D::Object3D(char modelFile[], bool skinned)
+Object3D::Object3D(char modelFile[])
 {
 	m_mesh = new Mesh(modelFile);
-	m_skinned = skinned;
+	m_skinned = m_mesh->Skinned();
 
 	//  | Description      | Values: ambient,diffuse,specular,shin |
 	//	| ---------------- | ------------------------------------- |
@@ -44,30 +44,6 @@ Object3D::Object3D(char modelFile[], bool skinned)
 	m_shader.load("shaders/phong.vert", "shaders/phong.frag");
 	m_shader.activate();                      
 	m_shader.setUniform("material", glm::vec4(0.2f, 0.7f, 0.1f, 8.0f));
-	m_shader.setUniform("ambientColor", glm::vec3(0.2f, 0.2f, 0.2f));
-	m_shader.setUniform("directionalColor", glm::vec3(1, 1, 1));
-	m_shader.setUniform("directionalLight", glm::vec3(-3, -3, -3));
-
-	m_position = glm::vec3(0);
-	m_rotation = glm::vec3(0);
-	m_scale = glm::vec3(1);
-}
-
-Object3D::Object3D(const char* modelFile, const char* textureFile, const char* normalMap)
-{
-	m_mesh = new Mesh(modelFile, textureFile, normalMap);
-
-	m_shader.load("shaders/phong.vert", "shaders/phong.frag");
-	m_shader.activate();
-	//  | Description      | Values: ambient,diffuse,specular,shin |
-	//	| ---------------- | ------------------------------------- |
-	//	| Matte surface    | `glm::vec4(0.3f, 0.7f, 0.1f, 8.0f)`   |
-	//	| Shiny surface    | `glm::vec4(0.1f, 0.5f, 1.0f, 128.0f)` |
-	//	| Full bright test | `glm::vec4(1.0f, 1.0f, 1.0f, 1.0f)`   |
-	//	| Only diffuse     | `glm::vec4(0.0f, 1.0f, 0.0f, 1.0f)`   |
-	//	| Only specular    | `glm::vec4(0.0f, 0.0f, 1.0f, 64.0f)`  |
-	//                         
-	m_shader.setUniform("material", glm::vec4(1.0f, 0.5f, 0.9f, 228.0f));
 	m_shader.setUniform("ambientColor", glm::vec3(0.2f, 0.2f, 0.2f));
 	m_shader.setUniform("directionalColor", glm::vec3(1, 1, 1));
 	m_shader.setUniform("directionalLight", glm::vec3(-3, -3, -3));

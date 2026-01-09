@@ -5,11 +5,53 @@
 #include <stb_image.h>
 
 const int VERTICES_PER_FACE = 3;
+void AddBoneData(Vertex3D& vertex, int boneID, float weight) 
+{
+	for (int i = 0; i < 4; i++) 
+	{
+		if (vertex.boneIDs[i] == 0) 
+		{
+			vertex.boneIDs[i] = boneID;
+			vertex.weights[i] = weight;
+			return;
+		}
+	}
+
+	//more than 4 weights
+	assert(0);
+}
+void printMatrix(const aiMatrix4x4& m) {
+	// Set precision and fixed notation
+	std::cout << std::fixed << std::setprecision(3);
+
+	// Print each row with proper alignment
+	// Width of 9 accommodates sign, digits, decimal point, and precision
+	std::cout << "[ "
+		<< std::setw(9) << m.a1 << " "
+		<< std::setw(9) << m.a2 << " "
+		<< std::setw(9) << m.a3 << " "
+		<< std::setw(9) << m.a4 << " ]\n";
+	std::cout << "[ "
+		<< std::setw(9) << m.b1 << " "
+		<< std::setw(9) << m.b2 << " "
+		<< std::setw(9) << m.b3 << " "
+		<< std::setw(9) << m.b4 << " ]\n";
+	std::cout << "[ "
+		<< std::setw(9) << m.c1 << " "
+		<< std::setw(9) << m.c2 << " "
+		<< std::setw(9) << m.c3 << " "
+		<< std::setw(9) << m.c4 << " ]\n";
+	std::cout << "[ "
+		<< std::setw(9) << m.d1 << " "
+		<< std::setw(9) << m.d2 << " "
+		<< std::setw(9) << m.d3 << " "
+		<< std::setw(9) << m.d4 << " ]\n";
+	std::cout << "----------------------------------------------\n";
+}
 
 Mesh::Mesh()
 {
 }
-
 Mesh::Mesh(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 {
 	m_vertices = vertices;
@@ -26,11 +68,9 @@ Mesh::Mesh(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 	SetTexture("models/brick_wall_diff.png");
 	SetNormalMap("models/brick_wall_norm.png");
 }
-
 Mesh::Mesh(char modelFile[])
 {
 	assimpLoad(modelFile, true);
-
 
 	//debug skeleton code
 	if (false)
@@ -81,60 +121,186 @@ Mesh::Mesh(char modelFile[])
 	SetBuffers();
 }
 
-Mesh::Mesh(const char* modelFile, const char* textureFile, const char* normalMap)
+//loading
+void Mesh::assimpLoad(const std::string& path, bool flipUvs) 
 {
-	assimpLoad(modelFile, true);
-
-	SetBuffers();
-	SetTexture(textureFile);
-	SetNormalMap(normalMap);
-}
-
-void AddBoneData(Vertex3D& vertex, int boneID, float weight) 
-{
-	for (int i = 0; i < 4; i++) 
+	int flags = (aiPostProcessSteps)aiProcessPreset_TargetRealtime_MaxQuality;
+	
+	if (flipUvs) 
 	{
-		if (vertex.boneIDs[i] == 0) 
+		flags |= aiProcess_FlipUVs;
+	}
+
+	m_scene = m_importer.ReadFile(path, flags | aiProcess_Triangulate | aiProcess_JoinIdenticalVertices);
+
+	// If the import failed, report it
+	if (nullptr == m_scene) 
+	{
+		std::cout << "ASSIMP ERROR: " << m_importer.GetErrorString() << std::endl;
+		exit(1);
+	}
+	else 
+	{
+		m_GlobalInverseTransform = m_scene->mRootNode->mTransformation;
+		m_GlobalInverseTransform = m_GlobalInverseTransform.Inverse();
+
+		std::vector<Vertex3D> vertices;
+		std::vector<uint32_t> faces;
+
+		//process vertices, faces and bones
+		fromAssimpMesh(m_scene->mMeshes[0], vertices, faces);
+
+		m_skeleton.finalTransformations.resize(m_skeleton.boneOffsetMatrices.size());
+
+		std::cout << "vertice[0]: " << vertices[0].position.x << vertices[0].position.y << vertices[0].position.z << std::endl;
+
+		
+		if (m_skinned) { ReadNodeHeirarchy(m_scene->mRootNode, aiMatrix4x4()); };
+		std::cout << "vertice[0]: " << vertices[0].position.x << vertices[0].position.y << vertices[0].position.z << std::endl;
+
+		m_vertices = vertices;
+		m_faces = faces;
+
+		//================== Materials =================================
+
+		aiMaterial* mat = m_scene->mMaterials[0];
+		unsigned int textureCount = mat->GetTextureCount(aiTextureType_DIFFUSE);
+
+		if (textureCount > 0)
 		{
-			vertex.boneIDs[i] = boneID;
-			vertex.weights[i] = weight;
+			aiString texturePath;
+			mat->GetTexture(aiTextureType_DIFFUSE, 0, &texturePath);
+
+			// Extract just the filename
+			std::string matPath = "";
+			std::string textureFile = texturePath.C_Str();
+
+			size_t lastSlash = textureFile.find_last_of("/\\");
+			if (lastSlash != std::string::npos) 
+			{
+				textureFile = textureFile.substr(lastSlash + 1);
+			}
+
+			lastSlash = path.find_last_of("/\\");
+			if (lastSlash != std::string::npos)
+			{
+				matPath = path.substr(0, lastSlash+1);
+			}
+
+			std::string texturePath_string = matPath + textureFile;
+			SetTexture(texturePath_string.c_str());
 			return;
+
+			// Search embedded textures for a matching name
+			aiTexture* embeddedTexture = nullptr;
+			for (unsigned int i = 0; i < m_scene->mNumTextures; i++) 
+			{
+				std::string embeddedName = m_scene->mTextures[i]->mFilename.C_Str();
+				size_t lastSlash2 = embeddedName.find_last_of("/\\");
+			
+				if (lastSlash2 != std::string::npos) 
+				{
+					embeddedName = embeddedName.substr(lastSlash2 + 1);
+				}
+
+				if (embeddedName == textureFile) 
+				{
+					embeddedTexture = m_scene->mTextures[i];
+					break;
+				}
+			}
+
+			if (embeddedTexture) 
+			{
+				// Load from memory as I showed before
+				if (embeddedTexture->mHeight == 0) 
+				{
+					//SetTextureMemory(embeddedTexture);
+				}
+			}
+		}
+	}
+}
+void Mesh::fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, std::vector<uint32_t>& faces)
+{
+	int numVertices = mesh->mNumVertices;
+	int numIndices = mesh->mNumFaces * 3;
+	int numBones = mesh->mNumBones;
+
+	//-------------------process vertices--------------------
+	for (size_t i{ 0 }; i < numVertices; ++i)
+	{
+		glm::vec3 position = { mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z };
+
+		glm::vec2 texCoord = glm::vec2(0.0f); // Default if no texcoords
+		if (mesh->mTextureCoords[0]) {
+		texCoord = {
+			mesh->mTextureCoords[0][i].x,
+			mesh->mTextureCoords[0][i].y
+		};
+	}
+
+		glm::vec3 normal = glm::vec3(0.0f);
+		if (mesh->HasNormals()) {
+		normal = {
+			mesh->mNormals[i].x,
+			mesh->mNormals[i].y,
+			mesh->mNormals[i].z
+		};
+	}
+
+		vertices.push_back({ position, texCoord, normal });
+	}
+	
+	//-------------process faces---------------------------
+	faces.reserve(mesh->mNumFaces * VERTICES_PER_FACE);
+	for (size_t i{ 0 }; i < mesh->mNumFaces; ++i) 
+	{
+		// We assume the faces are triangular, so we push three face indexes at a time into our faces list.
+		faces.push_back(mesh->mFaces[i].mIndices[0]);
+		faces.push_back(mesh->mFaces[i].mIndices[1]);
+		faces.push_back(mesh->mFaces[i].mIndices[2]);
+	}
+
+	m_skinned = mesh->mNumBones != 0;
+	if (!m_skinned) return;
+	
+	//-------------process bones-------------------
+	std::map<std::string, int> boneMap = m_skeleton.boneMapping;
+	m_skeleton.boneOffsetMatrices.resize(numBones);
+	for (int j = 0; j < numBones; j++)
+	{
+		int boneID = 0;
+		aiBone* bone = mesh->mBones[j];
+		std::string boneName = bone->mName.C_Str();
+
+
+		if (boneMap.find(boneName) == boneMap.end())
+		{
+			boneID = boneMap.size();
+		
+			if (boneID == 0)
+				int titMilk = 69;
+			
+			boneMap[boneName] = boneID;
+			m_skeleton.boneOffsetMatrices[boneID] = bone->mOffsetMatrix;
+		}
+		else
+		{
+			boneID = boneMap.find(boneName)->second;
+		}
+
+		for (int k = 0; k < bone->mNumWeights; k++)
+		{
+			const aiVertexWeight& vw = bone->mWeights[k];
+			float weight = vw.mWeight;
+			int globalVertexID = vw.mVertexId;
+			AddBoneData(vertices[globalVertexID], boneID, weight);
 		}
 	}
 
-	//more than 4 weights
-	assert(0);
+	m_skeleton.boneMapping = boneMap;
 }
-
-void printMatrix(const aiMatrix4x4& m) {
-	// Set precision and fixed notation
-	std::cout << std::fixed << std::setprecision(3);
-
-	// Print each row with proper alignment
-	// Width of 9 accommodates sign, digits, decimal point, and precision
-	std::cout << "[ "
-		<< std::setw(9) << m.a1 << " "
-		<< std::setw(9) << m.a2 << " "
-		<< std::setw(9) << m.a3 << " "
-		<< std::setw(9) << m.a4 << " ]\n";
-	std::cout << "[ "
-		<< std::setw(9) << m.b1 << " "
-		<< std::setw(9) << m.b2 << " "
-		<< std::setw(9) << m.b3 << " "
-		<< std::setw(9) << m.b4 << " ]\n";
-	std::cout << "[ "
-		<< std::setw(9) << m.c1 << " "
-		<< std::setw(9) << m.c2 << " "
-		<< std::setw(9) << m.c3 << " "
-		<< std::setw(9) << m.c4 << " ]\n";
-	std::cout << "[ "
-		<< std::setw(9) << m.d1 << " "
-		<< std::setw(9) << m.d2 << " "
-		<< std::setw(9) << m.d3 << " "
-		<< std::setw(9) << m.d4 << " ]\n";
-	std::cout << "----------------------------------------------\n";
-}
-
 void Mesh::ReadNodeHeirarchy(const aiNode* node, const aiMatrix4x4& ParentTransform)
 {
 	const std::string name = node->mName.C_Str();
@@ -154,16 +320,100 @@ void Mesh::ReadNodeHeirarchy(const aiNode* node, const aiMatrix4x4& ParentTransf
 	}
 }
 
+//opengl
+void Mesh::Bind() const
+{
+	glBindVertexArray(m_vao);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, m_textureColor);
+
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, m_textureNormal);
+
+}
+void Mesh::UnBind() const
+{
+	glBindVertexArray(0);
+	glBindTexture(GL_TEXTURE, 0);
+
+}
+uint32_t Mesh::FacesSize() const
+{
+	return m_faces.size();
+}
+
+//bounding box
 glm::vec3 Mesh::minBounds()
 {
 	return m_meshMinBounds;
 }
-
 glm::vec3 Mesh::maxBounds()
 {
 	return m_meshMaxBounds;
 }
+void Mesh::updateAABB(glm::vec3 position, glm::vec3 scale)
+{
+	m_minBounds = position + m_meshMinBounds;
+	m_maxBounds = position + m_meshMaxBounds;
+	m_minBounds *= scale;
+	m_maxBounds *= scale;
 
+	// Ensure correct ordering if scale is negative
+	for (int i = 0; i < 3; ++i) 
+	{
+		if (m_minBounds[i] > m_maxBounds[i])
+			std::swap(m_minBounds[i], m_maxBounds[i]);
+	}
+}
+glm::vec3 Mesh::centerAABB()
+{
+	glm::vec3 center;
+	center.x = (m_minBounds.x + m_maxBounds.x) / 2;
+	center.y = (m_minBounds.y + m_maxBounds.y) / 2;
+	center.z = (m_minBounds.z + m_maxBounds.z) / 2;
+	return center;
+}
+glm::vec3 Mesh::dimensionAABB()
+{
+	glm::vec3 dimensions;
+	dimensions.x = m_maxBounds.x - m_minBounds.x;
+	dimensions.x = m_maxBounds.y - m_minBounds.y;
+	dimensions.x = m_maxBounds.z - m_minBounds.z;
+	return dimensions;
+}
+bool Mesh::intersectsRay(const glm::vec3& rayOrigin, const glm::vec3& rayDir) const
+{
+	float tMin = 0.0f;
+	float tMax = 1e6f;
+
+	for (int i = 0; i < 3; ++i) 
+	{
+		if (std::abs(rayDir[i]) < 1e-6f) 
+		{
+			// Ray is parallel to slab
+			if (rayOrigin[i] < m_minBounds[i] || rayOrigin[i] > m_maxBounds[i])
+				return false;
+		}
+		else 
+		{
+			float ood = 1.0f / rayDir[i];
+			float t1 = (m_minBounds[i] - rayOrigin[i]) * ood;
+			float t2 = (m_maxBounds[i] - rayOrigin[i]) * ood;
+			if (t1 > t2) std::swap(t1, t2);
+
+			tMin = std::max(tMin, t1);
+			tMax = std::min(tMax, t2);
+
+			if (tMin > tMax)
+				return false;
+		}
+	}
+
+	return true;
+}
+
+//animation
 void Mesh::RunAnimation(float animTime)
 {
 	aiMatrix4x4 I = aiMatrix4x4();
@@ -174,7 +424,6 @@ void Mesh::RunAnimation(float animTime)
 	ReadNodeHeirarchy(animTimeTicks, m_scene->mRootNode, I);
 	int tit = 9;
 }
-
 const aiNodeAnim* Mesh::FindNodeAnim(const aiAnimation* pAnimation, const std::string& NodeName)
 {
 	for (int i = 0; i < pAnimation->mNumChannels; i++) {
@@ -187,8 +436,6 @@ const aiNodeAnim* Mesh::FindNodeAnim(const aiAnimation* pAnimation, const std::s
 
 	return nullptr;
 }
-
-// Function that creates a scaling matrix from a aiVector3D
 aiMatrix4x4 CreateScalingMatrix(const aiVector3D& scale)
 {
 	aiMatrix4x4 scalingMatrix;
@@ -207,7 +454,6 @@ aiMatrix4x4 CreateScalingMatrix(const aiVector3D& scale)
 
 	return scalingMatrix;
 }
-
 aiMatrix4x4 CreateTranslationMatrix(const aiVector3D& translation)
 {
 	aiMatrix4x4 translationMatrix;
@@ -220,7 +466,6 @@ aiMatrix4x4 CreateTranslationMatrix(const aiVector3D& translation)
 
 	return translationMatrix;
 }
-
 int Mesh::FindPosition(float AnimationTimeTicks, const aiNodeAnim* pNodeAnim)
 {
 	for (int i = 0; i < pNodeAnim->mNumPositionKeys - 1; i++) {
@@ -232,8 +477,6 @@ int Mesh::FindPosition(float AnimationTimeTicks, const aiNodeAnim* pNodeAnim)
 
 	return 0;
 }
-
-
 void Mesh::CalcInterpolatedPosition(aiVector3D& Out, float AnimationTimeTicks, const aiNodeAnim* pNodeAnim)
 {
 	// we need at least two values to interpolate...
@@ -255,7 +498,6 @@ void Mesh::CalcInterpolatedPosition(aiVector3D& Out, float AnimationTimeTicks, c
 	aiVector3D Delta = End - Start;
 	Out = Start + Factor * Delta;
 }
-
 int Mesh::FindRotation(float AnimationTimeTicks, const aiNodeAnim* pNodeAnim)
 {
 	assert(pNodeAnim->mNumRotationKeys > 0);
@@ -269,8 +511,6 @@ int Mesh::FindRotation(float AnimationTimeTicks, const aiNodeAnim* pNodeAnim)
 
 	return 0;
 }
-
-
 void Mesh::CalcInterpolatedRotation(aiQuaternion& Out, float AnimationTimeTicks, const aiNodeAnim* pNodeAnim)
 {
 	// we need at least two values to interpolate...
@@ -292,8 +532,6 @@ void Mesh::CalcInterpolatedRotation(aiQuaternion& Out, float AnimationTimeTicks,
 	aiQuaternion::Interpolate(Out, StartRotationQ, EndRotationQ, Factor);
 	Out.Normalize();
 }
-
-
 int Mesh::FindScaling(float AnimationTimeTicks, const aiNodeAnim* pNodeAnim)
 {
 	assert(pNodeAnim->mNumScalingKeys > 0);
@@ -307,8 +545,6 @@ int Mesh::FindScaling(float AnimationTimeTicks, const aiNodeAnim* pNodeAnim)
 
 	return 0;
 }
-
-
 void Mesh::CalcInterpolatedScaling(aiVector3D& Out, float AnimationTimeTicks, const aiNodeAnim* pNodeAnim)
 {
 	// we need at least two values to interpolate...
@@ -330,7 +566,6 @@ void Mesh::CalcInterpolatedScaling(aiVector3D& Out, float AnimationTimeTicks, co
 	aiVector3D Delta = End - Start;
 	Out = Start + Factor * Delta;
 }
-
 void Mesh::ReadNodeHeirarchy(float animTimeTicks, const aiNode* node, const aiMatrix4x4& ParentTransform)
 {
 	bool debugMatrices = false;
@@ -434,183 +669,7 @@ void Mesh::ReadNodeHeirarchy(float animTimeTicks, const aiNode* node, const aiMa
 	}
 }
 
-void Mesh::fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, std::vector<uint32_t>& faces)
-{
-	int numVertices = mesh->mNumVertices;
-	int numIndices = mesh->mNumFaces * 3;
-	int numBones = mesh->mNumBones;
-
-	//-------------------process vertices--------------------
-	for (size_t i{ 0 }; i < numVertices; ++i)
-	{
-		glm::vec3 position = { mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z };
-
-		glm::vec2 texCoord = glm::vec2(0.0f); // Default if no texcoords
-		if (mesh->mTextureCoords[0]) {
-		texCoord = {
-			mesh->mTextureCoords[0][i].x,
-			mesh->mTextureCoords[0][i].y
-		};
-	}
-
-		glm::vec3 normal = glm::vec3(0.0f);
-		if (mesh->HasNormals()) {
-		normal = {
-			mesh->mNormals[i].x,
-			mesh->mNormals[i].y,
-			mesh->mNormals[i].z
-		};
-	}
-
-		vertices.push_back({ position, texCoord, normal });
-	}
-	
-	//-------------process faces---------------------------
-	faces.reserve(mesh->mNumFaces * VERTICES_PER_FACE);
-	for (size_t i{ 0 }; i < mesh->mNumFaces; ++i) 
-	{
-		// We assume the faces are triangular, so we push three face indexes at a time into our faces list.
-		faces.push_back(mesh->mFaces[i].mIndices[0]);
-		faces.push_back(mesh->mFaces[i].mIndices[1]);
-		faces.push_back(mesh->mFaces[i].mIndices[2]);
-	}
-
-	//-------------process bones-------------------
-	std::map<std::string, int> boneMap = m_skeleton.boneMapping;
-	m_skeleton.boneOffsetMatrices.resize(numBones);
-	for (int j = 0; j < numBones; j++)
-	{
-		int boneID = 0;
-		aiBone* bone = mesh->mBones[j];
-		std::string boneName = bone->mName.C_Str();
-
-
-		if (boneMap.find(boneName) == boneMap.end())
-		{
-			boneID = boneMap.size();
-		
-			if (boneID == 0)
-				int titMilk = 69;
-			
-			boneMap[boneName] = boneID;
-			m_skeleton.boneOffsetMatrices[boneID] = bone->mOffsetMatrix;
-		}
-		else
-		{
-			boneID = boneMap.find(boneName)->second;
-		}
-
-		for (int k = 0; k < bone->mNumWeights; k++)
-		{
-			const aiVertexWeight& vw = bone->mWeights[k];
-			float weight = vw.mWeight;
-			int globalVertexID = vw.mVertexId;
-			if (globalVertexID == 0)
-				std::cout << "vertex[0] is affected by bone: " << boneName << std::endl;
-			AddBoneData(vertices[globalVertexID], boneID, weight);
-		}
-	}
-
-	
-	m_skeleton.boneMapping = boneMap;
-}
-
-void Mesh::assimpLoad(const std::string& path, bool flipUvs) 
-{
-	int flags = (aiPostProcessSteps)aiProcessPreset_TargetRealtime_MaxQuality;
-	
-	if (flipUvs) 
-	{
-		flags |= aiProcess_FlipUVs;
-	}
-
-	m_scene = m_importer.ReadFile(path, flags | aiProcess_Triangulate | aiProcess_JoinIdenticalVertices);
-
-	// If the import failed, report it
-	if (nullptr == m_scene) 
-	{
-		std::cout << "ASSIMP ERROR: " << m_importer.GetErrorString() << std::endl;
-		exit(1);
-	}
-	else 
-	{
-		m_GlobalInverseTransform = m_scene->mRootNode->mTransformation;
-		m_GlobalInverseTransform = m_GlobalInverseTransform.Inverse();
-
-		std::vector<Vertex3D> vertices;
-		std::vector<uint32_t> faces;
-
-		//process vertices, faces and bones
-		fromAssimpMesh(m_scene->mMeshes[0], vertices, faces);
-
-		m_skeleton.finalTransformations.resize(m_skeleton.boneOffsetMatrices.size());
-
-		aiMatrix4x4 m = aiMatrix4x4();
-		ReadNodeHeirarchy(m_scene->mRootNode, m);
-
-		m_vertices = vertices;
-		m_faces = faces;
-
-		//================== Materials =================================
-
-		aiMaterial* mat = m_scene->mMaterials[0];
-		unsigned int textureCount = mat->GetTextureCount(aiTextureType_DIFFUSE);
-
-		if (true)
-		{
-			aiString texturePath;
-			mat->GetTexture(aiTextureType_DIFFUSE, 0, &texturePath);
-
-			// Extract just the filename
-			std::string matPath = "";
-			std::string textureFile = texturePath.C_Str();
-
-			size_t lastSlash = textureFile.find_last_of("/\\");
-			if (lastSlash != std::string::npos) 
-			{
-				textureFile = textureFile.substr(lastSlash + 1);
-			}
-
-			lastSlash = path.find_last_of("/\\");
-			if (lastSlash != std::string::npos)
-			{
-				matPath = path.substr(0, lastSlash+1);
-			}
-
-			std::string texturePath_string = matPath + textureFile;
-
-
-			// Search embedded textures for a matching name
-			aiTexture* embeddedTexture = nullptr;
-			for (unsigned int i = 0; i < m_scene->mNumTextures; i++) 
-			{
-				std::string embeddedName = m_scene->mTextures[i]->mFilename.C_Str();
-				size_t lastSlash2 = embeddedName.find_last_of("/\\");
-			
-				if (lastSlash2 != std::string::npos) 
-				{
-					embeddedName = embeddedName.substr(lastSlash2 + 1);
-				}
-
-				if (embeddedName == textureFile) 
-				{
-					embeddedTexture = m_scene->mTextures[i];
-					break;
-				}
-			}
-
-			if (embeddedTexture) 
-			{
-				// Load from memory as I showed before
-				if (embeddedTexture->mHeight == 0) 
-				{
-					SetTextureMemory(embeddedTexture);
-				}
-			}
-		}
-	}
-}
-
+//getter setter
 void Mesh::SetBuffers()
 {
 	// Generate a vertex array object on the GPU.
@@ -656,7 +715,6 @@ void Mesh::SetBuffers()
 	// Unbind the vertex array, so no one else can accidentally mess with it.
 	glBindVertexArray(0);
 }
-
 void Mesh::SetTexture(const char* colorFile)
 {
 	StbImage stb_image_color;
@@ -685,7 +743,6 @@ void Mesh::SetTexture(const char* colorFile)
 	glGenerateMipmap(GL_TEXTURE_2D);
 
 }
-
 void Mesh::SetTextureMemory(aiTexture* text)
 {
 	StbImage stb_image_color;
@@ -713,7 +770,6 @@ void Mesh::SetTextureMemory(aiTexture* text)
 	);
 	glGenerateMipmap(GL_TEXTURE_2D);
 }
-
 void Mesh::SetNormalMap(const char* normalMap)
 {
 	StbImage stb_image_normal;
@@ -741,96 +797,12 @@ void Mesh::SetNormalMap(const char* normalMap)
 	);
 	glGenerateMipmap(GL_TEXTURE_2D);
 }
-
-void Mesh::Bind() const
-{
-	glBindVertexArray(m_vao);
-
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, m_textureColor);
-
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, m_textureNormal);
-
-}
-
-void Mesh::UnBind() const
-{
-	glBindVertexArray(0);
-	glBindTexture(GL_TEXTURE, 0);
-
-}
-
-uint32_t Mesh::FacesSize() const
-{
-	return m_faces.size();
-}
-
-void Mesh::updateAABB(glm::vec3 position, glm::vec3 scale)
-{
-	m_minBounds = position + m_meshMinBounds;
-	m_maxBounds = position + m_meshMaxBounds;
-	m_minBounds *= scale;
-	m_maxBounds *= scale;
-
-	// Ensure correct ordering if scale is negative
-	for (int i = 0; i < 3; ++i) 
-	{
-		if (m_minBounds[i] > m_maxBounds[i])
-			std::swap(m_minBounds[i], m_maxBounds[i]);
-	}
-}
-
-glm::vec3 Mesh::centerAABB()
-{
-	glm::vec3 center;
-	center.x = (m_minBounds.x + m_maxBounds.x) / 2;
-	center.y = (m_minBounds.y + m_maxBounds.y) / 2;
-	center.z = (m_minBounds.z + m_maxBounds.z) / 2;
-	return center;
-}
-
-glm::vec3 Mesh::dimensionAABB()
-{
-	glm::vec3 dimensions;
-	dimensions.x = m_maxBounds.x - m_minBounds.x;
-	dimensions.x = m_maxBounds.y - m_minBounds.y;
-	dimensions.x = m_maxBounds.z - m_minBounds.z;
-	return dimensions;
-}
-
-bool Mesh::intersectsRay(const glm::vec3& rayOrigin, const glm::vec3& rayDir) const
-{
-	float tMin = 0.0f;
-	float tMax = 1e6f;
-
-	for (int i = 0; i < 3; ++i) 
-	{
-		if (std::abs(rayDir[i]) < 1e-6f) 
-		{
-			// Ray is parallel to slab
-			if (rayOrigin[i] < m_minBounds[i] || rayOrigin[i] > m_maxBounds[i])
-				return false;
-		}
-		else 
-		{
-			float ood = 1.0f / rayDir[i];
-			float t1 = (m_minBounds[i] - rayOrigin[i]) * ood;
-			float t2 = (m_maxBounds[i] - rayOrigin[i]) * ood;
-			if (t1 > t2) std::swap(t1, t2);
-
-			tMin = std::max(tMin, t1);
-			tMax = std::min(tMax, t2);
-
-			if (tMin > tMax)
-				return false;
-		}
-	}
-
-	return true;
-}
-
 const Skeleton& Mesh::GetSkeleton() const
 {
 	return m_skeleton;
+}
+
+bool Mesh::Skinned()
+{
+	return m_skinned;
 }

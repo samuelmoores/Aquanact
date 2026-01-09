@@ -68,7 +68,7 @@ void AquanactLoop()
 
 	if (Engine::Level->Objects().size() > 0)
 	{
-		Engine::Level->Objects()[0].GetMesh()->RunAnimation(animTime);
+		//Engine::Level->Objects()[0].GetMesh()->RunAnimation(animTime);
 	}
 
 	Engine::UI->Loop();
