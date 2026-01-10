@@ -320,29 +320,6 @@ void Mesh::ReadNodeHeirarchy(const aiNode* node, const aiMatrix4x4& ParentTransf
 	}
 }
 
-//opengl
-void Mesh::Bind() const
-{
-	glBindVertexArray(m_vao);
-
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, m_textureColor);
-
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, m_textureNormal);
-
-}
-void Mesh::UnBind() const
-{
-	glBindVertexArray(0);
-	glBindTexture(GL_TEXTURE, 0);
-
-}
-uint32_t Mesh::FacesSize() const
-{
-	return m_faces.size();
-}
-
 //bounding box
 glm::vec3 Mesh::minBounds()
 {
@@ -801,8 +778,30 @@ const Skeleton& Mesh::GetSkeleton() const
 {
 	return m_skeleton;
 }
-
 bool Mesh::Skinned()
 {
 	return m_skinned;
+}
+
+//opengl
+void Mesh::Bind() const
+{
+	glBindVertexArray(m_vao);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, m_textureColor);
+
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, m_textureNormal);
+
+}
+void Mesh::UnBind() const
+{
+	glBindVertexArray(0);
+	glBindTexture(GL_TEXTURE, 0);
+
+}
+uint32_t Mesh::FacesSize() const
+{
+	return m_faces.size();
 }

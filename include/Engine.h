@@ -13,6 +13,8 @@ public:
 	Engine& operator=(const Engine&) = delete;
 	static bool Running();
 	static float DeltaFrameTime();
+	static float TimeElapsed();
+	static void Tick();
 
 	static Engine& Init() {
 		static Engine instance;
@@ -26,6 +28,7 @@ public:
 	static Level* Level;
 	static float m_deltaFrameTime;
 	static std::chrono::steady_clock::time_point m_prevFrameTime;
+	static float m_timeElapsed;
 private:
 	Engine();
 };

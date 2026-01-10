@@ -59,6 +59,7 @@ void Renderer::Flush(Camera* camera)
 		//apply transforms
 		if (commands[i].isSkinned)
 		{
+			//send transforms to GPU
 			const auto& assimpTransforms = commands[i].mesh->GetSkeleton().finalTransformations;
 			std::vector<glm::mat4> glmTransforms;
 			glmTransforms.reserve(assimpTransforms.size());
@@ -92,6 +93,11 @@ void Renderer::Loop()
 	//only loops through the objects of one default level
 	for (int i = 0; i < objects.size(); i++)
 	{
+		if (objects[i].skinned())
+		{
+			objects[i].GetMesh()->RunAnimation(Engine::TimeElapsed());
+		}
+
 		RenderCommand rc;
 		rc.mesh = objects[i].GetMesh();
 		rc.shader = objects[i].GetShader();

@@ -49,6 +49,7 @@ float animTime = 0.0f;
 void AquanactLoop()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	Engine::Tick();
 
 	if (mouseDown)
 	{
@@ -62,13 +63,6 @@ void AquanactLoop()
 		// Left mouse button was pressed
 		Engine::Camera->CameraControl(mouseDiff);
 		mouseLast = mouseCurr;
-	}
-
-	animTime += Engine::DeltaFrameTime();
-
-	if (Engine::Level->Objects().size() > 0)
-	{
-		//Engine::Level->Objects()[0].GetMesh()->RunAnimation(animTime);
 	}
 
 	Engine::UI->Loop();

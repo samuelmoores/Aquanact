@@ -7,6 +7,7 @@ Camera* Engine::Camera = nullptr;
 UI* Engine::UI = nullptr;
 Level* Engine::Level = nullptr;
 float Engine::m_deltaFrameTime = 0.0f;
+float Engine::m_timeElapsed = 0.0f;
 std::chrono::steady_clock::time_point Engine::m_prevFrameTime = std::chrono::high_resolution_clock::now();
 
 Engine::Engine()
@@ -33,4 +34,14 @@ float Engine::DeltaFrameTime()
     float diffTimeSec = diffTime.count();
     m_prevFrameTime = currTime;
     return diffTimeSec;
+}
+
+float Engine::TimeElapsed()
+{
+    return m_timeElapsed;
+}
+
+void Engine::Tick()
+{
+    m_timeElapsed += DeltaFrameTime();
 }
