@@ -6,14 +6,14 @@
 #include <Windows.h>
 #include <chrono>
 
+glm::vec2 mouseLast(0);
+glm::vec2 mouseCurr(0);
+bool mouseDown = false;
+
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
 	Engine::Camera->CameraControl(yoffset);
 }
-
-glm::vec2 mouseLast(0);
-glm::vec2 mouseCurr(0);
-bool mouseDown = false;
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 {
@@ -44,8 +44,6 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 
 }
 
-float animTime = 0.0f;
-
 void AquanactLoop()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -55,12 +53,8 @@ void AquanactLoop()
 	{
 		double xpos, ypos;
 		glfwGetCursorPos(Engine::Window->GLFW(), &xpos, &ypos);
-
 		mouseCurr = glm::vec2(xpos, ypos);
-
 		glm::vec2 mouseDiff = mouseCurr - mouseLast;
-
-		// Left mouse button was pressed
 		Engine::Camera->CameraControl(mouseDiff);
 		mouseLast = mouseCurr;
 	}

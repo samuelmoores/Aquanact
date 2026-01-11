@@ -20,6 +20,7 @@ public:
 	void updateMeshAABB();
 	bool intersectsRayMesh(glm::vec3 origin, glm::vec3& direction);
 	bool skinned();
+	std::string Name();
 
 	//primitives
 
@@ -96,4 +97,5 @@ private:
 	glm::vec3 m_rotation;
 	glm::vec3 m_scale;
 	bool m_skinned;
+	std::string m_name;
 };

@@ -78,7 +78,8 @@ void Camera::CameraControl(float scroll)
 
 void Camera::Focus(glm::vec3 min, glm::vec3 max)
 {
-	//m_lookAt.y = (max.y - min.y) / 2.0f;
+	m_lookAt.y = (max.y - (min.y/2.0f)) / 2.0f;
+	m_position.y = (max.y + ((max.y / 2.0f)));
 	m_view_matrix = glm::lookAt(m_position, m_lookAt, m_up);
 }
 

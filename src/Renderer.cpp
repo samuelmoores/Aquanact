@@ -64,12 +64,8 @@ void Renderer::Flush(Camera* camera)
 			std::vector<glm::mat4> glmTransforms;
 			glmTransforms.reserve(assimpTransforms.size());
 
-			int boneID = 0; 
-
 			for (const aiMatrix4x4& aiMat : assimpTransforms)
 			{
-				//std::cout << "bone: " << boneID++ << std::endl;
-				//printMatrixRender(aiMat);
 				glmTransforms.push_back(AiToGlm(aiMat));
 			}
 

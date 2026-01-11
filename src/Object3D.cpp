@@ -51,6 +51,14 @@ Object3D::Object3D(char modelFile[])
 	m_position = glm::vec3(0);
 	m_rotation = glm::vec3(0);
 	m_scale = glm::vec3(1);
+
+	m_name = modelFile;
+
+	size_t lastSlash = m_name.find_last_of("/\\");
+	if (lastSlash != std::string::npos)
+	{
+		m_name = m_name.substr(lastSlash + 1);
+	}
 }
 
 Object3D::~Object3D()
@@ -111,4 +119,9 @@ bool Object3D::intersectsRayMesh(glm::vec3 origin, glm::vec3& direction)
 bool Object3D::skinned()
 {
 	return m_skinned;
+}
+
+std::string Object3D::Name()
+{
+	return m_name;
 }

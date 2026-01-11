@@ -4,7 +4,6 @@
 Level::Level()
 {
 
-
 }
 
 std::vector<Object3D> Level::Objects()
@@ -44,4 +43,5 @@ void Level::LoadObject(char filepath[])
 
 	objects.push_back(Object3D(filepath));
     Engine::Camera->Focus(objects[0].GetMesh()->minBounds(), objects[0].GetMesh()->maxBounds());
+
 }

@@ -15,6 +15,8 @@ UI::UI()
     // 3. Initialize backends
     ImGui_ImplGlfw_InitForOpenGL(Engine::Window->GLFW(), true);
     ImGui_ImplOpenGL3_Init("#version 330");  // or your GLSL version
+
+    selectedObj = nullptr;
 }
 
 void UI::Loop()
@@ -42,11 +44,9 @@ void UI::Loop()
     if (import)
         ImGui::OpenPopup("Import");
 
+    // Set the size before BeginPopupModal
     static char inputBuffer[256] = "";
 
-    // Set the size before BeginPopupModal
-
-    // Maybe some other stuff here.
     if (ImGui::BeginPopupModal("Import")) 
     {
         // Draw popup contents.
@@ -64,6 +64,29 @@ void UI::Loop()
 
         ImGui::EndPopup();
     }
+
+    ImGui::Begin("Objects");
+    std::vector<Object3D> objects = Engine::Level->Objects();
+  
+    //check if there are objects in the scene
+    for (int i = 0; i < objects.size(); i++)
+    {
+        //for each object, put a button in the box to select it
+        // Add a selectable button
+        if (ImGui::Button(objects[i].Name().data()))
+        {
+            // Set this object as selected when button is clicked
+            selectedObj = &objects[i];
+        }
+
+        if (selectedObj)
+        {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(0, 1, 0, 1), "< Selected >");
+        }
+    }
+
+    ImGui::End();
 
 	// Render
 	ImGui::Render();

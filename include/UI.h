@@ -10,5 +10,6 @@ public:
 	void Import();
 private:
 	static ImGuiIO* imgui_io;
+	Object3D* selectedObj;
 
 };
