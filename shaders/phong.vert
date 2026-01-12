@@ -3,8 +3,9 @@
 layout (location = 0) in vec3 vPosition;
 layout (location = 1) in vec2 vTexCoord;
 layout (location = 2) in vec3 vNormal;
-layout (location = 3) in ivec4 vBoneIDs;
-layout (location = 4) in vec4 vWeights;
+layout (location = 3) in vec3 vTangent;
+layout (location = 4) in ivec4 vBoneIDs;
+layout (location = 5) in vec4 vWeights;
 
 uniform mat4 projection;
 uniform mat4 view;
@@ -47,13 +48,4 @@ void main()
     // Pass texture coordinates
     TexCoord = vTexCoord;
 
-    Normal = mat3(transpose(inverse(model))) * vNormal;
-
-    mat3 normalMatrix = transpose(inverse(mat3(model)));
-
-    //vec3 N = normalize(normalMatrix * vNormal);
-    //vec3 T = normalize(normalMatrix * vTangent);
-    //vec3 B = normalize(cross(N, T)); // safest way
-
-    //TBN = mat3(T, B, N);
 }

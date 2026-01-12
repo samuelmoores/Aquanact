@@ -71,6 +71,7 @@ Mesh::Mesh(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 Mesh::Mesh(char modelFile[])
 {
 	assimpLoad(modelFile, true);
+	m_currentAnim = 0;
 
 	//debug skeleton code
 	if (false)
@@ -152,11 +153,7 @@ void Mesh::assimpLoad(const std::string& path, bool flipUvs)
 
 		m_skeleton.finalTransformations.resize(m_skeleton.boneOffsetMatrices.size());
 
-		std::cout << "vertice[0]: " << vertices[0].position.x << vertices[0].position.y << vertices[0].position.z << std::endl;
-
-		
 		if (m_skinned) { ReadNodeHeirarchy(m_scene->mRootNode, aiMatrix4x4()); };
-		std::cout << "vertice[0]: " << vertices[0].position.x << vertices[0].position.y << vertices[0].position.z << std::endl;
 
 		m_vertices = vertices;
 		m_faces = faces;
@@ -181,23 +178,25 @@ void Mesh::fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, s
 		glm::vec3 position = { mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z };
 
 		glm::vec2 texCoord = glm::vec2(0.0f); // Default if no texcoords
-		if (mesh->mTextureCoords[0]) {
-		texCoord = {
-			mesh->mTextureCoords[0][i].x,
-			mesh->mTextureCoords[0][i].y
-		};
-	}
+		
+		if (mesh->mTextureCoords[0]) 
+		{
+			texCoord = { mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y };
+		}
 
 		glm::vec3 normal = glm::vec3(0.0f);
-		if (mesh->HasNormals()) {
-		normal = {
-			mesh->mNormals[i].x,
-			mesh->mNormals[i].y,
-			mesh->mNormals[i].z
-		};
-	}
+		if (mesh->HasNormals()) 
+		{
+			normal = { mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z };
+		}
 
-		vertices.push_back({ position, texCoord, normal });
+		glm::vec3 tangent = glm::vec3(0.0f);
+		if (mesh->HasTangentsAndBitangents())
+		{
+			tangent = { mesh->mTangents[i].x, mesh->mTangents[i].y, mesh->mTangents[i].z };
+		}
+
+		vertices.push_back({ position, texCoord, normal, tangent });
 	}
 	
 	//-------------process faces---------------------------
@@ -267,7 +266,6 @@ void Mesh::ReadNodeHeirarchy(const aiNode* node, const aiMatrix4x4& ParentTransf
 		ReadNodeHeirarchy(node->mChildren[i], GlobalTransform);
 	}
 }
-
 void Mesh::LoadTexture(aiMaterial* mat, aiTextureType textureType, std::string path)
 {
 	aiString texturePath;
@@ -401,12 +399,11 @@ bool Mesh::intersectsRay(const glm::vec3& rayOrigin, const glm::vec3& rayDir) co
 void Mesh::RunAnimation(float animTime)
 {
 	aiMatrix4x4 I = aiMatrix4x4();
-	float ticksPerSec = (float)(m_scene->mAnimations[0]->mTicksPerSecond != 0 ? m_scene->mAnimations[0]->mTicksPerSecond : 60.0f);
+	float ticksPerSec = (float)(m_scene->mAnimations[m_currentAnim]->mTicksPerSecond != 0 ? m_scene->mAnimations[0]->mTicksPerSecond : 60.0f);
 	float timeTicks = animTime * ticksPerSec;
-	float animTimeTicks = fmod(timeTicks, (float)m_scene->mAnimations[0]->mDuration);
+	float animTimeTicks = fmod(timeTicks, (float)m_scene->mAnimations[m_currentAnim]->mDuration);
 
-	ReadNodeHeirarchy(animTimeTicks, m_scene->mRootNode, I);
-	int tit = 9;
+	ReadNodeHeirarchy(animTimeTicks, m_scene->mRootNode, I, m_currentAnim);
 }
 const aiNodeAnim* Mesh::FindNodeAnim(const aiAnimation* pAnimation, const std::string& NodeName)
 {
@@ -550,20 +547,21 @@ void Mesh::CalcInterpolatedScaling(aiVector3D& Out, float AnimationTimeTicks, co
 	aiVector3D Delta = End - Start;
 	Out = Start + Factor * Delta;
 }
-void Mesh::ReadNodeHeirarchy(float animTimeTicks, const aiNode* node, const aiMatrix4x4& ParentTransform)
+void Mesh::SetAnim(int animIndex)
+{
+	m_currentAnim = animIndex;
+}
+void Mesh::ReadNodeHeirarchy(float animTimeTicks, const aiNode* node, const aiMatrix4x4& ParentTransform, int animIndex)
 {
 	bool debugMatrices = false;
 
 	const std::string name = node->mName.C_Str();
 
-	const aiAnimation* anim = m_scene->mAnimations[0];
+	const aiAnimation* anim = m_scene->mAnimations[animIndex];
 	aiMatrix4x4 NodeTransformation(node->mTransformation);
 
 	if (name.find("$AssimpFbx$") != std::string::npos)
 		NodeTransformation = aiMatrix4x4();
-
-	if (name.find("Leg") != std::string::npos)
-		int tit = 00;
 
 	if (debugMatrices)
 	{
@@ -649,7 +647,7 @@ void Mesh::ReadNodeHeirarchy(float animTimeTicks, const aiNode* node, const aiMa
 	for (int i = 0; i < node->mNumChildren; i++)
 	{
 		//std::cout << "ReadNodeHeirarchy() parent: " << name << " | child: " << node->mChildren[i]->mName.C_Str() << std::endl;
-		ReadNodeHeirarchy(animTimeTicks, node->mChildren[i], GlobalTransform);
+		ReadNodeHeirarchy(animTimeTicks, node->mChildren[i], GlobalTransform, animIndex);
 	}
 }
 
@@ -683,12 +681,14 @@ void Mesh::SetBuffers()
 	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex3D), (void*)20);
 	glEnableVertexAttribArray(2); // normal
 
-	glVertexAttribIPointer(3, 4, GL_INT, sizeof(Vertex3D), (void*)32);
-	glEnableVertexAttribArray(3); // boneIDs
+	glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex3D), (void*)32);
+	glEnableVertexAttribArray(3); // tangents
 
-	glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex3D), (void*)48);
-	glEnableVertexAttribArray(4); // weights
+	glVertexAttribIPointer(4, 4, GL_INT, sizeof(Vertex3D), (void*)44);
+	glEnableVertexAttribArray(4); // boneIDs
 
+	glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex3D), (void*)60);
+	glEnableVertexAttribArray(5); // weights
 
 	// Generate a second buffer, to store the indices of each triangle in the mesh.
 	uint32_t ebo;

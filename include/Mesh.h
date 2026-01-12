@@ -13,6 +13,7 @@ struct Vertex3D {
 	glm::vec3 position;   // offset 0  (3 floats)
 	glm::vec2 texCoord;   // offset 12 (2 floats)
 	glm::vec3 normal;     // offset 20 (3 floats)
+	glm::vec3 tangent;    // offset 32 (3 floats)
 
 	int boneIDs[4] = {0, 0, 0, 0};         // 16 bytes (4 ints)
 	float weights[4] = { 0.0f, 0.0f, 0.0f, 0.0f };       // 16 bytes (4 floats)
@@ -60,7 +61,8 @@ class Mesh {
 		bool Skinned();
 
 		//animation
-		void ReadNodeHeirarchy(float animTimeTicks, const aiNode* node, const aiMatrix4x4& ParentTransform);
+		void SetAnim(int animIndex);
+		void ReadNodeHeirarchy(float animTimeTicks, const aiNode* node, const aiMatrix4x4& ParentTransform, int animIndex);
 		void RunAnimation(float animTime);
 		const aiNodeAnim* FindNodeAnim(const aiAnimation* pAnimation, const std::string& NodeName);
 		int FindScaling(float AnimationTimeTicks, const aiNodeAnim* pNodeAnim);
@@ -85,4 +87,5 @@ class Mesh {
 		const aiScene* m_scene;
 		aiMatrix4x4 m_GlobalInverseTransform;
 		bool m_skinned;
+		int m_currentAnim;
 };

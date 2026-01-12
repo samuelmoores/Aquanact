@@ -20,24 +20,18 @@ uniform int bone;
 
 void main()
 {
-	bool found = false;
+	vec3 norm;
 
-	for(int i = 0; i < 4; i++)
+	if (textureSize(normalMap, 0).x > 1) 
+	{ 
+		// Check if normal map exists
+	    vec3 tangentNormal = texture(normalMap, TexCoord).rgb * 2.0 - 1.0;
+	    norm = normalize(TBN * tangentNormal);
+	} 
+	else 
 	{
-		if(BoneIDs[i] == 0)
-		{
-			FragColor = vec4(1.0, 1.0, 1.0, 0.0) * Weights[i];
-			found = true;
-			break;
-		}
+	    norm = normalize(Normal);
 	}
-
-	//if(!found)
-		//FragColor = vec4(0.0, 0.5, 1.0, 0.0);
-
-	//return;
-
-	vec3 norm = normalize(Normal);
 
 	vec3 ambientIntensity = material.x * ambientColor;
 	vec3 diffuseIntensity = vec3(0);
@@ -61,5 +55,6 @@ void main()
 	}
 
 	vec3 lightIntensity = ambientIntensity + diffuseIntensity + specularIntensity;
-	FragColor = vec4(lightIntensity, 1) * texture(baseTexture, TexCoord);
+	//FragColor = vec4(lightIntensity, 1) * texture(baseTexture, TexCoord);
+	FragColor = texture(baseTexture, TexCoord);
 }

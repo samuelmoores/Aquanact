@@ -66,17 +66,17 @@ void UI::Loop()
     }
 
     ImGui::Begin("Objects");
-    std::vector<Object3D> objects = Engine::Level->Objects();
+    std::vector<Object3D*> objects = Engine::Level->Objects();
   
     //check if there are objects in the scene
     for (int i = 0; i < objects.size(); i++)
     {
         //for each object, put a button in the box to select it
         // Add a selectable button
-        if (ImGui::Button(objects[i].Name().data()))
+        if (ImGui::Button(objects[i]->Name().data()))
         {
             // Set this object as selected when button is clicked
-            selectedObj = &objects[i];
+            selectedObj = objects[i];
         }
 
         if (selectedObj)

@@ -6,6 +6,7 @@
 #include <Windows.h>
 #include <chrono>
 
+std::vector<Object3D*> objects;
 glm::vec2 mouseLast(0);
 glm::vec2 mouseCurr(0);
 bool mouseDown = false;
@@ -44,6 +45,23 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 
 }
 
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+	std::cout << "y rot: " << objects[0]->Rotation().y << std::endl;
+
+	if (key == GLFW_KEY_W && action == GLFW_PRESS)
+		objects[0]->GetMesh()->SetAnim(1);
+
+	if (key == GLFW_KEY_W && action == GLFW_RELEASE)
+		objects[0]->GetMesh()->SetAnim(0);
+	
+	if(key == GLFW_KEY_S && action == GLFW_PRESS)
+		objects[0]->Rotate(glm::vec3(0, glm::radians(-180.0f),  0));
+
+
+}
+
+
 void AquanactLoop()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -57,6 +75,18 @@ void AquanactLoop()
 		glm::vec2 mouseDiff = mouseCurr - mouseLast;
 		Engine::Camera->CameraControl(mouseDiff);
 		mouseLast = mouseCurr;
+	}
+
+	if (glfwGetKey(Engine::Window->GLFW(), GLFW_KEY_W) == GLFW_PRESS)
+	{
+		float moveSpeed = 10*Engine::DeltaFrameTime()*100000.0f;
+		objects[0]->Move(glm::vec3(0.0f, 0.0f, moveSpeed));
+	}
+
+	if (glfwGetKey(Engine::Window->GLFW(), GLFW_KEY_S) == GLFW_PRESS)
+	{
+		float moveSpeed = -10 * Engine::DeltaFrameTime() * 100000.0f;
+		objects[0]->Move(glm::vec3(0.0f, 0.0f, moveSpeed));
 	}
 
 	Engine::UI->Loop();
@@ -80,6 +110,9 @@ int main()
 
 	glfwSetScrollCallback(Engine::Window->GLFW(), scroll_callback);
 	glfwSetMouseButtonCallback(Engine::Window->GLFW(), mouse_button_callback);
+	glfwSetKeyCallback(Engine::Window->GLFW(), key_callback);
+
+	objects = Engine::Level->Objects();
 
 	while (Engine::Running())
 	{

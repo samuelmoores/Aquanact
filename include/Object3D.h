@@ -21,6 +21,8 @@ public:
 	bool intersectsRayMesh(glm::vec3 origin, glm::vec3& direction);
 	bool skinned();
 	std::string Name();
+	glm::vec3 Position();
+	glm::vec3 Rotation();
 
 	//primitives
 
@@ -98,4 +100,5 @@ private:
 	glm::vec3 m_scale;
 	bool m_skinned;
 	std::string m_name;
+	int m_currentAnimation;
 };

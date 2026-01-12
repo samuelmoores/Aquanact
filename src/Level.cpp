@@ -6,7 +6,7 @@ Level::Level()
 
 }
 
-std::vector<Object3D> Level::Objects()
+std::vector<Object3D*> Level::Objects()
 {
 	return objects;
 }
@@ -14,7 +14,7 @@ std::vector<Object3D> Level::Objects()
 void Level::Load()
 {
 	m_axis = Axis(1000.0f, 100.0f);
-    std::string filepathString = "C:\\Users\\samue\\Downloads\\Idle(2).fbx";
+    std::string filepathString = "models/w.fbx";
     //std::string filepathString = "models/Todd.obj";
     char* filepath = filepathString.data();
     LoadObject(filepath);
@@ -42,7 +42,9 @@ void Level::LoadObject(char filepath[])
 
     filepath[j] = '\0';
 
-	objects.push_back(Object3D(filepath));
-    Engine::Camera->Focus(objects[0].GetMesh()->minBounds(), objects[0].GetMesh()->maxBounds());
+    Object3D* object = new Object3D(filepath);
+
+	objects.push_back(object);
+    Engine::Camera->Focus(objects[0]->GetMesh()->minBounds(), objects[0]->GetMesh()->maxBounds());
 
 }

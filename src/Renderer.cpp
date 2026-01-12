@@ -53,7 +53,6 @@ void Renderer::Flush(Camera* camera)
 		commands[i].shader->setUniform("model", commands[i].modelMatrix);
 		commands[i].shader->setUniform("view", camera->GetViewMatrix());
 		commands[i].shader->setUniform("projection", camera->GetProjectionMatrix());
-		commands[i].shader->setUniform("viewPos", camera->GetPosition());
 		commands[i].shader->setUniform("skinned", commands[i].isSkinned);
 
 		//apply transforms
@@ -83,22 +82,22 @@ void Renderer::Flush(Camera* camera)
 
 void Renderer::Loop()
 {
-	std::vector<Object3D> objects = Engine::Level->Objects();
+	std::vector<Object3D*> objects = Engine::Level->Objects();
 	Engine::Level->DrawAxis();
 
 	//only loops through the objects of one default level
 	for (int i = 0; i < objects.size(); i++)
 	{
-		if (objects[i].skinned())
+		if (objects[i]->skinned())
 		{
-			objects[i].GetMesh()->RunAnimation(Engine::TimeElapsed());
+			objects[i]->GetMesh()->RunAnimation(Engine::TimeElapsed());
 		}
 
 		RenderCommand rc;
-		rc.mesh = objects[i].GetMesh();
-		rc.shader = objects[i].GetShader();
-		rc.modelMatrix = objects[i].BuildModelMatrix();
-		rc.isSkinned = objects[i].skinned();
+		rc.mesh = objects[i]->GetMesh();
+		rc.shader = objects[i]->GetShader();
+		rc.modelMatrix = objects[i]->BuildModelMatrix();
+		rc.isSkinned = objects[i]->skinned();
 		Submit(rc);
 	}
 	Flush(Engine::Camera);
