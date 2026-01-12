@@ -47,17 +47,84 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-	std::cout << "y rot: " << objects[0]->Rotation().y << std::endl;
-
 	if (key == GLFW_KEY_W && action == GLFW_PRESS)
+	{
 		objects[0]->GetMesh()->SetAnim(1);
 
-	if (key == GLFW_KEY_W && action == GLFW_RELEASE)
-		objects[0]->GetMesh()->SetAnim(0);
-	
-	if(key == GLFW_KEY_S && action == GLFW_PRESS)
-		objects[0]->Rotate(glm::vec3(0, glm::radians(-180.0f),  0));
+		//get degress and check should we rotate?
+		float rotY = glm::degrees(objects[0]->Rotation().y);
 
+		//if we are not facing forward, rotate forward
+		if (rotY != 0.0f)
+		{
+			//negate current rotation
+			float rotY_rad = objects[0]->Rotation().y;
+			objects[0]->Rotate(glm::vec3(0, -rotY_rad, 0));
+		}
+
+	}
+
+	
+	if (key == GLFW_KEY_S && action == GLFW_PRESS)
+	{
+		objects[0]->GetMesh()->SetAnim(1);
+
+		//should we rotate?
+		float rotY = glm::degrees(objects[0]->Rotation().y);
+
+		//if we are not facing backwards, rotate backwards
+		if (rotY != -180.0f)
+		{
+			//negate current rotation
+			float rotY_rad = objects[0]->Rotation().y;
+			objects[0]->Rotate(glm::vec3(0, -rotY_rad, 0));
+
+			//rotate backwards
+			objects[0]->Rotate(glm::vec3(0, glm::radians(-180.0f),  0));
+			rotY = glm::degrees(objects[0]->Rotation().y);
+		}
+	}
+
+	if (key == GLFW_KEY_D && action == GLFW_PRESS)
+	{
+		objects[0]->GetMesh()->SetAnim(1);
+
+		//should we rotate?
+		float rotY = glm::degrees(objects[0]->Rotation().y);
+
+		//if we are not facing backwards, rotate backwards
+		if (rotY != -90.0f)
+		{
+			//negate current rotation
+			float rotY_rad = objects[0]->Rotation().y;
+			objects[0]->Rotate(glm::vec3(0, -rotY_rad, 0));
+
+			objects[0]->Rotate(glm::vec3(0, glm::radians(-90.0f), 0));
+			rotY = glm::degrees(objects[0]->Rotation().y);
+		}
+	}
+
+	if (key == GLFW_KEY_A && action == GLFW_PRESS)
+	{
+		objects[0]->GetMesh()->SetAnim(1);
+
+		//should we rotate?
+		float rotY = glm::degrees(objects[0]->Rotation().y);
+
+		//if we are not facing backwards, rotate backwards
+		if (rotY != 90.0f)
+		{
+			//negate current rotation
+			float rotY_rad = objects[0]->Rotation().y;
+			objects[0]->Rotate(glm::vec3(0, -rotY_rad, 0));
+
+			objects[0]->Rotate(glm::vec3(0, glm::radians(90.0f), 0));
+			rotY = glm::degrees(objects[0]->Rotation().y);
+		}
+	}
+
+	if ((key == GLFW_KEY_W || key == GLFW_KEY_S || key == GLFW_KEY_D || key == GLFW_KEY_A) && action == GLFW_RELEASE)
+		objects[0]->GetMesh()->SetAnim(0);
 
 }
 
@@ -77,17 +144,19 @@ void AquanactLoop()
 		mouseLast = mouseCurr;
 	}
 
+	float moveSpeed = 40*Engine::DeltaFrameTime()*100000.0f;
+
 	if (glfwGetKey(Engine::Window->GLFW(), GLFW_KEY_W) == GLFW_PRESS)
-	{
-		float moveSpeed = 10*Engine::DeltaFrameTime()*100000.0f;
 		objects[0]->Move(glm::vec3(0.0f, 0.0f, moveSpeed));
-	}
 
 	if (glfwGetKey(Engine::Window->GLFW(), GLFW_KEY_S) == GLFW_PRESS)
-	{
-		float moveSpeed = -10 * Engine::DeltaFrameTime() * 100000.0f;
-		objects[0]->Move(glm::vec3(0.0f, 0.0f, moveSpeed));
-	}
+		objects[0]->Move(glm::vec3(0.0f, 0.0f, -moveSpeed));
+
+	if (glfwGetKey(Engine::Window->GLFW(), GLFW_KEY_D) == GLFW_PRESS)
+		objects[0]->Move(glm::vec3(-moveSpeed, 0.0f, 0.0f));
+
+	if (glfwGetKey(Engine::Window->GLFW(), GLFW_KEY_A) == GLFW_PRESS)
+		objects[0]->Move(glm::vec3(moveSpeed, 0.0f, 0.0f));
 
 	Engine::UI->Loop();
 	Engine::Renderer->Loop();

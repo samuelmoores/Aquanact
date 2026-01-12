@@ -5,6 +5,7 @@ Object3D::Object3D(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 {
 	m_skinned = false;
 	m_mesh = new Mesh(vertices, faces);
+	m_currentAnimation = 0;
 
 	m_shader.load("shaders/texture_perspective.vert", "shaders/texturing.frag");
 	//m_shader.load("shaders/phong.vert", "shaders/phong.frag");
@@ -31,6 +32,7 @@ Object3D::Object3D(char modelFile[])
 {
 	m_mesh = new Mesh(modelFile);
 	m_skinned = m_mesh->Skinned();
+	m_currentAnimation = 0;
 
 	//  | Description      | Values: ambient,diffuse,specular,shin |
 	//	| ---------------- | ------------------------------------- |
