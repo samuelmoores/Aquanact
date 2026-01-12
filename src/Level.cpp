@@ -14,7 +14,8 @@ std::vector<Object3D> Level::Objects()
 void Level::Load()
 {
 	m_axis = Axis(1000.0f, 100.0f);
-    std::string filepathString = "models/Idle.fbx";
+    std::string filepathString = "C:\\Users\\samue\\Downloads\\Idle(2).fbx";
+    //std::string filepathString = "models/Todd.obj";
     char* filepath = filepathString.data();
     LoadObject(filepath);
 }

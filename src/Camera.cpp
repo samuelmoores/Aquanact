@@ -45,7 +45,6 @@ void Camera::CameraControl(glm::vec2 mouseDiff)
 {
 	float x = m_position.x;
 	float z = m_position.z;
-	std::cout << mouseDiff.x << std::endl;
 	float angle = glm::radians(90.0f) * Engine::DeltaFrameTime() * 100.0f;
 
 	if (mouseDiff.x > 0.0f)

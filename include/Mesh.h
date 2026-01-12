@@ -36,7 +36,8 @@ class Mesh {
 		void assimpLoad(const std::string& path, bool flipUvs);
 		void fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, std::vector<uint32_t>& faces);
 		void ReadNodeHeirarchy(const aiNode* node, const aiMatrix4x4& ParentTransform);
-		
+		void LoadTexture(aiMaterial* mat, aiTextureType textureType, std::string path);
+
 		//open gl
 		void Bind() const;
 		void UnBind() const;
@@ -53,8 +54,8 @@ class Mesh {
 		//getter setter
 		void SetBuffers();
 		void SetTexture(const char* colorFile);
-		void SetTextureMemory(aiTexture* text);
-		void SetNormalMap(const char* normalMap);
+		void SetDiffuseTextureMemory(aiTexture* text);
+		void SetNormalMapMemory(aiTexture* normalMap);
 		const Skeleton& GetSkeleton() const;
 		bool Skinned();
 

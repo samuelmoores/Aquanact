@@ -1,6 +1,7 @@
-﻿#include <Mesh.h>
+﻿#include <iomanip>
+#include <filesystem>
 #include <Engine.h>
-#include <iomanip>
+#include <Mesh.h>
 #include <glad/glad.h>
 #include <stb_image.h>
 
@@ -66,7 +67,6 @@ Mesh::Mesh(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 	
 	SetBuffers();
 	SetTexture("models/brick_wall_diff.png");
-	SetNormalMap("models/brick_wall_norm.png");
 }
 Mesh::Mesh(char modelFile[])
 {
@@ -164,61 +164,9 @@ void Mesh::assimpLoad(const std::string& path, bool flipUvs)
 		//================== Materials =================================
 
 		aiMaterial* mat = m_scene->mMaterials[0];
-		unsigned int textureCount = mat->GetTextureCount(aiTextureType_DIFFUSE);
-
-		if (textureCount > 0)
-		{
-			aiString texturePath;
-			mat->GetTexture(aiTextureType_DIFFUSE, 0, &texturePath);
-
-			// Extract just the filename
-			std::string matPath = "";
-			std::string textureFile = texturePath.C_Str();
-
-			size_t lastSlash = textureFile.find_last_of("/\\");
-			if (lastSlash != std::string::npos) 
-			{
-				textureFile = textureFile.substr(lastSlash + 1);
-			}
-
-			lastSlash = path.find_last_of("/\\");
-			if (lastSlash != std::string::npos)
-			{
-				matPath = path.substr(0, lastSlash+1);
-			}
-
-			std::string texturePath_string = matPath + textureFile;
-			SetTexture(texturePath_string.c_str());
-			return;
-
-			// Search embedded textures for a matching name
-			aiTexture* embeddedTexture = nullptr;
-			for (unsigned int i = 0; i < m_scene->mNumTextures; i++) 
-			{
-				std::string embeddedName = m_scene->mTextures[i]->mFilename.C_Str();
-				size_t lastSlash2 = embeddedName.find_last_of("/\\");
-			
-				if (lastSlash2 != std::string::npos) 
-				{
-					embeddedName = embeddedName.substr(lastSlash2 + 1);
-				}
-
-				if (embeddedName == textureFile) 
-				{
-					embeddedTexture = m_scene->mTextures[i];
-					break;
-				}
-			}
-
-			if (embeddedTexture) 
-			{
-				// Load from memory as I showed before
-				if (embeddedTexture->mHeight == 0) 
-				{
-					//SetTextureMemory(embeddedTexture);
-				}
-			}
-		}
+		LoadTexture(mat, aiTextureType_DIFFUSE, path);
+		LoadTexture(mat, aiTextureType_NORMALS, path);
+		
 	}
 }
 void Mesh::fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, std::vector<uint32_t>& faces)
@@ -317,6 +265,65 @@ void Mesh::ReadNodeHeirarchy(const aiNode* node, const aiMatrix4x4& ParentTransf
 	for (int i = 0; i < node->mNumChildren; i++)
 	{
 		ReadNodeHeirarchy(node->mChildren[i], GlobalTransform);
+	}
+}
+
+void Mesh::LoadTexture(aiMaterial* mat, aiTextureType textureType, std::string path)
+{
+	aiString texturePath;
+
+	//for each diffuse, normal, roughness...
+	mat->GetTexture(textureType, 0, &texturePath);
+
+	std::string textureFileName = texturePath.C_Str();
+
+	//get texture filename
+	size_t lastSlashIndex = textureFileName.find_last_of("/\\");
+	if (lastSlashIndex != std::string::npos)
+	{
+		textureFileName = textureFileName.substr(lastSlashIndex + 1);
+	}
+
+	//search for diffuse, normal, roughness
+	aiTexture* embeddedTexture = nullptr;
+	for (unsigned int i = 0; i < m_scene->mNumTextures; i++)
+	{
+		std::string embeddedName = m_scene->mTextures[i]->mFilename.C_Str();
+		size_t lastSlash2 = embeddedName.find_last_of("/\\");
+
+		if (lastSlash2 != std::string::npos)
+		{
+			embeddedName = embeddedName.substr(lastSlash2 + 1);
+		}
+
+		if (embeddedName == textureFileName)
+		{
+			embeddedTexture = m_scene->mTextures[i];
+			break;
+		}
+	}
+
+	//Is there an embedded texture?
+	if (embeddedTexture)
+	{
+		if (embeddedTexture->mHeight == 0)
+		{
+			switch (textureType)
+			{
+			case aiTextureType_DIFFUSE:
+				SetDiffuseTextureMemory(embeddedTexture);
+				break;
+			case aiTextureType_NORMALS:
+				SetNormalMapMemory(embeddedTexture);
+				break;
+			}
+		}
+	}
+	else //otherwise load from file
+	{
+		std::filesystem::path p = path;
+		p.replace_extension(".png");
+		SetTexture(p.string().c_str());
 	}
 }
 
@@ -720,7 +727,7 @@ void Mesh::SetTexture(const char* colorFile)
 	glGenerateMipmap(GL_TEXTURE_2D);
 
 }
-void Mesh::SetTextureMemory(aiTexture* text)
+void Mesh::SetDiffuseTextureMemory(aiTexture* text)
 {
 	StbImage stb_image_color;
 
@@ -747,11 +754,11 @@ void Mesh::SetTextureMemory(aiTexture* text)
 	);
 	glGenerateMipmap(GL_TEXTURE_2D);
 }
-void Mesh::SetNormalMap(const char* normalMap)
+void Mesh::SetNormalMapMemory(aiTexture* normalMap)
 {
 	StbImage stb_image_normal;
 
-	stb_image_normal.loadFromFile(normalMap);
+	stb_image_normal.loadFromMemory(normalMap);
 
 	glGenTextures(1, &m_textureNormal);
 
@@ -764,11 +771,11 @@ void Mesh::SetNormalMap(const char* normalMap)
 	glTexImage2D(
 		GL_TEXTURE_2D,
 		0,
-		GL_RGBA,
+		GL_RGB,
 		stb_image_normal.getWidth(),
 		stb_image_normal.getHeight(),
 		0,
-		GL_RGBA,
+		GL_RGB,
 		GL_UNSIGNED_BYTE,
 		stb_image_normal.getData()
 	);
