@@ -23,6 +23,7 @@ public:
 	std::string Name();
 	glm::vec3 Position();
 	glm::vec3 Rotation();
+	void SetRotation(glm::vec3 newRotation);
 
 	//primitives
 

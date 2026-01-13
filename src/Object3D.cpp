@@ -1,4 +1,19 @@
 #include "Object3D.h"
+#include <iomanip>
+
+void printMatrix(const glm::mat4& m) {
+	std::cout << std::fixed << std::setprecision(3);
+
+	for (int row = 0; row < 4; ++row) {
+		std::cout << "[ ";
+		for (int col = 0; col < 4; ++col) {
+			std::cout << std::setw(9) << m[col][row];
+			if (col < 3) std::cout << " ";
+		}
+		std::cout << " ]\n";
+	}
+	std::cout << "----------------------------------------------\n";
+}
 
 
 Object3D::Object3D(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
@@ -80,9 +95,22 @@ ShaderProgram* Object3D::GetShader()
 glm::mat4 Object3D::BuildModelMatrix()
 {
 	auto m = glm::translate(glm::mat4(1), m_position);
+	//std::cout << "m_position: " << m_position.x << ", " << m_position.y << ", " << m_position.z << std::endl;
+	//std::cout << "m after glm::translate m_position: \n";
+	//printMatrix(m);
+
 	m = glm::rotate(m, m_rotation[1], glm::vec3(0, 1, 0));
+	//std::cout << "m after glm::rotate y: \n";
+	//printMatrix(m);
+
 	m = glm::rotate(m, m_rotation[0], glm::vec3(1, 0, 0));
+	//std::cout << "m after glm::rotate x: \n";
+	//printMatrix(m);
+
 	m = glm::rotate(m, m_rotation[2], glm::vec3(0, 0, 1));
+	//std::cout << "m after glm::rotate z: \n";
+	//printMatrix(m);
+
 	m = glm::scale(m, m_scale);
 
 	return m;
@@ -106,6 +134,11 @@ glm::vec3 Object3D::Position()
 glm::vec3 Object3D::Rotation()
 {
 	return m_rotation;
+}
+
+void Object3D::SetRotation(glm::vec3 newRotation)
+{
+	m_rotation = newRotation;
 }
 
 void Object3D::Scale(glm::vec3 delta)
