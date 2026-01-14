@@ -18,6 +18,7 @@ Engine::Engine()
     UI = new ::UI();
     Level = new ::Level();
     gladLoadGL();
+    glfwSwapInterval(1);
     glEnable(GL_DEPTH_TEST);
     Level->Load();
 }

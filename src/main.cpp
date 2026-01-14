@@ -21,7 +21,7 @@ static bool aReleased = false;
 static bool dReleased = false;
 
 bool move = false;
-
+glm::vec3 moveDirection = glm::vec3(0);
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
@@ -43,8 +43,6 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 	glfwSetInputMode(Engine::Window->GLFW(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 }
-
-glm::vec3 moveDirection = glm::vec3(0);
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
@@ -82,7 +80,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	}
 }
 
-
 void AquanactLoop()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -92,8 +89,6 @@ void AquanactLoop()
 	{
 		glfwSetInputMode(Engine::Window->GLFW(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 	}
-
-	glfwSwapInterval(1);
 
 	double xpos, ypos;
 	glfwGetCursorPos(Engine::Window->GLFW(), &xpos, &ypos);
@@ -130,9 +125,6 @@ void AquanactLoop()
 	{ 
 		objects[0]->Move(glm::normalize(glm::vec3(moveDirection)) * moveSpeed * Engine::DeltaFrameTime());
 	}
-
-	std::cout << "FPS: " << 1.0f / Engine::DeltaFrameTime() << std::endl;
-
 
 	Engine::UI->Loop();
 	Engine::Renderer->Loop();
