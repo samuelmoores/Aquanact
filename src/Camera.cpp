@@ -49,7 +49,7 @@ void Camera::CameraControl(glm::vec2 mouseDiff, glm::vec3 playerPosition)
 
 	float x = m_position.x - playerPosition.x;
 	float z = m_position.z - playerPosition.z;
-	float angle = glm::radians(40000.0f) * Engine::DeltaFrameTime();
+	float angle = glm::radians(100.0f) * Engine::DeltaFrameTime();
 
 	if (mouseDiff.x > 0.0f)
 		angle = angle;

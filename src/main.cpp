@@ -40,20 +40,7 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 		return;
 	}
 
-	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
-	{
-		mouseDown = true;
-
-		double xpos, ypos;
-		glfwGetCursorPos(Engine::Window->GLFW(), &xpos, &ypos);
-		mouseLast = glm::vec2(xpos, ypos);
-
-	}
-
-	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
-	{
-		mouseDown = false;
-	}
+	glfwSetInputMode(Engine::Window->GLFW(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 }
 
@@ -101,17 +88,21 @@ void AquanactLoop()
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	Engine::Tick();
 
-	if (mouseDown)
+	if (glfwGetKey(Engine::Window->GLFW(), GLFW_KEY_ESCAPE) == GLFW_PRESS)
 	{
-		double xpos, ypos;
-		glfwGetCursorPos(Engine::Window->GLFW(), &xpos, &ypos);
-		mouseCurr = glm::vec2(xpos, ypos);
-		glm::vec2 mouseDiff = mouseCurr - mouseLast;
-		Engine::Camera->CameraControl(mouseDiff, Engine::Level->Objects()[0]->Position());
-		mouseLast = mouseCurr;
+		glfwSetInputMode(Engine::Window->GLFW(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 	}
 
-	float moveSpeed = 20*100000.0f;
+	glfwSwapInterval(1);
+
+	double xpos, ypos;
+	glfwGetCursorPos(Engine::Window->GLFW(), &xpos, &ypos);
+	mouseCurr = glm::vec2(xpos, ypos);
+	glm::vec2 mouseDiff = mouseCurr - mouseLast;
+	Engine::Camera->CameraControl(mouseDiff, Engine::Level->Objects()[0]->Position());
+	mouseLast = mouseCurr;
+	
+	float moveSpeed = 700.0f;
 
 	//************* These are all called AFTER the key callback ************
 	//************* For keys being held down, key callback does not register it fast enough ************
@@ -139,6 +130,9 @@ void AquanactLoop()
 	{ 
 		objects[0]->Move(glm::normalize(glm::vec3(moveDirection)) * moveSpeed * Engine::DeltaFrameTime());
 	}
+
+	std::cout << "FPS: " << 1.0f / Engine::DeltaFrameTime() << std::endl;
+
 
 	Engine::UI->Loop();
 	Engine::Renderer->Loop();

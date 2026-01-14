@@ -126,6 +126,7 @@ void Object3D::Move(glm::vec3 delta)
 {
 	glm::vec3 max = m_mesh->maxBounds();
 	glm::vec3 min = m_mesh->minBounds();
+	//std::cout << "move delta: " << delta.x << ", " << delta.z << std::endl;
 	m_position += delta;
 	glm::vec3 cameraDelta(delta.x, 0.0f, delta.z);
 	glm::vec3 cameraLookat(m_position.x, (max.y - (min.y / 2.0f)) / 2.0f, m_position.z);

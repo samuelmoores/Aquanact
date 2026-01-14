@@ -29,11 +29,7 @@ bool Engine::Running()
 
 float Engine::DeltaFrameTime()
 {
-    auto currTime = std::chrono::high_resolution_clock::now();
-    auto diffTime = std::chrono::duration<float>(currTime - m_prevFrameTime);
-    float diffTimeSec = diffTime.count();
-    m_prevFrameTime = currTime;
-    return diffTimeSec;
+    return m_deltaFrameTime;
 }
 
 float Engine::TimeElapsed()
@@ -44,9 +40,16 @@ float Engine::TimeElapsed()
 void Engine::Tick()
 {
     m_timeElapsed += DeltaFrameTime();
+    auto currTime = std::chrono::high_resolution_clock::now();
+    auto diffTime = std::chrono::duration<float>(currTime - m_prevFrameTime);
+    float diffTimeSec = diffTime.count();
+    m_prevFrameTime = currTime;
+    m_deltaFrameTime = diffTimeSec;
 }
 
 void Engine::ToggleAxis()
 {
 
 }
+
+
