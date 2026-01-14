@@ -9,7 +9,7 @@ Camera::Camera()
 
 	m_projection_matrix = glm::perspective(glm::radians(45.0), static_cast<double>(width) / height, 0.1, 1000000.0);
 
-	m_position = glm::vec3(463.462, 176.395, 417.303);
+	m_position = glm::vec3(-9.87885, 0.0f, -417.303);
 	m_front = glm::vec3(0);
 	m_up = glm::vec3(0.0f, 1.0f, 0.0f);
 	m_right = glm::normalize(glm::cross(m_front, m_up));
@@ -45,7 +45,7 @@ void Camera::CameraControl(glm::vec2 mouseDiff)
 {
 	float x = m_position.x;
 	float z = m_position.z;
-	float angle = glm::radians(90.0f) * Engine::DeltaFrameTime() * 1000.0f;
+	float angle = glm::radians(100000.0f) * Engine::DeltaFrameTime();
 
 	if (mouseDiff.x > 0.0f)
 		angle = angle;
@@ -78,7 +78,7 @@ void Camera::CameraControl(float scroll)
 void Camera::Focus(glm::vec3 min, glm::vec3 max)
 {
 	m_lookAt.y = (max.y - (min.y/2.0f)) / 2.0f;
-	m_position.y = (max.y + ((max.y / 2.0f)));
+	m_position.y = max.y;//(max.y + ((max.y / 2.0f)));
 	m_view_matrix = glm::lookAt(m_position, m_lookAt, m_up);
 }
 

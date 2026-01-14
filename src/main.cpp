@@ -111,7 +111,7 @@ void AquanactLoop()
 		mouseLast = mouseCurr;
 	}
 
-	float moveSpeed = 80*Engine::DeltaFrameTime()*100000.0f;
+	float moveSpeed = 20*100000.0f;
 
 	//************* These are all called AFTER the key callback ************
 	//************* For keys being held down, key callback does not register it fast enough ************
@@ -137,7 +137,7 @@ void AquanactLoop()
 
 	if (move && glm::length(moveDirection) != 0)
 	{ 
-		objects[0]->Move(glm::normalize(glm::vec3(moveDirection)) * moveSpeed);
+		objects[0]->Move(glm::normalize(glm::vec3(moveDirection)) * moveSpeed * Engine::DeltaFrameTime());
 	}
 
 	Engine::UI->Loop();
