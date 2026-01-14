@@ -72,15 +72,15 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	aReleased = (action == GLFW_RELEASE && key == GLFW_KEY_A);
 	dReleased = (action == GLFW_RELEASE && key == GLFW_KEY_D);
 
-	if (wPressed) moveDirection.z = 1.0f;
-	if (sPressed) moveDirection.z = -1.0f;
-	if (aPressed) moveDirection.x =  1.0f;
-	if (dPressed) moveDirection.x = -1.0f;
+	if (wPressed) moveDirection.z += 1.0f;
+	if (sPressed) moveDirection.z -= 1.0f;
+	if (aPressed) moveDirection.x += 1.0f;
+	if (dPressed) moveDirection.x -= 1.0f;
 
-	if (wReleased) moveDirection.z = 0.0f;
-	if (sReleased) moveDirection.z = 0.0f;
-	if (aReleased) moveDirection.x = 0.0f;
-	if (dReleased) moveDirection.x = 0.0f;
+	if (wReleased) moveDirection.z -= 1.0f;
+	if (sReleased) moveDirection.z += 1.0f;
+	if (aReleased) moveDirection.x -= 1.0f;
+	if (dReleased) moveDirection.x += 1.0f;
 
 	// Update animation and rotation
 	if (glm::length(moveDirection) > 0.0f)
@@ -114,14 +114,15 @@ void AquanactLoop()
 	float moveSpeed = 80*Engine::DeltaFrameTime()*100000.0f;
 
 	//************* These are all called AFTER the key callback ************
+	//************* For keys being held down, key callback does not register it fast enough ************
 	if (glfwGetKey(Engine::Window->GLFW(), GLFW_KEY_W) == GLFW_PRESS)
 	{
-		move = true;
+		move = wPressed = true;
 	}
 
 	if (glfwGetKey(Engine::Window->GLFW(), GLFW_KEY_S) == GLFW_PRESS)
 	{
-		move = true;
+		move = sPressed = true;
 	}
 
 	if (glfwGetKey(Engine::Window->GLFW(), GLFW_KEY_D) == GLFW_PRESS)
