@@ -41,11 +41,15 @@ glm::vec3 Camera::GetFacing()
 	return m_front;
 }
 
-void Camera::CameraControl(glm::vec2 mouseDiff)
+void Camera::CameraControl(glm::vec2 mouseDiff, glm::vec3 playerPosition)
 {
-	float x = m_position.x;
-	float z = m_position.z;
-	float angle = glm::radians(100000.0f) * Engine::DeltaFrameTime();
+	//player position is center of circle
+	//camera distance from player is radius
+	//camera position is the point on the circle
+
+	float x = m_position.x - playerPosition.x;
+	float z = m_position.z - playerPosition.z;
+	float angle = glm::radians(40000.0f) * Engine::DeltaFrameTime();
 
 	if (mouseDiff.x > 0.0f)
 		angle = angle;
@@ -56,6 +60,9 @@ void Camera::CameraControl(glm::vec2 mouseDiff)
 
 	float xRotated = x * cos(angle) - z * sin(angle);
 	float zRotated = x * sin(angle) + z * cos(angle);
+
+	xRotated += playerPosition.x;
+	zRotated += playerPosition.z;
 
 	//rotate
 	m_position.x = xRotated;
@@ -85,4 +92,12 @@ void Camera::Focus(glm::vec3 min, glm::vec3 max)
 void Camera::PrintPosition()
 {
 	std::cout << "position: " << m_position.x << ", " << m_position.y << ", " << m_position.z << std::endl;
+}
+
+void Camera::Move(glm::vec3 delta, glm::vec3 lookAt)
+{
+	m_position += delta;
+	m_lookAt = lookAt;
+	m_view_matrix = glm::lookAt(m_position, m_lookAt, m_up);
+
 }

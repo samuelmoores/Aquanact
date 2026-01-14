@@ -1,3 +1,4 @@
+#include "Engine.h"
 #include "Object3D.h"
 #include <iomanip>
 
@@ -123,7 +124,12 @@ void Object3D::Rotate(glm::vec3 delta)
 
 void Object3D::Move(glm::vec3 delta)
 {
+	glm::vec3 max = m_mesh->maxBounds();
+	glm::vec3 min = m_mesh->minBounds();
 	m_position += delta;
+	glm::vec3 cameraDelta(delta.x, 0.0f, delta.z);
+	glm::vec3 cameraLookat(m_position.x, (max.y - (min.y / 2.0f)) / 2.0f, m_position.z);
+	Engine::Camera->Move(cameraDelta, cameraLookat);
 }
 
 glm::vec3 Object3D::Position()
