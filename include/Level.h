@@ -10,8 +10,10 @@ public:
 	void Load();
 	void DrawAxis();
 	void LoadObject(char filepath[]);
+	void SetDrawAxis(bool drawAxis);
 
 private:
 	std::vector<Object3D*> objects;
 	Axis m_axis;
+	bool m_drawAxis;
 };

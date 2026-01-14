@@ -17,6 +17,7 @@ UI::UI()
     ImGui_ImplOpenGL3_Init("#version 330");  // or your GLSL version
 
     selectedObj = nullptr;
+    m_drawingAxis = true;
 }
 
 void UI::Loop()
@@ -26,16 +27,23 @@ void UI::Loop()
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
 
-	
     bool import = false;
 
     if (ImGui::BeginMainMenuBar()) 
     {
-        if (ImGui::BeginMenu("Menu")) 
+        if (ImGui::BeginMenu("File")) 
         {
             if (ImGui::MenuItem("Import"))
                 import = true;
     
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("View"))
+        {
+            if (ImGui::MenuItem("Axis", nullptr, &m_drawingAxis))
+                Engine::Level->SetDrawAxis(m_drawingAxis);
+
             ImGui::EndMenu();
         }
         ImGui::EndMainMenuBar();

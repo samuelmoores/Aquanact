@@ -11,5 +11,6 @@ public:
 private:
 	static ImGuiIO* imgui_io;
 	Object3D* selectedObj;
+	bool m_drawingAxis;
 
 };

@@ -15,6 +15,7 @@ public:
 	static float DeltaFrameTime();
 	static float TimeElapsed();
 	static void Tick();
+	static void ToggleAxis();
 
 	static Engine& Init() {
 		static Engine instance;

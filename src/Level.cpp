@@ -3,7 +3,7 @@
 
 Level::Level()
 {
-
+    m_drawAxis = true;
 }
 
 std::vector<Object3D*> Level::Objects()
@@ -18,12 +18,19 @@ void Level::Load()
     //std::string filepathString = "models/Todd.obj";
     char* filepath = filepathString.data();
     LoadObject(filepath);
+
+    filepathString = "models/floor.fbx";
+    filepath = filepathString.data();
+    LoadObject(filepath);
 }
 
 void Level::DrawAxis()
 {
-	m_axis.UpdateProjection(Engine::Camera->GetProjectionMatrix());
-	m_axis.draw(Engine::Camera->GetViewMatrix());
+    if (m_drawAxis)
+    {
+	    m_axis.UpdateProjection(Engine::Camera->GetProjectionMatrix());
+	    m_axis.draw(Engine::Camera->GetViewMatrix());
+    }
 }
 
 void Level::LoadObject(char filepath[])
@@ -47,4 +54,9 @@ void Level::LoadObject(char filepath[])
 	objects.push_back(object);
     Engine::Camera->Focus(objects[0]->GetMesh()->minBounds(), objects[0]->GetMesh()->maxBounds());
 
+}
+
+void Level::SetDrawAxis(bool drawAxis)
+{
+    m_drawAxis = drawAxis;
 }

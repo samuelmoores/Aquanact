@@ -10,16 +10,16 @@ Axis::Axis(float axisLength, float scale) :m_vao(-1), m_vbo(-1)
 {
 	m_vertices = {
 		// X axis (Red)
-		{-axisLength, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f},  // origin
-		{axisLength, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f},  // x-direction
+		{-axisLength * 100, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f},  // origin
+		{axisLength  * 100, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f},  // x-direction
 
 		// Y axis (Green)
 		{0.0f, -axisLength, 0.0f, 0.0f, 1.0f, 0.0f},  // origin
 		{0.0f, axisLength, 0.0f, 0.0f, 1.0f, 0.0f},  // y-direction
 
 		// Z axis (Blue)
-		{0.0f, 0.0f, -axisLength, 0.0f, 0.0f, 1.0f},  // origin
-		{0.0f, 0.0f, axisLength, 0.0f, 0.0f, 1.0f},   // z-direction
+		{0.0f, 0.0f, -axisLength * 100, 0.0f, 0.0f, 1.0f},  // origin
+		{0.0f, 0.0f, axisLength  * 100, 0.0f, 0.0f, 1.0f},   // z-direction
 
 	};
 

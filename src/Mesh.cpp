@@ -162,7 +162,7 @@ void Mesh::assimpLoad(const std::string& path, bool flipUvs)
 
 		aiMaterial* mat = m_scene->mMaterials[0];
 		LoadTexture(mat, aiTextureType_DIFFUSE, path);
-		LoadTexture(mat, aiTextureType_NORMALS, path);
+		//LoadTexture(mat, aiTextureType_NORMALS, path);
 		
 	}
 }

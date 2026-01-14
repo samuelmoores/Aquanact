@@ -45,3 +45,8 @@ void Engine::Tick()
 {
     m_timeElapsed += DeltaFrameTime();
 }
+
+void Engine::ToggleAxis()
+{
+
+}
