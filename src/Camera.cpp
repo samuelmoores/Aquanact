@@ -41,32 +41,29 @@ glm::vec3 Camera::GetFacing()
 	return m_front;
 }
 
+float yaw = 0.0f;
+float pitch = 0.0f;
+float sensitivity = 0.08f;
+
 void Camera::CameraControl(glm::vec2 mouseDiff, glm::vec3 playerPosition)
 {
-	//player position is center of circle
-	//camera distance from player is radius
-	//camera position is the point on the circle
+	yaw += mouseDiff.x * sensitivity;
+	pitch += mouseDiff.y * sensitivity;
 
-	float x = m_position.x - playerPosition.x;
-	float z = m_position.z - playerPosition.z;
-	float angle = glm::radians(100.0f) * Engine::DeltaFrameTime();
+	pitch = std::clamp(pitch, -89.0f, 89.0f);
 
-	if (mouseDiff.x > 0.0f)
-		angle = angle;
-	else if (mouseDiff.x < 0.0f)
-		angle = -angle;
-	else
-		return;
+	float yawRad = glm::radians(yaw);
+	float pitchRad = glm::radians(-pitch);
 
-	float xRotated = x * cos(angle) - z * sin(angle);
-	float zRotated = x * sin(angle) + z * cos(angle);
+	glm::vec3 direction;
+	direction.x = cos(pitchRad) * cos(yawRad);
+	direction.y = sin(pitchRad);
+	direction.z = cos(pitchRad) * sin(yawRad);
 
-	xRotated += playerPosition.x;
-	zRotated += playerPosition.z;
+	direction = normalize(direction);
+	float radius = glm::length(m_position - playerPosition);
 
-	//rotate
-	m_position.x = xRotated;
-	m_position.z = zRotated;
+	m_position = playerPosition - direction * radius;
 
 	m_view_matrix = glm::lookAt(m_position, m_lookAt, m_up);
 }
