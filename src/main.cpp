@@ -22,6 +22,10 @@ static bool dReleased = false;
 
 bool move = false;
 glm::vec3 moveDirection = glm::vec3(0);
+bool blendRot = false;
+float currRot = 0.0f;
+float nextRot = 0.0f;
+float startRot = 0.0f;
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
@@ -76,7 +80,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		}
 		moveDirection.z -= 1.0f;
 	}
-
 	if (aPressed)
 	{
 		if (glm::length(moveDirection) == 0.0f)
@@ -86,7 +89,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		}
 		moveDirection.x += 1.0f;
 	}
-
 	if (dPressed)
 	{
 		if (glm::length(moveDirection) == 0.0f)
@@ -96,7 +98,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		}
 		moveDirection.x -= 1.0f;
 	}
-
 	if (wReleased)
 	{
 		moveDirection.z -= 1.0f;
@@ -115,8 +116,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 			Engine::Level->Objects()[0]->StartAnimBlend();
 		}
 	}
-
-
 	if (aReleased)
 	{
 		moveDirection.x -= 1.0f;
@@ -126,8 +125,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 			Engine::Level->Objects()[0]->StartAnimBlend();
 		}
 	}
-
-
 	if (dReleased)
 	{
 		moveDirection.x += 1.0f;
@@ -141,9 +138,13 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	// Update animation and rotation
 	if (glm::length(moveDirection) > 0.0f)
 	{
-		float angle = atan2(moveDirection.x, moveDirection.z);
-		objects[0]->SetRotation(glm::vec3(0.0f, angle, 0.0f));
+		startRot = currRot;
+		nextRot = atan2(moveDirection.x, moveDirection.z);
+		blendRot = true;
+		std::cout << "startRot: " << glm::degrees(startRot) << std::endl;
+		std::cout << "nextRot: " << glm::degrees(nextRot) << std::endl;
 	}
+
 }
 
 void AquanactLoop()
@@ -192,6 +193,46 @@ void AquanactLoop()
 	if (move && glm::length(moveDirection) != 0)
 	{ 
 		objects[0]->Move(glm::normalize(glm::vec3(moveDirection)) * moveSpeed * Engine::DeltaFrameTime());
+	}
+
+	if (blendRot)
+	{
+		if ((glm::degrees(startRot) == -90 || glm::degrees(startRot) == -135 ) && glm::degrees(nextRot) == 180)
+		{
+			currRot -= Engine::DeltaFrameTime() * 15.0f;
+
+			if (glm::degrees(currRot) <= -180)
+			{
+				currRot = nextRot;
+				blendRot = false;
+			}
+
+		}
+		else if (glm::degrees(currRot) == 180 && (glm::degrees(nextRot) == -90 || glm::degrees(nextRot) == -135))
+		{
+			currRot = glm::radians(-180.0f);
+			currRot -= Engine::DeltaFrameTime() * 15.0f;
+		}
+		else if (currRot > nextRot)
+		{
+			currRot -= Engine::DeltaFrameTime() * 15.0f;
+			if (currRot <= nextRot)
+			{	
+				currRot = nextRot;
+				blendRot = false;
+			}
+		}
+		else if (currRot < nextRot)
+		{
+			currRot += Engine::DeltaFrameTime()* 15.0f;
+			if (currRot >= nextRot)
+			{
+				currRot = nextRot;
+				blendRot = false;
+			}
+		}
+
+		objects[0]->SetRotation(glm::vec3(0.0f, currRot, 0.0f));
 	}
 
 	Engine::UI->Loop();
