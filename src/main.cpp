@@ -57,26 +57,92 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	aReleased = (action == GLFW_RELEASE && key == GLFW_KEY_A);
 	dReleased = (action == GLFW_RELEASE && key == GLFW_KEY_D);
 
-	if (wPressed) moveDirection.z += 1.0f;
-	if (sPressed) moveDirection.z -= 1.0f;
-	if (aPressed) moveDirection.x += 1.0f;
-	if (dPressed) moveDirection.x -= 1.0f;
+	if (wPressed)
+	{
+		if (glm::length(moveDirection) == 0.0f)
+		{
+			Engine::Level->Objects()[0]->GetMesh()->SetNextAnim(1);
+			Engine::Level->Objects()[0]->StartAnimBlend();
+		}
 
-	if (wReleased) moveDirection.z -= 1.0f;
-	if (sReleased) moveDirection.z += 1.0f;
-	if (aReleased) moveDirection.x -= 1.0f;
-	if (dReleased) moveDirection.x += 1.0f;
+		moveDirection.z += 1.0f;
+	}
+	if (sPressed)
+	{
+		if (glm::length(moveDirection) == 0.0f)
+		{
+			Engine::Level->Objects()[0]->GetMesh()->SetNextAnim(1);
+			Engine::Level->Objects()[0]->StartAnimBlend();
+		}
+		moveDirection.z -= 1.0f;
+	}
+
+	if (aPressed)
+	{
+		if (glm::length(moveDirection) == 0.0f)
+		{
+			Engine::Level->Objects()[0]->GetMesh()->SetNextAnim(1);
+			Engine::Level->Objects()[0]->StartAnimBlend();
+		}
+		moveDirection.x += 1.0f;
+	}
+
+	if (dPressed)
+	{
+		if (glm::length(moveDirection) == 0.0f)
+		{
+			Engine::Level->Objects()[0]->GetMesh()->SetNextAnim(1);
+			Engine::Level->Objects()[0]->StartAnimBlend();
+		}
+		moveDirection.x -= 1.0f;
+	}
+
+	if (wReleased)
+	{
+		moveDirection.z -= 1.0f;
+		if (glm::length(moveDirection) == 0.0f)
+		{
+			Engine::Level->Objects()[0]->GetMesh()->SetNextAnim(0);
+			Engine::Level->Objects()[0]->StartAnimBlend();
+		}
+	}
+	if (sReleased)
+	{
+		moveDirection.z += 1.0f;
+		if (glm::length(moveDirection) == 0.0f)
+		{
+			Engine::Level->Objects()[0]->GetMesh()->SetNextAnim(0);
+			Engine::Level->Objects()[0]->StartAnimBlend();
+		}
+	}
+
+
+	if (aReleased)
+	{
+		moveDirection.x -= 1.0f;
+		if (glm::length(moveDirection) == 0.0f)
+		{
+			Engine::Level->Objects()[0]->GetMesh()->SetNextAnim(0);
+			Engine::Level->Objects()[0]->StartAnimBlend();
+		}
+	}
+
+
+	if (dReleased)
+	{
+		moveDirection.x += 1.0f;
+		if (glm::length(moveDirection) == 0.0f)
+		{
+			Engine::Level->Objects()[0]->GetMesh()->SetNextAnim(0);
+			Engine::Level->Objects()[0]->StartAnimBlend();
+		}
+	}
 
 	// Update animation and rotation
 	if (glm::length(moveDirection) > 0.0f)
 	{
-		objects[0]->GetMesh()->SetAnim(1);
 		float angle = atan2(moveDirection.x, moveDirection.z);
 		objects[0]->SetRotation(glm::vec3(0.0f, angle, 0.0f));
-	}
-	else
-	{
-		objects[0]->GetMesh()->SetAnim(0);
 	}
 }
 
@@ -84,6 +150,8 @@ void AquanactLoop()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	Engine::Tick();
+
+	//std::cout << "fps: " << 1.0f/Engine::DeltaFrameTime() << std::endl;
 
 	if (glfwGetKey(Engine::Window->GLFW(), GLFW_KEY_ESCAPE) == GLFW_PRESS)
 	{

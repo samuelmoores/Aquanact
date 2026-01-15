@@ -59,11 +59,16 @@ class Mesh {
 		void SetNormalMapMemory(aiTexture* normalMap);
 		const Skeleton& GetSkeleton() const;
 		bool Skinned();
+		void SetNextAnim(int nextAnim);
+		void SetCurrentAnim(int currAnim);
+		int GetNextAnim();
 
 		//animation
 		void SetAnim(int animIndex);
 		void ReadNodeHeirarchy(float animTimeTicks, const aiNode* node, const aiMatrix4x4& ParentTransform, int animIndex);
 		void RunAnimation(float animTime);
+		void BlendAnimation(int nextAnim, float animTime, float blendFactor);
+		void ReadNodeHeirarchyBlend(float blendFactor, float animTimeTicks_Start, float animTimeTicks_End, const aiNode* node, const aiMatrix4x4& ParentTransform, aiAnimation* start, aiAnimation* end, int animIndex);
 		const aiNodeAnim* FindNodeAnim(const aiAnimation* pAnimation, const std::string& NodeName);
 		int FindScaling(float AnimationTimeTicks, const aiNodeAnim* pNodeAnim);
 		void CalcInterpolatedScaling(aiVector3D& Out, float AnimationTimeTicks, const aiNodeAnim* pNodeAnim);
@@ -88,4 +93,5 @@ class Mesh {
 		aiMatrix4x4 m_GlobalInverseTransform;
 		bool m_skinned;
 		int m_currentAnim;
+		int m_nextAnim;
 };

@@ -80,6 +80,9 @@ void Renderer::Flush(Camera* camera)
 	commands.clear();
 }
 
+
+float blendFactor = 0.0f;
+
 void Renderer::Loop()
 {
 	std::vector<Object3D*> objects = Engine::Level->Objects();
@@ -90,7 +93,22 @@ void Renderer::Loop()
 	{
 		if (objects[i]->skinned())
 		{
-			objects[i]->GetMesh()->RunAnimation(Engine::TimeElapsed());
+			//std::cout << objects[i]->BlendFactor() << std::endl;
+			if (objects[i]->BlendFactor() < 1.0f)
+			{
+				int nextAnim = objects[i]->GetMesh()->GetNextAnim();
+				objects[i]->IncBlendFactor(Engine::DeltaFrameTime() * 3.0f);
+				objects[i]->GetMesh()->BlendAnimation(nextAnim, Engine::TimeElapsed(), objects[i]->BlendFactor());
+
+				if (objects[i]->BlendFactor() >= 1.0f)
+				{
+					objects[i]->GetMesh()->SetCurrentAnim(nextAnim);
+				}
+			}
+			else
+			{
+				objects[i]->GetMesh()->RunAnimation(Engine::TimeElapsed());
+			}
 		}
 
 		RenderCommand rc;

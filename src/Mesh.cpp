@@ -72,6 +72,7 @@ Mesh::Mesh(char modelFile[])
 {
 	assimpLoad(modelFile, true);
 	m_currentAnim = 0;
+	m_nextAnim = 1;
 
 	//debug skeleton code
 	if (false)
@@ -399,11 +400,31 @@ bool Mesh::intersectsRay(const glm::vec3& rayOrigin, const glm::vec3& rayDir) co
 void Mesh::RunAnimation(float animTime)
 {
 	aiMatrix4x4 I = aiMatrix4x4();
-	float ticksPerSec = (float)(m_scene->mAnimations[m_currentAnim]->mTicksPerSecond != 0 ? m_scene->mAnimations[0]->mTicksPerSecond : 60.0f);
+	float ticksPerSec = (float)(m_scene->mAnimations[m_currentAnim]->mTicksPerSecond != 0 ? m_scene->mAnimations[m_currentAnim]->mTicksPerSecond : 60.0f);
 	float timeTicks = animTime * ticksPerSec;
 	float animTimeTicks = fmod(timeTicks, (float)m_scene->mAnimations[m_currentAnim]->mDuration);
 
 	ReadNodeHeirarchy(animTimeTicks, m_scene->mRootNode, I, m_currentAnim);
+}
+
+int count = 0;
+void Mesh::BlendAnimation(int nextAnim, float animTime, float blendFactor)
+{
+	count++;
+	aiMatrix4x4 I = aiMatrix4x4();
+	float ticksPerSec_Start = (float)(m_scene->mAnimations[m_currentAnim]->mTicksPerSecond != 0 ? m_scene->mAnimations[m_currentAnim]->mTicksPerSecond : 60.0f);
+	float timeTicks_Start = animTime * ticksPerSec_Start;
+	float animTimeTicks_Start = fmod(timeTicks_Start, (float)m_scene->mAnimations[m_currentAnim]->mDuration);
+
+	float ticksPerSec_End = (float)(m_scene->mAnimations[nextAnim]->mTicksPerSecond != 0 ? m_scene->mAnimations[nextAnim]->mTicksPerSecond : 60.0f);
+	float timeTicks_End = animTime * ticksPerSec_End;
+	float animTimeTicks_End = fmod(timeTicks_End, (float)m_scene->mAnimations[nextAnim]->mDuration);
+
+	aiAnimation* startAnim = m_scene->mAnimations[m_currentAnim];
+	aiAnimation* endAnim = m_scene->mAnimations[nextAnim];
+
+	ReadNodeHeirarchyBlend(blendFactor, animTimeTicks_Start, animTimeTicks_End, m_scene->mRootNode, I, startAnim, endAnim, nextAnim);
+
 }
 const aiNodeAnim* Mesh::FindNodeAnim(const aiAnimation* pAnimation, const std::string& NodeName)
 {
@@ -517,9 +538,11 @@ int Mesh::FindScaling(float AnimationTimeTicks, const aiNodeAnim* pNodeAnim)
 {
 	assert(pNodeAnim->mNumScalingKeys > 0);
 
-	for (int i = 0; i < pNodeAnim->mNumScalingKeys - 1; i++) {
+	for (int i = 0; i < pNodeAnim->mNumScalingKeys - 1; i++) 
+	{
 		float t = (float)pNodeAnim->mScalingKeys[i + 1].mTime;
-		if (AnimationTimeTicks < t) {
+		if (AnimationTimeTicks < t) 
+		{
 			return i;
 		}
 	}
@@ -648,6 +671,144 @@ void Mesh::ReadNodeHeirarchy(float animTimeTicks, const aiNode* node, const aiMa
 	{
 		//std::cout << "ReadNodeHeirarchy() parent: " << name << " | child: " << node->mChildren[i]->mName.C_Str() << std::endl;
 		ReadNodeHeirarchy(animTimeTicks, node->mChildren[i], GlobalTransform, animIndex);
+	}
+}
+void Mesh::ReadNodeHeirarchyBlend(float blendFactor, float animTimeTicks_Start, float animTimeTicks_End, const aiNode* node, const aiMatrix4x4& ParentTransform, aiAnimation* start, aiAnimation* end, int animIndex)
+{
+	bool debugMatrices = false;
+
+	const std::string name = node->mName.C_Str();
+	aiMatrix4x4 NodeTransformation(node->mTransformation);
+
+	if (name.find("$AssimpFbx$") != std::string::npos)
+		NodeTransformation = aiMatrix4x4();
+	
+
+	if (debugMatrices)
+	{
+		std::cout << "********** node: " << name << " ***********************\n";
+		std::cout << "NodeTransformation Matrix: \n";
+		printMatrix(NodeTransformation);
+
+	}
+
+	const aiAnimation* animStart = m_scene->mAnimations[m_currentAnim];
+	const aiNodeAnim* animNodeStart = FindNodeAnim(animStart, name);
+	aiVector3D   StartScaling;
+	aiQuaternion StartRotation;
+	aiVector3D   StartTranslation;
+
+	const aiAnimation* animEnd = m_scene->mAnimations[animIndex];
+	const aiNodeAnim* animNodeEnd = FindNodeAnim(animEnd, name);
+	aiVector3D EndScaling;
+	aiQuaternion EndRotation;
+	aiVector3D EndTranslation;
+
+	if (animNodeStart)
+	{
+		// Interpolate scaling and generate scaling transformation matrix
+		CalcInterpolatedScaling(StartScaling, animTimeTicks_Start, animNodeStart);
+
+		// Interpolate rotation and generate rotation transformation matrix
+		CalcInterpolatedRotation(StartRotation, animTimeTicks_Start, animNodeStart);
+
+		// Interpolate translation and generate translation transformation matrix
+		CalcInterpolatedPosition(StartTranslation, animTimeTicks_Start, animNodeStart);
+
+	}
+
+	if (animNodeEnd)
+	{
+		// Interpolate scaling and generate scaling transformation matrix
+		CalcInterpolatedScaling(EndScaling, animTimeTicks_End, animNodeEnd);
+
+		// Interpolate rotation and generate rotation transformation matrix
+		CalcInterpolatedRotation(EndRotation, animTimeTicks_End, animNodeEnd);
+
+		// Interpolate translation and generate translation transformation matrix
+		CalcInterpolatedPosition(EndTranslation, animTimeTicks_End, animNodeEnd);
+
+	}
+
+	//blend anim interp
+	if (animNodeStart && animNodeEnd)
+	{
+		//interp scale
+		const aiVector3D& Scale0 = StartScaling;
+		const aiVector3D& Scale1 = EndScaling;
+		aiVector3D BlendScaling = (1.0f - blendFactor) * Scale0 + Scale1 * blendFactor;
+		aiMatrix4x4 ScalingM = CreateScalingMatrix(BlendScaling);
+
+		//interp rot
+		const aiQuaternion& Rot0 = StartRotation;
+		const aiQuaternion& Rot1 = EndRotation;
+		aiQuaternion blendRot;
+		aiQuaternion::Interpolate(blendRot, Rot0, Rot1, blendFactor);
+		aiMatrix4x4 RotationM = aiMatrix4x4(blendRot.GetMatrix());
+
+		//interp trans
+		const aiVector3D& Trans0 = StartTranslation;
+		const aiVector3D& Trans1 =   EndTranslation;
+		aiVector3D BlendTrans = (1.0f - blendFactor) * Trans0 + Trans1 * blendFactor;
+		aiMatrix4x4 TranslationM = CreateTranslationMatrix(BlendTrans);
+
+		//combine all to NodeTransformation
+		NodeTransformation = TranslationM * RotationM * ScalingM;
+
+		if (debugMatrices)
+		{
+			std::cout << "##### anim[0]: " << animStart->mName.C_Str() << " #########\n";
+			std::cout << "##### anim[1]: " << animEnd->mName.C_Str() << " #########\n";
+			std::cout << "scaling mat: \n";
+			printMatrix(ScalingM);
+			std::cout << "rotation mat: \n";
+			printMatrix(RotationM);
+			std::cout << "translation mat: \n";
+			printMatrix(TranslationM);
+			std::cout << "NodeTransformation mat after anim: \n";
+			printMatrix(NodeTransformation);
+		}
+	}
+
+	aiMatrix4x4 GlobalTransform = ParentTransform * NodeTransformation;
+	std::string parentName = "no parent (identity matrix)";
+
+	if (debugMatrices)
+	{
+		std::cout << "ParentTransform Matrix: \n";
+		printMatrix(ParentTransform);
+		std::cout << "ChildTransform Matrix (current)\n";
+		printMatrix(NodeTransformation);
+		std::cout << "--- GlobalTransform Matrix: Parent * Child ----\n";
+		printMatrix(GlobalTransform);
+	}
+
+	if (m_skeleton.boneMapping.find(name) != m_skeleton.boneMapping.end())
+	{
+		numBoneUpdates++;
+		int boneIndex = m_skeleton.boneMapping[name];
+		m_skeleton.finalTransformations[boneIndex] = (GlobalTransform * m_skeleton.boneOffsetMatrices[boneIndex]);
+
+		if (debugMatrices)
+		{
+			std::cout << "node in skeleton at bone: " << name << " index: " << boneIndex << std::endl;
+			std::cout << "Offset matrix\n";
+			printMatrix(m_skeleton.boneOffsetMatrices[boneIndex]);
+			std::cout << "skeleton bone final transorm: GlobInv * Glob * Offset: \n";
+
+			printMatrix(m_skeleton.finalTransformations[boneIndex]);
+		}
+	}
+	else
+	{
+		if (debugMatrices)
+			std::cout << name << " is not in skeleton\n";
+	}
+
+	for (int i = 0; i < node->mNumChildren; i++)
+	{
+		//std::cout << "ReadNodeHeirarchy() parent: " << name << " | child: " << node->mChildren[i]->mName.C_Str() << std::endl;
+		ReadNodeHeirarchyBlend(blendFactor, animTimeTicks_Start, animTimeTicks_End, node->mChildren[i], GlobalTransform, start, end, animIndex);
 	}
 }
 
@@ -788,6 +949,21 @@ const Skeleton& Mesh::GetSkeleton() const
 bool Mesh::Skinned()
 {
 	return m_skinned;
+}
+
+void Mesh::SetNextAnim(int nextAnim)
+{
+	m_nextAnim = nextAnim;
+}
+
+void Mesh::SetCurrentAnim(int currAnim)
+{
+	m_currentAnim = currAnim;
+}
+
+int Mesh::GetNextAnim()
+{
+	return m_nextAnim;
 }
 
 //opengl

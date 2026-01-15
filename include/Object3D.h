@@ -24,6 +24,9 @@ public:
 	glm::vec3 Position();
 	glm::vec3 Rotation();
 	void SetRotation(glm::vec3 newRotation);
+	float BlendFactor();
+	void IncBlendFactor(float delta);
+	void StartAnimBlend();
 
 	//primitives
 
@@ -101,5 +104,5 @@ private:
 	glm::vec3 m_scale;
 	bool m_skinned;
 	std::string m_name;
-	int m_currentAnimation;
+	float m_blendFactor;
 };
