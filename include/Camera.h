@@ -11,7 +11,7 @@ class Camera {
 		glm::mat4 GetViewMatrix();
 		glm::vec3 GetPosition();
 		glm::vec3 GetFacing();
-		void CameraControl(glm::vec2 mouseDiff, glm::vec3 playerPosition);
+		void CameraControl(glm::vec2 mouseDiff);
 		void CameraControl(float scroll);
 		void Focus(glm::vec3 min, glm::vec3 max);
 		void PrintPosition();

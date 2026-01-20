@@ -45,10 +45,24 @@ float yaw = 0.0f;
 float pitch = 0.0f;
 float sensitivity = 0.08f;
 
-void Camera::CameraControl(glm::vec2 mouseDiff, glm::vec3 playerPosition)
+void Camera::CameraControl(glm::vec2 mouseDiff)
 {
+	float floorY = 10.0f;
+	float radius = glm::length(m_position - m_lookAt);
+
+	// Clamp the argument to asin to avoid NaNs
+	float minPitchRad = -asinf(glm::clamp(
+		(m_lookAt.y - floorY) / radius,
+		0.0f,
+		1.0f
+	));
+
+	float minPitchDeg = glm::degrees(minPitchRad);
+
 	yaw += mouseDiff.x * sensitivity;
 	pitch += mouseDiff.y * sensitivity;
+
+	pitch = std::clamp(pitch, minPitchDeg, 89.0f);
 
 	pitch = std::clamp(pitch, -89.0f, 89.0f);
 
@@ -61,10 +75,8 @@ void Camera::CameraControl(glm::vec2 mouseDiff, glm::vec3 playerPosition)
 	direction.z = cos(pitchRad) * sin(yawRad);
 
 	direction = normalize(direction);
-	float radius = glm::length(m_position - playerPosition);
 
-	m_position = playerPosition - direction * radius;
-
+	glm::vec3 m_position = m_lookAt - direction * radius;
 	m_view_matrix = glm::lookAt(m_position, m_lookAt, m_up);
 }
 
@@ -76,7 +88,6 @@ void Camera::CameraControl(float scroll)
 		m_position *= (1.1f + Engine::DeltaFrameTime());
 
 	m_view_matrix = glm::lookAt(m_position, m_lookAt, m_up);
-
 }
 
 void Camera::Focus(glm::vec3 min, glm::vec3 max)

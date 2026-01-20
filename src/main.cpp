@@ -141,8 +141,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		startRot = currRot;
 		nextRot = atan2(moveDirection.x, moveDirection.z);
 		blendRot = true;
-		std::cout << "startRot: " << glm::degrees(startRot) << std::endl;
-		std::cout << "nextRot: " << glm::degrees(nextRot) << std::endl;
 	}
 
 }
