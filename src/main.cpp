@@ -161,7 +161,7 @@ void AquanactLoop()
 	glfwGetCursorPos(Engine::Window->GLFW(), &xpos, &ypos);
 	mouseCurr = glm::vec2(xpos, ypos);
 	glm::vec2 mouseDiff = mouseCurr - mouseLast;
-	Engine::Camera->CameraControl(mouseDiff, Engine::Level->Objects()[0]->Position());
+	Engine::Camera->CameraControl(mouseDiff);
 	mouseLast = mouseCurr;
 	
 	float moveSpeed = 700.0f;

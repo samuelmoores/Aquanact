@@ -150,6 +150,8 @@ void Mesh::assimpLoad(const std::string& path, bool flipUvs)
 		std::vector<uint32_t> faces;
 
 		//process vertices, faces and bones
+
+		std::cout << "num meshes: " << m_scene->mNumMeshes << std::endl;
 		fromAssimpMesh(m_scene->mMeshes[0], vertices, faces);
 
 		m_skeleton.finalTransformations.resize(m_skeleton.boneOffsetMatrices.size());
