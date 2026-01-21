@@ -73,9 +73,14 @@ void Renderer::Flush(Camera* camera)
 
 		//check if submeshes?
 		//	then get curr texture and facesize
-		commands[i].mesh->Bind();
-		glDrawElements(GL_TRIANGLES, commands[i].mesh->FacesSize(), GL_UNSIGNED_INT, 0);
-		commands[i].mesh->UnBind();
+		int numBuffs = commands[i].mesh->NumBuffers();
+		for (int j = 0; j < numBuffs; j++)
+		{
+			commands[i].mesh->Bind();
+			glDrawElements(GL_TRIANGLES, commands[i].mesh->FacesSize(), GL_UNSIGNED_INT, 0);
+			commands[i].mesh->UnBind();
+		}
+		commands[i].mesh->ClearBufferIndex();
 	}
 
 	commands.clear();

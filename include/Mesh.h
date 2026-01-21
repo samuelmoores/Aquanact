@@ -40,8 +40,8 @@ class Mesh {
 		void LoadTexture(aiMaterial* mat, aiTextureType textureType, std::string path);
 
 		//open gl
-		void Bind() const;
-		void UnBind() const;
+		void Bind();
+		void UnBind();
 		uint32_t FacesSize() const;
 		
 		//bounding box
@@ -53,15 +53,16 @@ class Mesh {
 		glm::vec3 maxBounds();
 
 		//getter setter
-		void SetBuffers();
+		void SetBuffers(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces);
 		void SetTexture(const char* colorFile);
 		void SetDiffuseTextureMemory(aiTexture* text);
-		void SetNormalMapMemory(aiTexture* normalMap);
 		const Skeleton& GetSkeleton() const;
 		bool Skinned();
 		void SetNextAnim(int nextAnim);
 		void SetCurrentAnim(int currAnim);
 		int GetNextAnim();
+		int NumBuffers();
+		void ClearBufferIndex();
 
 		//animation
 		void SetAnim(int animIndex);
@@ -80,9 +81,10 @@ class Mesh {
 	private:
 		std::vector<Vertex3D> m_vertices;
 		std::vector<uint32_t> m_faces;
-		uint32_t m_vao;
-		uint32_t m_textureColor;
-		uint32_t m_textureNormal;
+		std::vector<uint32_t> m_vao;
+		std::vector<uint32_t> m_textureColor;
+		int m_currVao;
+		int m_currTextureColor;
 		glm::vec3 m_minBounds;
 		glm::vec3 m_maxBounds;
 		glm::vec3 m_meshMinBounds;
@@ -96,4 +98,5 @@ class Mesh {
 		int m_nextAnim;
 		int m_totalVertices;
 		std::vector<Mesh> m_subMeshes;
+		std::vector<int> m_facesSize;
 };

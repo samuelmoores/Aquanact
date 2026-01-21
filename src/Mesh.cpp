@@ -57,6 +57,8 @@ Mesh::Mesh(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 {
 	m_vertices = vertices;
 	m_faces = faces;
+	m_currVao = 0;
+	m_currTextureColor = 0;
 
 	//cube only
 	m_minBounds = glm::vec3(-0.5f, -0.5f, -0.5f);
@@ -65,11 +67,13 @@ Mesh::Mesh(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 	m_meshMinBounds = m_minBounds;
 	m_meshMaxBounds = m_maxBounds;
 	
-	SetBuffers();
+	SetBuffers(vertices, faces);
 	SetTexture("models/brick_wall_diff.png");
 }
 Mesh::Mesh(char modelFile[])
 {
+	m_currVao = 0;
+	m_currTextureColor = 0;
 	assimpLoad(modelFile, true);
 	m_currentAnim = 0;
 	m_nextAnim = 1;
@@ -120,7 +124,6 @@ Mesh::Mesh(char modelFile[])
 	m_meshMinBounds = m_minBounds;
 	m_meshMaxBounds = m_maxBounds;
 
-	SetBuffers();
 }
 
 //loading
@@ -217,8 +220,15 @@ void Mesh::fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, s
 		faces.push_back(mesh->mFaces[i].mIndices[2] + m_totalVertices);
 	}
 
+	m_facesSize.push_back(faces.size());
+	std::cout << "Num buffers afer fromassimpMesh() | " << NumBuffers() << std::endl;
+
 	m_skinned = mesh->mNumBones != 0;
-	if (!m_skinned) return;
+	if (!m_skinned)
+	{
+		SetBuffers(vertices, faces);
+		return;
+	}
 	
 	//-------------process bones-------------------
 	std::map<std::string, int> boneMap = m_skeleton.boneMapping;
@@ -252,6 +262,7 @@ void Mesh::fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, s
 
 	m_skeleton.boneMapping = boneMap;
 	m_totalVertices += numVertices;
+	SetBuffers(vertices, faces);
 }
 void Mesh::ReadNodeHeirarchy(const aiNode* node, const aiMatrix4x4& ParentTransform)
 {
@@ -317,7 +328,6 @@ void Mesh::LoadTexture(aiMaterial* mat, aiTextureType textureType, std::string p
 				SetDiffuseTextureMemory(embeddedTexture);
 				break;
 			case aiTextureType_NORMALS:
-				SetNormalMapMemory(embeddedTexture);
 				break;
 			}
 		}
@@ -817,13 +827,15 @@ void Mesh::ReadNodeHeirarchyBlend(float blendFactor, float animTimeTicks_Start, 
 }
 
 //getter setter
-void Mesh::SetBuffers()
+void Mesh::SetBuffers(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 {
+	m_vao.push_back(0);
+	std::cout << "num buffers after SetBuffers: " << NumBuffers() << std::endl;
 	// Generate a vertex array object on the GPU.
-	glGenVertexArrays(1, &m_vao);
+	glGenVertexArrays(1, &m_vao.back());
 
 	// "Bind" the newly-generated vao, which makes future functions operate on that specific object.
-	glBindVertexArray(m_vao);
+	glBindVertexArray(m_vao.back());
 
 	// Generate a vertex buffer object on the GPU.
 	uint32_t vbo;
@@ -834,7 +846,7 @@ void Mesh::SetBuffers()
 	// This vbo is now associated with m_vao.
 
 	// Copy the contents of the vertices list to the buffer that lives on the GPU.
-	glBufferData(GL_ARRAY_BUFFER, m_vertices.size() * sizeof(Vertex3D), &m_vertices[0], GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex3D), &vertices[0], GL_STATIC_DRAW);
 
 	// Use offsetof to get exact offsets instead of hardcoding them
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex3D), 0);
@@ -859,20 +871,22 @@ void Mesh::SetBuffers()
 	uint32_t ebo;
 	glGenBuffers(1, &ebo);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_faces.size() * sizeof(uint32_t), &m_faces[0], GL_STATIC_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, faces.size() * sizeof(uint32_t), &faces[0], GL_STATIC_DRAW);
 
 	// Unbind the vertex array, so no one else can accidentally mess with it.
 	glBindVertexArray(0);
 }
 void Mesh::SetTexture(const char* colorFile)
 {
+	m_textureColor.push_back(0);
+
 	StbImage stb_image_color;
 
 	stb_image_color.loadFromFile(colorFile);
 
-	glGenTextures(1, &m_textureColor);
+	glGenTextures(1, &m_textureColor.back());
 
-	glBindTexture(GL_TEXTURE_2D, m_textureColor);
+	glBindTexture(GL_TEXTURE_2D, m_textureColor.back());
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
@@ -894,13 +908,14 @@ void Mesh::SetTexture(const char* colorFile)
 }
 void Mesh::SetDiffuseTextureMemory(aiTexture* text)
 {
+	m_textureColor.push_back(0);
 	StbImage stb_image_color;
 
 	stb_image_color.loadFromMemory(text);
 
-	glGenTextures(1, &m_textureColor);
+	glGenTextures(1, &m_textureColor.back());
 
-	glBindTexture(GL_TEXTURE_2D, m_textureColor);
+	glBindTexture(GL_TEXTURE_2D, m_textureColor.back());
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
@@ -916,33 +931,6 @@ void Mesh::SetDiffuseTextureMemory(aiTexture* text)
 		GL_RGBA,
 		GL_UNSIGNED_BYTE,
 		stb_image_color.getData()
-	);
-	glGenerateMipmap(GL_TEXTURE_2D);
-}
-void Mesh::SetNormalMapMemory(aiTexture* normalMap)
-{
-	StbImage stb_image_normal;
-
-	stb_image_normal.loadFromMemory(normalMap);
-
-	glGenTextures(1, &m_textureNormal);
-
-	glBindTexture(GL_TEXTURE_2D, m_textureNormal);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-	glTexImage2D(
-		GL_TEXTURE_2D,
-		0,
-		GL_RGB,
-		stb_image_normal.getWidth(),
-		stb_image_normal.getHeight(),
-		0,
-		GL_RGB,
-		GL_UNSIGNED_BYTE,
-		stb_image_normal.getData()
 	);
 	glGenerateMipmap(GL_TEXTURE_2D);
 }
@@ -970,25 +958,31 @@ int Mesh::GetNextAnim()
 	return m_nextAnim;
 }
 
-//opengl
-void Mesh::Bind() const
+int Mesh::NumBuffers()
 {
-	glBindVertexArray(m_vao);
-
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, m_textureColor);
-
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, m_textureNormal);
-
+	return m_vao.size();
 }
-void Mesh::UnBind() const
+
+void Mesh::ClearBufferIndex()
 {
+	m_currVao = 0;
+	m_currTextureColor = 0;
+}
+
+//opengl
+void Mesh::Bind()
+{
+	glBindVertexArray(m_vao[m_currVao]);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, m_textureColor[0]);
+}
+void Mesh::UnBind() 
+{
+	m_currVao++;
 	glBindVertexArray(0);
 	glBindTexture(GL_TEXTURE, 0);
-
 }
 uint32_t Mesh::FacesSize() const
 {
-	return m_faces.size();
+	return m_facesSize[m_currVao];
 }
