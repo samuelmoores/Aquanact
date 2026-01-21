@@ -150,9 +150,14 @@ void Mesh::assimpLoad(const std::string& path, bool flipUvs)
 		std::vector<uint32_t> faces;
 
 		//process vertices, faces and bones
+		m_totalVertices = 0;
 
 		std::cout << "num meshes: " << m_scene->mNumMeshes << std::endl;
-		fromAssimpMesh(m_scene->mMeshes[0], vertices, faces);
+		for (int i = 0; i < m_scene->mNumMeshes; i++)
+		{
+			fromAssimpMesh(m_scene->mMeshes[i], vertices, faces);
+
+		}
 
 		m_skeleton.finalTransformations.resize(m_skeleton.boneOffsetMatrices.size());
 
@@ -207,9 +212,9 @@ void Mesh::fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, s
 	for (size_t i{ 0 }; i < mesh->mNumFaces; ++i) 
 	{
 		// We assume the faces are triangular, so we push three face indexes at a time into our faces list.
-		faces.push_back(mesh->mFaces[i].mIndices[0]);
-		faces.push_back(mesh->mFaces[i].mIndices[1]);
-		faces.push_back(mesh->mFaces[i].mIndices[2]);
+		faces.push_back(mesh->mFaces[i].mIndices[0] + m_totalVertices);
+		faces.push_back(mesh->mFaces[i].mIndices[1] + m_totalVertices);
+		faces.push_back(mesh->mFaces[i].mIndices[2] + m_totalVertices);
 	}
 
 	m_skinned = mesh->mNumBones != 0;
@@ -217,7 +222,6 @@ void Mesh::fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, s
 	
 	//-------------process bones-------------------
 	std::map<std::string, int> boneMap = m_skeleton.boneMapping;
-	m_skeleton.boneOffsetMatrices.resize(numBones);
 	for (int j = 0; j < numBones; j++)
 	{
 		int boneID = 0;
@@ -229,11 +233,8 @@ void Mesh::fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, s
 		{
 			boneID = boneMap.size();
 		
-			if (boneID == 0)
-				int titMilk = 69;
-			
 			boneMap[boneName] = boneID;
-			m_skeleton.boneOffsetMatrices[boneID] = bone->mOffsetMatrix;
+			m_skeleton.boneOffsetMatrices.push_back(bone->mOffsetMatrix);
 		}
 		else
 		{
@@ -244,12 +245,13 @@ void Mesh::fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, s
 		{
 			const aiVertexWeight& vw = bone->mWeights[k];
 			float weight = vw.mWeight;
-			int globalVertexID = vw.mVertexId;
+			int globalVertexID = vw.mVertexId + m_totalVertices;
 			AddBoneData(vertices[globalVertexID], boneID, weight);
 		}
 	}
 
 	m_skeleton.boneMapping = boneMap;
+	m_totalVertices += numVertices;
 }
 void Mesh::ReadNodeHeirarchy(const aiNode* node, const aiMatrix4x4& ParentTransform)
 {

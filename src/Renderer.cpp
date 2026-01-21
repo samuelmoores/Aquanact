@@ -71,8 +71,9 @@ void Renderer::Flush(Camera* camera)
 			commands[i].shader->setUniform("finalBones", glmTransforms);
 		}
 
+		//check if submeshes?
+		//	then get curr texture and facesize
 		commands[i].mesh->Bind();
-
 		glDrawElements(GL_TRIANGLES, commands[i].mesh->FacesSize(), GL_UNSIGNED_INT, 0);
 		commands[i].mesh->UnBind();
 	}
@@ -107,7 +108,7 @@ void Renderer::Loop()
 			}
 			else
 			{
-				objects[i]->GetMesh()->RunAnimation(Engine::TimeElapsed());
+				//objects[i]->GetMesh()->RunAnimation(Engine::TimeElapsed());
 			}
 		}
 

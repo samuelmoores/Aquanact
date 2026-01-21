@@ -94,4 +94,6 @@ class Mesh {
 		bool m_skinned;
 		int m_currentAnim;
 		int m_nextAnim;
+		int m_totalVertices;
+		std::vector<Mesh> m_subMeshes;
 };
