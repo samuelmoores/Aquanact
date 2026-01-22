@@ -155,11 +155,11 @@ void Mesh::assimpLoad(const std::string& path, bool flipUvs)
 		//process vertices, faces and bones
 		m_totalVertices = 0;
 
-		std::cout << "num meshes: " << m_scene->mNumMeshes << std::endl;
 		for (int i = 0; i < m_scene->mNumMeshes; i++)
 		{
 			fromAssimpMesh(m_scene->mMeshes[i], vertices, faces);
-
+			aiMaterial* mat = m_scene->mMaterials[i];
+			LoadTexture(mat, aiTextureType_DIFFUSE, path);
 		}
 
 		m_skeleton.finalTransformations.resize(m_skeleton.boneOffsetMatrices.size());
@@ -171,8 +171,6 @@ void Mesh::assimpLoad(const std::string& path, bool flipUvs)
 
 		//================== Materials =================================
 
-		aiMaterial* mat = m_scene->mMaterials[0];
-		LoadTexture(mat, aiTextureType_DIFFUSE, path);
 		//LoadTexture(mat, aiTextureType_NORMALS, path);
 		
 	}
@@ -221,7 +219,6 @@ void Mesh::fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, s
 	}
 
 	m_facesSize.push_back(faces.size());
-	std::cout << "Num buffers afer fromassimpMesh() | " << NumBuffers() << std::endl;
 
 	m_skinned = mesh->mNumBones != 0;
 	if (!m_skinned)
@@ -830,7 +827,6 @@ void Mesh::ReadNodeHeirarchyBlend(float blendFactor, float animTimeTicks_Start, 
 void Mesh::SetBuffers(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 {
 	m_vao.push_back(0);
-	std::cout << "num buffers after SetBuffers: " << NumBuffers() << std::endl;
 	// Generate a vertex array object on the GPU.
 	glGenVertexArrays(1, &m_vao.back());
 
@@ -973,12 +969,13 @@ void Mesh::ClearBufferIndex()
 void Mesh::Bind()
 {
 	glBindVertexArray(m_vao[m_currVao]);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, m_textureColor[0]);
+	glActiveTexture(GL_TEXTURE0);// + m_currTextureColor);
+	glBindTexture(GL_TEXTURE_2D, m_textureColor[m_currTextureColor]);
 }
 void Mesh::UnBind() 
 {
 	m_currVao++;
+	m_currTextureColor++;
 	glBindVertexArray(0);
 	glBindTexture(GL_TEXTURE, 0);
 }

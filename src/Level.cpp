@@ -22,11 +22,11 @@ void Level::Load()
 
     filepathString = "models/floor.fbx";
     filepath = filepathString.data();
-    LoadObject(filepath);
+    //LoadObject(filepath);
 
     filepathString = "models/wall.fbx";
     filepath = filepathString.data();
-    LoadObject(filepath);
+    //LoadObject(filepath);
 }
 
 void Level::DrawAxis()
