@@ -264,6 +264,8 @@ void Mesh::fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, s
 void Mesh::ReadNodeHeirarchy(const aiNode* node, const aiMatrix4x4& ParentTransform)
 {
 	const std::string name = node->mName.C_Str();
+
+	std::cout << name << std::endl;
 	
 	aiMatrix4x4 NodeTransformation(node->mTransformation);
 	aiMatrix4x4 GlobalTransform = ParentTransform * NodeTransformation;
@@ -413,6 +415,8 @@ void Mesh::RunAnimation(float animTime)
 	aiMatrix4x4 I = aiMatrix4x4();
 	float ticksPerSec = (float)(m_scene->mAnimations[m_currentAnim]->mTicksPerSecond != 0 ? m_scene->mAnimations[m_currentAnim]->mTicksPerSecond : 60.0f);
 	float timeTicks = animTime * ticksPerSec;
+	if (m_scene->mNumAnimations == 0)
+		return;
 	float animTimeTicks = fmod(timeTicks, (float)m_scene->mAnimations[m_currentAnim]->mDuration);
 
 	ReadNodeHeirarchy(animTimeTicks, m_scene->mRootNode, I, m_currentAnim);
@@ -426,6 +430,7 @@ void Mesh::BlendAnimation(int nextAnim, float animTime, float blendFactor)
 	float ticksPerSec_Start = (float)(m_scene->mAnimations[m_currentAnim]->mTicksPerSecond != 0 ? m_scene->mAnimations[m_currentAnim]->mTicksPerSecond : 60.0f);
 	float timeTicks_Start = animTime * ticksPerSec_Start;
 	float animTimeTicks_Start = fmod(timeTicks_Start, (float)m_scene->mAnimations[m_currentAnim]->mDuration);
+
 
 	float ticksPerSec_End = (float)(m_scene->mAnimations[nextAnim]->mTicksPerSecond != 0 ? m_scene->mAnimations[nextAnim]->mTicksPerSecond : 60.0f);
 	float timeTicks_End = animTime * ticksPerSec_End;
@@ -522,7 +527,7 @@ int Mesh::FindRotation(float AnimationTimeTicks, const aiNodeAnim* pNodeAnim)
 		}
 	}
 
-	return 0;
+	return pNodeAnim->mNumRotationKeys - 2;
 }
 void Mesh::CalcInterpolatedRotation(aiQuaternion& Out, float AnimationTimeTicks, const aiNodeAnim* pNodeAnim)
 {
@@ -531,7 +536,7 @@ void Mesh::CalcInterpolatedRotation(aiQuaternion& Out, float AnimationTimeTicks,
 		Out = pNodeAnim->mRotationKeys[0].mValue;
 		return;
 	}
-
+	
 	int RotationIndex = FindRotation(AnimationTimeTicks, pNodeAnim);
 	int NextRotationIndex = RotationIndex + 1;
 	assert(NextRotationIndex < pNodeAnim->mNumRotationKeys);
@@ -594,12 +599,16 @@ void Mesh::ReadNodeHeirarchy(float animTimeTicks, const aiNode* node, const aiMa
 	const aiAnimation* anim = m_scene->mAnimations[animIndex];
 	aiMatrix4x4 NodeTransformation(node->mTransformation);
 
+	//if string contains this
 	if (name.find("$AssimpFbx$") != std::string::npos)
 		NodeTransformation = aiMatrix4x4();
 
 	if (debugMatrices)
 	{
+		std::cout << "###################################################################\n";
 		std::cout << "********** node: " << name << " ***********************\n";
+		std::cout << "###################################################################\n";
+
 		std::cout << "NodeTransformation Matrix: \n";
 		printMatrix(NodeTransformation);
 

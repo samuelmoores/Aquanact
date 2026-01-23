@@ -113,7 +113,7 @@ void Renderer::Loop()
 			}
 			else
 			{
-				//objects[i]->GetMesh()->RunAnimation(Engine::TimeElapsed());
+				objects[i]->GetMesh()->RunAnimation(Engine::TimeElapsed());
 			}
 		}
 
