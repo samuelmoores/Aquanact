@@ -196,7 +196,7 @@ void AquanactLoop()
 
 	if (blendRot)
 	{
-		if ((glm::degrees(startRot) == -90 || glm::degrees(startRot) == -135 ) && glm::degrees(nextRot) == 180)
+		if ((glm::degrees(startRot) <= -90 && glm::degrees(startRot) >= -135 ) && glm::degrees(nextRot) == 180)
 		{
 			currRot -= Engine::DeltaFrameTime() * 15.0f;
 
