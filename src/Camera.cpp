@@ -106,6 +106,4 @@ void Camera::Move(glm::vec3 delta, glm::vec3 lookAt)
 {
 	m_position += delta;
 	m_lookAt = lookAt;
-	m_view_matrix = glm::lookAt(m_position, m_lookAt, m_up);
-
 }

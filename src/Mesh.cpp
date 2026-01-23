@@ -265,8 +265,6 @@ void Mesh::ReadNodeHeirarchy(const aiNode* node, const aiMatrix4x4& ParentTransf
 {
 	const std::string name = node->mName.C_Str();
 
-	std::cout << name << std::endl;
-	
 	aiMatrix4x4 NodeTransformation(node->mTransformation);
 	aiMatrix4x4 GlobalTransform = ParentTransform * NodeTransformation;
 

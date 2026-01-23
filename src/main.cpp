@@ -164,7 +164,7 @@ void AquanactLoop()
 	Engine::Camera->CameraControl(mouseDiff);
 	mouseLast = mouseCurr;
 	
-	float moveSpeed = 700.0f;
+	float moveSpeed = 100.0f;
 
 	//************* These are all called AFTER the key callback ************
 	//************* For keys being held down, key callback does not register it fast enough ************
@@ -192,6 +192,7 @@ void AquanactLoop()
 	{ 
 		objects[0]->Move(glm::normalize(glm::vec3(moveDirection)) * moveSpeed * Engine::DeltaFrameTime());
 	}
+
 
 	if (blendRot)
 	{
