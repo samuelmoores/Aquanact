@@ -23,7 +23,7 @@ Axis::Axis(float axisLength, float scale) :m_vao(-1), m_vbo(-1)
 
 	};
 
-	for (float i = 0; i < axisLength * 2; i += scale)
+	for (float i = scale; i < axisLength * 2; i += scale)
 	{
 		//along x
 		m_vertices.push_back({  i / 2.0f, 0.0f, axisLength, 1.0f, 1.0f, 1.0f });
@@ -32,7 +32,7 @@ Axis::Axis(float axisLength, float scale) :m_vao(-1), m_vbo(-1)
 		m_vertices.push_back({ -i / 2.0f, 0.0f, -axisLength, 1.0f, 1.0f, 1.0f });
 	}
 
-	for (float i = 0; i < axisLength * 2; i += scale)
+	for (float i = scale; i < axisLength * 2; i += scale)
 	{
 		//along z
 		m_vertices.push_back({ axisLength, 0.0f,   i / 2.0f, 1.0f, 1.0f, 1.0f });

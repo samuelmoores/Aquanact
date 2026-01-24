@@ -2,6 +2,10 @@
 #include <glm/ext/matrix_clip_space.hpp>
 #include "Engine.h"
 
+float yaw = 0.0f;
+float pitch = 0.0f;
+float sensitivity = 0.08f;
+
 Camera::Camera()
 {
 	int width, height;
@@ -9,12 +13,21 @@ Camera::Camera()
 
 	m_projection_matrix = glm::perspective(glm::radians(45.0), static_cast<double>(width) / height, 0.1, 1000000.0);
 
-	m_position = glm::vec3(-9.87885, 0.0f, -417.303);
+	m_position = glm::vec3(0.405, 111.572f, -290.303);
 	m_front = glm::vec3(0);
 	m_up = glm::vec3(0.0f, 1.0f, 0.0f);
 	m_right = glm::normalize(glm::cross(m_front, m_up));
 	m_view_matrix = glm::lookAt(m_position, m_front, m_up);
 	m_lookAt = glm::vec3(0);
+
+	glm::vec3 dir = glm::normalize(m_lookAt - m_position);
+
+	// Pitch: arcsin of Y
+	pitch = -glm::degrees(asinf(dir.y));
+
+	// Yaw: atan2(Z, X)
+	yaw = glm::degrees(atan2f(dir.z, dir.x));
+
 }
 
 glm::mat4 Camera::GetProjectionMatrix()
@@ -41,9 +54,6 @@ glm::vec3 Camera::GetFacing()
 	return m_front;
 }
 
-float yaw = 0.0f;
-float pitch = 0.0f;
-float sensitivity = 0.08f;
 
 void Camera::CameraControl(glm::vec2 mouseDiff)
 {
@@ -76,7 +86,7 @@ void Camera::CameraControl(glm::vec2 mouseDiff)
 
 	direction = normalize(direction);
 
-	glm::vec3 m_position = m_lookAt - direction * radius;
+	m_position = m_lookAt - direction * radius;
 	m_view_matrix = glm::lookAt(m_position, m_lookAt, m_up);
 }
 

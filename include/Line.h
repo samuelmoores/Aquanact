@@ -10,7 +10,7 @@ struct LineVertex3D {
 class Line {
 public:
 	Line();
-	Line(float length, glm::vec3 origin, glm::vec3 direction);
+	Line(glm::vec3 minBounds, glm::vec3 maxBounds);
 	void UpdateProjection(glm::mat4 projectionMatrix);
 	void draw(glm::mat4 viewMatrix);
 private:

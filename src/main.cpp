@@ -27,6 +27,8 @@ float currRot = 0.0f;
 float nextRot = 0.0f;
 float startRot = 0.0f;
 
+bool windowActive = true;
+
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
 	Engine::Camera->CameraControl(yoffset);
@@ -45,7 +47,10 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 	}
 
 	glfwSetInputMode(Engine::Window->GLFW(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
+	windowActive = true;
+	double xpos, ypos;
+	glfwGetCursorPos(Engine::Window->GLFW(), &xpos, &ypos);
+	mouseLast = glm::vec2(xpos, ypos);
 }
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
@@ -145,6 +150,30 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
 }
 
+bool AABBIntersect(
+	const glm::vec3& minA, const glm::vec3& maxA,
+	const glm::vec3& minB, const glm::vec3& maxB)
+{
+	bool overlapX = (minA.x <= maxB.x && maxA.x >= minB.x);
+	bool overlapY = (minA.y <= maxB.y && maxA.y >= minB.y);
+	bool overlapZ = (minA.z <= maxB.z && maxA.z >= minB.z);
+
+	//std::cout << "AABB Check:\n";
+	//std::cout << "  A min: " << minA.x << ", " << minA.y << ", " << minA.z << "\n";
+	//std::cout << "  A max: " << maxA.x << ", " << maxA.y << ", " << maxA.z << "\n";
+	//std::cout << "  B min: " << minB.x << ", " << minB.y << ", " << minB.z << "\n";
+	//std::cout << "  B max: " << maxB.x << ", " << maxB.y << ", " << maxB.z << "\n";
+
+	//std::cout << "  Overlap X: " << overlapX << "\n";
+	//std::cout << "  Overlap Y: " << overlapY << "\n";
+	//std::cout << "  Overlap Z: " << overlapZ << "\n";
+
+	bool result = overlapX && overlapY && overlapZ;
+	//std::cout << "  COLLISION: " << result << "\n\n";
+
+	return result;
+}
+
 void AquanactLoop()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -155,16 +184,21 @@ void AquanactLoop()
 	if (glfwGetKey(Engine::Window->GLFW(), GLFW_KEY_ESCAPE) == GLFW_PRESS)
 	{
 		glfwSetInputMode(Engine::Window->GLFW(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+		windowActive = false;
 	}
 
-	double xpos, ypos;
-	glfwGetCursorPos(Engine::Window->GLFW(), &xpos, &ypos);
-	mouseCurr = glm::vec2(xpos, ypos);
-	glm::vec2 mouseDiff = mouseCurr - mouseLast;
-	Engine::Camera->CameraControl(mouseDiff);
-	mouseLast = mouseCurr;
-	
-	float moveSpeed = 100.0f;
+	if (windowActive)
+	{
+		double xpos, ypos;
+		glfwGetCursorPos(Engine::Window->GLFW(), &xpos, &ypos);
+		mouseCurr = glm::vec2(xpos, ypos);
+		glm::vec2 mouseDiff = mouseCurr - mouseLast;
+		Engine::Camera->CameraControl(mouseDiff);
+		mouseLast = mouseCurr;
+	}
+
+
+	float moveSpeed = 75.0f;
 
 	//************* These are all called AFTER the key callback ************
 	//************* For keys being held down, key callback does not register it fast enough ************
@@ -187,12 +221,33 @@ void AquanactLoop()
 	{
 		move = true;
 	}
+	Mesh* playerMesh = objects[0]->GetMesh();
+	glm::vec3 playerMin = playerMesh->minBounds();
+	glm::vec3 playerMax = playerMesh->maxBounds();
 
-	if (move && glm::length(moveDirection) != 0)
-	{ 
-		objects[0]->Move(glm::normalize(glm::vec3(moveDirection)) * moveSpeed * Engine::DeltaFrameTime());
+	Mesh* wallMesh = objects[1]->GetMesh();
+	glm::vec3 wallMin = wallMesh->minBounds();
+	glm::vec3 wallMax = wallMesh->maxBounds();
+
+
+	glm::vec3 movement(0.0f);
+
+	if (move && glm::dot(moveDirection, moveDirection) > 0.0001f)
+	{
+		movement = glm::normalize(moveDirection) * moveSpeed * Engine::DeltaFrameTime();
 	}
 
+	// Predict next AABB
+	glm::vec3 nextMin = playerMin + movement;
+	glm::vec3 nextMax = playerMax + movement;
+
+	bool collided = AABBIntersect(nextMin, nextMax, wallMin, wallMax);
+
+	// Apply movement only if no collision
+	if (!collided)
+	{
+		objects[0]->Move(movement);
+	}
 
 	if (blendRot)
 	{
@@ -256,8 +311,14 @@ int main()
 	glfwSetScrollCallback(Engine::Window->GLFW(), scroll_callback);
 	glfwSetMouseButtonCallback(Engine::Window->GLFW(), mouse_button_callback);
 	glfwSetKeyCallback(Engine::Window->GLFW(), key_callback);
-
+	glfwSetInputMode(Engine::Window->GLFW(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	objects = Engine::Level->Objects();
+
+	objects[1]->Move(glm::vec3(0.0f, 0.0f, 200.0f));
+
+	double xpos, ypos;
+	glfwGetCursorPos(Engine::Window->GLFW(), &xpos, &ypos);
+	mouseLast = glm::vec2(xpos, ypos);
 
 	while (Engine::Running())
 	{

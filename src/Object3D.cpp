@@ -41,6 +41,7 @@ Object3D::Object3D(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 	m_position = glm::vec3(0);
 	m_rotation = glm::vec3(0);
 	m_scale = glm::vec3(1);
+	std::cout << "start pos x: " << m_position.x << std::endl;
 }
 
 Object3D::Object3D(char modelFile[])
@@ -130,6 +131,7 @@ void Object3D::Move(glm::vec3 delta)
 	glm::vec3 cameraDelta(delta.x, 0.0f, delta.z);
 	glm::vec3 cameraLookat(m_position.x, (max.y - (min.y / 2.0f)) / 2.0f, m_position.z);
 	Engine::Camera->Move(cameraDelta, cameraLookat);
+	updateMeshAABB(delta);
 }
 
 glm::vec3 Object3D::Position()
@@ -172,9 +174,9 @@ void Object3D::SetScale(glm::vec3 scale)
 	m_scale = scale;
 }
 
-void Object3D::updateMeshAABB()
+void Object3D::updateMeshAABB(glm::vec3 delta)
 {
-	m_mesh->updateAABB(m_position, m_scale);
+	m_mesh->updateAABB(delta, m_scale);
 }
 
 bool Object3D::intersectsRayMesh(glm::vec3 origin, glm::vec3& direction)

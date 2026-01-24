@@ -4,6 +4,7 @@
 #include <Mesh.h>
 #include <glad/glad.h>
 #include <stb_image.h>
+#include <Line.h>
 
 const int VERTICES_PER_FACE = 3;
 void AddBoneData(Vertex3D& vertex, int boneID, float weight) 
@@ -123,7 +124,7 @@ Mesh::Mesh(char modelFile[])
 
 	m_meshMinBounds = m_minBounds;
 	m_meshMaxBounds = m_maxBounds;
-
+	std::cout << "min x in construct: " << m_meshMinBounds.x << std::endl;
 }
 
 //loading
@@ -348,10 +349,9 @@ glm::vec3 Mesh::maxBounds()
 }
 void Mesh::updateAABB(glm::vec3 position, glm::vec3 scale)
 {
-	m_minBounds = position + m_meshMinBounds;
-	m_maxBounds = position + m_meshMaxBounds;
-	m_minBounds *= scale;
-	m_maxBounds *= scale;
+	m_meshMinBounds += position;
+	m_meshMaxBounds += position;
+
 
 	// Ensure correct ordering if scale is negative
 	for (int i = 0; i < 3; ++i) 
@@ -418,6 +418,10 @@ void Mesh::RunAnimation(float animTime)
 	float animTimeTicks = fmod(timeTicks, (float)m_scene->mAnimations[m_currentAnim]->mDuration);
 
 	ReadNodeHeirarchy(animTimeTicks, m_scene->mRootNode, I, m_currentAnim);
+
+	//Line line(m_meshMinBounds, m_meshMaxBounds);
+	//line.UpdateProjection(Engine::Camera->GetProjectionMatrix());
+	//line.draw(Engine::Camera->GetViewMatrix());
 }
 
 int count = 0;

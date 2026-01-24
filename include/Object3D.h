@@ -17,7 +17,7 @@ public:
 	void Move(glm::vec3 delta);
 	void Scale(glm::vec3 delta);
 	void SetScale(glm::vec3 scale);
-	void updateMeshAABB();
+	void updateMeshAABB(glm::vec3 delta);
 	bool intersectsRayMesh(glm::vec3 origin, glm::vec3& direction);
 	bool skinned();
 	std::string Name();

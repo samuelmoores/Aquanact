@@ -6,13 +6,35 @@ Line::Line()
 {
 }
 
-Line::Line(float length, glm::vec3 origin, glm::vec3 direction) :m_vao(-1), m_vbo(-1)
+Line::Line(glm::vec3 minBounds, glm::vec3 maxBounds) :m_vao(-1), m_vbo(-1)
 {
-	m_vertices = {
-		// X axis (Red)
-		{origin.x, origin.y, origin.z, 1.0f, 0.0f, 1.0f},  // origin
-		{direction.x * length, direction.y * length, direction.z * length, 1.0f, 0.0f, 1.0f},  // direction
+	// 8 corners of the cube
+	glm::vec3 v000(minBounds.x, minBounds.y, minBounds.z);
+	glm::vec3 v100(maxBounds.x, minBounds.y, minBounds.z);
+	glm::vec3 v010(minBounds.x, maxBounds.y, minBounds.z);
+	glm::vec3 v110(maxBounds.x, maxBounds.y, minBounds.z);
+
+	glm::vec3 v001(minBounds.x, minBounds.y, maxBounds.z);
+	glm::vec3 v101(maxBounds.x, minBounds.y, maxBounds.z);
+	glm::vec3 v011(minBounds.x, maxBounds.y, maxBounds.z);
+	glm::vec3 v111(maxBounds.x, maxBounds.y, maxBounds.z);
+
+	// 12 edges (each edge is two vertices)
+	std::vector<glm::vec3> edgeVerts = {
+		// Bottom face
+		v000, v100, v100, v110, v110, v010, v010, v000,
+		// Top face
+		v001, v101, v101, v111, v111, v011, v011, v001,
+		// Vertical edges
+		v000, v001, v100, v101, v010, v011, v110, v111
 	};
+
+	// Build m_vertices with colors
+	m_vertices.clear();
+	for (auto& v : edgeVerts)
+	{
+		m_vertices.push_back({ v.x, v.y, v.z, 1.0f, 0.0f, 1.0f }); // magenta for example
+	}
 
 	glGenVertexArrays(1, &m_vao);
 	glGenBuffers(1, &m_vbo);

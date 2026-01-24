@@ -3,7 +3,7 @@
 
 Level::Level()
 {
-    m_drawAxis = false;
+    m_drawAxis = true;
 }
 
 std::vector<Object3D*> Level::Objects()
@@ -20,11 +20,11 @@ void Level::Load()
     char* filepath = filepathString.data();
     LoadObject(filepath);
 
-    filepathString = "models/floor.fbx";
+    filepathString = "models/wall.fbx";
     filepath = filepathString.data();
     LoadObject(filepath);
 
-    filepathString = "models/wall.fbx";
+    filepathString = "models/OllieIdle.fbx";
     filepath = filepathString.data();
     //LoadObject(filepath);
 }
