@@ -51,6 +51,7 @@ class Mesh {
 		bool intersectsRay(const glm::vec3& rayOrigin, const glm::vec3& rayDir) const;
 		glm::vec3 minBounds();
 		glm::vec3 maxBounds();
+		void DrawBoundingBox();
 
 		//getter setter
 		void SetBuffers(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces);

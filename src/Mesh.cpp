@@ -347,6 +347,12 @@ glm::vec3 Mesh::maxBounds()
 {
 	return m_meshMaxBounds;
 }
+void Mesh::DrawBoundingBox()
+{
+	Line line(m_meshMinBounds, m_meshMaxBounds);
+	line.UpdateProjection(Engine::Camera->GetProjectionMatrix());
+	line.draw(Engine::Camera->GetViewMatrix());
+}
 void Mesh::updateAABB(glm::vec3 position, glm::vec3 scale)
 {
 	m_meshMinBounds += position;
@@ -418,10 +424,6 @@ void Mesh::RunAnimation(float animTime)
 	float animTimeTicks = fmod(timeTicks, (float)m_scene->mAnimations[m_currentAnim]->mDuration);
 
 	ReadNodeHeirarchy(animTimeTicks, m_scene->mRootNode, I, m_currentAnim);
-
-	//Line line(m_meshMinBounds, m_meshMaxBounds);
-	//line.UpdateProjection(Engine::Camera->GetProjectionMatrix());
-	//line.draw(Engine::Camera->GetViewMatrix());
 }
 
 int count = 0;
