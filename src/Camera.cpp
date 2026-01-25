@@ -28,6 +28,8 @@ Camera::Camera()
 	// Yaw: atan2(Z, X)
 	yaw = glm::degrees(atan2f(dir.z, dir.x));
 
+	m_defaultDistance = glm::length(m_position - m_lookAt);
+
 }
 
 glm::mat4 Camera::GetProjectionMatrix()
@@ -55,17 +57,15 @@ glm::vec3 Camera::GetFacing()
 }
 
 
-void Camera::CameraControl(glm::vec2 mouseDiff)
+void Camera::CameraControl(glm::vec2 mouseDiff, Mesh* mesh)
 {
+	glm::vec3 originalPosition = m_position;
 	float floorY = 10.0f;
 	float radius = glm::length(m_position - m_lookAt);
 
 	// Clamp the argument to asin to avoid NaNs
-	float minPitchRad = -asinf(glm::clamp(
-		(m_lookAt.y - floorY) / radius,
-		0.0f,
-		1.0f
-	));
+	// Constrain pitch, not position, allowing camera to still yaw
+	float minPitchRad = -asinf(glm::clamp((m_lookAt.y - floorY) / radius, 0.0f, 1.0f));
 
 	float minPitchDeg = glm::degrees(minPitchRad);
 
@@ -86,18 +86,64 @@ void Camera::CameraControl(glm::vec2 mouseDiff)
 
 	direction = normalize(direction);
 
-	m_position = m_lookAt - direction * radius;
+	glm::vec3 desiredPos = m_lookAt - direction * radius;
+
+	//construct ray and max distance
+	glm::vec3 rayOrigin = m_lookAt;
+	glm::vec3 rayDir = glm::normalize(desiredPos - m_lookAt);
+	float maxDist = m_defaultDistance;
+	float allowedDistance = glm::length(desiredPos - m_lookAt);
+	float minDist = 1.0f;
+	float cameraDist = maxDist;
+	float closestHit = maxDist;
+	bool hit = false;
+
+	float t = 0;
+	float cameraPadding = 10.0f;
+	if (Engine::Level->Objects()[1]->GetMesh()->RayHit(rayOrigin, rayDir, t) && t < closestHit)
+	{
+		allowedDistance = std::max(minDist, t - cameraPadding);
+		if (t < minDist)
+		{
+			//problem
+		}
+	}
+	else
+	{
+		allowedDistance = maxDist;
+	}
+	
+
+	cameraDist = std::min(maxDist, allowedDistance);
+	m_position = m_lookAt + rayDir * cameraDist;
+	
+	//m_position = desiredPos;
 	m_view_matrix = glm::lookAt(m_position, m_lookAt, m_up);
+	
 }
 
 void Camera::CameraControl(float scroll)
 {
+	glm::vec3 nextPosition = m_position;
+	float minDistance = 60.0f;
+	
 	if (scroll > 0)
-		m_position /= (1.1f + Engine::DeltaFrameTime());
+	{
+		nextPosition /= (1.1f + Engine::DeltaFrameTime());
+	}
 	else
-		m_position *= (1.1f + Engine::DeltaFrameTime());
+	{
+		nextPosition *= (1.1f + Engine::DeltaFrameTime());
+	}
 
-	m_view_matrix = glm::lookAt(m_position, m_lookAt, m_up);
+	float nextDistanceFromPlayer = glm::length(nextPosition - m_lookAt);
+	if (nextDistanceFromPlayer > minDistance)
+	{
+		m_position = nextPosition;
+		m_view_matrix = glm::lookAt(m_position, m_lookAt, m_up);
+	}
+
+	m_defaultDistance = glm::length(m_position - m_lookAt);
 }
 
 void Camera::Focus(glm::vec3 min, glm::vec3 max)

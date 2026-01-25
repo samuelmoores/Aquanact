@@ -5,6 +5,9 @@
 #include <glad/glad.h>
 #include <stb_image.h>
 #include <Line.h>
+#include <algorithm>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/norm.hpp>
 
 const int VERTICES_PER_FACE = 3;
 void AddBoneData(Vertex3D& vertex, int boneID, float weight) 
@@ -124,7 +127,6 @@ Mesh::Mesh(char modelFile[])
 
 	m_meshMinBounds = m_minBounds;
 	m_meshMaxBounds = m_maxBounds;
-	std::cout << "min x in construct: " << m_meshMinBounds.x << std::endl;
 }
 
 //loading
@@ -411,6 +413,21 @@ bool Mesh::intersectsRay(const glm::vec3& rayOrigin, const glm::vec3& rayDir) co
 	}
 
 	return true;
+}
+bool Mesh::SphereAABBOverlap(const glm::vec3& center, float radius)
+{
+	glm::vec3 closest;
+	closest.x = std::clamp(center.x, m_meshMinBounds.x, m_meshMaxBounds.x);
+	closest.y = std::clamp(center.y, m_meshMinBounds.y, m_meshMaxBounds.y);
+	closest.z = std::clamp(center.z, m_meshMinBounds.z, m_meshMaxBounds.z);
+
+	//std::cout << "  camera center: " << center.x << ", " << center.y << ", " << center.z << std::endl;
+	//std::cout << "m_meshMinBounds: " << m_meshMinBounds.x << ", " << m_meshMinBounds.y << ", " << m_meshMinBounds.z << std::endl;
+	//std::cout << "m_meshMaxBounds: " << m_meshMaxBounds.x << ", " << m_meshMaxBounds.y << ", " << m_meshMaxBounds.z << std::endl;
+
+	float distSq = glm::length2(center - closest);
+	//std::cout << "distSq from camera center to closest point on AABB < radius squared | " << distSq << " < " << radius * radius << std::endl;
+	return distSq < radius * radius;
 }
 
 //animation
@@ -976,6 +993,26 @@ void Mesh::ClearBufferIndex()
 {
 	m_currVao = 0;
 	m_currTextureColor = 0;
+}
+
+bool Mesh::RayHit(const glm::vec3& ro, const glm::vec3& rd, float& tHit)
+{
+	glm::vec3 invDir = 1.0f / rd;
+
+	glm::vec3 t0 = (m_meshMinBounds - ro) * invDir;
+	glm::vec3 t1 = (m_meshMaxBounds - ro) * invDir;
+
+	glm::vec3 tmin = glm::min(t0, t1);
+	glm::vec3 tmax = glm::max(t0, t1);
+
+	float tNear = std::max({ tmin.x, tmin.y, tmin.z });
+	float tFar = std::min({ tmax.x, tmax.y, tmax.z });
+
+	if (tNear > tFar || tFar < 0.0f)
+		return false;
+
+	tHit = tNear >= 0.0f ? tNear : tFar;
+	return true;
 }
 
 //opengl

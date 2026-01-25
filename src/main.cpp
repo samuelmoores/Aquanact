@@ -193,7 +193,7 @@ void AquanactLoop()
 		glfwGetCursorPos(Engine::Window->GLFW(), &xpos, &ypos);
 		mouseCurr = glm::vec2(xpos, ypos);
 		glm::vec2 mouseDiff = mouseCurr - mouseLast;
-		Engine::Camera->CameraControl(mouseDiff);
+		Engine::Camera->CameraControl(mouseDiff, Engine::Level->Objects()[1]->GetMesh());
 		mouseLast = mouseCurr;
 	}
 
@@ -314,7 +314,7 @@ int main()
 	glfwSetInputMode(Engine::Window->GLFW(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	objects = Engine::Level->Objects();
 
-	objects[1]->Move(glm::vec3(0.0f, 0.0f, 200.0f));
+	objects[1]->Move(glm::vec3(0.0f, 0.0f, -250.0f));
 
 	double xpos, ypos;
 	glfwGetCursorPos(Engine::Window->GLFW(), &xpos, &ypos);

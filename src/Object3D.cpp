@@ -41,7 +41,6 @@ Object3D::Object3D(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 	m_position = glm::vec3(0);
 	m_rotation = glm::vec3(0);
 	m_scale = glm::vec3(1);
-	std::cout << "start pos x: " << m_position.x << std::endl;
 }
 
 Object3D::Object3D(char modelFile[])

@@ -52,6 +52,7 @@ class Mesh {
 		glm::vec3 minBounds();
 		glm::vec3 maxBounds();
 		void DrawBoundingBox();
+		bool SphereAABBOverlap(const glm::vec3& center, float radius);
 
 		//getter setter
 		void SetBuffers(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces);
@@ -64,6 +65,7 @@ class Mesh {
 		int GetNextAnim();
 		int NumBuffers();
 		void ClearBufferIndex();
+		bool RayHit(const glm::vec3& ro, const glm::vec3& rd, float& tHit);
 
 		//animation
 		void SetAnim(int animIndex);
