@@ -29,11 +29,13 @@ float startRot = 0.0f;
 
 bool windowActive = true;
 
+//zoom camera in and out
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
 	Engine::Camera->CameraControl(yoffset);
 }
 
+//Mouse press, ignore IMGUI or set window active
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 {
 	// Forward to ImGui first
@@ -53,6 +55,7 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 	mouseLast = glm::vec2(xpos, ypos);
 }
 
+//WASD press and release
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
 	// Update key states
@@ -140,19 +143,22 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		}
 	}
 
-	// Update animation and rotation
+	// Update player rotation to direction of movement
 	if (glm::length(moveDirection) > 0.0f)
 	{
 		startRot = currRot;
 		nextRot = atan2(moveDirection.x, moveDirection.z);
 		blendRot = true;
 	}
+	else
+	{
+		move = false;
+	}
 
 }
 
-bool AABBIntersect(
-	const glm::vec3& minA, const glm::vec3& maxA,
-	const glm::vec3& minB, const glm::vec3& maxB)
+//Collision detect
+bool AABBIntersect(const glm::vec3& minA, const glm::vec3& maxA, const glm::vec3& minB, const glm::vec3& maxB)
 {
 	bool overlapX = (minA.x <= maxB.x && maxA.x >= minB.x);
 	bool overlapY = (minA.y <= maxB.y && maxA.y >= minB.y);
@@ -181,14 +187,17 @@ void AquanactLoop()
 
 	//std::cout << "fps: " << 1.0f/Engine::DeltaFrameTime() << std::endl;
 
+	//press escape to get cursor back and make window inactive
 	if (glfwGetKey(Engine::Window->GLFW(), GLFW_KEY_ESCAPE) == GLFW_PRESS)
 	{
 		glfwSetInputMode(Engine::Window->GLFW(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 		windowActive = false;
 	}
 
+
 	if (windowActive)
 	{
+		//calculate mouse movement to send to camera controller
 		double xpos, ypos;
 		glfwGetCursorPos(Engine::Window->GLFW(), &xpos, &ypos);
 		mouseCurr = glm::vec2(xpos, ypos);
@@ -221,6 +230,8 @@ void AquanactLoop()
 	{
 		move = true;
 	}
+
+	//Collision detection
 	Mesh* playerMesh = objects[0]->GetMesh();
 	glm::vec3 playerMin = playerMesh->minBounds();
 	glm::vec3 playerMax = playerMesh->maxBounds();
@@ -229,10 +240,9 @@ void AquanactLoop()
 	glm::vec3 wallMin = wallMesh->minBounds();
 	glm::vec3 wallMax = wallMesh->maxBounds();
 
-
 	glm::vec3 movement(0.0f);
 
-	if (move && glm::dot(moveDirection, moveDirection) > 0.0001f)
+	if (move)
 	{
 		movement = glm::normalize(moveDirection) * moveSpeed * Engine::DeltaFrameTime();
 	}
