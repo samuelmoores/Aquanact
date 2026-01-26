@@ -1,5 +1,6 @@
 #include "Window.h"
 #include <stdexcept>
+#include <iostream>
 
 Window::Window()
 {
@@ -18,4 +19,5 @@ Window::Window()
 
     /* Make the window's context current */
     glfwMakeContextCurrent(m_glfwWindow);
+    glfwSwapInterval(0);
 }
