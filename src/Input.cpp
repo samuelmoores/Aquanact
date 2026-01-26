@@ -269,7 +269,8 @@ void Input::Loop()
 	glm::vec3 nextMax = playerMax + movement;
 
 	bool collided = false;
-	for (int i = 1; i < objects_input.size(); i++)
+	//first object player, last object floor
+	for (int i = 1; i < objects_input.size() - 1; i++)
 	{
 		Mesh* wallMesh = objects_input[i]->GetMesh();
 		glm::vec3 wallMin = wallMesh->minBounds();

@@ -2,6 +2,8 @@
 #include <glm/ext/matrix_clip_space.hpp>
 #include "Engine.h"
 
+std::vector<Object3D*> objects_camera;
+
 float yaw = 0.0f;
 float pitch = 0.0f;
 float sensitivity = 0.08f;
@@ -29,7 +31,6 @@ Camera::Camera()
 	yaw = glm::degrees(atan2f(dir.z, dir.x));
 
 	m_defaultDistance = glm::length(m_position - m_lookAt);
-
 }
 
 glm::mat4 Camera::GetProjectionMatrix()
@@ -100,17 +101,24 @@ void Camera::CameraControl(glm::vec2 mouseDiff, Mesh* mesh)
 
 	float t = 0;
 	float cameraPadding = 10.0f;
-	if (Engine::Level->Objects()[1]->GetMesh()->RayHit(rayOrigin, rayDir, t) && t < closestHit)
+
+	//loop through each object
+	for (int i = 1; i < objects_camera.size(); i++)
 	{
-		allowedDistance = std::max(minDist, t - cameraPadding);
-		if (t < minDist)
+		if (objects_camera[i]->GetMesh()->RayHit(rayOrigin, rayDir, t) && t < closestHit)
 		{
-			//problem
+			allowedDistance = std::max(minDist, t - cameraPadding);
+			if (t < minDist)
+			{
+				//problem
+			}
+			break;
 		}
-	}
-	else
-	{
-		allowedDistance = maxDist;
+		else
+		{
+			allowedDistance = maxDist;
+		}
+
 	}
 	
 
@@ -150,7 +158,6 @@ void Camera::CameraControl(float scroll)
 void Camera::Focus(glm::vec3 min, glm::vec3 max)
 {
 	m_lookAt.y = (max.y - (min.y/2.0f));
-	std::cout << "m_lookAt Focus(): " << m_lookAt.x << ", " << m_lookAt.y << ", " << m_lookAt.z << std::endl;
 	m_position.y = max.y;//(max.y + ((max.y / 2.0f)));
 	m_view_matrix = glm::lookAt(m_position, m_lookAt, m_up);
 }
@@ -164,4 +171,10 @@ void Camera::Move(glm::vec3 delta, glm::vec3 lookAt)
 {
 	m_position += delta;
 	m_lookAt = lookAt;
+}
+
+void Camera::SetObjects()
+{
+	objects_camera = Engine::Level->Objects();
+
 }

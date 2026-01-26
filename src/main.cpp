@@ -31,8 +31,7 @@ int main()
 	glfwSetInputMode(Engine::Window->GLFW(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	objects = Engine::Level->Objects();
 	Engine::Input->SetObjects();
-
-	objects[1]->Move(glm::vec3(0.0f, 0.0f, -250.0f));
+	Engine::Camera->SetObjects();
 
 	while (Engine::Running())
 	{
