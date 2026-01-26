@@ -255,11 +255,8 @@ void Input::Loop()
 	// wall is second
 	// get min and max
 	Mesh* playerMesh = objects_input[0]->GetMesh();
-	Mesh* wallMesh = objects_input[1]->GetMesh();
 	glm::vec3 playerMin = playerMesh->minBounds();
 	glm::vec3 playerMax = playerMesh->maxBounds();
-	glm::vec3 wallMin = wallMesh->minBounds();
-	glm::vec3 wallMax = wallMesh->maxBounds();
 
 	// move is set by keyboard input
 	if (move)
@@ -271,7 +268,18 @@ void Input::Loop()
 	glm::vec3 nextMin = playerMin + movement;
 	glm::vec3 nextMax = playerMax + movement;
 
-	bool collided = AABBIntersect(nextMin, nextMax, wallMin, wallMax);
+	bool collided = false;
+	for (int i = 1; i < objects_input.size(); i++)
+	{
+		Mesh* wallMesh = objects_input[i]->GetMesh();
+		glm::vec3 wallMin = wallMesh->minBounds();
+		glm::vec3 wallMax = wallMesh->maxBounds();
+		collided = AABBIntersect(nextMin, nextMax, wallMin, wallMax);
+
+		if (collided)
+			break;
+	}
+
 
 	// Apply movement only if no collision
 	if (!collided)
