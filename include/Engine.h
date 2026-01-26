@@ -3,6 +3,7 @@
 #include <Window.h>
 #include <UI.h>
 #include <Level.h>
+#include <Input.h>
 #include "GLFW/glfw3.h"
 #include <chrono>
 
@@ -27,6 +28,7 @@ public:
 	static Camera* Camera;
 	static UI* UI;
 	static Level* Level;
+	static Input* Input;
 	static float m_deltaFrameTime;
 	static std::chrono::steady_clock::time_point m_prevFrameTime;
 	static float m_timeElapsed;

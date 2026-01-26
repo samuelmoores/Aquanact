@@ -1,14 +1,13 @@
 ﻿#include <iostream>
+#include <chrono>
 #include <glad/glad.h>
 #include <Object3D.h>
 #include <Animator.h>
 #include <Engine.h>
 #include <Windows.h>
-#include <chrono>
+#include <Input.h>
 
 std::vector<Object3D*> objects;
-glm::vec2 mouseLast(0);
-glm::vec2 mouseCurr(0);
 bool mouseDown = false;
 static bool wPressed = false;
 static bool sPressed = false;
@@ -27,32 +26,11 @@ float currRot = 0.0f;
 float nextRot = 0.0f;
 float startRot = 0.0f;
 
-bool windowActive = true;
 
 //zoom camera in and out
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
 	Engine::Camera->CameraControl(yoffset);
-}
-
-//Mouse press, ignore IMGUI or set window active
-void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
-{
-	// Forward to ImGui first
-	ImGui_ImplGlfw_MouseButtonCallback(window, button, action, mods);
-
-	ImGuiIO& io = ImGui::GetIO();
-
-	// Only process for your game if ImGui doesn't want it
-	if (io.WantCaptureMouse) {
-		return;
-	}
-
-	glfwSetInputMode(Engine::Window->GLFW(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-	windowActive = true;
-	double xpos, ypos;
-	glfwGetCursorPos(Engine::Window->GLFW(), &xpos, &ypos);
-	mouseLast = glm::vec2(xpos, ypos);
 }
 
 //WASD press and release
@@ -198,27 +176,12 @@ void AquanactLoop()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	Engine::Tick();
+	Engine::Input->Loop();
 	float moveSpeed = 75.0f;
 	glm::vec3 movement(0.0f);
 	//std::cout << "fps: " << 1.0f/Engine::DeltaFrameTime() << std::endl;
 
-	//press escape to get cursor back and make window inactive
-	if (glfwGetKey(Engine::Window->GLFW(), GLFW_KEY_ESCAPE) == GLFW_PRESS)
-	{
-		glfwSetInputMode(Engine::Window->GLFW(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-		windowActive = false;
-	}
 
-	//calculate mouse movement to send to camera controller
-	if (windowActive)
-	{
-		double xpos, ypos;
-		glfwGetCursorPos(Engine::Window->GLFW(), &xpos, &ypos);
-		mouseCurr = glm::vec2(xpos, ypos);
-		glm::vec2 mouseDiff = mouseCurr - mouseLast;
-		Engine::Camera->CameraControl(mouseDiff, Engine::Level->Objects()[1]->GetMesh());
-		mouseLast = mouseCurr;
-	}
 
 	//************* These are all called AFTER the key callback ************
 	//************* For keys being held down, key callback does not register it fast enough ************
@@ -320,16 +283,13 @@ int main()
 	Engine::Init();
 
 	glfwSetScrollCallback(Engine::Window->GLFW(), scroll_callback);
-	glfwSetMouseButtonCallback(Engine::Window->GLFW(), mouse_button_callback);
 	glfwSetKeyCallback(Engine::Window->GLFW(), key_callback);
 	glfwSetInputMode(Engine::Window->GLFW(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	objects = Engine::Level->Objects();
 
 	objects[1]->Move(glm::vec3(0.0f, 0.0f, -250.0f));
 
-	double xpos, ypos;
-	glfwGetCursorPos(Engine::Window->GLFW(), &xpos, &ypos);
-	mouseLast = glm::vec2(xpos, ypos);
+
 
 	while (Engine::Running())
 	{
