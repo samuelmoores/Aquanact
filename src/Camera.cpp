@@ -144,11 +144,13 @@ void Camera::CameraControl(float scroll)
 	}
 
 	m_defaultDistance = glm::length(m_position - m_lookAt);
+	std::cout << "m_lookAt: " << m_lookAt.x << ", " << m_lookAt.y << ", " << m_lookAt.z << std::endl;
 }
 
 void Camera::Focus(glm::vec3 min, glm::vec3 max)
 {
-	m_lookAt.y = (max.y - (min.y/2.0f)) / 2.0f;
+	m_lookAt.y = (max.y - (min.y/2.0f));
+	std::cout << "m_lookAt Focus(): " << m_lookAt.x << ", " << m_lookAt.y << ", " << m_lookAt.z << std::endl;
 	m_position.y = max.y;//(max.y + ((max.y / 2.0f)));
 	m_view_matrix = glm::lookAt(m_position, m_lookAt, m_up);
 }

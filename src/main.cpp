@@ -174,17 +174,32 @@ bool AABBIntersect(const glm::vec3& minA, const glm::vec3& maxA, const glm::vec3
 	//std::cout << "  Overlap Y: " << overlapY << "\n";
 	//std::cout << "  Overlap Z: " << overlapZ << "\n";
 
+	//if any are not overlapping, there is no collision
 	bool result = overlapX && overlapY && overlapZ;
 	//std::cout << "  COLLISION: " << result << "\n\n";
 
 	return result;
 }
 
+float ShortestAngleDelta(float from, float to)
+{
+	// angualar difference
+	float delta = to - from;
+
+	// if angualar distance is greater than pi, minus 2pi
+	// just like the unit circle in calculus
+	while (delta > glm::pi<float>()) delta -= glm::two_pi<float>();
+	while (delta < -glm::pi<float>()) delta += glm::two_pi<float>();
+
+	return delta;
+}
+
 void AquanactLoop()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	Engine::Tick();
-
+	float moveSpeed = 75.0f;
+	glm::vec3 movement(0.0f);
 	//std::cout << "fps: " << 1.0f/Engine::DeltaFrameTime() << std::endl;
 
 	//press escape to get cursor back and make window inactive
@@ -194,10 +209,9 @@ void AquanactLoop()
 		windowActive = false;
 	}
 
-
+	//calculate mouse movement to send to camera controller
 	if (windowActive)
 	{
-		//calculate mouse movement to send to camera controller
 		double xpos, ypos;
 		glfwGetCursorPos(Engine::Window->GLFW(), &xpos, &ypos);
 		mouseCurr = glm::vec2(xpos, ypos);
@@ -206,42 +220,38 @@ void AquanactLoop()
 		mouseLast = mouseCurr;
 	}
 
-
-	float moveSpeed = 75.0f;
-
 	//************* These are all called AFTER the key callback ************
 	//************* For keys being held down, key callback does not register it fast enough ************
+	// continuously set move to true if WASD is held down
 	if (glfwGetKey(Engine::Window->GLFW(), GLFW_KEY_W) == GLFW_PRESS)
 	{
 		move = wPressed = true;
 	}
-
 	if (glfwGetKey(Engine::Window->GLFW(), GLFW_KEY_S) == GLFW_PRESS)
 	{
 		move = sPressed = true;
 	}
-
 	if (glfwGetKey(Engine::Window->GLFW(), GLFW_KEY_D) == GLFW_PRESS)
 	{
 		move = true;
 	}
-
 	if (glfwGetKey(Engine::Window->GLFW(), GLFW_KEY_A) == GLFW_PRESS)
 	{
 		move = true;
 	}
 
-	//Collision detection
+	//================ Collision detection =================================
+	// player is first scene object by default
+	// wall is second
+	// get min and max
 	Mesh* playerMesh = objects[0]->GetMesh();
+	Mesh* wallMesh = objects[1]->GetMesh();
 	glm::vec3 playerMin = playerMesh->minBounds();
 	glm::vec3 playerMax = playerMesh->maxBounds();
-
-	Mesh* wallMesh = objects[1]->GetMesh();
 	glm::vec3 wallMin = wallMesh->minBounds();
 	glm::vec3 wallMax = wallMesh->maxBounds();
 
-	glm::vec3 movement(0.0f);
-
+	// move is set by keyboard input
 	if (move)
 	{
 		movement = glm::normalize(moveDirection) * moveSpeed * Engine::DeltaFrameTime();
@@ -259,44 +269,35 @@ void AquanactLoop()
 		objects[0]->Move(movement);
 	}
 
+
+	//============================= Rotation ===========================================
 	if (blendRot)
 	{
-		if ((glm::degrees(startRot) <= -90 && glm::degrees(startRot) >= -135 ) && glm::degrees(nextRot) == 180)
-		{
-			currRot -= Engine::DeltaFrameTime() * 15.0f;
+		const float speed = 15.0f;
+		float dt = Engine::DeltaFrameTime();
 
-			if (glm::degrees(currRot) <= -180)
-			{
-				currRot = nextRot;
-				blendRot = false;
-			}
+		// dont rotate more than 180 degrees
+		// this is the start of the angle to rotate by
+		float delta = ShortestAngleDelta(currRot, nextRot);
 
-		}
-		else if (glm::degrees(currRot) == 180 && (glm::degrees(nextRot) == -90 || glm::degrees(nextRot) == -135))
+		// create exponential smoothing  (e^x)
+		// higher speed -> snappy rotation
+		// lower speed  -> floaty rotation
+		float t = 1.0f - exp(-speed * dt);
+
+		// smooth out delta before adding to current rotation
+		currRot += delta * t;
+
+		// floating absolute value
+		// once you are .5 radians away, stop rotating
+		if (fabs(delta) < glm::radians(0.5f))
 		{
-			currRot = glm::radians(-180.0f);
-			currRot -= Engine::DeltaFrameTime() * 15.0f;
-		}
-		else if (currRot > nextRot)
-		{
-			currRot -= Engine::DeltaFrameTime() * 15.0f;
-			if (currRot <= nextRot)
-			{	
-				currRot = nextRot;
-				blendRot = false;
-			}
-		}
-		else if (currRot < nextRot)
-		{
-			currRot += Engine::DeltaFrameTime()* 15.0f;
-			if (currRot >= nextRot)
-			{
-				currRot = nextRot;
-				blendRot = false;
-			}
+			currRot = nextRot;
+			blendRot = false;
 		}
 
-		objects[0]->SetRotation(glm::vec3(0.0f, currRot, 0.0f));
+		//player is first scene object by default
+		objects[0]->SetRotation({ 0.0f, currRot, 0.0f });
 	}
 
 	Engine::UI->Loop();

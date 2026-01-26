@@ -128,7 +128,8 @@ void Object3D::Move(glm::vec3 delta)
 	glm::vec3 min = m_mesh->minBounds();
 	m_position += delta;
 	glm::vec3 cameraDelta(delta.x, 0.0f, delta.z);
-	glm::vec3 cameraLookat(m_position.x, (max.y - (min.y / 2.0f)) / 2.0f, m_position.z);
+	float midHeight = (max.y - min.y) / 2.0f;
+	glm::vec3 cameraLookat(m_position.x, midHeight + (midHeight / 1.5f), m_position.z);
 	Engine::Camera->Move(cameraDelta, cameraLookat);
 	updateMeshAABB(delta);
 }
