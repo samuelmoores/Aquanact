@@ -15,11 +15,14 @@ void Level::Load()
 {
 	m_axis = Axis(1000.0f, 100.0f);
 
-    std::string filepathString = "models/storm.fbx";
-    //std::string filepathString = "models/Todd.obj";
+    //Player
+    std::string filepathString = "models/Ollie.fbx";
     char* filepath = filepathString.data();
     LoadObject(filepath);
+    Mesh* mesh = objects[0]->GetMesh();
+    Engine::Camera->Focus(mesh->minBounds(), mesh->maxBounds());
 
+    // =============================================================
     filepathString = "models/wall_front.fbx";
     filepath = filepathString.data();
     LoadObject(filepath);
@@ -39,7 +42,9 @@ void Level::Load()
     filepathString = "models/ceiling.fbx";
     filepath = filepathString.data();
     LoadObject(filepath);
+    // ================================================================
 
+    //ground
     filepathString = "models/floor.fbx";
     filepath = filepathString.data();
     LoadObject(filepath);

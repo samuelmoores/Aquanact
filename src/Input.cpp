@@ -16,6 +16,7 @@ static bool sReleased = false;
 static bool aReleased = false;
 static bool dReleased = false;
 
+float moveSpeed = 25.0f;
 bool move = false;
 glm::vec3 moveDirection = glm::vec3(0);
 bool blendRot = false;
@@ -173,7 +174,6 @@ void Input::Loop()
 		mouseLast = mouseCurr;
 
 		//Movement
-		float moveSpeed = 75.0f;
 		glm::vec3 movement(0.0f);
 		glm::vec3 forward = Engine::Camera->Forward();
 		glm::vec3 right = Engine::Camera->Right();

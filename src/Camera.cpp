@@ -10,6 +10,7 @@ float sensitivity = 0.08f;
 
 Camera::Camera()
 {
+
 	int width, height;
 	glfwGetWindowSize(Engine::Window->GLFW(), &width, &height);
 
@@ -31,6 +32,8 @@ Camera::Camera()
 	yaw = glm::degrees(atan2f(dir.z, dir.x));
 
 	m_defaultDistance = glm::length(m_position - m_lookAt);
+	
+
 }
 
 glm::mat4 Camera::GetProjectionMatrix()
@@ -60,6 +63,7 @@ glm::vec3 Camera::GetFacing()
 
 void Camera::CameraControl(glm::vec2 mouseDiff, Mesh* mesh)
 {
+
 	glm::vec3 originalPosition = m_position;
 	float floorY = 10.0f;
 	float radius = glm::length(m_position - m_lookAt);
@@ -125,7 +129,7 @@ void Camera::CameraControl(glm::vec2 mouseDiff, Mesh* mesh)
 	
 	//m_position = desiredPos;
 	m_view_matrix = glm::lookAt(m_position, m_lookAt, m_up);
-	
+
 }
 
 void Camera::CameraControl(float scroll)

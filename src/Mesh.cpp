@@ -226,6 +226,7 @@ void Mesh::fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, s
 	m_skinned = mesh->mNumBones != 0;
 	if (!m_skinned)
 	{
+		m_totalVertices += numVertices;
 		SetBuffers(vertices, faces);
 		return;
 	}
@@ -260,8 +261,8 @@ void Mesh::fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, s
 		}
 	}
 
-	m_skeleton.boneMapping = boneMap;
 	m_totalVertices += numVertices;
+	m_skeleton.boneMapping = boneMap;
 	SetBuffers(vertices, faces);
 }
 void Mesh::ReadNodeHeirarchy(const aiNode* node, const aiMatrix4x4& ParentTransform)
@@ -428,6 +429,25 @@ bool Mesh::SphereAABBOverlap(const glm::vec3& center, float radius)
 	float distSq = glm::length2(center - closest);
 	//std::cout << "distSq from camera center to closest point on AABB < radius squared | " << distSq << " < " << radius * radius << std::endl;
 	return distSq < radius * radius;
+}
+bool Mesh::RayHit(const glm::vec3& ro, const glm::vec3& rd, float& tHit)
+{
+	glm::vec3 invDir = 1.0f / rd;
+
+	glm::vec3 t0 = (m_meshMinBounds - ro) * invDir;
+	glm::vec3 t1 = (m_meshMaxBounds - ro) * invDir;
+
+	glm::vec3 tmin = glm::min(t0, t1);
+	glm::vec3 tmax = glm::max(t0, t1);
+
+	float tNear = std::max({ tmin.x, tmin.y, tmin.z });
+	float tFar = std::min({ tmax.x, tmax.y, tmax.z });
+
+	if (tNear > tFar || tFar < 0.0f)
+		return false;
+
+	tHit = tNear >= 0.0f ? tNear : tFar;
+	return true;
 }
 
 //animation
@@ -968,52 +988,28 @@ bool Mesh::Skinned()
 {
 	return m_skinned;
 }
-
 void Mesh::SetNextAnim(int nextAnim)
 {
 	m_nextAnim = nextAnim;
 }
-
 void Mesh::SetCurrentAnim(int currAnim)
 {
 	m_currentAnim = currAnim;
 }
-
 int Mesh::GetNextAnim()
 {
 	return m_nextAnim;
 }
-
 int Mesh::NumBuffers()
 {
 	return m_vao.size();
 }
-
 void Mesh::ClearBufferIndex()
 {
 	m_currVao = 0;
 	m_currTextureColor = 0;
 }
 
-bool Mesh::RayHit(const glm::vec3& ro, const glm::vec3& rd, float& tHit)
-{
-	glm::vec3 invDir = 1.0f / rd;
-
-	glm::vec3 t0 = (m_meshMinBounds - ro) * invDir;
-	glm::vec3 t1 = (m_meshMaxBounds - ro) * invDir;
-
-	glm::vec3 tmin = glm::min(t0, t1);
-	glm::vec3 tmax = glm::max(t0, t1);
-
-	float tNear = std::max({ tmin.x, tmin.y, tmin.z });
-	float tFar = std::min({ tmax.x, tmax.y, tmax.z });
-
-	if (tNear > tFar || tFar < 0.0f)
-		return false;
-
-	tHit = tNear >= 0.0f ? tNear : tFar;
-	return true;
-}
 
 //opengl
 void Mesh::Bind()
