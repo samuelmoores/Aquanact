@@ -66,6 +66,8 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	aReleased = (action == GLFW_RELEASE && key == GLFW_KEY_A);
 	dReleased = (action == GLFW_RELEASE && key == GLFW_KEY_D);
 
+
+
 	if (wPressed)
 	{
 		if (glm::length(moveDirection) == 0.0f)
@@ -73,17 +75,17 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 			Engine::Level->Objects()[0]->GetMesh()->SetNextAnim(1);
 			Engine::Level->Objects()[0]->StartAnimBlend();
 		}
-
-		moveDirection.z += 1.0f;
 	}
 	if (sPressed)
 	{
+		//make sure both s and w are not pressed, canceling each other out
+		//if so, you do not want to play move anim
+		
 		if (glm::length(moveDirection) == 0.0f)
 		{
 			Engine::Level->Objects()[0]->GetMesh()->SetNextAnim(1);
 			Engine::Level->Objects()[0]->StartAnimBlend();
 		}
-		moveDirection.z -= 1.0f;
 	}
 	if (aPressed)
 	{
@@ -92,66 +94,61 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 			Engine::Level->Objects()[0]->GetMesh()->SetNextAnim(1);
 			Engine::Level->Objects()[0]->StartAnimBlend();
 		}
-		moveDirection.x += 1.0f;
 	}
 	if (dPressed)
 	{
+		//play idle anim
 		if (glm::length(moveDirection) == 0.0f)
 		{
 			Engine::Level->Objects()[0]->GetMesh()->SetNextAnim(1);
 			Engine::Level->Objects()[0]->StartAnimBlend();
 		}
-		moveDirection.x -= 1.0f;
 	}
+
+	//============================ RELEASE ===========================================
 	if (wReleased)
 	{
-		moveDirection.z -= 1.0f;
-		if (glm::length(moveDirection) == 0.0f)
+		moveDirection -= Engine::Camera->Forward();
+		std::cout << "move direction: " << moveDirection.x << ", " << moveDirection.z << std::endl;
+		if (glm::length(moveDirection) < 0.1f)
 		{
 			Engine::Level->Objects()[0]->GetMesh()->SetNextAnim(0);
 			Engine::Level->Objects()[0]->StartAnimBlend();
+			moveDirection = glm::vec3(0);
 		}
+		
 	}
 	if (sReleased)
 	{
-		moveDirection.z += 1.0f;
+		moveDirection += Engine::Camera->Forward();
 		if (glm::length(moveDirection) == 0.0f)
 		{
 			Engine::Level->Objects()[0]->GetMesh()->SetNextAnim(0);
 			Engine::Level->Objects()[0]->StartAnimBlend();
+			moveDirection = glm::vec3(0);
 		}
 	}
 	if (aReleased)
 	{
-		moveDirection.x -= 1.0f;
+		moveDirection += Engine::Camera->Right();
 		if (glm::length(moveDirection) == 0.0f)
 		{
 			Engine::Level->Objects()[0]->GetMesh()->SetNextAnim(0);
 			Engine::Level->Objects()[0]->StartAnimBlend();
+			moveDirection = glm::vec3(0);
 		}
 	}
 	if (dReleased)
 	{
-		moveDirection.x += 1.0f;
-		if (glm::length(moveDirection) == 0.0f)
+		moveDirection -= Engine::Camera->Right();
+		if (glm::length(moveDirection) < 0.1f)
 		{
 			Engine::Level->Objects()[0]->GetMesh()->SetNextAnim(0);
 			Engine::Level->Objects()[0]->StartAnimBlend();
+			moveDirection = glm::vec3(0);
 		}
+		
 	}
-
-	// Update player rotation to direction of movement
-	if (glm::length(moveDirection) > 0.0f)
-	{
-		startRot = currRot;
-		nextRot = atan2(moveDirection.x, moveDirection.z);
-		blendRot = true;
-	}
-	else
-	{
-		move = false;
-	}
-
 }
 
 
@@ -192,8 +189,6 @@ float ShortestAngleDelta(float from, float to)
 	return delta;
 }
 
-
-
 Input::Input()
 {
 	glfwSetMouseButtonCallback(Engine::Window->GLFW(), mouse_button_callback);
@@ -205,6 +200,10 @@ Input::Input()
 	mouseLast = glm::vec2(xpos, ypos);
 
 
+}
+
+bool almostEqual(const glm::vec3& a, const glm::vec3& b, float epsilon = 0.0001f) {
+	return glm::all(glm::lessThanEqual(glm::abs(a - b), glm::vec3(epsilon)));
 }
 
 void Input::Loop()
@@ -229,26 +228,36 @@ void Input::Loop()
 
 	float moveSpeed = 75.0f;
 	glm::vec3 movement(0.0f);
+	glm::vec3 forward = Engine::Camera->Forward();
+	glm::vec3 right = Engine::Camera->Right();
+	moveDirection = glm::vec3(0);
 
 	//************* These are all called AFTER the key callback ************
 	//************* For keys being held down, key callback does not register it fast enough ************
 	// continuously set move to true if WASD is held down
 	if (glfwGetKey(Engine::Window->GLFW(), GLFW_KEY_W) == GLFW_PRESS)
 	{
+		moveDirection += forward;
 		move = wPressed = true;
 	}
 	if (glfwGetKey(Engine::Window->GLFW(), GLFW_KEY_S) == GLFW_PRESS)
 	{
+		moveDirection -= forward;
 		move = sPressed = true;
 	}
 	if (glfwGetKey(Engine::Window->GLFW(), GLFW_KEY_D) == GLFW_PRESS)
 	{
+		moveDirection += right;
 		move = true;
 	}
 	if (glfwGetKey(Engine::Window->GLFW(), GLFW_KEY_A) == GLFW_PRESS)
 	{
+		moveDirection -= right;
 		move = true;
 	}
+
+	//two opposite keys are pressed, play idle
+
 
 	//================ Collision detection =================================
 	// player is first scene object by default
@@ -259,9 +268,15 @@ void Input::Loop()
 	glm::vec3 playerMax = playerMesh->maxBounds();
 
 	// move is set by keyboard input
-	if (move)
+	if (move && glm::length(moveDirection) > 0.1f)
 	{
 		movement = glm::normalize(moveDirection) * moveSpeed * Engine::DeltaFrameTime();
+	}
+	else
+	{
+		std::cout << "dont call move\n";
+		//Engine::Level->Objects()[0]->GetMesh()->SetNextAnim(0);
+		//Engine::Level->Objects()[0]->StartAnimBlend();
 	}
 
 	// Predict next AABB
@@ -290,6 +305,18 @@ void Input::Loop()
 
 
 	//============================= Rotation ===========================================
+	//if player is moving, update rotation
+	if (glm::length(moveDirection) > 0.01f)
+	{
+		startRot = currRot;
+		nextRot = atan2(moveDirection.x, moveDirection.z);
+		blendRot = true;
+	}
+	else
+	{
+		move = false;
+	}
+
 	if (blendRot)
 	{
 		const float speed = 15.0f;

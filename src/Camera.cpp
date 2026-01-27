@@ -16,7 +16,7 @@ Camera::Camera()
 	m_projection_matrix = glm::perspective(glm::radians(45.0), static_cast<double>(width) / height, 0.1, 1000000.0);
 
 	m_position = glm::vec3(0.405, 111.572f, -290.303);
-	m_front = glm::vec3(0);
+	m_front = glm::vec3(0, 0, 1);
 	m_up = glm::vec3(0.0f, 1.0f, 0.0f);
 	m_right = glm::normalize(glm::cross(m_front, m_up));
 	m_view_matrix = glm::lookAt(m_position, m_front, m_up);
@@ -118,10 +118,8 @@ void Camera::CameraControl(glm::vec2 mouseDiff, Mesh* mesh)
 		{
 			allowedDistance = maxDist;
 		}
-
 	}
 	
-
 	cameraDist = std::min(maxDist, allowedDistance);
 	m_position = m_lookAt + rayDir * cameraDist;
 	
@@ -152,7 +150,6 @@ void Camera::CameraControl(float scroll)
 	}
 
 	m_defaultDistance = glm::length(m_position - m_lookAt);
-	std::cout << "m_lookAt: " << m_lookAt.x << ", " << m_lookAt.y << ", " << m_lookAt.z << std::endl;
 }
 
 void Camera::Focus(glm::vec3 min, glm::vec3 max)
@@ -177,4 +174,18 @@ void Camera::SetObjects()
 {
 	objects_camera = Engine::Level->Objects();
 
+}
+
+glm::vec3 Camera::Forward()
+{
+	glm::vec3 cameraLookDir = glm::normalize(m_lookAt - m_position);
+	cameraLookDir.y = 0.0f;
+	return cameraLookDir;
+}
+
+glm::vec3 Camera::Right()
+{
+	glm::vec3 cameraLookDir = glm::normalize(m_lookAt - m_position);
+	cameraLookDir.y = 0.0f;
+	return glm::normalize(glm::cross(cameraLookDir, glm::vec3(0, 1, 0)));
 }

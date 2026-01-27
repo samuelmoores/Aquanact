@@ -73,7 +73,6 @@ void Level::LoadObject(char filepath[])
     Object3D* object = new Object3D(filepath);
 
 	objects.push_back(object);
-    Engine::Camera->Focus(objects[0]->GetMesh()->minBounds(), objects[0]->GetMesh()->maxBounds());
 
 }
 

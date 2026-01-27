@@ -17,6 +17,8 @@ class Camera {
 		void PrintPosition();
 		void Move(glm::vec3 delta, glm::vec3 lookAt);
 		void SetObjects();
+		glm::vec3 Forward();
+		glm::vec3 Right();
 	private:
 		glm::mat4 m_projection_matrix;
 		glm::mat4 m_view_matrix;
