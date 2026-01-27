@@ -1,19 +1,19 @@
 ﻿#include <iostream>
 #include <chrono>
 #include <glad/glad.h>
-#include <Object3D.h>
-#include <Animator.h>
 #include <Engine.h>
-#include <Windows.h>
-#include <Input.h>
-
-std::vector<Object3D*> objects;
 
 void AquanactLoop()
 {
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	Engine::Tick();
+	//std::cout << "fps: " << 1.0f/Engine::DeltaFrameTime() << std::endl;
 	Engine::Input->Loop();
 	Engine::UI->Loop();
 	Engine::Renderer->Loop();
+	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+	glfwSwapBuffers(Engine::Window->GLFW());
+	glfwPollEvents();
 }
 
 void Shutdown()
@@ -27,22 +27,15 @@ void Shutdown()
 int main() 
 {
 	Engine::Init();
-
 	glfwSetInputMode(Engine::Window->GLFW(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-	objects = Engine::Level->Objects();
 	Engine::Input->SetObjects();
 	Engine::Camera->SetObjects();
 
 	while (Engine::Running())
 	{
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		Engine::Tick();
-		//std::cout << "fps: " << 1.0f/Engine::DeltaFrameTime() << std::endl;
 		AquanactLoop();
-		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-		glfwSwapBuffers(Engine::Window->GLFW());
-		glfwPollEvents();
 	}
+
 	Shutdown();
 	return 0;
 }
