@@ -16,7 +16,7 @@ static bool sReleased = false;
 static bool aReleased = false;
 static bool dReleased = false;
 
-float moveSpeed = 25.0f;
+float moveSpeed = 125.0f;
 bool move = false;
 glm::vec3 moveDirection = glm::vec3(0);
 bool blendRot = false;
@@ -67,8 +67,14 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	dReleased = (action == GLFW_RELEASE && key == GLFW_KEY_D);
 
 	//start playing walk anim BUT dont move
-	if ((wPressed || aPressed || sPressed || dPressed) && glm::length(moveDirection) == 0.0f)
+	if ((wPressed || aPressed || sPressed || dPressed))
 	{
+		//two opposite keys are pressed
+		if (glm::length(moveDirection) > 0.0f)
+		{
+
+		}
+
 		Engine::Level->Objects()[0]->GetMesh()->SetNextAnim(1);
 		Engine::Level->Objects()[0]->StartAnimBlend();
 	}
@@ -77,7 +83,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	if (wReleased)
 	{
 		moveDirection -= Engine::Camera->Forward();
-		if (glm::length(moveDirection) < 0.1f)
+		if (glm::length(moveDirection) < 0.001f)
 		{
 			Engine::Level->Objects()[0]->GetMesh()->SetNextAnim(0);
 			Engine::Level->Objects()[0]->StartAnimBlend();
@@ -87,7 +93,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	if (sReleased)
 	{
 		moveDirection += Engine::Camera->Forward();
-		if (glm::length(moveDirection) == 0.0f)
+		if (glm::length(moveDirection) < 0.001f)
 		{
 			Engine::Level->Objects()[0]->GetMesh()->SetNextAnim(0);
 			Engine::Level->Objects()[0]->StartAnimBlend();
@@ -97,7 +103,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	if (aReleased)
 	{
 		moveDirection += Engine::Camera->Right();
-		if (glm::length(moveDirection) == 0.0f)
+		if (glm::length(moveDirection) < 0.001f)
 		{
 			Engine::Level->Objects()[0]->GetMesh()->SetNextAnim(0);
 			Engine::Level->Objects()[0]->StartAnimBlend();
@@ -107,13 +113,15 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	if (dReleased)
 	{
 		moveDirection -= Engine::Camera->Right();
-		if (glm::length(moveDirection) < 0.1f)
+		if (glm::length(moveDirection) < 0.001f)
 		{
 			Engine::Level->Objects()[0]->GetMesh()->SetNextAnim(0);
 			Engine::Level->Objects()[0]->StartAnimBlend();
 			moveDirection = glm::vec3(0);
 		}
 	}
+
+
 }
 
 //Collision detect
@@ -185,6 +193,7 @@ void Input::Loop()
 		{
 			moveDirection += forward;
 			move = wPressed = true;
+
 		}
 		if (glfwGetKey(Engine::Window->GLFW(), GLFW_KEY_S) == GLFW_PRESS)
 		{
@@ -196,6 +205,7 @@ void Input::Loop()
 			moveDirection += right;
 			move = true;
 		}
+		std::cout << "movement: " << moveDirection.x << ", " << moveDirection.z << std::endl;
 		if (glfwGetKey(Engine::Window->GLFW(), GLFW_KEY_A) == GLFW_PRESS)
 		{
 			moveDirection -= right;
@@ -240,6 +250,7 @@ void Input::Loop()
 		{
 			objects_input[0]->Move(movement);
 		}
+
 
 
 		//============================= Rotation ===========================================

@@ -453,11 +453,18 @@ bool Mesh::RayHit(const glm::vec3& ro, const glm::vec3& rd, float& tHit)
 //animation
 void Mesh::RunAnimation(float animTime)
 {
-	aiMatrix4x4 I = aiMatrix4x4();
-	float ticksPerSec = (float)(m_scene->mAnimations[m_currentAnim]->mTicksPerSecond != 0 ? m_scene->mAnimations[m_currentAnim]->mTicksPerSecond : 60.0f);
-	float timeTicks = animTime * ticksPerSec;
 	if (m_scene->mNumAnimations == 0)
 		return;
+	
+	aiMatrix4x4 I = aiMatrix4x4();
+
+	//get anim ticks per sec for this muesh
+	float ticksPerSec = (float)(m_scene->mAnimations[m_currentAnim]->mTicksPerSecond != 0 ? m_scene->mAnimations[m_currentAnim]->mTicksPerSecond : 60.0f);
+	
+	//get the current total tick for the anim of this mesh that is currently playing
+	float timeTicks = animTime * ticksPerSec;
+
+	//get current tick of the anim
 	float animTimeTicks = fmod(timeTicks, (float)m_scene->mAnimations[m_currentAnim]->mDuration);
 
 	ReadNodeHeirarchy(animTimeTicks, m_scene->mRootNode, I, m_currentAnim);

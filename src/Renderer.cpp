@@ -82,7 +82,7 @@ void Renderer::Flush(Camera* camera)
 		}
 		commands[i].mesh->ClearBufferIndex();
 
-		commands[i].mesh->DrawBoundingBox();
+		//commands[i].mesh->DrawBoundingBox();
 	}
 
 	commands.clear();

@@ -2,6 +2,7 @@
 #include <glm/glm.hpp>
 #include <Mesh.h>
 #include <ShaderProgram.h>
+#include <Animation.h>
 
 
 
@@ -105,4 +106,5 @@ private:
 	bool m_skinned;
 	std::string m_name;
 	float m_blendFactor;
+	std::vector<Animation*> m_animations;
 };
