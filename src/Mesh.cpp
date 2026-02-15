@@ -261,6 +261,12 @@ void Mesh::fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, s
 		}
 	}
 
+	//anims
+	for (int i = 0; i < m_scene->mNumAnimations; i++)
+	{
+		m_animations.push_back(m_scene->mAnimations[i]);
+	}
+
 	m_totalVertices += numVertices;
 	m_skeleton.boneMapping = boneMap;
 	SetBuffers(vertices, faces);

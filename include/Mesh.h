@@ -102,4 +102,5 @@ class Mesh {
 		int m_totalVertices;
 		std::vector<Mesh> m_subMeshes;
 		std::vector<int> m_facesSize;
+		std::vector<aiAnimation*> m_animations;
 };

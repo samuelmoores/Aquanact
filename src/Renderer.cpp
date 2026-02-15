@@ -99,9 +99,11 @@ void Renderer::Loop()
 	//only loops through the objects of one default level
 	for (int i = 0; i < objects.size(); i++)
 	{
+		// before submitting the render command, check if object should be animated
 		if (objects[i]->skinned())
 		{
-			//std::cout << objects[i]->BlendFactor() << std::endl;
+			//hack, when new anim starts, blend factor is set to 0
+			//ideally, if skinned -> RunAnim(), deal with blending inside anim class
 			if (objects[i]->BlendFactor() < 1.0f)
 			{
 				int nextAnim = objects[i]->GetMesh()->GetNextAnim();
