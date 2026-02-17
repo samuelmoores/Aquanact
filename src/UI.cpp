@@ -17,7 +17,7 @@ UI::UI()
     ImGui_ImplOpenGL3_Init("#version 330");  // or your GLSL version
 
     selectedObj = nullptr;
-    m_drawingAxis = false;
+    m_drawingAxis = true;
 }
 
 void UI::Loop()

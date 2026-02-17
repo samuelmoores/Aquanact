@@ -3,7 +3,7 @@
 
 Level::Level()
 {
-    m_drawAxis = false;
+    m_drawAxis = true;
 }
 
 std::vector<Object3D*> Level::Objects()
@@ -23,31 +23,10 @@ void Level::Load()
     Engine::Camera->Focus(mesh->minBounds(), mesh->maxBounds());
 
     // =============================================================
-    filepathString = "models/wall_front.fbx";
-    filepath = filepathString.data();
-    LoadObject(filepath);
 
-    filepathString = "models/wall_right.fbx";
-    filepath = filepathString.data();
-    LoadObject(filepath);
-
-    filepathString = "models/wall_left.fbx";
-    filepath = filepathString.data();
-    LoadObject(filepath);
-
-    filepathString = "models/wall_back.fbx";
-    filepath = filepathString.data();
-    LoadObject(filepath);
-
-    filepathString = "models/ceiling.fbx";
-    filepath = filepathString.data();
-    LoadObject(filepath);
     // ================================================================
 
     //ground
-    filepathString = "models/floor.fbx";
-    filepath = filepathString.data();
-    LoadObject(filepath);
 }
 
 void Level::DrawAxis()

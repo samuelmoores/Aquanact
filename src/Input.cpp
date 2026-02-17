@@ -178,7 +178,7 @@ void Input::Loop()
 		glfwGetCursorPos(Engine::Window->GLFW(), &xpos, &ypos);
 		mouseCurr = glm::vec2(xpos, ypos);
 		glm::vec2 mouseDiff = mouseCurr - mouseLast;
-		Engine::Camera->CameraControl(mouseDiff, Engine::Level->Objects()[1]->GetMesh());
+		Engine::Camera->CameraControl(mouseDiff);
 		mouseLast = mouseCurr;
 
 		//Movement
@@ -205,7 +205,6 @@ void Input::Loop()
 			moveDirection += right;
 			move = true;
 		}
-		std::cout << "movement: " << moveDirection.x << ", " << moveDirection.z << std::endl;
 		if (glfwGetKey(Engine::Window->GLFW(), GLFW_KEY_A) == GLFW_PRESS)
 		{
 			moveDirection -= right;

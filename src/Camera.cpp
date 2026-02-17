@@ -16,7 +16,7 @@ Camera::Camera()
 
 	m_projection_matrix = glm::perspective(glm::radians(45.0), static_cast<double>(width) / height, 0.1, 1000000.0);
 
-	m_position = glm::vec3(0.405, 111.572f, -290.303);
+	m_position = glm::vec3(-368.918, 412.794, -555.261);
 	m_front = glm::vec3(0, 0, 1);
 	m_up = glm::vec3(0.0f, 1.0f, 0.0f);
 	m_right = glm::normalize(glm::cross(m_front, m_up));
@@ -61,9 +61,8 @@ glm::vec3 Camera::GetFacing()
 }
 
 
-void Camera::CameraControl(glm::vec2 mouseDiff, Mesh* mesh)
+void Camera::CameraControl(glm::vec2 mouseDiff)
 {
-
 	glm::vec3 originalPosition = m_position;
 	float floorY = 10.0f;
 	float radius = glm::length(m_position - m_lookAt);
