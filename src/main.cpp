@@ -9,6 +9,9 @@ void AquanactLoop()
 	Engine::Tick();
 	//std::cout << "fps: " << 1.0f/Engine::DeltaFrameTime() << std::endl;
 	Engine::Input->Loop();
+
+	//Gameplay logic here
+
 	Engine::UI->Loop();
 	Engine::Renderer->Loop();
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

@@ -16,7 +16,7 @@ static bool sReleased = false;
 static bool aReleased = false;
 static bool dReleased = false;
 
-float moveSpeed = 125.0f;
+float moveSpeed = 250.0f;
 bool move = false;
 glm::vec3 moveDirection = glm::vec3(0);
 bool blendRot = false;

@@ -43,7 +43,25 @@ void main()
     gl_Position = projection * view * model * PosL;
 
     // World-space position
-    FragWorldPos = vec3(model);
+    FragWorldPos = vec3(model * PosL);
+
+    // Transform normal to world space
+    // For skinned meshes, apply bone transform first so normals follow the skeleton
+    vec3 localNormal  = vNormal;
+    vec3 localTangent = vTangent;
+    if (skinned)
+    {
+        localNormal  = mat3(BoneTransform) * vNormal;
+        localTangent = mat3(BoneTransform) * vTangent;
+    }
+
+    mat3 normalMatrix = mat3(transpose(inverse(model)));
+    vec3 N = normalize(normalMatrix * localNormal);
+    vec3 T = normalize(normalMatrix * localTangent);
+    T = normalize(T - dot(T, N) * N); // re-orthogonalize
+    vec3 B = cross(N, T);
+    TBN = mat3(T, B, N);
+    Normal = N;
 
     // Pass texture coordinates
     TexCoord = vTexCoord;

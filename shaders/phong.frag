@@ -10,6 +10,7 @@ in vec4 Weights;
 
 uniform sampler2D baseTexture;
 uniform sampler2D normalMap;
+uniform bool useNormalMap;
 
 uniform vec4 material;
 uniform vec3 ambientColor;
@@ -20,15 +21,17 @@ uniform int bone;
 
 void main()
 {
+	FragColor = texture(baseTexture, TexCoord);
+	return;
+
 	vec3 norm;
 
-	if (textureSize(normalMap, 0).x > 1) 
-	{ 
-		// Check if normal map exists
+	if (useNormalMap)
+	{
 	    vec3 tangentNormal = texture(normalMap, TexCoord).rgb * 2.0 - 1.0;
 	    norm = normalize(TBN * tangentNormal);
-	} 
-	else 
+	}
+	else
 	{
 	    norm = normalize(Normal);
 	}
@@ -55,6 +58,5 @@ void main()
 	}
 
 	vec3 lightIntensity = ambientIntensity + diffuseIntensity + specularIntensity;
-	//FragColor = vec4(lightIntensity, 1) * texture(baseTexture, TexCoord);
-	FragColor = texture(baseTexture, TexCoord);
+	FragColor = vec4(lightIntensity, 1.0) * texture(baseTexture, TexCoord);
 }
