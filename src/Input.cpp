@@ -29,16 +29,6 @@ std::vector<Object3D*> objects_input;
 //Mouse press, ignore IMGUI or set window active
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 {
-	// Forward to ImGui first
-	ImGui_ImplGlfw_MouseButtonCallback(window, button, action, mods);
-
-	ImGuiIO& io = ImGui::GetIO();
-
-	// Only process for your game if ImGui doesn't want it
-	if (io.WantCaptureMouse) {
-		return;
-	}
-
 	glfwSetInputMode(Engine::Window->GLFW(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	windowActive = true;
 	double xpos, ypos;

@@ -51,8 +51,9 @@ void main()
     vec3 localTangent = vTangent;
     if (skinned)
     {
-        localNormal  = mat3(BoneTransform) * vNormal;
-        localTangent = mat3(BoneTransform) * vTangent;
+        mat3 boneNormalMatrix = mat3(transpose(inverse(BoneTransform)));
+        localNormal  = boneNormalMatrix * vNormal;
+        localTangent = boneNormalMatrix * vTangent;
     }
 
     mat3 normalMatrix = mat3(transpose(inverse(model)));

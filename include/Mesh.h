@@ -2,6 +2,7 @@
 #include <iostream>
 #include <map>
 #include <vector>
+#include <memory>
 #include <StbImage.h>
 #include <ShaderProgram.h>
 #include <assimp/Importer.hpp> 
@@ -25,6 +26,13 @@ struct Skeleton {
 	std::vector<aiMatrix4x4> finalTransformations;
 };
 
+struct SubMeshMaterial {
+	glm::vec4 phong;            // (ambient_factor, diffuse_factor, specular_factor, shininess)
+	glm::vec3 ambientColor;
+	glm::vec3 directionalColor;
+	glm::vec3 directionalLight;
+};
+
 static int numBoneUpdates = 0;
 
 class Mesh {
@@ -34,6 +42,7 @@ class Mesh {
 		Mesh(char modelFile[]);
 		
 		//loading
+		void loadFromFolder(const std::string& folderPath);
 		void assimpLoad(const std::string& path, bool flipUvs);
 		void fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, std::vector<uint32_t>& faces);
 		void ReadNodeHeirarchy(const aiNode* node, const aiMatrix4x4& ParentTransform);
@@ -59,6 +68,7 @@ class Mesh {
 		void SetTexture(const char* colorFile);
 		void SetDiffuseTextureMemory(aiTexture* text);
 		const Skeleton& GetSkeleton() const;
+		const SubMeshMaterial& GetMaterial(int index) const;
 		bool Skinned();
 		void SetNextAnim(int nextAnim);
 		void SetCurrentAnim(int currAnim);
@@ -94,13 +104,17 @@ class Mesh {
 		glm::vec3 m_meshMaxBounds;
 		Skeleton m_skeleton;
 		Assimp::Importer m_importer;
+		std::vector<std::unique_ptr<Assimp::Importer>> m_animImporters;
 		const aiScene* m_scene;
 		aiMatrix4x4 m_GlobalInverseTransform;
 		bool m_skinned;
 		int m_currentAnim;
 		int m_nextAnim;
 		int m_totalVertices;
+		std::string m_texturesFolder;
 		std::vector<Mesh> m_subMeshes;
 		std::vector<int> m_facesSize;
 		std::vector<aiAnimation*> m_animations;
+		std::vector<SubMeshMaterial> m_materials;
+		static SubMeshMaterial s_defaultMaterial;
 };

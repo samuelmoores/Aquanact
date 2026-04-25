@@ -60,11 +60,6 @@ Object3D::Object3D(char modelFile[])
 	//  | Fabric surface   | `glm::vec4(0.2f, 0.7f, 0.1f, 8.0f)`   |
 
 	m_shader.load("shaders/phong.vert", "shaders/phong.frag");
-	m_shader.activate();                      
-	m_shader.setUniform("material", glm::vec4(0.3f, 0.7f, 0.1f, 8.0f));
-	m_shader.setUniform("ambientColor", glm::vec3(0.2f, 0.2f, 0.2f));
-	m_shader.setUniform("directionalColor", glm::vec3(1, 1, 1));
-	m_shader.setUniform("directionalLight", glm::vec3(-1, -1, -1));
 
 	m_position = glm::vec3(0);
 	m_rotation = glm::vec3(0);

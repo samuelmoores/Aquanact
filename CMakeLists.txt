@@ -49,9 +49,9 @@ add_custom_target(copyshaders
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 add_custom_target(copymodels
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/models
-        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/models ${CMAKE_BINARY_DIR}/models
-        COMMENT "copying ${CMAKE_SOURCE_DIR}/models to ${CMAKE_CURRENT_BINARY_DIR}/models"
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/assets
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/assets ${CMAKE_BINARY_DIR}/assets
+        COMMENT "copying ${CMAKE_SOURCE_DIR}/assets to ${CMAKE_CURRENT_BINARY_DIR}/assets"
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 add_dependencies(AquanactEngine copyshaders copymodels)

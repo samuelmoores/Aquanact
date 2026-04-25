@@ -78,7 +78,11 @@ Mesh::Mesh(char modelFile[])
 {
 	m_currVao = 0;
 	m_currTextureColor = 0;
-	assimpLoad(modelFile, true);
+
+	if (std::filesystem::is_directory(modelFile))
+		loadFromFolder(modelFile);
+	else
+		assimpLoad(modelFile, true);
 	m_currentAnim = 0;
 	m_nextAnim = 1;
 
@@ -130,7 +134,69 @@ Mesh::Mesh(char modelFile[])
 }
 
 //loading
-void Mesh::assimpLoad(const std::string& path, bool flipUvs) 
+void Mesh::loadFromFolder(const std::string& folderPath)
+{
+	namespace fs = std::filesystem;
+	fs::path folder(folderPath);
+
+	m_texturesFolder = (folder / "textures").string();
+
+	// find model file — prefer the file whose stem matches the folder name
+	fs::path modelDir = folder / "model";
+	std::string mainModelPath;
+	std::string fallbackModelPath;
+	std::string folderName = folder.filename().string();
+	static const std::vector<std::string> modelExts = { ".fbx", ".obj", ".gltf", ".glb", ".dae" };
+
+	for (const auto& entry : fs::directory_iterator(modelDir))
+	{
+		if (!entry.is_regular_file()) continue;
+		std::string ext = entry.path().extension().string();
+		std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+		if (std::find(modelExts.begin(), modelExts.end(), ext) == modelExts.end()) continue;
+
+		if (entry.path().stem().string() == folderName)
+			mainModelPath = entry.path().string();
+		else if (fallbackModelPath.empty())
+			fallbackModelPath = entry.path().string();
+	}
+
+	if (mainModelPath.empty())
+		mainModelPath = fallbackModelPath;
+
+	if (mainModelPath.empty())
+	{
+		std::cout << "[Mesh] loadFromFolder: no model file found in " << modelDir << std::endl;
+		return;
+	}
+
+	std::cout << "[Mesh] loadFromFolder: model: " << mainModelPath << std::endl;
+	assimpLoad(mainModelPath, true);
+
+	// load animations
+	fs::path animDir = folder / "animations";
+	if (!fs::exists(animDir)) return;
+
+	for (const auto& entry : fs::directory_iterator(animDir))
+	{
+		if (!entry.is_regular_file()) continue;
+		std::string ext = entry.path().extension().string();
+		std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+		if (std::find(modelExts.begin(), modelExts.end(), ext) == modelExts.end()) continue;
+
+		std::string animPath = entry.path().string();
+		std::cout << "[Mesh] loadFromFolder: animation: " << animPath << std::endl;
+
+		auto& imp = m_animImporters.emplace_back(std::make_unique<Assimp::Importer>());
+		const aiScene* animScene = imp->ReadFile(animPath, aiProcess_Triangulate);
+		if (animScene)
+		{
+			for (unsigned int i = 0; i < animScene->mNumAnimations; i++)
+				m_animations.push_back(animScene->mAnimations[i]);
+		}
+	}
+}
+void Mesh::assimpLoad(const std::string& path, bool flipUvs)
 {
 	int flags = (aiPostProcessSteps)aiProcessPreset_TargetRealtime_MaxQuality;
 	
@@ -161,8 +227,26 @@ void Mesh::assimpLoad(const std::string& path, bool flipUvs)
 		for (int i = 0; i < m_scene->mNumMeshes; i++)
 		{
 			fromAssimpMesh(m_scene->mMeshes[i], vertices, faces);
-			aiMaterial* mat = m_scene->mMaterials[i];
+			aiMaterial* mat = m_scene->mMaterials[m_scene->mMeshes[i]->mMaterialIndex];
+			aiString matName;
+			mat->Get(AI_MATKEY_NAME, matName);
+			std::cout << "[Mesh] mesh[" << i << "] material: " << matName.C_Str() << std::endl;
 			LoadTexture(mat, aiTextureType_DIFFUSE, path);
+
+			aiColor4D ambient(0.2f, 0.2f, 0.2f, 1.0f);
+			aiColor4D specular(0.5f, 0.5f, 0.5f, 1.0f);
+			float shininess = 32.0f;
+			mat->Get(AI_MATKEY_COLOR_AMBIENT, ambient);
+			mat->Get(AI_MATKEY_COLOR_SPECULAR, specular);
+			mat->Get(AI_MATKEY_SHININESS, shininess);
+
+			float specStrength = glm::length(glm::vec3(specular.r, specular.g, specular.b)) / glm::sqrt(3.0f);
+			SubMeshMaterial submeshMat;
+			submeshMat.phong = glm::vec4(1.0f, 1.0f, specStrength, glm::max(shininess, 1.0f));
+			submeshMat.ambientColor = glm::vec3(ambient.r, ambient.g, ambient.b);
+			submeshMat.directionalColor = glm::vec3(1.0f, 1.0f, 1.0f);
+			submeshMat.directionalLight = glm::vec3(-1.0f, -1.0f, -1.0f);
+			m_materials.push_back(submeshMat);
 		}
 
 		m_skeleton.finalTransformations.resize(m_skeleton.boneOffsetMatrices.size());
@@ -304,6 +388,7 @@ void Mesh::LoadTexture(aiMaterial* mat, aiTextureType textureType, std::string p
 	{
 		textureFileName = textureFileName.substr(lastSlashIndex + 1);
 	}
+	std::cout << "[LoadTexture] raw path: " << texturePath.C_Str() << " | filename: " << textureFileName << std::endl;
 
 	//search for diffuse, normal, roughness
 	aiTexture* embeddedTexture = nullptr;
@@ -341,9 +426,11 @@ void Mesh::LoadTexture(aiMaterial* mat, aiTextureType textureType, std::string p
 	}
 	else //otherwise load from file
 	{
-		std::filesystem::path p = path;
-		p.replace_extension(".png");
-		SetTexture(p.string().c_str());
+		std::filesystem::path texDir = m_texturesFolder.empty()
+			? std::filesystem::path(path).parent_path()
+			: std::filesystem::path(m_texturesFolder);
+		std::filesystem::path texPath = texDir / textureFileName;
+		SetTexture(texPath.string().c_str());
 	}
 }
 
@@ -459,6 +546,7 @@ bool Mesh::RayHit(const glm::vec3& ro, const glm::vec3& rd, float& tHit)
 //animation
 void Mesh::RunAnimation(float animTime)
 {
+	return;
 	if (m_scene->mNumAnimations == 0)
 		return;
 	
@@ -479,6 +567,7 @@ void Mesh::RunAnimation(float animTime)
 int count = 0;
 void Mesh::BlendAnimation(int nextAnim, float animTime, float blendFactor)
 {
+	return;
 	count++;
 	aiMatrix4x4 I = aiMatrix4x4();
 	float ticksPerSec_Start = (float)(m_scene->mAnimations[m_currentAnim]->mTicksPerSecond != 0 ? m_scene->mAnimations[m_currentAnim]->mTicksPerSecond : 60.0f);
@@ -993,6 +1082,20 @@ void Mesh::SetDiffuseTextureMemory(aiTexture* text)
 	);
 	glGenerateMipmap(GL_TEXTURE_2D);
 }
+SubMeshMaterial Mesh::s_defaultMaterial = {
+	glm::vec4(0.3f, 0.7f, 0.1f, 8.0f),
+	glm::vec3(0.2f, 0.2f, 0.2f),
+	glm::vec3(1.0f, 1.0f, 1.0f),
+	glm::vec3(-1.0f, -1.0f, -1.0f)
+};
+
+const SubMeshMaterial& Mesh::GetMaterial(int index) const
+{
+	if (index < 0 || index >= (int)m_materials.size())
+		return s_defaultMaterial;
+	return m_materials[index];
+}
+
 const Skeleton& Mesh::GetSkeleton() const
 {
 	return m_skeleton;

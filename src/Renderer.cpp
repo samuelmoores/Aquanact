@@ -72,11 +72,15 @@ void Renderer::Flush(Camera* camera)
 			commands[i].shader->setUniform("finalBones", glmTransforms);
 		}
 
-		//check if submeshes?
-		//	then get curr texture and facesize
 		int numBuffs = commands[i].mesh->NumBuffers();
 		for (int j = 0; j < numBuffs; j++)
 		{
+			const SubMeshMaterial& mat = commands[i].mesh->GetMaterial(j);
+			commands[i].shader->setUniform("material", mat.phong);
+			commands[i].shader->setUniform("ambientColor", mat.ambientColor);
+			commands[i].shader->setUniform("directionalColor", mat.directionalColor);
+			commands[i].shader->setUniform("directionalLight", mat.directionalLight);
+
 			commands[i].mesh->Bind();
 			glDrawElements(GL_TRIANGLES, commands[i].mesh->FacesSize(), GL_UNSIGNED_INT, 0);
 			commands[i].mesh->UnBind();
@@ -94,6 +98,9 @@ float blendFactor = 0.0f;
 
 void Renderer::Loop()
 {
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	
+	Engine::UI->Loop();
 	std::vector<Object3D*> objects = Engine::Level->Objects();
 	Engine::Level->DrawAxis();
 
@@ -130,4 +137,6 @@ void Renderer::Loop()
 		Submit(rc);
 	}
 	Flush(Engine::Camera);
+	glfwSwapBuffers(Engine::Window->GLFW());
+	glfwPollEvents();
 }

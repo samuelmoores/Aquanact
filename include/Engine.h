@@ -20,6 +20,7 @@ public:
 
 	static Engine& Init() {
 		static Engine instance;
+		glfwSetInputMode(Engine::Window->GLFW(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 		return instance;
 	}
 

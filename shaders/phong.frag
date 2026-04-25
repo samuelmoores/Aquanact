@@ -21,9 +21,6 @@ uniform int bone;
 
 void main()
 {
-	FragColor = texture(baseTexture, TexCoord);
-	return;
-
 	vec3 norm;
 
 	if (useNormalMap)
