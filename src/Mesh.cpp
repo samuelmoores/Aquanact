@@ -546,20 +546,19 @@ bool Mesh::RayHit(const glm::vec3& ro, const glm::vec3& rd, float& tHit)
 //animation
 void Mesh::RunAnimation(float animTime)
 {
-	return;
-	if (m_scene->mNumAnimations == 0)
+	if (m_animations.empty())
 		return;
-	
+
 	aiMatrix4x4 I = aiMatrix4x4();
 
 	//get anim ticks per sec for this muesh
-	float ticksPerSec = (float)(m_scene->mAnimations[m_currentAnim]->mTicksPerSecond != 0 ? m_scene->mAnimations[m_currentAnim]->mTicksPerSecond : 60.0f);
-	
+	float ticksPerSec = (float)(m_animations[m_currentAnim]->mTicksPerSecond != 0 ? m_animations[m_currentAnim]->mTicksPerSecond : 60.0f);
+
 	//get the current total tick for the anim of this mesh that is currently playing
 	float timeTicks = animTime * ticksPerSec;
 
 	//get current tick of the anim
-	float animTimeTicks = fmod(timeTicks, (float)m_scene->mAnimations[m_currentAnim]->mDuration);
+	float animTimeTicks = fmod(timeTicks, (float)m_animations[m_currentAnim]->mDuration);
 
 	ReadNodeHeirarchy(animTimeTicks, m_scene->mRootNode, I, m_currentAnim);
 }
@@ -567,20 +566,19 @@ void Mesh::RunAnimation(float animTime)
 int count = 0;
 void Mesh::BlendAnimation(int nextAnim, float animTime, float blendFactor)
 {
-	return;
 	count++;
 	aiMatrix4x4 I = aiMatrix4x4();
-	float ticksPerSec_Start = (float)(m_scene->mAnimations[m_currentAnim]->mTicksPerSecond != 0 ? m_scene->mAnimations[m_currentAnim]->mTicksPerSecond : 60.0f);
+	float ticksPerSec_Start = (float)(m_animations[m_currentAnim]->mTicksPerSecond != 0 ? m_animations[m_currentAnim]->mTicksPerSecond : 60.0f);
 	float timeTicks_Start = animTime * ticksPerSec_Start;
-	float animTimeTicks_Start = fmod(timeTicks_Start, (float)m_scene->mAnimations[m_currentAnim]->mDuration);
+	float animTimeTicks_Start = fmod(timeTicks_Start, (float)m_animations[m_currentAnim]->mDuration);
 
 
-	float ticksPerSec_End = (float)(m_scene->mAnimations[nextAnim]->mTicksPerSecond != 0 ? m_scene->mAnimations[nextAnim]->mTicksPerSecond : 60.0f);
+	float ticksPerSec_End = (float)(m_animations[nextAnim]->mTicksPerSecond != 0 ? m_animations[nextAnim]->mTicksPerSecond : 60.0f);
 	float timeTicks_End = animTime * ticksPerSec_End;
-	float animTimeTicks_End = fmod(timeTicks_End, (float)m_scene->mAnimations[nextAnim]->mDuration);
+	float animTimeTicks_End = fmod(timeTicks_End, (float)m_animations[nextAnim]->mDuration);
 
-	aiAnimation* startAnim = m_scene->mAnimations[m_currentAnim];
-	aiAnimation* endAnim = m_scene->mAnimations[nextAnim];
+	aiAnimation* startAnim = m_animations[m_currentAnim];
+	aiAnimation* endAnim = m_animations[nextAnim];
 
 	ReadNodeHeirarchyBlend(blendFactor, animTimeTicks_Start, animTimeTicks_End, m_scene->mRootNode, I, startAnim, endAnim, nextAnim);
 
@@ -739,7 +737,7 @@ void Mesh::ReadNodeHeirarchy(float animTimeTicks, const aiNode* node, const aiMa
 
 	const std::string name = node->mName.C_Str();
 
-	const aiAnimation* anim = m_scene->mAnimations[animIndex];
+	const aiAnimation* anim = m_animations[animIndex];
 	aiMatrix4x4 NodeTransformation(node->mTransformation);
 
 	//if string contains this
@@ -855,13 +853,13 @@ void Mesh::ReadNodeHeirarchyBlend(float blendFactor, float animTimeTicks_Start, 
 
 	}
 
-	const aiAnimation* animStart = m_scene->mAnimations[m_currentAnim];
+	const aiAnimation* animStart = m_animations[m_currentAnim];
 	const aiNodeAnim* animNodeStart = FindNodeAnim(animStart, name);
 	aiVector3D   StartScaling;
 	aiQuaternion StartRotation;
 	aiVector3D   StartTranslation;
 
-	const aiAnimation* animEnd = m_scene->mAnimations[animIndex];
+	const aiAnimation* animEnd = m_animations[animIndex];
 	const aiNodeAnim* animNodeEnd = FindNodeAnim(animEnd, name);
 	aiVector3D EndScaling;
 	aiQuaternion EndRotation;
