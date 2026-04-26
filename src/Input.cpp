@@ -1,293 +1,177 @@
 #include "Input.h"
 #include "Engine.h"
 
-bool windowActive = true;
-glm::vec2 mouseLast(0);
-glm::vec2 mouseCurr(0);
-
-bool mouseDown = false;
-static bool wPressed = false;
-static bool sPressed = false;
-static bool aPressed = false;
-static bool dPressed = false;
-
-static bool wReleased = false;
-static bool sReleased = false;
-static bool aReleased = false;
-static bool dReleased = false;
-
-float moveSpeed = 250.0f;
-bool move = false;
-glm::vec3 moveDirection = glm::vec3(0);
-bool blendRot = false;
-float currRot = 0.0f;
-float nextRot = 0.0f;
-float startRot = 0.0f;
-
-std::vector<Object3D*> objects_input;
-
-//Mouse press, ignore IMGUI or set window active
-void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
+static bool AABBIntersect(const glm::vec3& minA, const glm::vec3& maxA, const glm::vec3& minB, const glm::vec3& maxB)
 {
-	glfwSetInputMode(Engine::Window->GLFW(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-	windowActive = true;
-	double xpos, ypos;
-	glfwGetCursorPos(Engine::Window->GLFW(), &xpos, &ypos);
-	mouseLast = glm::vec2(xpos, ypos);
+	return (minA.x <= maxB.x && maxA.x >= minB.x)
+		&& (minA.y <= maxB.y && maxA.y >= minB.y)
+		&& (minA.z <= maxB.z && maxA.z >= minB.z);
 }
 
-//zoom camera in and out
-void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
+static float ShortestAngleDelta(float from, float to)
 {
-	Engine::Camera->CameraControl(yoffset);
-}
-
-//WASD press and release
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
-{
-	// Update key states
-	wPressed = (action == GLFW_PRESS && key == GLFW_KEY_W);
-	sPressed = (action == GLFW_PRESS && key == GLFW_KEY_S);
-	aPressed = (action == GLFW_PRESS && key == GLFW_KEY_A);
-	dPressed = (action == GLFW_PRESS && key == GLFW_KEY_D);
-
-	wReleased = (action == GLFW_RELEASE && key == GLFW_KEY_W);
-	sReleased = (action == GLFW_RELEASE && key == GLFW_KEY_S);
-	aReleased = (action == GLFW_RELEASE && key == GLFW_KEY_A);
-	dReleased = (action == GLFW_RELEASE && key == GLFW_KEY_D);
-
-	//start playing walk anim BUT dont move
-	if ((wPressed || aPressed || sPressed || dPressed))
-	{
-		//two opposite keys are pressed
-		if (glm::length(moveDirection) > 0.0f)
-		{
-
-		}
-
-		Engine::Level->Objects()[0]->GetMesh()->SetNextAnim(1);
-		Engine::Level->Objects()[0]->StartAnimBlend();
-	}
-	
-	//============================ RELEASE ===========================================
-	if (wReleased)
-	{
-		moveDirection -= Engine::Camera->Forward();
-		if (glm::length(moveDirection) < 0.001f)
-		{
-			Engine::Level->Objects()[0]->GetMesh()->SetNextAnim(0);
-			Engine::Level->Objects()[0]->StartAnimBlend();
-			moveDirection = glm::vec3(0);
-		}
-	}
-	if (sReleased)
-	{
-		moveDirection += Engine::Camera->Forward();
-		if (glm::length(moveDirection) < 0.001f)
-		{
-			Engine::Level->Objects()[0]->GetMesh()->SetNextAnim(0);
-			Engine::Level->Objects()[0]->StartAnimBlend();
-			moveDirection = glm::vec3(0);
-		}
-	}
-	if (aReleased)
-	{
-		moveDirection += Engine::Camera->Right();
-		if (glm::length(moveDirection) < 0.001f)
-		{
-			Engine::Level->Objects()[0]->GetMesh()->SetNextAnim(0);
-			Engine::Level->Objects()[0]->StartAnimBlend();
-			moveDirection = glm::vec3(0);
-		}
-	}
-	if (dReleased)
-	{
-		moveDirection -= Engine::Camera->Right();
-		if (glm::length(moveDirection) < 0.001f)
-		{
-			Engine::Level->Objects()[0]->GetMesh()->SetNextAnim(0);
-			Engine::Level->Objects()[0]->StartAnimBlend();
-			moveDirection = glm::vec3(0);
-		}
-	}
-
-
-}
-
-//Collision detect
-bool AABBIntersect(const glm::vec3& minA, const glm::vec3& maxA, const glm::vec3& minB, const glm::vec3& maxB)
-{
-	bool overlapX = (minA.x <= maxB.x && maxA.x >= minB.x);
-	bool overlapY = (minA.y <= maxB.y && maxA.y >= minB.y);
-	bool overlapZ = (minA.z <= maxB.z && maxA.z >= minB.z);
-	bool result = overlapX && overlapY && overlapZ;
-	return result;
-}
-
-float ShortestAngleDelta(float from, float to)
-{
-	// angualar difference
 	float delta = to - from;
-
-	// if angualar distance is greater than pi, minus 2pi
-	// just like the unit circle in calculus
-	while (delta > glm::pi<float>()) delta -= glm::two_pi<float>();
+	while (delta >  glm::pi<float>()) delta -= glm::two_pi<float>();
 	while (delta < -glm::pi<float>()) delta += glm::two_pi<float>();
 	return delta;
 }
 
+void Input::MouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
+{
+	Input* self = static_cast<Input*>(glfwGetWindowUserPointer(window));
+	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	self->m_windowActive = true;
+	double xpos, ypos;
+	glfwGetCursorPos(window, &xpos, &ypos);
+	self->m_mouseLast = glm::vec2(xpos, ypos);
+}
+
+void Input::ScrollCallback(GLFWwindow* window, double xoffset, double yoffset)
+{
+	Engine::Camera->CameraControl(yoffset);
+}
+
 Input::Input()
 {
-	glfwSetMouseButtonCallback(Engine::Window->GLFW(), mouse_button_callback);
-	glfwSetScrollCallback(Engine::Window->GLFW(), scroll_callback);
-	glfwSetKeyCallback(Engine::Window->GLFW(), key_callback);
+	GLFWwindow* win = Engine::Window->GLFW();
+	glfwSetWindowUserPointer(win, this);
+	glfwSetMouseButtonCallback(win, MouseButtonCallback);
+	glfwSetScrollCallback(win, ScrollCallback);
+
 	double xpos, ypos;
-	glfwGetCursorPos(Engine::Window->GLFW(), &xpos, &ypos);
-	mouseLast = glm::vec2(xpos, ypos);
+	glfwGetCursorPos(win, &xpos, &ypos);
+	m_mouseLast = glm::vec2(xpos, ypos);
+
+	m_bindings[GLFW_KEY_W]      = Action::MoveForward;
+	m_bindings[GLFW_KEY_S]      = Action::MoveBack;
+	m_bindings[GLFW_KEY_A]      = Action::MoveLeft;
+	m_bindings[GLFW_KEY_D]      = Action::MoveRight;
+	m_bindings[GLFW_KEY_ESCAPE] = Action::Escape;
 }
 
-bool almostEqual(const glm::vec3& a, const glm::vec3& b, float epsilon = 0.0001f) 
+void Input::UpdateActionStates()
 {
-	return glm::all(glm::lessThanEqual(glm::abs(a - b), glm::vec3(epsilon)));
+	GLFWwindow* win = Engine::Window->GLFW();
+	for (auto& [key, action] : m_bindings)
+	{
+		bool wasDown = m_actions[action].isDown;
+		bool nowDown = glfwGetKey(win, key) == GLFW_PRESS;
+		m_actions[action].isDown       = nowDown;
+		m_actions[action].justPressed  = !wasDown && nowDown;
+		m_actions[action].justReleased = wasDown && !nowDown;
+	}
 }
 
-void Input::Loop()
+bool Input::IsDown(Action a) const
 {
-	//press escape to disable window and get cursor back
-	if (glfwGetKey(Engine::Window->GLFW(), GLFW_KEY_ESCAPE) == GLFW_PRESS)
-	{
-		glfwSetInputMode(Engine::Window->GLFW(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-		windowActive = false;
-	}
+	auto it = m_actions.find(a);
+	return it != m_actions.end() && it->second.isDown;
+}
 
-	//camera control with mouse, movement, rotation colission
-	if (windowActive)
-	{
-		//calculate mouse movement to send to camera controller
-		double xpos, ypos;
-		glfwGetCursorPos(Engine::Window->GLFW(), &xpos, &ypos);
-		mouseCurr = glm::vec2(xpos, ypos);
-		glm::vec2 mouseDiff = mouseCurr - mouseLast;
-		Engine::Camera->CameraControl(mouseDiff);
-		mouseLast = mouseCurr;
+bool Input::JustPressed(Action a) const
+{
+	auto it = m_actions.find(a);
+	return it != m_actions.end() && it->second.justPressed;
+}
 
-		//Movement
-		glm::vec3 movement(0.0f);
-		glm::vec3 forward = Engine::Camera->Forward();
-		glm::vec3 right = Engine::Camera->Right();
-		moveDirection = glm::vec3(0);
-
-		//************* These are all called AFTER the key callback ************
-		//************* For keys being held down, key callback does not register it fast enough ************
-		if (glfwGetKey(Engine::Window->GLFW(), GLFW_KEY_W) == GLFW_PRESS)
-		{
-			moveDirection += forward;
-			move = wPressed = true;
-
-		}
-		if (glfwGetKey(Engine::Window->GLFW(), GLFW_KEY_S) == GLFW_PRESS)
-		{
-			moveDirection -= forward;
-			move = sPressed = true;
-		}
-		if (glfwGetKey(Engine::Window->GLFW(), GLFW_KEY_D) == GLFW_PRESS)
-		{
-			moveDirection += right;
-			move = true;
-		}
-		if (glfwGetKey(Engine::Window->GLFW(), GLFW_KEY_A) == GLFW_PRESS)
-		{
-			moveDirection -= right;
-			move = true;
-		}
-		//two opposite keys are pressed, play idle
-
-		//================ Collision detection =================================
-		// player is first scene object by default
-		// wall is second
-		// get min and max
-		Mesh* playerMesh = objects_input[0]->GetMesh();
-		glm::vec3 playerMin = playerMesh->minBounds();
-		glm::vec3 playerMax = playerMesh->maxBounds();
-
-		// move is set by keyboard input
-		if (move && glm::length(moveDirection) > 0.1f)
-		{
-			movement = glm::normalize(moveDirection) * moveSpeed * Engine::DeltaFrameTime();
-		}
-
-		// Predict next AABB
-		glm::vec3 nextMin = playerMin + movement;
-		glm::vec3 nextMax = playerMax + movement;
-
-		bool collided = false;
-		//first object player, last object floor
-		for (int i = 1; i < objects_input.size() - 1; i++)
-		{
-			Mesh* wallMesh = objects_input[i]->GetMesh();
-			glm::vec3 wallMin = wallMesh->minBounds();
-			glm::vec3 wallMax = wallMesh->maxBounds();
-			collided = AABBIntersect(nextMin, nextMax, wallMin, wallMax);
-
-			if (collided)
-				break;
-		}
-
-
-		// Apply movement only if no collision
-		if (!collided)
-		{
-			objects_input[0]->Move(movement);
-		}
-
-
-
-		//============================= Rotation ===========================================
-		//if player is moving, update rotation
-		if (glm::length(moveDirection) > 0.01f)
-		{
-			startRot = currRot;
-			nextRot = atan2(moveDirection.x, moveDirection.z);
-			blendRot = true;
-		}
-		else
-		{
-			move = false;
-		}
-
-		if (blendRot)
-		{
-			const float speed = 15.0f;
-			float dt = Engine::DeltaFrameTime();
-
-			// dont rotate more than 180 degrees
-			// this is the start of the angle to rotate by
-			float delta = ShortestAngleDelta(currRot, nextRot);
-
-			// create exponential smoothing  (e^x)
-			// higher speed -> snappy rotation
-			// lower speed  -> floaty rotation
-			float t = 1.0f - exp(-speed * dt);
-
-			// smooth out delta before adding to current rotation
-			currRot += delta * t;
-
-			// floating absolute value
-			// once you are .5 radians away, stop rotating
-			if (fabs(delta) < glm::radians(0.5f))
-			{
-				currRot = nextRot;
-				blendRot = false;
-			}
-
-			//player is first scene object by default
-			objects_input[0]->SetRotation({ 0.0f, currRot, 0.0f });
-		}
-	}
-
+bool Input::JustReleased(Action a) const
+{
+	auto it = m_actions.find(a);
+	return it != m_actions.end() && it->second.justReleased;
 }
 
 void Input::SetObjects()
 {
-	objects_input = Engine::Level->Objects();
+	m_objects = Engine::Level->Objects();
+}
+
+void Input::Loop()
+{
+	UpdateActionStates();
+
+	if (IsDown(Action::Escape))
+	{
+		glfwSetInputMode(Engine::Window->GLFW(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+		m_windowActive = false;
+	}
+
+	if (!m_windowActive)
+		return;
+
+	// Mouse look
+	double xpos, ypos;
+	glfwGetCursorPos(Engine::Window->GLFW(), &xpos, &ypos);
+	m_mouseCurr = glm::vec2(xpos, ypos);
+	Engine::Camera->CameraControl(m_mouseCurr - m_mouseLast);
+	m_mouseLast = m_mouseCurr;
+
+	// Movement direction
+	glm::vec3 forward = Engine::Camera->Forward();
+	glm::vec3 right   = Engine::Camera->Right();
+	m_moveDirection   = glm::vec3(0);
+	m_move            = false;
+
+	if (IsDown(Action::MoveForward)) { m_moveDirection += forward; m_move = true; }
+	if (IsDown(Action::MoveBack))    { m_moveDirection -= forward; m_move = true; }
+	if (IsDown(Action::MoveRight))   { m_moveDirection += right;   m_move = true; }
+	if (IsDown(Action::MoveLeft))    { m_moveDirection -= right;   m_move = true; }
+
+	// Animation: trigger on move start/stop transitions
+	bool isMoving = m_move;
+	if (!m_wasMoving && isMoving)
+	{
+		m_objects[0]->GetMesh()->SetNextAnim(1);
+		m_objects[0]->StartAnimBlend();
+	}
+	if (m_wasMoving && !isMoving)
+	{
+		m_objects[0]->GetMesh()->SetNextAnim(0);
+		m_objects[0]->StartAnimBlend();
+	}
+	m_wasMoving = isMoving;
+
+	// Collision + movement
+	const float moveSpeed = 250.0f;
+	glm::vec3 movement(0.0f);
+	if (m_move && glm::length(m_moveDirection) > 0.1f)
+		movement = glm::normalize(m_moveDirection) * moveSpeed * Engine::DeltaFrameTime();
+
+	Mesh* playerMesh = m_objects[0]->GetMesh();
+	glm::vec3 nextMin = playerMesh->minBounds() + movement;
+	glm::vec3 nextMax = playerMesh->maxBounds() + movement;
+
+	bool collided = false;
+	for (int i = 1; i < (int)m_objects.size() - 1; i++)
+	{
+		Mesh* wallMesh = m_objects[i]->GetMesh();
+		if (AABBIntersect(nextMin, nextMax, wallMesh->minBounds(), wallMesh->maxBounds()))
+		{
+			collided = true;
+			break;
+		}
+	}
+
+	if (!collided)
+		m_objects[0]->Move(movement);
+
+	// Rotation smoothing
+	if (glm::length(m_moveDirection) > 0.01f)
+	{
+		m_nextRot  = atan2(m_moveDirection.x, m_moveDirection.z);
+		m_blendRot = true;
+	}
+
+	if (m_blendRot)
+	{
+		const float speed = 15.0f;
+		float delta = ShortestAngleDelta(m_currRot, m_nextRot);
+		float t     = 1.0f - exp(-speed * Engine::DeltaFrameTime());
+		m_currRot  += delta * t;
+		if (fabs(delta) < glm::radians(0.5f))
+		{
+			m_currRot  = m_nextRot;
+			m_blendRot = false;
+		}
+		m_objects[0]->SetRotation({ 0.0f, m_currRot, 0.0f });
+	}
 }
