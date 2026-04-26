@@ -24,12 +24,14 @@ void Level::Load()
 
     // =============================================================
 
+    filepathString = "assets/Office";
+    filepath = filepathString.data();
+    LoadObject(filepath);
     
-
     // ================================================================
 
     //ground
-    filepathString = "models/ground.fbx";
+    filepathString = "assets/Floor";
     filepath = filepathString.data();
     LoadObject(filepath);
 }

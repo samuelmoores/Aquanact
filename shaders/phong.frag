@@ -33,7 +33,7 @@ void main()
 	    norm = normalize(Normal);
 	}
 
-	vec3 ambientIntensity = material.x * ambientColor;
+	vec3 ambientIntensity = material.x * ambientColor + 0.35;
 	vec3 diffuseIntensity = vec3(0);
 	vec3 specularIntensity = vec3(0);
 	

@@ -43,15 +43,15 @@ set_target_properties(AquanactEngine
 # output (.exe) directory, so the application can reference those folders using relative paths
 # instead of absolute paths.
 add_custom_target(copyshaders
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/shaders
+        COMMAND ${CMAKE_COMMAND} -E rm -rf ${CMAKE_BINARY_DIR}/shaders
         COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/shaders ${CMAKE_BINARY_DIR}/shaders
-        COMMENT "copying ${CMAKE_SOURCE_DIR}/shaders to ${CMAKE_BINARY_DIR}/shaders"
+        COMMENT "syncing ${CMAKE_SOURCE_DIR}/shaders to ${CMAKE_BINARY_DIR}/shaders"
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 add_custom_target(copymodels
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/assets
+        COMMAND ${CMAKE_COMMAND} -E rm -rf ${CMAKE_BINARY_DIR}/assets
         COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/assets ${CMAKE_BINARY_DIR}/assets
-        COMMENT "copying ${CMAKE_SOURCE_DIR}/assets to ${CMAKE_CURRENT_BINARY_DIR}/assets"
+        COMMENT "syncing ${CMAKE_SOURCE_DIR}/assets to ${CMAKE_BINARY_DIR}/assets"
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 add_dependencies(AquanactEngine copyshaders copymodels)

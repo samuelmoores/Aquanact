@@ -139,39 +139,29 @@ void Mesh::loadFromFolder(const std::string& folderPath)
 	namespace fs = std::filesystem;
 	fs::path folder(folderPath);
 
-	m_texturesFolder = (folder / "textures").string();
+	m_texturesFolder = folder.string();
 
-	// find model file — prefer the file whose stem matches the folder name
-	fs::path modelDir = folder / "model";
-	std::string mainModelPath;
-	std::string fallbackModelPath;
-	std::string folderName = folder.filename().string();
 	static const std::vector<std::string> modelExts = { ".fbx", ".obj", ".gltf", ".glb", ".dae" };
+	std::vector<std::string> modelPaths;
 
-	for (const auto& entry : fs::directory_iterator(modelDir))
+	for (const auto& entry : fs::directory_iterator(folder))
 	{
 		if (!entry.is_regular_file()) continue;
 		std::string ext = entry.path().extension().string();
 		std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
 		if (std::find(modelExts.begin(), modelExts.end(), ext) == modelExts.end()) continue;
-
-		if (entry.path().stem().string() == folderName)
-			mainModelPath = entry.path().string();
-		else if (fallbackModelPath.empty())
-			fallbackModelPath = entry.path().string();
+		modelPaths.push_back(entry.path().string());
+		std::cout << "[Mesh] loadFromFolder: model: " << entry.path().string() << std::endl;
 	}
 
-	if (mainModelPath.empty())
-		mainModelPath = fallbackModelPath;
-
-	if (mainModelPath.empty())
+	if (modelPaths.empty())
 	{
-		std::cout << "[Mesh] loadFromFolder: no model file found in " << modelDir << std::endl;
+		std::cout << "[Mesh] loadFromFolder: no model files found in " << folderPath << std::endl;
 		return;
 	}
 
-	std::cout << "[Mesh] loadFromFolder: model: " << mainModelPath << std::endl;
-	assimpLoad(mainModelPath, true);
+	for (const auto& modelPath : modelPaths)
+		assimpLoad(modelPath, true);
 
 	// load animations
 	fs::path animDir = folder / "animations";
@@ -390,41 +380,23 @@ void Mesh::LoadTexture(aiMaterial* mat, aiTextureType textureType, std::string p
 	}
 	std::cout << "[LoadTexture] raw path: " << texturePath.C_Str() << " | filename: " << textureFileName << std::endl;
 
-	//search for diffuse, normal, roughness
-	aiTexture* embeddedTexture = nullptr;
-	for (unsigned int i = 0; i < m_scene->mNumTextures; i++)
-	{
-		std::string embeddedName = m_scene->mTextures[i]->mFilename.C_Str();
-		size_t lastSlash2 = embeddedName.find_last_of("/\\");
+	const aiTexture* embeddedTexture = m_scene->GetEmbeddedTexture(texturePath.C_Str());
 
-		if (lastSlash2 != std::string::npos)
-		{
-			embeddedName = embeddedName.substr(lastSlash2 + 1);
-		}
-
-		if (embeddedName == textureFileName)
-		{
-			embeddedTexture = m_scene->mTextures[i];
-			break;
-		}
-	}
-
-	//Is there an embedded texture?
-	if (embeddedTexture)
+	if (embeddedTexture && embeddedTexture->pcData != nullptr)
 	{
 		if (embeddedTexture->mHeight == 0)
 		{
 			switch (textureType)
 			{
 			case aiTextureType_DIFFUSE:
-				SetDiffuseTextureMemory(embeddedTexture);
+				SetDiffuseTextureMemory(const_cast<aiTexture*>(embeddedTexture));
 				break;
 			case aiTextureType_NORMALS:
 				break;
 			}
 		}
 	}
-	else //otherwise load from file
+	else //load from file
 	{
 		std::filesystem::path texDir = m_texturesFolder.empty()
 			? std::filesystem::path(path).parent_path()
