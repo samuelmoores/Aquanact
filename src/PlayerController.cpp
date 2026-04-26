@@ -1,20 +1,7 @@
 #include "PlayerController.h"
+#include "Physics.h"
+#include "MathUtils.h"
 #include "Engine.h"
-
-static bool AABBIntersect(const glm::vec3& minA, const glm::vec3& maxA, const glm::vec3& minB, const glm::vec3& maxB)
-{
-	return (minA.x <= maxB.x && maxA.x >= minB.x)
-		&& (minA.y <= maxB.y && maxA.y >= minB.y)
-		&& (minA.z <= maxB.z && maxA.z >= minB.z);
-}
-
-static float ShortestAngleDelta(float from, float to)
-{
-	float delta = to - from;
-	while (delta >  glm::pi<float>()) delta -= glm::two_pi<float>();
-	while (delta < -glm::pi<float>()) delta += glm::two_pi<float>();
-	return delta;
-}
 
 PlayerController::PlayerController(std::vector<Object3D*> objects)
 	: m_objects(std::move(objects)) {}
@@ -47,14 +34,12 @@ void PlayerController::Update()
 		movement = glm::normalize(moveDir) * moveSpeed * Engine::DeltaFrameTime();
 
 	Mesh* playerMesh = m_objects[0]->GetMesh();
-	glm::vec3 nextMin = playerMesh->minBounds() + movement;
-	glm::vec3 nextMax = playerMesh->maxBounds() + movement;
 
 	bool collided = false;
 	for (int i = 1; i < (int)m_objects.size() - 1; i++)
 	{
 		Mesh* wallMesh = m_objects[i]->GetMesh();
-		if (AABBIntersect(nextMin, nextMax, wallMesh->minBounds(), wallMesh->maxBounds()))
+		if (Physics::SweepAABB(playerMesh->minBounds(), playerMesh->maxBounds(), movement, wallMesh->minBounds(), wallMesh->maxBounds()))
 		{
 			collided = true;
 			break;
@@ -74,7 +59,7 @@ void PlayerController::Update()
 	if (m_blendRot)
 	{
 		const float speed = 15.0f;
-		float delta = ShortestAngleDelta(m_currRot, m_nextRot);
+		float delta = MathUtils::ShortestAngleDelta(m_currRot, m_nextRot);
 		float t     = 1.0f - exp(-speed * Engine::DeltaFrameTime());
 		m_currRot  += delta * t;
 		if (fabs(delta) < glm::radians(0.5f))
