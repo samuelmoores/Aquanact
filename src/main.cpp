@@ -1,36 +1,23 @@
-﻿#include <iostream>
+#include <iostream>
 #include <chrono>
 #include <glad/glad.h>
 #include <Engine.h>
+#include "PlayerController.h"
 
-void AquanactLoop()
-{
-	Engine::Tick();
-	//std::cout << "fps: " << 1.0f/Engine::DeltaFrameTime() << std::endl;
-
-	Engine::Input->Loop();
-	//Gameplay logic here
-	Engine::Renderer->Loop();
-}
-
-void Shutdown()
-{
-	glfwTerminate();
-}
-
-int main() 
+int main()
 {
 	Engine::Init();
-	Engine::Input->SetObjects();
+	PlayerController playerController(Engine::Level->Objects());
 	Engine::Camera->SetObjects();
 
 	while (Engine::Running())
 	{
-		AquanactLoop();
+		Engine::Tick();
+		Engine::Input->Loop();
+		playerController.Update();
+		Engine::Renderer->Loop();
 	}
 
-	Shutdown();
+	glfwTerminate();
 	return 0;
 }
-
-
