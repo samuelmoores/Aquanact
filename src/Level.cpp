@@ -16,7 +16,7 @@ void Level::Load()
 	m_axis = Axis(1000.0f, 100.0f);
 
     //Player
-    std::string filepathString = "assets/Sentinal";
+    std::string filepathString = "assets/Tom";
     char* filepath = filepathString.data();
     LoadObject(filepath);
     Mesh* mesh = objects[0]->GetMesh();

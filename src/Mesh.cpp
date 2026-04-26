@@ -367,8 +367,22 @@ void Mesh::LoadTexture(aiMaterial* mat, aiTextureType textureType, std::string p
 {
 	aiString texturePath;
 
-	//for each diffuse, normal, roughness...
-	mat->GetTexture(textureType, 0, &texturePath);
+	// OpenPBR/PBR materials store base color under BASE_COLOR, not DIFFUSE
+	aiReturn result = mat->GetTexture(textureType, 0, &texturePath);
+	if (result != AI_SUCCESS && textureType == aiTextureType_DIFFUSE)
+		result = mat->GetTexture(aiTextureType_BASE_COLOR, 0, &texturePath);
+
+	if (result != AI_SUCCESS || texturePath.length == 0)
+	{
+		std::cout << "[LoadTexture] no texture found for type " << textureType << " — dumping material properties:" << std::endl;
+		for (unsigned int p = 0; p < mat->mNumProperties; p++)
+		{
+			aiMaterialProperty* prop = mat->mProperties[p];
+			std::cout << "  [" << p << "] key=" << prop->mKey.C_Str()
+				<< " type=" << prop->mType << " index=" << prop->mIndex << std::endl;
+		}
+		return;
+	}
 
 	std::string textureFileName = texturePath.C_Str();
 

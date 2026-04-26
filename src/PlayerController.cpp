@@ -28,7 +28,7 @@ void PlayerController::Update()
 	m_wasMoving = isMoving;
 
 	// Movement + collision
-	const float moveSpeed = 250.0f;
+	const float moveSpeed = 500.0f;
 	glm::vec3 movement(0.0f);
 	if (isMoving)
 		movement = glm::normalize(moveDir) * moveSpeed * Engine::DeltaFrameTime();
