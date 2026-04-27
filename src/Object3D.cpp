@@ -1,5 +1,7 @@
 #include "Engine.h"
 #include "Object3D.h"
+#include "Animator.h"
+#include "Animation.h"
 #include <iomanip>
 
 void printMatrix(const glm::mat4& m) {
@@ -47,17 +49,14 @@ Object3D::Object3D(char modelFile[])
 {
 	m_mesh = new Mesh(modelFile);
 	m_skinned = m_mesh->Skinned();
-	m_blendFactor = 1.0f;
+	m_animator = nullptr;
 
-
-	//  | Description      | Values: ambient,diffuse,specular,shin |
-	//	| ---------------- | ------------------------------------- |
-	//	| Matte surface    | `glm::vec4(0.3f, 0.7f, 0.1f, 8.0f)`   |
-	//	| Shiny surface    | `glm::vec4(0.1f, 0.5f, 1.0f, 128.0f)` |
-	//	| Full bright test | `glm::vec4(1.0f, 1.0f, 1.0f, 1.0f)`   |
-	//	| Only diffuse     | `glm::vec4(0.0f, 1.0f, 0.0f, 1.0f)`   |
-	//	| Only specular    | `glm::vec4(0.0f, 0.0f, 1.0f, 64.0f)`  |
-	//  | Fabric surface   | `glm::vec4(0.2f, 0.7f, 0.1f, 8.0f)`   |
+	if (m_skinned)
+	{
+		m_animator = new Animator(m_mesh->GetRootNode(), m_mesh->GetSkeletonPtr());
+		for (int i = 0; i < m_mesh->NumAnimations(); i++)
+			m_animator->AddClip(new Animation(m_mesh->GetAnimation(i)));
+	}
 
 	m_shader.load("shaders/phong.vert", "shaders/phong.frag");
 
@@ -69,9 +68,7 @@ Object3D::Object3D(char modelFile[])
 
 	size_t lastSlash = m_name.find_last_of("/\\");
 	if (lastSlash != std::string::npos)
-	{
 		m_name = m_name.substr(lastSlash + 1);
-	}
 }
 
 Object3D::~Object3D()
@@ -81,6 +78,11 @@ Object3D::~Object3D()
 Mesh* Object3D::GetMesh()
 {
 	return m_mesh;
+}
+
+Animator* Object3D::GetAnimator()
+{
+	return m_animator;
 }
 
 ShaderProgram* Object3D::GetShader()
@@ -142,21 +144,6 @@ glm::vec3 Object3D::Rotation()
 void Object3D::SetRotation(glm::vec3 newRotation)
 {
 	m_rotation = newRotation;
-}
-
-float Object3D::BlendFactor()
-{
-	return m_blendFactor;
-}
-
-void Object3D::IncBlendFactor(float delta)
-{
-	m_blendFactor += delta;
-}
-
-void Object3D::StartAnimBlend()
-{
-	m_blendFactor = 0.0f;
 }
 
 void Object3D::Scale(glm::vec3 delta)

@@ -93,9 +93,6 @@ void Renderer::Flush(Camera* camera)
 	commands.clear();
 }
 
-
-float blendFactor = 0.0f;
-
 void Renderer::Loop()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -107,27 +104,8 @@ void Renderer::Loop()
 	//only loops through the objects of one default level
 	for (int i = 0; i < objects.size(); i++)
 	{
-		// before submitting the render command, check if object should be animated
-		if (objects[i]->skinned())
-		{
-			//hack, when new anim starts, blend factor is set to 0
-			//ideally, if skinned -> RunAnim(), deal with blending inside anim class
-			if (objects[i]->BlendFactor() < 1.0f)
-			{
-				int nextAnim = objects[i]->GetMesh()->GetNextAnim();
-				objects[i]->IncBlendFactor(Engine::DeltaFrameTime() * 3.0f);
-				objects[i]->GetMesh()->BlendAnimation(nextAnim, Engine::TimeElapsed(), objects[i]->BlendFactor());
-
-				if (objects[i]->BlendFactor() >= 1.0f)
-				{
-					objects[i]->GetMesh()->SetCurrentAnim(nextAnim);
-				}
-			}
-			else
-			{
-				objects[i]->GetMesh()->RunAnimation(Engine::TimeElapsed());
-			}
-		}
+		if (objects[i]->GetAnimator())
+			objects[i]->GetAnimator()->Update(Engine::DeltaFrameTime());
 
 		RenderCommand rc;
 		rc.mesh = objects[i]->GetMesh();

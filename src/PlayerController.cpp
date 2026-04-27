@@ -20,15 +20,9 @@ void PlayerController::Update()
 
 	// Animation transitions
 	if (!m_wasMoving && isMoving)
-	{
-		m_objects[0]->GetMesh()->SetNextAnim(1);
-		m_objects[0]->StartAnimBlend();
-	}
+		m_objects[0]->GetAnimator()->Play(1);
 	if (m_wasMoving && !isMoving)
-	{
-		m_objects[0]->GetMesh()->SetNextAnim(0);
-		m_objects[0]->StartAnimBlend();
-	}
+		m_objects[0]->GetAnimator()->Play(0);
 	m_wasMoving = isMoving;
 
 	// Movement + collision

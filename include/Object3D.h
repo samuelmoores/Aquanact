@@ -2,7 +2,7 @@
 #include <glm/glm.hpp>
 #include <Mesh.h>
 #include <ShaderProgram.h>
-#include <Animation.h>
+#include <Animator.h>
 
 
 
@@ -13,6 +13,7 @@ public:
 	~Object3D();
 	Mesh* GetMesh();
 	ShaderProgram* GetShader();
+	Animator* GetAnimator();
 	glm::mat4 BuildModelMatrix();
 	void Rotate(glm::vec3 delta);
 	void Move(glm::vec3 delta);
@@ -25,9 +26,6 @@ public:
 	glm::vec3 Position();
 	glm::vec3 Rotation();
 	void SetRotation(glm::vec3 newRotation);
-	float BlendFactor();
-	void IncBlendFactor(float delta);
-	void StartAnimBlend();
 
 	//primitives
 
@@ -95,16 +93,13 @@ public:
 		20,22,23
 	};
 
-	//line
-
 private:
 	Mesh* m_mesh;
+	Animator* m_animator;
 	ShaderProgram m_shader;
 	glm::vec3 m_position;
 	glm::vec3 m_rotation;
 	glm::vec3 m_scale;
 	bool m_skinned;
 	std::string m_name;
-	float m_blendFactor;
-	std::vector<Animation*> m_animations;
 };
