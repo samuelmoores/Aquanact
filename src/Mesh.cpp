@@ -109,6 +109,8 @@ Mesh::Mesh(char modelFile[])
 		}
 	}
 
+	BuildAnimChannelMaps();
+
 	//debug skeleton code
 	if (false)
 	{
@@ -315,6 +317,7 @@ void Mesh::fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, s
 	{
 		m_animations.push_back(m_scene->mAnimations[i]);
 	}
+	BuildAnimChannelMaps();
 
 	m_totalVertices += numVertices;
 	m_skeleton.boneMapping = boneMap;
@@ -544,16 +547,30 @@ void Mesh::BlendAnimation(int nextAnim, float animTime, float blendFactor)
 	ReadNodeHeirarchyBlend(blendFactor, animTimeTicks_Start, animTimeTicks_End, m_scene->mRootNode, I, startAnim, endAnim, nextAnim);
 
 }
+void Mesh::BuildAnimChannelMaps()
+{
+	m_animChannelMaps.clear();
+	m_animChannelMaps.resize(m_animations.size());
+	for (int a = 0; a < (int)m_animations.size(); a++)
+	{
+		auto& map = m_animChannelMaps[a];
+		const aiAnimation* anim = m_animations[a];
+		for (unsigned int i = 0; i < anim->mNumChannels; i++)
+			map[anim->mChannels[i]->mNodeName.C_Str()] = anim->mChannels[i];
+	}
+}
+
 const aiNodeAnim* Mesh::FindNodeAnim(const aiAnimation* pAnimation, const std::string& NodeName)
 {
-	for (int i = 0; i < pAnimation->mNumChannels; i++) {
-		const aiNodeAnim* pNodeAnim = pAnimation->mChannels[i];
-
-		if (std::string(pNodeAnim->mNodeName.data) == NodeName) {
-			return pNodeAnim;
+	// find which index this animation is at so we can use the pre-built map
+	for (int a = 0; a < (int)m_animations.size(); a++)
+	{
+		if (m_animations[a] == pAnimation)
+		{
+			auto it = m_animChannelMaps[a].find(NodeName);
+			return it != m_animChannelMaps[a].end() ? it->second : nullptr;
 		}
 	}
-
 	return nullptr;
 }
 aiMatrix4x4 CreateScalingMatrix(const aiVector3D& scale)
@@ -595,7 +612,7 @@ int Mesh::FindPosition(float AnimationTimeTicks, const aiNodeAnim* pNodeAnim)
 		}
 	}
 
-	return 0;
+	return pNodeAnim->mNumPositionKeys - 2;
 }
 void Mesh::CalcInterpolatedPosition(aiVector3D& Out, float AnimationTimeTicks, const aiNodeAnim* pNodeAnim)
 {
@@ -656,16 +673,16 @@ int Mesh::FindScaling(float AnimationTimeTicks, const aiNodeAnim* pNodeAnim)
 {
 	assert(pNodeAnim->mNumScalingKeys > 0);
 
-	for (int i = 0; i < pNodeAnim->mNumScalingKeys - 1; i++) 
+	for (int i = 0; i < pNodeAnim->mNumScalingKeys - 1; i++)
 	{
 		float t = (float)pNodeAnim->mScalingKeys[i + 1].mTime;
-		if (AnimationTimeTicks < t) 
+		if (AnimationTimeTicks < t)
 		{
 			return i;
 		}
 	}
 
-	return 0;
+	return pNodeAnim->mNumScalingKeys - 2;
 }
 void Mesh::CalcInterpolatedScaling(aiVector3D& Out, float AnimationTimeTicks, const aiNodeAnim* pNodeAnim)
 {
