@@ -1,5 +1,7 @@
 #include "Level.h"
 #include "Engine.h"
+#include <filesystem>
+#include <algorithm>
 
 Level::Level()
 {
@@ -47,10 +49,26 @@ void Level::DrawAxis()
 
 void Level::LoadObject(char filepath[])
 {
-    Object3D* object = new Object3D(filepath);
+    namespace fs = std::filesystem;
+    static const std::vector<std::string> modelExts = { ".fbx", ".obj", ".gltf", ".glb", ".dae" };
 
-	objects.push_back(object);
+    if (fs::is_directory(filepath))
+    {
+        for (const auto& entry : fs::directory_iterator(filepath))
+        {
+            if (!entry.is_regular_file()) continue;
+            std::string ext = entry.path().extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+            if (std::find(modelExts.begin(), modelExts.end(), ext) == modelExts.end()) continue;
 
+            std::string modelPath = entry.path().string();
+            objects.push_back(new Object3D(modelPath.data()));
+        }
+    }
+    else
+    {
+        objects.push_back(new Object3D(filepath));
+    }
 }
 
 void Level::SetDrawAxis(bool drawAxis)

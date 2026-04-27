@@ -79,12 +79,35 @@ Mesh::Mesh(char modelFile[])
 	m_currVao = 0;
 	m_currTextureColor = 0;
 
-	if (std::filesystem::is_directory(modelFile))
-		loadFromFolder(modelFile);
-	else
-		assimpLoad(modelFile, true);
+	assimpLoad(modelFile, true);
 	m_currentAnim = 0;
 	m_nextAnim = 1;
+
+	// load animations from sibling animations/ folder
+	namespace fs = std::filesystem;
+	fs::path animDir = fs::path(modelFile).parent_path() / "animations";
+	if (fs::exists(animDir) && fs::is_directory(animDir))
+	{
+		static const std::vector<std::string> modelExts = { ".fbx", ".obj", ".gltf", ".glb", ".dae" };
+		for (const auto& entry : fs::directory_iterator(animDir))
+		{
+			if (!entry.is_regular_file()) continue;
+			std::string ext = entry.path().extension().string();
+			std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+			if (std::find(modelExts.begin(), modelExts.end(), ext) == modelExts.end()) continue;
+
+			std::string animPath = entry.path().string();
+			std::cout << "[Mesh] loading animation: " << animPath << std::endl;
+
+			auto& imp = m_animImporters.emplace_back(std::make_unique<Assimp::Importer>());
+			const aiScene* animScene = imp->ReadFile(animPath, aiProcess_Triangulate);
+			if (animScene)
+			{
+				for (unsigned int i = 0; i < animScene->mNumAnimations; i++)
+					m_animations.push_back(animScene->mAnimations[i]);
+			}
+		}
+	}
 
 	//debug skeleton code
 	if (false)
@@ -112,82 +135,17 @@ Mesh::Mesh(char modelFile[])
 		}
 	}
 
-	m_minBounds = glm::vec3(FLT_MAX);
-	m_maxBounds = glm::vec3(-FLT_MAX);
+	
 
-	for (int i = 0; i < m_vertices.size(); i++)
-	{
-		//find max and min positions
-		const glm::vec3& pos = m_vertices[i].position;
-
-		m_minBounds.x = std::min(m_minBounds.x, pos.x);
-		m_minBounds.y = std::min(m_minBounds.y, pos.y);
-		m_minBounds.z = std::min(m_minBounds.z, pos.z);
-
-		m_maxBounds.x = std::max(m_maxBounds.x, pos.x);
-		m_maxBounds.y = std::max(m_maxBounds.y, pos.y);
-		m_maxBounds.z = std::max(m_maxBounds.z, pos.z);
-	}
-
-	m_meshMinBounds = m_minBounds;
-	m_meshMaxBounds = m_maxBounds;
+	
 }
 
 //loading
-void Mesh::loadFromFolder(const std::string& folderPath)
-{
-	namespace fs = std::filesystem;
-	fs::path folder(folderPath);
-
-	m_texturesFolder = folder.string();
-
-	static const std::vector<std::string> modelExts = { ".fbx", ".obj", ".gltf", ".glb", ".dae" };
-	std::vector<std::string> modelPaths;
-
-	for (const auto& entry : fs::directory_iterator(folder))
-	{
-		if (!entry.is_regular_file()) continue;
-		std::string ext = entry.path().extension().string();
-		std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-		if (std::find(modelExts.begin(), modelExts.end(), ext) == modelExts.end()) continue;
-		modelPaths.push_back(entry.path().string());
-		std::cout << "[Mesh] loadFromFolder: model: " << entry.path().string() << std::endl;
-	}
-
-	if (modelPaths.empty())
-	{
-		std::cout << "[Mesh] loadFromFolder: no model files found in " << folderPath << std::endl;
-		return;
-	}
-
-	for (const auto& modelPath : modelPaths)
-		assimpLoad(modelPath, true);
-
-	// load animations
-	fs::path animDir = folder / "animations";
-	if (!fs::exists(animDir)) return;
-
-	for (const auto& entry : fs::directory_iterator(animDir))
-	{
-		if (!entry.is_regular_file()) continue;
-		std::string ext = entry.path().extension().string();
-		std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-		if (std::find(modelExts.begin(), modelExts.end(), ext) == modelExts.end()) continue;
-
-		std::string animPath = entry.path().string();
-		std::cout << "[Mesh] loadFromFolder: animation: " << animPath << std::endl;
-
-		auto& imp = m_animImporters.emplace_back(std::make_unique<Assimp::Importer>());
-		const aiScene* animScene = imp->ReadFile(animPath, aiProcess_Triangulate);
-		if (animScene)
-		{
-			for (unsigned int i = 0; i < animScene->mNumAnimations; i++)
-				m_animations.push_back(animScene->mAnimations[i]);
-		}
-	}
-}
 void Mesh::assimpLoad(const std::string& path, bool flipUvs)
 {
+	m_minBounds = glm::vec3(FLT_MAX);
+	m_maxBounds = glm::vec3(-FLT_MAX);
+
 	int flags = (aiPostProcessSteps)aiProcessPreset_TargetRealtime_MaxQuality;
 	
 	if (flipUvs) 
@@ -249,6 +207,23 @@ void Mesh::assimpLoad(const std::string& path, bool flipUvs)
 		//================== Materials =================================
 
 		//LoadTexture(mat, aiTextureType_NORMALS, path);
+
+		for (int i = 0; i < m_vertices.size(); i++)
+		{
+			//find max and min positions
+			const glm::vec3& pos = m_vertices[i].position;
+
+			m_minBounds.x = std::min(m_minBounds.x, pos.x);
+			m_minBounds.y = std::min(m_minBounds.y, pos.y);
+			m_minBounds.z = std::min(m_minBounds.z, pos.z);
+
+			m_maxBounds.x = std::max(m_maxBounds.x, pos.x);
+			m_maxBounds.y = std::max(m_maxBounds.y, pos.y);
+			m_maxBounds.z = std::max(m_maxBounds.z, pos.z);
+		}
+
+		m_meshMinBounds = m_minBounds;
+		m_meshMaxBounds = m_maxBounds;
 		
 	}
 }

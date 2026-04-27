@@ -11,6 +11,7 @@ class Line {
 public:
 	Line();
 	Line(glm::vec3 minBounds, glm::vec3 maxBounds);
+	Line(std::vector<LineVertex3D> verts);
 	void UpdateProjection(glm::mat4 projectionMatrix);
 	void draw(glm::mat4 viewMatrix);
 private:

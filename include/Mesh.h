@@ -42,7 +42,6 @@ class Mesh {
 		Mesh(char modelFile[]);
 		
 		//loading
-		void loadFromFolder(const std::string& folderPath);
 		void assimpLoad(const std::string& path, bool flipUvs);
 		void fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, std::vector<uint32_t>& faces);
 		void ReadNodeHeirarchy(const aiNode* node, const aiMatrix4x4& ParentTransform);

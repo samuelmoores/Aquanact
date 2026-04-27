@@ -8,6 +8,7 @@ class PlayerController {
 public:
 	PlayerController(std::vector<Object3D*> objects);
 	void Update();
+	void DrawCapsule();
 
 private:
 	std::vector<Object3D*> m_objects;

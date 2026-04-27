@@ -61,6 +61,29 @@ Line::Line(glm::vec3 minBounds, glm::vec3 maxBounds) :m_vao(-1), m_vbo(-1)
 	m_shader.setUniform("projection", glm::perspective(glm::radians(45.0f), static_cast<float>(1200) / 800, 0.1f, 1000.0f));
 }
 
+Line::Line(std::vector<LineVertex3D> verts) : m_vao(-1), m_vbo(-1)
+{
+	m_vertices = std::move(verts);
+
+	glGenVertexArrays(1, &m_vao);
+	glGenBuffers(1, &m_vbo);
+
+	glBindVertexArray(m_vao);
+	glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
+	glBufferData(GL_ARRAY_BUFFER, m_vertices.size() * sizeof(LineVertex3D), m_vertices.data(), GL_STATIC_DRAW);
+
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(LineVertex3D), (void*)0);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(LineVertex3D), (void*)12);
+	glEnableVertexAttribArray(1);
+
+	glBindVertexArray(0);
+
+	m_shader.load("shaders/vertexColor.vert", "shaders/vertexColor.frag");
+	m_shader.activate();
+	m_shader.setUniform("projection", glm::perspective(glm::radians(45.0f), static_cast<float>(1200) / 800, 0.1f, 1000.0f));
+}
+
 void Line::UpdateProjection(glm::mat4 projectionMatrix)
 {
 	m_shader.activate();

@@ -48,6 +48,7 @@ void Engine::Tick()
     float diffTimeSec = diffTime.count();
     m_prevFrameTime = currTime;
     m_deltaFrameTime = diffTimeSec;
+    std::cout << "fps: " << 1 / diffTimeSec << std::endl;
 }
 
 void Engine::ToggleAxis()
