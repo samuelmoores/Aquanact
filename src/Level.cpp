@@ -1,5 +1,6 @@
 #include "Level.h"
 #include "Engine.h"
+#include "Audio.h"
 #include <filesystem>
 #include <algorithm>
 
@@ -36,6 +37,13 @@ void Level::Load()
     filepathString = "assets/Floor";
     filepath = filepathString.data();
     LoadObject(filepath);
+
+    Audio::PlayMusic("assets/sounds/music/TheMole.mp3");
+    Audio::LoadSound("footstep", "assets/sounds/sfx/Footstep_01.wav");
+
+    Animator* playerAnimator = objects[0]->GetAnimator();
+    playerAnimator->AddEvent(1, 5.0f, [] { Audio::PlaySound("footstep", 50.0f); });
+    playerAnimator->AddEvent(1, 15.0f, [] { Audio::PlaySound("footstep", 50.0f); });
 }
 
 void Level::DrawAxis()

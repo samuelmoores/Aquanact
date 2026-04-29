@@ -38,6 +38,27 @@ void Animator::Play(int clipIndex)
 	m_blendFactor = 0.0f;
 }
 
+void Animator::AddEvent(int clipIndex, float tickTime, std::function<void()> callback)
+{
+	m_events.push_back({ clipIndex, tickTime, std::move(callback) });
+}
+
+void Animator::FireEvents(int clipIndex, float prevTicks, float currTicks, float duration)
+{
+	for (auto& e : m_events) {
+		if (e.clipIndex != clipIndex) continue;
+		// Normal advance: prev < curr
+		if (prevTicks <= currTicks) {
+			if (e.tickTime > prevTicks && e.tickTime <= currTicks)
+				e.callback();
+		} else {
+			// Loop wrap: fire if in [prev, duration) or [0, curr]
+			if (e.tickTime > prevTicks || e.tickTime <= currTicks)
+				e.callback();
+		}
+	}
+}
+
 void Animator::Update(float dt)
 {
 	if (m_clips.empty()) return;
@@ -56,12 +77,16 @@ void Animator::Update(float dt)
 		float ticksA = fmodf(m_currentTime * a->TicksPerSecond(), a->Duration());
 		float ticksB = fmodf(m_currentTime * b->TicksPerSecond(), b->Duration());
 		TraverseBlend(ticksA, ticksB, m_blendFactor, m_rootNode, aiMatrix4x4(), a, b);
+		FireEvents(m_nextClip, m_prevTicks, ticksB, b->Duration());
+		m_prevTicks = ticksB;
 	}
 	else
 	{
 		Animation* a = m_clips[m_currentClip].get();
 		float ticks = fmodf(m_currentTime * a->TicksPerSecond(), a->Duration());
 		Traverse(ticks, m_rootNode, aiMatrix4x4(), a);
+		FireEvents(m_currentClip, m_prevTicks, ticks, a->Duration());
+		m_prevTicks = ticks;
 	}
 }
 

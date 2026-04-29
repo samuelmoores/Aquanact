@@ -76,9 +76,14 @@ void Renderer::Flush(Camera* camera)
 		for (int j = 0; j < numBuffs; j++)
 		{
 			const SubMeshMaterial& mat = commands[i].mesh->GetMaterial(j);
+
+			SubMeshMaterial newMat = commands[i].mesh->GetMaterial(j);
+			newMat.directionalColor.z = 1.0f;
+
+			newMat.ambientColor.x = 1.0f;
 			commands[i].shader->setUniform("material", mat.phong);
 			commands[i].shader->setUniform("ambientColor", mat.ambientColor);
-			commands[i].shader->setUniform("directionalColor", mat.directionalColor);
+			commands[i].shader->setUniform("directionalColor", newMat.directionalColor);
 			commands[i].shader->setUniform("directionalLight", mat.directionalLight);
 
 			commands[i].mesh->Bind();
