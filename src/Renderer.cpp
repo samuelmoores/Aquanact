@@ -5,6 +5,16 @@ void Renderer::Submit(const RenderCommand& command)
 	commands.push_back(command);
 }
 
+void Renderer::AddPointLight(const PointLight& light)
+{
+	m_pointLights.push_back(light);
+}
+
+void Renderer::ClearPointLights()
+{
+	m_pointLights.clear();
+}
+
 glm::mat4 AiToGlm(const aiMatrix4x4& aiMat)
 {
 	glm::mat4 result;
@@ -72,19 +82,24 @@ void Renderer::Flush(Camera* camera)
 			commands[i].shader->setUniform("finalBones", glmTransforms);
 		}
 
+		commands[i].shader->setUniform("numPointLights", (int32_t)m_pointLights.size());
+		for (int k = 0; k < (int)m_pointLights.size(); k++)
+		{
+			std::string base = "pointLights[" + std::to_string(k) + "].";
+			commands[i].shader->setUniform(base + "position", m_pointLights[k].position);
+			commands[i].shader->setUniform(base + "color", m_pointLights[k].color);
+			commands[i].shader->setUniform(base + "constant", m_pointLights[k].constant);
+			commands[i].shader->setUniform(base + "linear", m_pointLights[k].linear);
+			commands[i].shader->setUniform(base + "quadratic", m_pointLights[k].quadratic);
+		}
+
 		int numBuffs = commands[i].mesh->NumBuffers();
 		for (int j = 0; j < numBuffs; j++)
 		{
 			const SubMeshMaterial& mat = commands[i].mesh->GetMaterial(j);
 
-			SubMeshMaterial newMat = commands[i].mesh->GetMaterial(j);
-			newMat.directionalColor.z = 1.0f;
-
-			newMat.ambientColor.x = 1.0f;
 			commands[i].shader->setUniform("material", mat.phong);
 			commands[i].shader->setUniform("ambientColor", mat.ambientColor);
-			commands[i].shader->setUniform("directionalColor", newMat.directionalColor);
-			commands[i].shader->setUniform("directionalLight", mat.directionalLight);
 
 			commands[i].mesh->Bind();
 			glDrawElements(GL_TRIANGLES, commands[i].mesh->FacesSize(), GL_UNSIGNED_INT, 0);

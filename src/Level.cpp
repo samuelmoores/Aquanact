@@ -18,6 +18,11 @@ void Level::Load()
 {
 	m_axis = Axis(1000.0f, 100.0f);
 
+    PointLight pl;
+    pl.position = glm::vec3(0.0f, 350.0f, 0.0f);
+    pl.color = glm::vec3(1.0f, 0.9f, 0.8f);
+    Engine::Renderer->AddPointLight(pl);
+
     //Player
     std::string filepathString = "assets/Tom";
     char* filepath = filepathString.data();
@@ -44,6 +49,7 @@ void Level::Load()
     Animator* playerAnimator = objects[0]->GetAnimator();
     playerAnimator->AddEvent(1, 5.0f, [] { Audio::PlaySound("footstep", 50.0f); });
     playerAnimator->AddEvent(1, 15.0f, [] { Audio::PlaySound("footstep", 50.0f); });
+
 }
 
 void Level::DrawAxis()

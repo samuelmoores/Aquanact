@@ -1,5 +1,6 @@
 #pragma once
 #include <glad/glad.h>
+#include "Light.h"
 #include "Mesh.h"
 #include "Camera.h"
 #include "Level.h"
@@ -17,6 +18,10 @@ public:
 	void Flush(Camera* camera);
 	void Loop();
 
+	void AddPointLight(const PointLight& light);
+	void ClearPointLights();
+
 private:
 	std::vector<RenderCommand> commands;
+	std::vector<PointLight> m_pointLights;
 };

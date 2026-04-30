@@ -14,10 +14,21 @@ uniform bool useNormalMap;
 
 uniform vec4 material;
 uniform vec3 ambientColor;
-uniform vec3 directionalLight;
-uniform vec3 directionalColor;
 uniform vec3 viewPos;
 uniform int bone;
+
+#define MAX_POINT_LIGHTS 8
+
+struct PointLight {
+	vec3 position;
+	vec3 color;
+	float constant;
+	float linear;
+	float quadratic;
+};
+
+uniform int numPointLights;
+uniform PointLight pointLights[MAX_POINT_LIGHTS];
 
 void main()
 {
@@ -36,21 +47,30 @@ void main()
 	vec3 ambientIntensity = material.x * ambientColor + 0.35;
 	vec3 diffuseIntensity = vec3(0);
 	vec3 specularIntensity = vec3(0);
-	
-	vec3 lightDir = -directionalLight;
-	float lambertFactor = dot(norm, normalize(lightDir));
 
-	if(lambertFactor > 0)
+	// Point lights
+	vec3 eyeDir = normalize(viewPos - FragWorldPos);
+	for (int i = 0; i < numPointLights; i++)
 	{
-		diffuseIntensity = material.y * directionalColor * lambertFactor;
+		vec3 toLight = pointLights[i].position - FragWorldPos;
+		float dist = length(toLight);
+		vec3 plDir = normalize(toLight);
 
-		vec3 eyeDir = normalize(viewPos - FragWorldPos);
-		vec3 reflectDir = normalize(reflect(-lightDir, norm));
-		float spec = dot(reflectDir, eyeDir);
+		float attenuation = 1.0 / (pointLights[i].constant
+			+ pointLights[i].linear * dist
+			+ pointLights[i].quadratic * dist * dist);
 
-		if(spec > 0)
+		float lambert = dot(norm, plDir);
+		if (lambert > 0)
 		{
-			specularIntensity = material.z * directionalColor * pow(spec, material.w);
+			diffuseIntensity += material.y * pointLights[i].color * lambert * attenuation;
+
+			vec3 reflectDir = normalize(reflect(-plDir, norm));
+			float spec = dot(reflectDir, eyeDir);
+			if (spec > 0)
+			{
+				specularIntensity += material.z * pointLights[i].color * pow(spec, material.w) * attenuation;
+			}
 		}
 	}
 

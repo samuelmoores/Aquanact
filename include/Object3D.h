@@ -27,6 +27,7 @@ public:
 	glm::vec3 Rotation();
 	void SetRotation(glm::vec3 newRotation);
 
+
 	//primitives
 
 	//cube
