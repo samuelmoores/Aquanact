@@ -1,5 +1,10 @@
 #include "Engine.h"
 
+void Renderer::Init()
+{
+	m_shadowMap = std::make_unique<ShadowMap>(2048);
+}
+
 void Renderer::Submit(const RenderCommand& command)
 {
 	commands.push_back(command);
@@ -82,6 +87,13 @@ void Renderer::Flush(Camera* camera)
 			commands[i].shader->setUniform("finalBones", glmTransforms);
 		}
 
+		if (m_shadowMap && !m_pointLights.empty())
+		{
+			m_shadowMap->BindTexture(2);
+			commands[i].shader->setUniform("shadowMap", (int32_t)2);
+			commands[i].shader->setUniform("shadowFarPlane", m_shadowMap->FarPlane());
+		}
+
 		commands[i].shader->setUniform("numPointLights", (int32_t)m_pointLights.size());
 		for (int k = 0; k < (int)m_pointLights.size(); k++)
 		{
@@ -134,6 +146,9 @@ void Renderer::Loop()
 		rc.isSkinned = objects[i]->skinned();
 		Submit(rc);
 	}
+	if (m_shadowMap && !m_pointLights.empty())
+		m_shadowMap->ShadowPass(commands, m_pointLights[0]);
+
 	Flush(Engine::Camera);
 	glfwSwapBuffers(Engine::Window->GLFW());
 	glfwPollEvents();

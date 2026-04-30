@@ -1,19 +1,16 @@
 #pragma once
 #include <glad/glad.h>
+#include <memory>
 #include "Light.h"
 #include "Mesh.h"
 #include "Camera.h"
 #include "Level.h"
-
-struct RenderCommand {
-	Mesh* mesh;
-	const ShaderProgram* shader;
-	glm::mat4 modelMatrix;
-	bool isSkinned;
-};
+#include "RenderCommand.h"
+#include "ShadowMap.h"
 
 class Renderer {
 public:
+	void Init();
 	void Submit(const RenderCommand& command);
 	void Flush(Camera* camera);
 	void Loop();
@@ -24,4 +21,5 @@ public:
 private:
 	std::vector<RenderCommand> commands;
 	std::vector<PointLight> m_pointLights;
+	std::unique_ptr<ShadowMap> m_shadowMap;
 };

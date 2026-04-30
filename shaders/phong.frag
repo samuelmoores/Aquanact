@@ -30,6 +30,33 @@ struct PointLight {
 uniform int numPointLights;
 uniform PointLight pointLights[MAX_POINT_LIGHTS];
 
+uniform samplerCube shadowMap;
+uniform float shadowFarPlane;
+
+vec3 shadowSampleOffsets[20] = vec3[](
+    vec3( 1,  1,  1), vec3( 1, -1,  1), vec3(-1, -1,  1), vec3(-1,  1,  1),
+    vec3( 1,  1, -1), vec3( 1, -1, -1), vec3(-1, -1, -1), vec3(-1,  1, -1),
+    vec3( 1,  1,  0), vec3( 1, -1,  0), vec3(-1, -1,  0), vec3(-1,  1,  0),
+    vec3( 1,  0,  1), vec3(-1,  0,  1), vec3( 1,  0, -1), vec3(-1,  0, -1),
+    vec3( 0,  1,  1), vec3( 0, -1,  1), vec3( 0, -1, -1), vec3( 0,  1, -1)
+);
+
+float PointShadow(vec3 fragPos, vec3 lightPos)
+{
+    vec3 toFrag = fragPos - lightPos;
+    float currentDepth = length(toFrag);
+    float bias = currentDepth * 0.005 + 0.5;
+    float shadow = 0.0;
+    float diskRadius = currentDepth * 0.003;
+    for (int i = 0; i < 20; ++i)
+    {
+        float closestDepth = texture(shadowMap, toFrag + shadowSampleOffsets[i] * diskRadius).r * shadowFarPlane;
+        if (currentDepth - bias > closestDepth)
+            shadow += 1.0;
+    }
+    return shadow / 20.0;
+}
+
 void main()
 {
 	vec3 norm;
@@ -48,7 +75,6 @@ void main()
 	vec3 diffuseIntensity = vec3(0);
 	vec3 specularIntensity = vec3(0);
 
-	// Point lights
 	vec3 eyeDir = normalize(viewPos - FragWorldPos);
 	for (int i = 0; i < numPointLights; i++)
 	{
@@ -63,13 +89,16 @@ void main()
 		float lambert = dot(norm, plDir);
 		if (lambert > 0)
 		{
-			diffuseIntensity += material.y * pointLights[i].color * lambert * attenuation;
+			float shadow = (i == 0) ? PointShadow(FragWorldPos, pointLights[i].position) : 0.0;
+			float lit = (1.0 - shadow);
+
+			diffuseIntensity += lit * material.y * pointLights[i].color * lambert * attenuation;
 
 			vec3 reflectDir = normalize(reflect(-plDir, norm));
 			float spec = dot(reflectDir, eyeDir);
 			if (spec > 0)
 			{
-				specularIntensity += material.z * pointLights[i].color * pow(spec, material.w) * attenuation;
+				specularIntensity += lit * material.z * pointLights[i].color * pow(spec, material.w) * attenuation;
 			}
 		}
 	}

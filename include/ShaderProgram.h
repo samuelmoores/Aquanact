@@ -11,6 +11,7 @@ class ShaderProgram {
 public:
 	ShaderProgram();
 	void load(const std::string& vertexShaderPath, const std::string& fragmentShaderPath);
+	void load(const std::string& vertexShaderPath, const std::string& geometryShaderPath, const std::string& fragmentShaderPath);
 
 	void activate() const;
 

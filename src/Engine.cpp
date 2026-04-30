@@ -20,6 +20,7 @@ Engine::Engine()
     Level = new ::Level();
     Input = new ::Input();
     gladLoadGL();
+    Renderer->Init();
     glfwSwapInterval(1);
     glEnable(GL_DEPTH_TEST);
     Level->Load();
@@ -48,7 +49,7 @@ void Engine::Tick()
     float diffTimeSec = diffTime.count();
     m_prevFrameTime = currTime;
     m_deltaFrameTime = diffTimeSec;
-    //std::cout << "fps: " << 1 / diffTimeSec << std::endl;
+    std::cout << "fps: " << 1 / diffTimeSec << std::endl;
 }
 
 void Engine::ToggleAxis()

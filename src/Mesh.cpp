@@ -14,7 +14,7 @@ void AddBoneData(Vertex3D& vertex, int boneID, float weight)
 {
 	for (int i = 0; i < 4; i++) 
 	{
-		if (vertex.boneIDs[i] == 0) 
+		if (vertex.boneIDs[i] == -1)
 		{
 			vertex.boneIDs[i] = boneID;
 			vertex.weights[i] = weight;

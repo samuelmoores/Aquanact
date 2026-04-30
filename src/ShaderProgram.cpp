@@ -88,6 +88,57 @@ void ShaderProgram::load(const std::string& vertexShaderPath, const std::string&
     glDeleteShader(fragment);
 }
 
+void ShaderProgram::load(const std::string& vertexShaderPath, const std::string& geometryShaderPath, const std::string& fragmentShaderPath)
+{
+    std::string vertexCode, geometryCode, fragmentCode;
+    try
+    {
+        auto readFile = [](const std::string& path) {
+            std::ifstream file;
+            file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+            file.open(path);
+            std::stringstream ss;
+            ss << file.rdbuf();
+            return ss.str();
+        };
+        vertexCode   = readFile(vertexShaderPath);
+        geometryCode = readFile(geometryShaderPath);
+        fragmentCode = readFile(fragmentShaderPath);
+    }
+    catch (std::ifstream::failure&)
+    {
+        throw std::runtime_error("Failed to locate shader files");
+    }
+
+    int success;
+    char infoLog[512];
+
+    auto compile = [&](GLenum type, const char* src) {
+        unsigned int id = glCreateShader(type);
+        glShaderSource(id, 1, &src, NULL);
+        glCompileShader(id);
+        glGetShaderiv(id, GL_COMPILE_STATUS, &success);
+        if (!success) { glGetShaderInfoLog(id, 512, NULL, infoLog); throw std::runtime_error(infoLog); }
+        return id;
+    };
+
+    unsigned int vert = compile(GL_VERTEX_SHADER,   vertexCode.c_str());
+    unsigned int geom = compile(GL_GEOMETRY_SHADER, geometryCode.c_str());
+    unsigned int frag = compile(GL_FRAGMENT_SHADER, fragmentCode.c_str());
+
+    m_programId = glCreateProgram();
+    glAttachShader(m_programId, vert);
+    glAttachShader(m_programId, geom);
+    glAttachShader(m_programId, frag);
+    glLinkProgram(m_programId);
+    glGetProgramiv(m_programId, GL_LINK_STATUS, &success);
+    if (!success) { glGetProgramInfoLog(m_programId, 512, NULL, infoLog); throw std::runtime_error(infoLog); }
+
+    glDeleteShader(vert);
+    glDeleteShader(geom);
+    glDeleteShader(frag);
+}
+
 void ShaderProgram::activate() const
 {
     glUseProgram(m_programId);
@@ -110,7 +161,7 @@ void ShaderProgram::setUniform(const std::string& uniformName, int32_t value) co
 
 void ShaderProgram::setUniform(const std::string& uniformName, float value) const
 {
-    glUniform1f(glGetUniformLocation(m_programId, uniformName.c_str()), (int)value);
+    glUniform1f(glGetUniformLocation(m_programId, uniformName.c_str()), value);
 }
 
 void ShaderProgram::setUniform(const std::string& uniformName, const glm::vec2& value) const

@@ -28,10 +28,10 @@ void main()
 
     mat4 BoneTransform = mat4(0.0);
 
-    BoneTransform = finalBones[BoneIDs[0]] * Weights[0];
-    BoneTransform     += finalBones[BoneIDs[1]] * Weights[1];
-    BoneTransform     += finalBones[BoneIDs[2]] * Weights[2];
-    BoneTransform     += finalBones[BoneIDs[3]] * Weights[3];
+    if (BoneIDs[0] >= 0) BoneTransform += finalBones[BoneIDs[0]] * Weights[0];
+    if (BoneIDs[1] >= 0) BoneTransform += finalBones[BoneIDs[1]] * Weights[1];
+    if (BoneIDs[2] >= 0) BoneTransform += finalBones[BoneIDs[2]] * Weights[2];
+    if (BoneIDs[3] >= 0) BoneTransform += finalBones[BoneIDs[3]] * Weights[3];
  
     vec4 PosL = vec4(vPosition, 1.0);
 

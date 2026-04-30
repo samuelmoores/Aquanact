@@ -16,7 +16,7 @@ struct Vertex3D {
 	glm::vec3 normal;     // offset 20 (3 floats)
 	glm::vec3 tangent;    // offset 32 (3 floats)
 
-	int boneIDs[4] = {0, 0, 0, 0};
+	int boneIDs[4] = {-1, -1, -1, -1};
 	float weights[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
 };
 

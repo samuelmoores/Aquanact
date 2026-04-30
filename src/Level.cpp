@@ -19,8 +19,11 @@ void Level::Load()
 	m_axis = Axis(1000.0f, 100.0f);
 
     PointLight pl;
-    pl.position = glm::vec3(0.0f, 350.0f, 0.0f);
-    pl.color = glm::vec3(1.0f, 0.9f, 0.8f);
+    pl.position  = glm::vec3(400.0f, 550.0f, 100.0f);
+    pl.color     = glm::vec3(1.0f, 0.9f, 0.8f);
+    pl.constant  = 1.0f;
+    pl.linear    = 0.001f;
+    pl.quadratic = 0.000007f;
     Engine::Renderer->AddPointLight(pl);
 
     //Player
