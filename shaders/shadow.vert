@@ -3,11 +3,12 @@ layout (location = 0) in vec3 vPosition;
 layout (location = 4) in ivec4 vBoneIDs;
 layout (location = 5) in vec4 vWeights;
 
+uniform mat4 shadowMatrix;
 uniform mat4 model;
 uniform bool skinned;
 uniform mat4 finalBones[200];
 
-out vec3 vWorldPos;
+out vec3 FragPos;
 
 void main()
 {
@@ -21,5 +22,7 @@ void main()
         if (vBoneIDs[3] >= 0) boneTransform += finalBones[vBoneIDs[3]] * vWeights[3];
         pos = boneTransform * pos;
     }
-    vWorldPos = vec3(model * pos);
+    vec4 worldPos = model * pos;
+    FragPos = vec3(worldPos);
+    gl_Position = shadowMatrix * worldPos;
 }

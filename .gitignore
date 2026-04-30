@@ -432,6 +432,7 @@ cmake-build-*/
 
 # IntelliJ
 out/
+build_web/
 
 # Editor-based Rest Client
 .idea/httpRequests

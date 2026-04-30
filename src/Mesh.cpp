@@ -2,7 +2,7 @@
 #include <filesystem>
 #include <Engine.h>
 #include <Mesh.h>
-#include <glad/glad.h>
+#include <GLHeaders.h>
 #include <stb_image.h>
 #include <Line.h>
 #include <algorithm>

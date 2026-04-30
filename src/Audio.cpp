@@ -1,6 +1,8 @@
 #include <Audio.h>
 #include <iostream>
 
+#ifndef __EMSCRIPTEN__
+
 std::unordered_map<std::string, sf::SoundBuffer> Audio::m_buffers;
 std::unordered_map<std::string, sf::Sound> Audio::m_sounds;
 sf::Music Audio::m_music;
@@ -12,7 +14,6 @@ void Audio::LoadSound(const std::string& name, const std::string& path) {
         return;
     }
 
-    //reset all existing sounds after any insertion, since the map may have rehashed
     for (auto& [n, sound] : m_sounds)
         sound.setBuffer(m_buffers[n]);
 
@@ -52,3 +53,14 @@ void Audio::StopMusic() {
 void Audio::SetMusicVolume(float volume) {
     m_music.setVolume(volume);
 }
+
+#else
+
+void Audio::LoadSound(const std::string&, const std::string&) {}
+void Audio::PlaySound(const std::string&, float) {}
+void Audio::StopSound(const std::string&) {}
+void Audio::PlayMusic(const std::string&, bool, float) {}
+void Audio::StopMusic() {}
+void Audio::SetMusicVolume(float) {}
+
+#endif

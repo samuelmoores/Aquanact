@@ -19,7 +19,9 @@ Engine::Engine()
     UI = new ::UI();
     Level = new ::Level();
     Input = new ::Input();
+#ifndef __EMSCRIPTEN__
     gladLoadGL();
+#endif
     Renderer->Init();
     glfwSwapInterval(1);
     glEnable(GL_DEPTH_TEST);

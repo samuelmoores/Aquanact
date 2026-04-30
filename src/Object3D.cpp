@@ -58,7 +58,11 @@ Object3D::Object3D(char modelFile[])
 			m_animator->AddClip(new Animation(m_mesh->GetAnimation(i)));
 	}
 
+#ifdef __EMSCRIPTEN__
+	m_shader.load("shaders/web/phong.vert", "shaders/web/phong.frag");
+#else
 	m_shader.load("shaders/phong.vert", "shaders/phong.frag");
+#endif
 
 	m_position = glm::vec3(0);
 	m_rotation = glm::vec3(0);

@@ -1,5 +1,5 @@
 #include "ShaderProgram.h"
-#include <glad/glad.h>
+#include <GLHeaders.h>
 #include <fstream>
 #include <sstream>
 #include <iostream>
@@ -90,6 +90,12 @@ void ShaderProgram::load(const std::string& vertexShaderPath, const std::string&
 
 void ShaderProgram::load(const std::string& vertexShaderPath, const std::string& geometryShaderPath, const std::string& fragmentShaderPath)
 {
+#ifdef __EMSCRIPTEN__
+    (void)vertexShaderPath;
+    (void)geometryShaderPath;
+    (void)fragmentShaderPath;
+    throw std::runtime_error("Geometry shaders are not supported by WebGL 2");
+#else
     std::string vertexCode, geometryCode, fragmentCode;
     try
     {
@@ -137,6 +143,7 @@ void ShaderProgram::load(const std::string& vertexShaderPath, const std::string&
     glDeleteShader(vert);
     glDeleteShader(geom);
     glDeleteShader(frag);
+#endif
 }
 
 void ShaderProgram::activate() const

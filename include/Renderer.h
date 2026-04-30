@@ -1,5 +1,5 @@
 #pragma once
-#include <glad/glad.h>
+#include <GLHeaders.h>
 #include <memory>
 #include "Light.h"
 #include "Mesh.h"
