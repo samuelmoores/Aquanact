@@ -9,7 +9,10 @@
 #include <glm/gtc/constants.hpp>
 
 PlayerController::PlayerController(std::vector<Object3D*> objects)
-	: m_objects(std::move(objects)) {}
+	: m_objects(std::move(objects)) 
+{
+	m_objects[0]->Move(glm::vec3(0));
+}
 
 void PlayerController::Update()
 {
@@ -32,30 +35,37 @@ void PlayerController::Update()
 	if (isMoving)
 		movement = glm::normalize(moveDir) * moveSpeed * Engine::DeltaFrameTime();
 
-	Mesh* playerMesh = m_objects[0]->GetMesh();
+	
 
-	// Build capsule from player's world-space bounding box
-	glm::vec3 pMin = playerMesh->minBounds();
-	glm::vec3 pMax = playerMesh->maxBounds();
-	float radius = std::max((pMax.x - pMin.x), (pMax.z - pMin.z)) * 0.5f * 0.25f;
-	float cx = (pMin.x + pMax.x) * 0.5f;
-	float cz = (pMin.z + pMax.z) * 0.5f;
-	glm::vec3 capBase(cx, pMin.y + radius, cz);
-	glm::vec3 capTip(cx, std::max(pMax.y - radius, capBase.y), cz);
-
-	bool collided = false;
-	for (int i = 1; i < (int)m_objects.size() - 1; i++)
+	if (isMoving)
 	{
-		Mesh* wallMesh = m_objects[i]->GetMesh();
-		if (Physics::SweepCapsuleAABB(capBase, capTip, radius, movement, wallMesh->minBounds(), wallMesh->maxBounds()))
+		m_objects[0]->Move(movement);
+
+		for (int iter = 0; iter < 8; iter++)
 		{
-			collided = true;
-			break;
+			bool collidedInThisIter = false;
+			for (int i = 1; i < (int)m_objects.size() - 1; i++)
+			{
+				Mesh* playerMesh = m_objects[0]->GetMesh();
+				glm::vec3 pMin = playerMesh->minBounds();
+				glm::vec3 pMax = playerMesh->maxBounds();
+				float radius = std::max((pMax.x - pMin.x), (pMax.z - pMin.z)) * 0.5f * 0.25f;
+				float cx = (pMin.x + pMax.x) * 0.5f;
+				float cz = (pMin.z + pMax.z) * 0.5f;
+				glm::vec3 capBase(cx, pMin.y + radius, cz);
+				glm::vec3 capTip(cx, std::max(pMax.y - radius, capBase.y), cz);
+
+				Mesh* wallMesh = m_objects[i]->GetMesh();
+				Physics::Collision col = Physics::GetCapsuleAABBCollision(capBase, capTip, radius, wallMesh->minBounds(), wallMesh->maxBounds(), movement);
+				if (col.hit)
+				{
+					m_objects[0]->Move(col.normal * col.penetration);
+					collidedInThisIter = true;
+				}
+			}
+			if (!collidedInThisIter) break;
 		}
 	}
-
-	if (!collided)
-		m_objects[0]->Move(movement);
 
 	// Push state to HUD
 	Engine::UI->SetHealth(m_health);
@@ -93,6 +103,7 @@ void PlayerController::AddScore(int points)
     m_score += points;
 }
 
+// call in main loop after render loop
 void PlayerController::DrawCapsule()
 {
 	Mesh* playerMesh = m_objects[0]->GetMesh();

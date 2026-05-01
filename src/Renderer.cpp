@@ -119,8 +119,6 @@ void Renderer::Flush(Camera* camera)
 			commands[i].mesh->UnBind();
 		}
 		commands[i].mesh->ClearBufferIndex();
-
-		//commands[i].mesh->DrawBoundingBox();
 	}
 
 	commands.clear();
@@ -151,6 +149,4 @@ void Renderer::Loop()
 
 	Flush(Engine::Camera);
 	Engine::UI->Loop();
-	glfwSwapBuffers(Engine::Window->GLFW());
-	glfwPollEvents();
 }

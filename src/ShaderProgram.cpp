@@ -9,6 +9,11 @@ ShaderProgram::ShaderProgram()
 
 }
 
+ShaderProgram::~ShaderProgram()
+{
+	if (m_programId != (uint32_t)-1) glDeleteProgram(m_programId);
+}
+
 void ShaderProgram::load(const std::string& vertexShaderPath, const std::string& fragmentShaderPath)
 {
     std::string vertexCode;

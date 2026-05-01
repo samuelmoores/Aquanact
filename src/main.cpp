@@ -15,6 +15,8 @@ static void mainLoop()
     Engine::Input->Loop();
     g_playerController->Update();
     Engine::Renderer->Loop();
+    glfwSwapBuffers(Engine::Window->GLFW());
+    glfwPollEvents();
 }
 
 int main()

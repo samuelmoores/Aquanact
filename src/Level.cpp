@@ -79,12 +79,30 @@ void Level::LoadObject(char filepath[])
             if (std::find(modelExts.begin(), modelExts.end(), ext) == modelExts.end()) continue;
 
             std::string modelPath = entry.path().string();
-            objects.push_back(new Object3D(modelPath.data()));
+            Object3D* obj = new Object3D(modelPath.data());
+            
+            std::string name = obj->Name();
+            std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+            if (name.find("wall") == std::string::npos)
+            {
+                obj->SetIgnoreCameraCollision(true);
+            }
+
+            objects.push_back(obj);
         }
     }
     else
     {
-        objects.push_back(new Object3D(filepath));
+        Object3D* obj = new Object3D(filepath);
+        
+        std::string name = obj->Name();
+        std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+        if (name.find("wall") == std::string::npos)
+        {
+            obj->SetIgnoreCameraCollision(true);
+        }
+
+        objects.push_back(obj);
     }
 }
 

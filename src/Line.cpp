@@ -92,6 +92,12 @@ Line::Line(std::vector<LineVertex3D> verts) : m_vao(-1), m_vbo(-1)
 	m_shader.setUniform("projection", glm::perspective(glm::radians(45.0f), static_cast<float>(1200) / 800, 0.1f, 1000.0f));
 }
 
+Line::~Line()
+{
+	if (m_vao != (uint32_t)-1) glDeleteVertexArrays(1, &m_vao);
+	if (m_vbo != (uint32_t)-1) glDeleteBuffers(1, &m_vbo);
+}
+
 void Line::UpdateProjection(glm::mat4 projectionMatrix)
 {
 	m_shader.activate();

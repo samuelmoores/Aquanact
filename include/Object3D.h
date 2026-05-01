@@ -27,6 +27,9 @@ public:
 	glm::vec3 Rotation();
 	void SetRotation(glm::vec3 newRotation);
 
+	void SetIgnoreCameraCollision(bool ignore) { m_ignoreCameraCollision = ignore; }
+	bool IgnoreCameraCollision() const { return m_ignoreCameraCollision; }
+
 
 	//primitives
 
@@ -102,5 +105,6 @@ private:
 	glm::vec3 m_rotation;
 	glm::vec3 m_scale;
 	bool m_skinned;
+	bool m_ignoreCameraCollision = false;
 	std::string m_name;
 };

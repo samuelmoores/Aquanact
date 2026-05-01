@@ -108,6 +108,9 @@ void Camera::CameraControl(glm::vec2 mouseDiff)
 	//loop through each object
 	for (int i = 1; i < objects_camera.size(); i++)
 	{
+		if (objects_camera[i]->IgnoreCameraCollision())
+			continue;
+
 		if (objects_camera[i]->GetMesh()->RayHit(rayOrigin, rayDir, t) && t < closestHit)
 		{
 			allowedDistance = std::max(minDist, t - cameraPadding);
@@ -133,32 +136,49 @@ void Camera::CameraControl(glm::vec2 mouseDiff)
 
 void Camera::CameraControl(float scroll)
 {
-	glm::vec3 nextPosition = m_position;
-	float minDistance = 60.0f;
-	
-	if (scroll > 0)
-	{
-		nextPosition /= (1.1f + Engine::DeltaFrameTime());
-	}
-	else
-	{
-		nextPosition *= (1.1f + Engine::DeltaFrameTime());
-	}
+	const float minDistance = 100.0f;
+	const float maxDistance = 2000.0f;
+	const float zoomSpeed = 0.2f;
 
-	float nextDistanceFromPlayer = glm::length(nextPosition - m_lookAt);
-	if (nextDistanceFromPlayer > minDistance)
+	// Calculate new target distance based on current default distance
+	float zoomFactor = 1.0f - (scroll * zoomSpeed);
+	float newDistance = m_defaultDistance * zoomFactor;
+
+	// Clamp the distance
+	newDistance = std::clamp(newDistance, minDistance, maxDistance);
+
+	// Update the default distance (the target distance the camera wants to be at)
+	m_defaultDistance = newDistance;
+
+	// Update position immediately based on new distance
+	glm::vec3 dir = m_position - m_lookAt;
+	if (glm::length(dir) > 0.001f)
 	{
-		m_position = nextPosition;
+		m_position = m_lookAt + glm::normalize(dir) * m_defaultDistance;
 		m_view_matrix = glm::lookAt(m_position, m_lookAt, m_up);
 	}
-
-	m_defaultDistance = glm::length(m_position - m_lookAt);
 }
 
 void Camera::Focus(glm::vec3 min, glm::vec3 max)
 {
-	m_lookAt.y = (max.y - (min.y/2.0f));
-	m_position.y = max.y;//(max.y + ((max.y / 2.0f)));
+	m_lookAt = (min + max) * 0.5f;
+	m_lookAt.y = max.y * 0.8f; // Look at upper body
+
+	// Reset yaw/pitch to a default view
+	yaw = -90.0f;
+	pitch = 20.0f;
+
+	float yawRad = glm::radians(yaw);
+	float pitchRad = glm::radians(-pitch);
+
+	glm::vec3 direction;
+	direction.x = cos(pitchRad) * cos(yawRad);
+	direction.y = sin(pitchRad);
+	direction.z = cos(pitchRad) * sin(yawRad);
+	direction = glm::normalize(direction);
+
+	m_defaultDistance = 500.0f; // Default zoom distance
+	m_position = m_lookAt - direction * m_defaultDistance;
 	m_view_matrix = glm::lookAt(m_position, m_lookAt, m_up);
 }
 
@@ -171,6 +191,7 @@ void Camera::Move(glm::vec3 delta, glm::vec3 lookAt)
 {
 	m_position += delta;
 	m_lookAt = lookAt;
+	m_view_matrix = glm::lookAt(m_position, m_lookAt, m_up);
 }
 
 void Camera::SetObjects()
