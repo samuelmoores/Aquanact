@@ -50,6 +50,9 @@ void UI::Loop()
 
 void UI::SetHealth(float fraction)
 {
+    if (!m_context || !m_context->GetDocument(0))
+        return;
+
     Rml::Element* fill = m_context->GetDocument(0)->GetElementById("health-bar-fill");
     if (!fill) return;
     int pct = static_cast<int>(fraction * 100.0f);
@@ -58,6 +61,9 @@ void UI::SetHealth(float fraction)
 
 void UI::SetScore(int score)
 {
+    if (!m_context || !m_context->GetDocument(0))
+        return;
+
     Rml::Element* el = m_context->GetDocument(0)->GetElementById("score-value");
     if (!el) return;
     el->SetInnerRML(Rml::ToString(score));

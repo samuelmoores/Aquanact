@@ -20,11 +20,11 @@ REM Check for emcc
 where emcc >nul 2>nul
 if %ERRORLEVEL% NEQ 0 (
     set EMSDK_ENV=%SOURCE_DIR%\emsdk\emsdk_env.bat
-    if exist "%EMSDK_ENV%" (
+    if exist "!EMSDK_ENV!" (
         echo Activating emsdk environment...
-        call "%EMSDK_ENV%"
+        call "!EMSDK_ENV!"
     ) else (
-        echo ERROR: emcc not found on PATH and emsdk_env.bat not found at %EMSDK_ENV%
+        echo ERROR: emcc not found on PATH and emsdk_env.bat not found at !EMSDK_ENV!
         echo        Activate emsdk first: cd emsdk ^&^& emsdk activate latest
         exit /b 1
     )

@@ -80,6 +80,11 @@ if (EMSCRIPTEN)
     find_package(assimp CONFIG REQUIRED)
     target_link_libraries(AquanactEngine PRIVATE assimp::assimp)
 
+    find_package(RmlUi CONFIG REQUIRED)
+    find_package(Freetype REQUIRED)
+    target_link_libraries(AquanactEngine PRIVATE RmlCore RmlDebugger Freetype::Freetype)
+    target_compile_definitions(AquanactEngine PRIVATE RMLUI_PLATFORM_EMSCRIPTEN)
+
 else()
     # ---- Native desktop build ----
     find_package(SFML COMPONENTS system window graphics audio CONFIG REQUIRED)
@@ -104,7 +109,9 @@ endif()
 target_include_directories(AquanactEngine PUBLIC "./include" "${RMLUI_BACKEND_DIR}")
 
 # Use our existing glad instead of RmlUi's bundled GLAD loader
-target_compile_definitions(AquanactEngine PRIVATE "RMLUI_GL3_CUSTOM_LOADER=<glad/glad.h>")
+if (NOT EMSCRIPTEN)
+    target_compile_definitions(AquanactEngine PRIVATE "RMLUI_GL3_CUSTOM_LOADER=<glad/glad.h>")
+endif()
 
 if (NOT EMSCRIPTEN)
     set_target_properties(AquanactEngine
