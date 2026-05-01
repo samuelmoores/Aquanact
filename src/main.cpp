@@ -29,6 +29,7 @@ int main()
 #else
     while (Engine::Running())
         mainLoop();
+    Engine::Shutdown();
     glfwTerminate();
 #endif
     return 0;

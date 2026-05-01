@@ -31,8 +31,13 @@ public:
 private:
 	void UpdateActionStates();
 
+	static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
+	static void CharCallback(GLFWwindow* window, unsigned int codepoint);
+	static void CursorPosCallback(GLFWwindow* window, double xpos, double ypos);
+	static void CursorEnterCallback(GLFWwindow* window, int entered);
 	static void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
 	static void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset);
+	static void FramebufferSizeCallback(GLFWwindow* window, int width, int height);
 
 	std::unordered_map<int, Action>         m_bindings;
 	std::unordered_map<Action, ActionState> m_actions;

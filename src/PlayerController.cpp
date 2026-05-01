@@ -4,6 +4,7 @@
 #include "Engine.h"
 #include "Line.h"
 #include <algorithm>
+#include <cmath>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtc/constants.hpp>
 
@@ -56,6 +57,10 @@ void PlayerController::Update()
 	if (!collided)
 		m_objects[0]->Move(movement);
 
+	// Push state to HUD
+	Engine::UI->SetHealth(m_health);
+	Engine::UI->SetScore(m_score);
+
 	// Rotation smoothing
 	if (isMoving)
 	{
@@ -76,6 +81,16 @@ void PlayerController::Update()
 		}
 		m_objects[0]->SetRotation({ 0.0f, m_currRot, 0.0f });
 	}
+}
+
+void PlayerController::TakeDamage(float amount)
+{
+    m_health = std::max(0.0f, m_health - amount);
+}
+
+void PlayerController::AddScore(int points)
+{
+    m_score += points;
 }
 
 void PlayerController::DrawCapsule()

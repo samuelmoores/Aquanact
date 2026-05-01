@@ -14,14 +14,14 @@ std::chrono::steady_clock::time_point Engine::m_prevFrameTime = std::chrono::hig
 Engine::Engine()
 {
     Window = new ::Window();
+#ifndef __EMSCRIPTEN__
+    gladLoadGL();
+#endif
     Camera = new ::Camera();
     Renderer = new ::Renderer();
     UI = new ::UI();
     Level = new ::Level();
     Input = new ::Input();
-#ifndef __EMSCRIPTEN__
-    gladLoadGL();
-#endif
     Renderer->Init();
     glfwSwapInterval(1);
     glEnable(GL_DEPTH_TEST);
@@ -57,6 +57,16 @@ void Engine::Tick()
 void Engine::ToggleAxis()
 {
 
+}
+
+void Engine::Shutdown()
+{
+    delete UI;      UI = nullptr;
+    delete Input;   Input = nullptr;
+    delete Level;   Level = nullptr;
+    delete Renderer; Renderer = nullptr;
+    delete Camera;  Camera = nullptr;
+    delete Window;  Window = nullptr;
 }
 
 

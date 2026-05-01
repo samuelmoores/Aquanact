@@ -6,6 +6,11 @@
     "assimp",
     "glm",
     {
+      "name": "rmlui",
+      "features": ["freetype"],
+      "platform": "!emscripten"
+    },
+    {
       "name": "sfml",
       "platform": "!emscripten"
     },

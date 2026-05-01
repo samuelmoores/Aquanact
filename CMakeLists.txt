@@ -12,8 +12,12 @@ endif()
 
 project ("AquanactEngine")
 
+set(RMLUI_BACKEND_DIR "${CMAKE_SOURCE_DIR}/src/rmlui_backends")
+
 set(SOURCES
     "src/main.cpp"
+    "${RMLUI_BACKEND_DIR}/RmlUi_Platform_GLFW.cpp"
+    "${RMLUI_BACKEND_DIR}/RmlUi_Renderer_GL3.cpp"
     "include/ShaderProgram.h" "src/ShaderProgram.cpp"
     "include/StbImage.h" "src/StbImage.cpp"
     "include/Mesh.h" "src/Mesh.cpp"
@@ -92,9 +96,15 @@ else()
 
     find_package(imgui CONFIG REQUIRED)
     target_link_libraries(AquanactEngine PRIVATE imgui::imgui)
+
+    find_package(RmlUi CONFIG REQUIRED)
+    target_link_libraries(AquanactEngine PRIVATE RmlCore RmlDebugger)
 endif()
 
-target_include_directories(AquanactEngine PUBLIC "./include")
+target_include_directories(AquanactEngine PUBLIC "./include" "${RMLUI_BACKEND_DIR}")
+
+# Use our existing glad instead of RmlUi's bundled GLAD loader
+target_compile_definitions(AquanactEngine PRIVATE "RMLUI_GL3_CUSTOM_LOADER=<glad/glad.h>")
 
 if (NOT EMSCRIPTEN)
     set_target_properties(AquanactEngine

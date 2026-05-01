@@ -129,8 +129,7 @@ void Renderer::Flush(Camera* camera)
 void Renderer::Loop()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	
-	Engine::UI->Loop();
+
 	std::vector<Object3D*> objects = Engine::Level->Objects();
 	Engine::Level->DrawAxis();
 
@@ -151,6 +150,7 @@ void Renderer::Loop()
 		m_shadowMap->ShadowPass(commands, m_pointLights[0]);
 
 	Flush(Engine::Camera);
+	Engine::UI->Loop();
 	glfwSwapBuffers(Engine::Window->GLFW());
 	glfwPollEvents();
 }

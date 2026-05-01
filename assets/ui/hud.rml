@@ -1,0 +1,30 @@
+<rml>
+<head>
+    <link type="text/rcss" href="hud.rcss"/>
+</head>
+<body>
+<div id="hud">
+
+    <!-- Crosshair -->
+    <div id="crosshair">
+        <div class="crosshair-h"/>
+        <div class="crosshair-v"/>
+    </div>
+
+    <!-- Health bar -->
+    <div id="health-container">
+        <div id="health-label">HEALTH</div>
+        <div id="health-bar-bg">
+            <div id="health-bar-fill"/>
+        </div>
+    </div>
+
+    <!-- Score -->
+    <div id="score-container">
+        <div id="score-label">SCORE</div>
+        <div id="score-value">0</div>
+    </div>
+
+</div>
+</body>
+</rml>

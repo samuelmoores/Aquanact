@@ -17,6 +17,7 @@ public:
 	static float TimeElapsed();
 	static void Tick();
 	static void ToggleAxis();
+	static void Shutdown();
 
 	static Engine& Init() {
 		static Engine instance;
