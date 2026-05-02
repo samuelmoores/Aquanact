@@ -67,9 +67,35 @@ void PlayerController::Update()
 		}
 	}
 
-	// Push state to HUD
-	Engine::UI->SetHealth(m_health);
-	Engine::UI->SetScore(m_score);
+
+	// Trigger box – objects[6]
+	if ((int)m_objects.size() > 6)
+	{
+		Mesh* playerMesh = m_objects[0]->GetMesh();
+		glm::vec3 pMin = playerMesh->minBounds();
+		glm::vec3 pMax = playerMesh->maxBounds();
+		Mesh* triggerMesh = m_objects[6]->GetMesh();
+		glm::vec3 tCenter = (triggerMesh->minBounds() + triggerMesh->maxBounds()) * 0.5f;
+		glm::vec3 tHalf   = (triggerMesh->maxBounds() - triggerMesh->minBounds()) * 1.0f;
+		glm::vec3 tMin = tCenter - tHalf;
+		glm::vec3 tMax = tCenter + tHalf;
+		bool overlapping = pMax.x > tMin.x && pMin.x < tMax.x &&
+		                   pMax.y > tMin.y && pMin.y < tMax.y &&
+		                   pMax.z > tMin.z && pMin.z < tMax.z;
+		if (overlapping && !m_inTrigger)
+		{
+			m_inTrigger = true;
+			Engine::UI->SetImageVisible(true);
+		}
+		else if (!overlapping && m_inTrigger)
+		{
+			m_inTrigger = false;
+			Engine::UI->SetImageVisible(false);
+		}
+
+		if (m_inTrigger && Engine::Input->JustPressed(Action::Interact))
+			Engine::UI->SetImageVisible(false);
+	}
 
 	// Rotation smoothing
 	if (isMoving)

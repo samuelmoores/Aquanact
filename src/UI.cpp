@@ -1,74 +1,82 @@
-#include <string>
-#include <Engine.h>
 #include <UI.h>
+#include <Engine.h>
+#include <StbImage.h>
+#include <GLHeaders.h>
 
 UI::UI()
 {
-    m_systemInterface.SetWindow(Engine::Window->GLFW());
-    Rml::SetSystemInterface(&m_systemInterface);
-    Rml::SetRenderInterface(&m_renderInterface);
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGui_ImplGlfw_InitForOpenGL(Engine::Window->GLFW(), false);
+#ifdef __EMSCRIPTEN__
+    ImGui_ImplOpenGL3_Init("#version 300 es");
+#else
+    ImGui_ImplOpenGL3_Init("#version 330");
+#endif
 
-    RmlGL3::Initialize();
-    Rml::Initialise();
+    StbImage img;
+    img.loadFromFile("assets/ui/PanelWindow.tga");
 
-    int width, height;
-    glfwGetFramebufferSize(Engine::Window->GLFW(), &width, &height);
-    m_renderInterface.SetViewport(width, height);
-
-    m_context = Rml::CreateContext("main", Rml::Vector2i(width, height));
-
-    Rml::LoadFontFace("assets/fonts/OpenSans-VariableFont_wdth,wght.ttf");
-
-    Rml::ElementDocument* doc = m_context->LoadDocument("assets/ui/hud.rml");
-    if (doc)
-        doc->Show();
+    glGenTextures(1, &m_panelTexture);
+    glBindTexture(GL_TEXTURE_2D, m_panelTexture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, img.getWidth(), img.getHeight(), 0, GL_RGBA, GL_UNSIGNED_BYTE, img.getData());
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 UI::~UI()
 {
-    Rml::RemoveContext("main");
-    Rml::Shutdown();
+    glDeleteTextures(1, &m_panelTexture);
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
 }
 
-void UI::SetViewport(int width, int height)
-{
-    m_renderInterface.SetViewport(width, height);
-    if (m_context)
-        m_context->SetDimensions(Rml::Vector2i(width, height));
-}
+void UI::SetViewport(int width, int height) {}
 
 void UI::Loop()
 {
-    if (!m_context)
+    if (!m_visible)
         return;
 
-    m_renderInterface.BeginFrame();
-    m_context->Update();
-    m_context->Render();
-    m_renderInterface.EndFrame();
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+    constexpr ImGuiWindowFlags kHUDFlags =
+        ImGuiWindowFlags_NoDecoration    |
+        ImGuiWindowFlags_AlwaysAutoResize |
+        ImGuiWindowFlags_NoMove          |
+        ImGuiWindowFlags_NoInputs        |
+        ImGuiWindowFlags_NoNav           |
+        ImGuiWindowFlags_NoBackground;
+
+    ImVec2 panelSize(160, 80);
+    ImVec2 screen = ImGui::GetIO().DisplaySize;
+    ImVec2 center(screen.x * 0.5f - panelSize.x * 0.5f, screen.y * 0.5f - panelSize.y * 0.5f);
+
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    ImGui::SetNextWindowPos(center, ImGuiCond_Always);
+    ImGui::Begin("HUD", nullptr, kHUDFlags);
+
+    ImGui::Image((ImTextureID)(intptr_t)m_panelTexture, panelSize);
+
+    const char* label = "[E]";
+    float labelW = ImGui::CalcTextSize(label).x;
+    ImGui::SetCursorPos(ImVec2((panelSize.x - labelW) * 0.5f, (panelSize.y - ImGui::GetTextLineHeight()) * 0.5f));
+    ImGui::Text("%s", label);
+
+    ImGui::End();
+    ImGui::PopStyleVar();
+
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
-void UI::SetHealth(float fraction)
+void UI::Import() {}
+
+void UI::SetImageVisible(bool isVisible)
 {
-    if (!m_context || !m_context->GetDocument(0))
-        return;
-
-    Rml::Element* fill = m_context->GetDocument(0)->GetElementById("health-bar-fill");
-    if (!fill) return;
-    int pct = static_cast<int>(fraction * 100.0f);
-    fill->SetProperty("width", std::to_string(pct) + "%");
-}
-
-void UI::SetScore(int score)
-{
-    if (!m_context || !m_context->GetDocument(0))
-        return;
-
-    Rml::Element* el = m_context->GetDocument(0)->GetElementById("score-value");
-    if (!el) return;
-    el->SetInnerRML(Rml::ToString(score));
-}
-
-void UI::Import()
-{
+    m_visible = isVisible;
 }

@@ -29,6 +29,17 @@
   <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
 
   <script>
+    // Emscripten's GLFW calls requestPointerLock() during init without catching the
+    // returned Promise; silence those rejections so they don't pollute the console.
+    (function() {
+      var orig = Element.prototype.requestPointerLock;
+      Element.prototype.requestPointerLock = function() {
+        var p = orig.apply(this, arguments);
+        if (p && typeof p.catch === "function") p.catch(function() {});
+        return p;
+      };
+    })();
+
     var canvasElement = document.getElementById("canvas");
 
     function resizeCanvas() {

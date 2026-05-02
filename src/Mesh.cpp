@@ -95,8 +95,6 @@ Mesh::Mesh(char modelFile[])
 			if (std::find(modelExts.begin(), modelExts.end(), ext) == modelExts.end()) continue;
 
 			std::string animPath = entry.path().string();
-			std::cout << "[Mesh] loading animation: " << animPath << std::endl;
-
 			auto& imp = m_animImporters.emplace_back(std::make_unique<Assimp::Importer>());
 			const aiScene* animScene = imp->ReadFile(animPath, aiProcess_Triangulate);
 			if (animScene)
@@ -176,7 +174,6 @@ void Mesh::assimpLoad(const std::string& path, bool flipUvs)
 			aiMaterial* mat = m_scene->mMaterials[m_scene->mMeshes[i]->mMaterialIndex];
 			aiString matName;
 			mat->Get(AI_MATKEY_NAME, matName);
-			std::cout << "[Mesh] mesh[" << i << "] material: " << matName.C_Str() << std::endl;
 			LoadTexture(mat, aiTextureType_DIFFUSE, path);
 
 			aiColor4D ambient(0.2f, 0.2f, 0.2f, 1.0f);
@@ -346,16 +343,7 @@ void Mesh::LoadTexture(aiMaterial* mat, aiTextureType textureType, std::string p
 		result = mat->GetTexture(aiTextureType_BASE_COLOR, 0, &texturePath);
 
 	if (result != AI_SUCCESS || texturePath.length == 0)
-	{
-		std::cout << "[LoadTexture] no texture found for type " << textureType << " — dumping material properties:" << std::endl;
-		for (unsigned int p = 0; p < mat->mNumProperties; p++)
-		{
-			aiMaterialProperty* prop = mat->mProperties[p];
-			std::cout << "  [" << p << "] key=" << prop->mKey.C_Str()
-				<< " type=" << prop->mType << " index=" << prop->mIndex << std::endl;
-		}
 		return;
-	}
 
 	std::string textureFileName = texturePath.C_Str();
 
@@ -365,8 +353,6 @@ void Mesh::LoadTexture(aiMaterial* mat, aiTextureType textureType, std::string p
 	{
 		textureFileName = textureFileName.substr(lastSlashIndex + 1);
 	}
-	std::cout << "[LoadTexture] raw path: " << texturePath.C_Str() << " | filename: " << textureFileName << std::endl;
-
 	const aiTexture* embeddedTexture = m_scene->GetEmbeddedTexture(texturePath.C_Str());
 
 	if (embeddedTexture && embeddedTexture->pcData != nullptr)
@@ -662,7 +648,7 @@ void Mesh::UnBind()
 	m_currVao++;
 	m_currTextureColor++;
 	glBindVertexArray(0);
-	glBindTexture(GL_TEXTURE, 0);
+	glBindTexture(GL_TEXTURE_2D, 0);
 }
 uint32_t Mesh::FacesSize() const
 {

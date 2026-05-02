@@ -5,24 +5,10 @@
 <body>
 <div id="hud">
 
-    <!-- Crosshair -->
-    <div id="crosshair">
-        <div class="crosshair-h"/>
-        <div class="crosshair-v"/>
-    </div>
-
-    <!-- Health bar -->
-    <div id="health-container">
-        <div id="health-label">HEALTH</div>
-        <div id="health-bar-bg">
-            <div id="health-bar-fill"/>
-        </div>
-    </div>
-
-    <!-- Score -->
-    <div id="score-container">
-        <div id="score-label">SCORE</div>
-        <div id="score-value">0</div>
+    <div class="panel" id="score-panel">
+        <img src="PanelWindow.tga" class="panel-bg"/>
+        <p class="panel-label">SCORE</p>
+        <p class="panel-value" id="score-value">0</p>
     </div>
 
 </div>

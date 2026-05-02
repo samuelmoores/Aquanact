@@ -1,48 +1,33 @@
 #include "Input.h"
 #include "Engine.h"
 #include "Audio.h"
-#include <RmlUi_Platform_GLFW.h>
+#include <imgui_impl_glfw.h>
 
 void Input::KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
     Audio::Resume();
-    RmlGLFW::ProcessKeyCallback(Engine::UI->GetContext(), key, action, mods);
 }
 
 void Input::CharCallback(GLFWwindow* window, unsigned int codepoint)
 {
-    RmlGLFW::ProcessCharCallback(Engine::UI->GetContext(), codepoint);
 }
 
 void Input::CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
 {
-    RmlGLFW::ProcessCursorPosCallback(Engine::UI->GetContext(), xpos, ypos, 0);
+    ImGui_ImplGlfw_CursorPosCallback(window, xpos, ypos);
 }
 
 void Input::CursorEnterCallback(GLFWwindow* window, int entered)
 {
-    RmlGLFW::ProcessCursorEnterCallback(Engine::UI->GetContext(), entered);
 }
 
 void Input::MouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 {
     Audio::Resume();
+    ImGui_ImplGlfw_MouseButtonCallback(window, button, action, mods);
     Input* self = static_cast<Input*>(glfwGetWindowUserPointer(window));
 
-    // When the window isn't focused, the first click always re-enters game mode
-    // (don't forward it to RML — the cursor may be over a HUD element)
     if (!self->m_windowActive && action == GLFW_PRESS)
-    {
-        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-        self->m_windowActive = true;
-        double xpos, ypos;
-        glfwGetCursorPos(window, &xpos, &ypos);
-        self->m_mouseLast = glm::vec2(xpos, ypos);
-        return;
-    }
-
-    bool rmlHandled = !RmlGLFW::ProcessMouseButtonCallback(Engine::UI->GetContext(), button, action, mods);
-    if (!rmlHandled)
     {
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         self->m_windowActive = true;
@@ -64,15 +49,7 @@ EM_BOOL Input::PointerLockChangeCallback(int /*eventType*/, const EmscriptenPoin
 
 void Input::ScrollCallback(GLFWwindow* window, double xoffset, double yoffset)
 {
-    int mods = 0;
-    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS)
-        mods |= GLFW_MOD_SHIFT;
-    if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS)
-        mods |= GLFW_MOD_CONTROL;
-
-    bool rmlHandled = !RmlGLFW::ProcessScrollCallback(Engine::UI->GetContext(), yoffset, mods);
-    if (!rmlHandled)
-        Engine::Camera->CameraControl(static_cast<float>(yoffset));
+    Engine::Camera->CameraControl(static_cast<float>(yoffset));
 }
 
 void Input::FramebufferSizeCallback(GLFWwindow* window, int width, int height)
@@ -111,6 +88,7 @@ Input::Input()
     m_bindings[GLFW_KEY_A]      = Action::MoveLeft;
     m_bindings[GLFW_KEY_D]      = Action::MoveRight;
     m_bindings[GLFW_KEY_ESCAPE] = Action::Escape;
+    m_bindings[GLFW_KEY_E]     = Action::Interact;
 }
 
 void Input::UpdateActionStates()

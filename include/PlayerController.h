@@ -25,4 +25,6 @@ private:
 
 	float m_health    = 1.0f;   // 0.0 – 1.0
 	int   m_score     = 0;
+
+	bool  m_inTrigger = false;
 };

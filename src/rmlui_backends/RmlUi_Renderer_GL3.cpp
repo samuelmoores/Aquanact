@@ -32,6 +32,7 @@
 #include <RmlUi/Core/Log.h>
 #include <RmlUi/Core/Platform.h>
 #include <string.h>
+#include <iostream>
 
 #if defined(RMLUI_PLATFORM_WIN32) && !defined(__MINGW32__)
 	// function call missing argument list
@@ -542,12 +543,15 @@ struct TGAHeader {
 
 bool RenderInterface_GL3::LoadTexture(Rml::TextureHandle& texture_handle, Rml::Vector2i& texture_dimensions, const Rml::String& source)
 {
+	std::cout << "[LoadTexture] attempting: " << source << std::endl;
 	Rml::FileInterface* file_interface = Rml::GetFileInterface();
 	Rml::FileHandle file_handle = file_interface->Open(source);
 	if (!file_handle)
 	{
+		std::cout << "[LoadTexture] FAILED to open: " << source << std::endl;
 		return false;
 	}
+	std::cout << "[LoadTexture] opened OK: " << source << std::endl;
 
 	file_interface->Seek(file_handle, 0, SEEK_END);
 	size_t buffer_size = file_interface->Tell(file_handle);

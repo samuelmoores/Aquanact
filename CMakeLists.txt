@@ -2,7 +2,7 @@
 # CMakeList.txt : CMake project for Graphics, include source and define
 # project specific logic here.
 #
-cmake_minimum_required (VERSION 3.8)
+cmake_minimum_required (VERSION 3.8...3.30)
 
 # Enable Hot Reload for MSVC compilers if supported.
 if (POLICY CMP0141)
@@ -16,8 +16,6 @@ set(RMLUI_BACKEND_DIR "${CMAKE_SOURCE_DIR}/src/rmlui_backends")
 
 set(SOURCES
     "src/main.cpp"
-    "${RMLUI_BACKEND_DIR}/RmlUi_Platform_GLFW.cpp"
-    "${RMLUI_BACKEND_DIR}/RmlUi_Renderer_GL3.cpp"
     "include/ShaderProgram.h" "src/ShaderProgram.cpp"
     "include/StbImage.h" "src/StbImage.cpp"
     "include/Mesh.h" "src/Mesh.cpp"
@@ -85,13 +83,16 @@ if (EMSCRIPTEN)
     find_path(MINIAUDIO_INCLUDE_DIR NAMES miniaudio.h REQUIRED)
     target_include_directories(AquanactEngine PRIVATE ${MINIAUDIO_INCLUDE_DIR})
 
-    find_package(RmlUi CONFIG REQUIRED)
-    find_package(Freetype REQUIRED)
-    target_link_libraries(AquanactEngine PRIVATE RmlCore RmlDebugger Freetype::Freetype)
-    target_compile_definitions(AquanactEngine PRIVATE RMLUI_PLATFORM_EMSCRIPTEN)
+    find_package(imgui CONFIG REQUIRED)
+    target_link_libraries(AquanactEngine PRIVATE imgui::imgui)
 
 else()
     # ---- Native desktop build ----
+    target_sources(AquanactEngine PRIVATE
+        "${RMLUI_BACKEND_DIR}/RmlUi_Platform_GLFW.cpp"
+        "${RMLUI_BACKEND_DIR}/RmlUi_Renderer_GL3.cpp"
+    )
+
     find_package(SFML COMPONENTS system window graphics audio CONFIG REQUIRED)
     target_link_libraries(AquanactEngine PRIVATE sfml-system sfml-network sfml-graphics sfml-window sfml-audio)
 

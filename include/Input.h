@@ -10,7 +10,8 @@ enum class Action {
 	MoveBack,
 	MoveLeft,
 	MoveRight,
-	Escape
+	Escape,
+	Interact
 };
 
 struct ActionState {
