@@ -28,6 +28,7 @@
         "opengl3-binding"
       ],
       "platform": "!emscripten"
-    }
+    },
+    "miniaudio"
   ]
 }

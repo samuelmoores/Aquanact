@@ -9,6 +9,7 @@ set SOURCE_DIR=%SOURCE_DIR:~0,-1%
 
 set BUILD_DIR=%SOURCE_DIR%\out\build\wasm-release
 set DIST_DIR=%SOURCE_DIR%\build_web
+set ZIP_FILE=%SOURCE_DIR%\build_web.zip
 set EMSCRIPTEN_TOOLCHAIN=%SOURCE_DIR%\emsdk\upstream\emscripten\cmake\Modules\Platform\Emscripten.cmake
 
 echo === Aquanact Web Build ===
@@ -68,16 +69,22 @@ copy /Y "%BUILD_DIR%\index.wasm" "%DIST_DIR%\index.wasm" >nul
 copy /Y "%BUILD_DIR%\index.data" "%DIST_DIR%\index.data" >nul
 if %ERRORLEVEL% NEQ 0 exit /b %ERRORLEVEL%
 
+REM Package the itch.io upload with index.html at the zip root.
+if exist "%ZIP_FILE%" del /q "%ZIP_FILE%"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Compress-Archive -Path '%DIST_DIR%\index.html','%DIST_DIR%\index.js','%DIST_DIR%\index.wasm','%DIST_DIR%\index.data' -DestinationPath '%ZIP_FILE%' -Force"
+if %ERRORLEVEL% NEQ 0 exit /b %ERRORLEVEL%
+
 echo.
 echo === Build complete ===
 echo Files in %DIST_DIR%:
 
 dir "%DIST_DIR%\index.html" "%DIST_DIR%\index.js" "%DIST_DIR%\index.wasm" "%DIST_DIR%\index.data" 2>nul
+dir "%ZIP_FILE%" 2>nul
 
 echo.
 echo To test locally:
 echo   emrun --no_browser --port 8080 "%DIST_DIR%\index.html"
 echo To deploy:
-echo   zip the four index.* files and upload to itch.io
+echo   upload "%ZIP_FILE%" to itch.io
 
 endlocal

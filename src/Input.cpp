@@ -1,9 +1,11 @@
 #include "Input.h"
 #include "Engine.h"
+#include "Audio.h"
 #include <RmlUi_Platform_GLFW.h>
 
 void Input::KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
+    Audio::Resume();
     RmlGLFW::ProcessKeyCallback(Engine::UI->GetContext(), key, action, mods);
 }
 
@@ -24,7 +26,20 @@ void Input::CursorEnterCallback(GLFWwindow* window, int entered)
 
 void Input::MouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 {
+    Audio::Resume();
     Input* self = static_cast<Input*>(glfwGetWindowUserPointer(window));
+
+    // When the window isn't focused, the first click always re-enters game mode
+    // (don't forward it to RML — the cursor may be over a HUD element)
+    if (!self->m_windowActive && action == GLFW_PRESS)
+    {
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        self->m_windowActive = true;
+        double xpos, ypos;
+        glfwGetCursorPos(window, &xpos, &ypos);
+        self->m_mouseLast = glm::vec2(xpos, ypos);
+        return;
+    }
 
     bool rmlHandled = !RmlGLFW::ProcessMouseButtonCallback(Engine::UI->GetContext(), button, action, mods);
     if (!rmlHandled)
@@ -36,6 +51,16 @@ void Input::MouseButtonCallback(GLFWwindow* window, int button, int action, int 
         self->m_mouseLast = glm::vec2(xpos, ypos);
     }
 }
+
+#ifdef __EMSCRIPTEN__
+EM_BOOL Input::PointerLockChangeCallback(int /*eventType*/, const EmscriptenPointerlockChangeEvent* e, void* userData)
+{
+    Input* self = static_cast<Input*>(userData);
+    if (!e->isActive)
+        self->m_windowActive = false;
+    return EM_TRUE;
+}
+#endif
 
 void Input::ScrollCallback(GLFWwindow* window, double xoffset, double yoffset)
 {
@@ -71,6 +96,15 @@ Input::Input()
     double xpos, ypos;
     glfwGetCursorPos(win, &xpos, &ypos);
     m_mouseLast = glm::vec2(xpos, ypos);
+
+#ifdef __EMSCRIPTEN__
+    // Web: can't lock cursor without a user gesture — wait for first click
+    m_windowActive = false;
+    emscripten_set_pointerlockchange_callback(EMSCRIPTEN_EVENT_TARGET_DOCUMENT, this, false, PointerLockChangeCallback);
+#else
+    // Desktop: lock and hide cursor immediately
+    glfwSetInputMode(win, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+#endif
 
     m_bindings[GLFW_KEY_W]      = Action::MoveForward;
     m_bindings[GLFW_KEY_S]      = Action::MoveBack;

@@ -70,7 +70,9 @@ if (EMSCRIPTEN)
         "--shell-file ${CMAKE_SOURCE_DIR}/web/shell.html"
         "--use-preload-cache"
         "-s WASM=1"
-        "-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap']"
+        "-s EXPORTED_FUNCTIONS=['_main','_Audio_Resume']"
+        "-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','HEAPF32']"
+        "-s ALLOW_TABLE_GROWTH=1"
     )
     string(JOIN " " EM_LINK_FLAGS_STR ${EM_LINK_FLAGS})
     set_target_properties(AquanactEngine PROPERTIES LINK_FLAGS "${EM_LINK_FLAGS_STR}")
@@ -79,6 +81,9 @@ if (EMSCRIPTEN)
     # We still need assimp compiled for Emscripten (use emcmake + vcpkg or pre-built).
     find_package(assimp CONFIG REQUIRED)
     target_link_libraries(AquanactEngine PRIVATE assimp::assimp)
+
+    find_path(MINIAUDIO_INCLUDE_DIR NAMES miniaudio.h REQUIRED)
+    target_include_directories(AquanactEngine PRIVATE ${MINIAUDIO_INCLUDE_DIR})
 
     find_package(RmlUi CONFIG REQUIRED)
     find_package(Freetype REQUIRED)
