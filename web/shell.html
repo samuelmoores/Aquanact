@@ -50,6 +50,14 @@
     window.addEventListener("resize", resizeCanvas);
     resizeCanvas();
 
+    // Prevent browser scroll/navigation triggered by game keys (arrows, space, digits, etc.)
+    window.addEventListener("keydown", function(e) {
+      var scrollKeys = [32, 33, 34, 35, 36, 37, 38, 39, 40];
+      if (scrollKeys.indexOf(e.keyCode) !== -1 || (e.keyCode >= 48 && e.keyCode <= 57)) {
+        e.preventDefault();
+      }
+    }, { passive: false });
+
     canvasElement.addEventListener("webglcontextlost", function(event) {
       alert("WebGL context lost. Reload the page to continue.");
       event.preventDefault();

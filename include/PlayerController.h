@@ -26,5 +26,17 @@ private:
 	float m_health    = 1.0f;   // 0.0 – 1.0
 	int   m_score     = 0;
 
-	bool  m_inTrigger = false;
+	bool  m_inTrigger   = false;
+	bool  m_inTvTrigger = false;
+	bool  m_keypadActive = false;
+	int   m_keypadIndex  = 0; // 0-3 for digits, 4 for EXECUTE
+	int   m_keypadDigits[4] = { 0, 0, 0, 0 };
+
+	bool m_upHeld = false;
+	bool m_downHeld = false;
+	bool m_leftHeld = false;
+	bool m_rightHeld = false;
+	bool m_enterHeld = false;
+	bool m_codeCorrect = false;
+	bool m_keypadChecked = false;
 };

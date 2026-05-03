@@ -47,6 +47,8 @@ float PointShadow(vec3 fragPos, vec3 lightPos)
 {
     vec3 toFrag = fragPos - lightPos;
     float currentDepth = length(toFrag);
+    if (currentDepth >= shadowFarPlane)
+        return 0.0;
     float bias = currentDepth * 0.005 + 0.5;
     float shadow = 0.0;
     float diskRadius = currentDepth * 0.003;
@@ -56,7 +58,10 @@ float PointShadow(vec3 fragPos, vec3 lightPos)
         if (currentDepth - bias > closestDepth)
             shadow += 1.0;
     }
-    return shadow / 20.0;
+    shadow /= 20.0;
+    // Fade shadow to zero as it approaches the shadow map boundary
+    float fade = 1.0 - smoothstep(shadowFarPlane * 0.75, shadowFarPlane, currentDepth);
+    return shadow * fade;
 }
 
 void main()
@@ -72,7 +77,7 @@ void main()
         norm = normalize(Normal);
     }
 
-    vec3 ambientIntensity = material.x * ambientColor + vec3(0.35);
+    vec3 ambientIntensity = material.x * ambientColor + vec3(0.02);
     vec3 diffuseIntensity = vec3(0.0);
     vec3 specularIntensity = vec3(0.0);
 
@@ -91,7 +96,7 @@ void main()
         if (lambert > 0.0)
         {
             float shadow = (i == 0) ? PointShadow(FragWorldPos, pointLights[i].position) : 0.0;
-            float lit = 1.0 - shadow;
+            float lit = max(1.0 - shadow, 0.3);
 
             diffuseIntensity += lit * material.y * pointLights[i].color * lambert * attenuation;
 

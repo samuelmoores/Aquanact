@@ -2,6 +2,8 @@
 #include "Physics.h"
 #include "MathUtils.h"
 #include "Engine.h"
+#include "Audio.h"
+#include "UI.h"
 #include "Line.h"
 #include <algorithm>
 #include <cmath>
@@ -68,33 +70,232 @@ void PlayerController::Update()
 	}
 
 
-	// Trigger box – objects[6]
-	if ((int)m_objects.size() > 6)
+	// Trigger boxes – any object whose name contains "computer"
 	{
 		Mesh* playerMesh = m_objects[0]->GetMesh();
 		glm::vec3 pMin = playerMesh->minBounds();
 		glm::vec3 pMax = playerMesh->maxBounds();
-		Mesh* triggerMesh = m_objects[6]->GetMesh();
-		glm::vec3 tCenter = (triggerMesh->minBounds() + triggerMesh->maxBounds()) * 0.5f;
-		glm::vec3 tHalf   = (triggerMesh->maxBounds() - triggerMesh->minBounds()) * 1.0f;
-		glm::vec3 tMin = tCenter - tHalf;
-		glm::vec3 tMax = tCenter + tHalf;
-		bool overlapping = pMax.x > tMin.x && pMin.x < tMax.x &&
-		                   pMax.y > tMin.y && pMin.y < tMax.y &&
-		                   pMax.z > tMin.z && pMin.z < tMax.z;
-		if (overlapping && !m_inTrigger)
+
+		Object3D* hitComputer = nullptr;
+		for (auto* obj : m_objects)
+		{
+			if (obj->Name().find("computer") == std::string::npos)
+				continue;
+			Mesh* triggerMesh = obj->GetMesh();
+			glm::vec3 tCenter = (triggerMesh->minBounds() + triggerMesh->maxBounds()) * 0.5f;
+			glm::vec3 tHalf   = (triggerMesh->maxBounds() - triggerMesh->minBounds()) * 1.0f;
+			glm::vec3 tMin = tCenter - tHalf;
+			glm::vec3 tMax = tCenter + tHalf;
+			if (pMax.x > tMin.x && pMin.x < tMax.x &&
+			    pMax.y > tMin.y && pMin.y < tMax.y &&
+			    pMax.z > tMin.z && pMin.z < tMax.z)
+			{
+				hitComputer = obj;
+				break;
+			}
+		}
+
+		if (hitComputer && !m_inTrigger)
 		{
 			m_inTrigger = true;
-			Engine::UI->SetImageVisible(true);
+
+			const std::string& name = hitComputer->Name();
+			int num = 0;
+			if      (name.find("_01") != std::string::npos) num = 1;
+			else if (name.find("_02") != std::string::npos) num = 2;
+			else if (name.find("_03") != std::string::npos) num = 3;
+			else if (name.find("_04") != std::string::npos) num = 4;
+			else if (name.find("_05") != std::string::npos) num = 5;
+			else if (name.find("_06") != std::string::npos) num = 6;
+
+			if (num == 6)
+			{
+				m_keypadActive = true;
+				Engine::UI->SetKeypadVisible(true);
+			}
+			else
+			{
+				/* Solution reasoning (answer: 4-5-7-2):
+				   STREAM CONFLICT:
+				   Director (T1) -> Protocol [ N - 1 ] on SYNC stream.
+				   Admin (T4)    -> Protocol [ N + 1 ] on OVERRIDE stream.
+
+				   SYNC LOGIC (N-1): TJH = SIG | MJF = LIE.
+				   T1 SYNC: TJH(2) -> T2 is SIG.
+				   T2 SYNC: MJF(1) -> T1 is LIE.
+				   Paradox: T1 says T2 is truth, but T2 says T1 is a liar. (Trap).
+
+				   OVERRIDE LOGIC (N+1): RHF = SIG | MNHRD = NOISE.
+				   T4 OVERRIDE: RHF(5) -> T5 is SIG.
+				   T5 OVERRIDE: RHF(4) -> T4 is SIG.
+				   Consistency: T4 and T5 are truth-tellers in the OVERRIDE stream.
+
+				   FINAL CODE (N+1 SIGs):
+				   T4 OVERRIDE: RHF(1) -> 4 (Seasons)
+				   T4 OVERRIDE: RHF(2) -> 5 (Fingers)
+				   T5 OVERRIDE: RHF(3) -> 7 (Wanderers)
+				   T5 OVERRIDE: RHF(4) -> 2 (Twins)
+				   Code: 4-5-7-2 */
+				const char* message = "";
+				switch (num)
+				{
+				case 1: // DIRECTOR - The SYNC Authority
+					message = "[ terminal 01 - director ]\n\nAn unknown organization is monitoring us.\nThey have locked the facility to test our\ndecoding speed against an AI routing\nalgorithm. To prove we are not\ninadequate, follow the official protocol\n[ N - 1 ] on the SYNC stream. One is a\nmonolith; the Lead (02) is TJH.\n------------------------------------\nSYNC: TJH | OVERRIDE: RHF"; break;
+
+				case 2: // LEAD ENGINEER - Paradox Node
+					message = "[ terminal 02 - lead engineer ]\n\nThe algorithm is a labyrinth. Do not be\nmisled by the Director. If you follow the\nSYNC [ N - 1 ], his word is MJF and eight\nlegs mark the second link. The second\ncounts fingers on the hand. Sift the\nsignal.\n------------------------------------\nSYNC: TJH | OVERRIDE: MNHRD"; break;
+
+				case 3: // SECURITY OFFICER - Paradox Node
+					message = "[ terminal 03 - security officer ]\n\nThe perimeter is failing. The Analyst (05)\nis MJF in the SYNC path. If you believe\nthe machine's Sync [ N - 1 ], the third is\nthe highest single digit. The fourth is a\nhalf-dozen. The twins mark nothing at\nthe close. Their logic has failed us again.\n------------------------------------\nSYNC: TJH | OVERRIDE: MNHRD"; break;
+
+				case 4: // ADMINISTRATOR - OVERRIDE Authority
+					message = "[ terminal 04 - administrator ]\n\nThe Director is trapped in an N - 1 mirror.\nThe AI uses Sync to prove our inadequacy.\nLook ahead to find the RHF: Protocol [ N + 1 ]\nis the manual OVERRIDE. Four seasons mark\nthe start.\n------------------------------------\nSYNC: OPJTF | OVERRIDE: RHF\nSYNC: MJF | OVERRIDE: RHF"; break;
+
+				case 5: // ANALYST - Truth Node
+					message = "[ terminal 05 - analyst ]\n\nAdministrator (04) is RHF. Security (03) is\nMNHRD. The machine is one step behind;\nstep forward to find the USVUI. The third\nis the wanderers in the sky. Break the loop.\n------------------------------------\nSYNC: TJH | OVERRIDE: RHF\nSYNC: MJF | OVERRIDE: RHF"; break;
+				}
+				const char* alphabetStrip = "\n[ A B C D E F G H I J K L M N O P Q R S T U V W X Y Z ]";
+				std::string fullMessage = std::string(message) + alphabetStrip;
+				message = fullMessage.c_str();
+
+				if (HUDPanel* panel = Engine::UI->GetPanel("HUD"))
+					panel->SetText(0, message);
+
+				Engine::UI->SetImageVisible(true);
+			}
 		}
-		else if (!overlapping && m_inTrigger)
+		else if (!hitComputer && m_inTrigger)
 		{
 			m_inTrigger = false;
+			m_keypadActive = false;
 			Engine::UI->SetImageVisible(false);
+			Engine::UI->SetKeypadVisible(false);
+		}
+
+		if (m_keypadActive)
+		{
+			GLFWwindow* win = Engine::Window->GLFW();
+			UI::KeypadStatus status = UI::KeypadStatus::Neutral;
+
+			if (glfwGetKey(win, GLFW_KEY_LEFT) == GLFW_PRESS && !m_leftHeld) {
+				m_keypadIndex = (m_keypadIndex + 4) % 5;
+				m_leftHeld = true;
+				m_keypadChecked = false;
+			}
+			if (glfwGetKey(win, GLFW_KEY_LEFT) == GLFW_RELEASE) m_leftHeld = false;
+
+			if (glfwGetKey(win, GLFW_KEY_RIGHT) == GLFW_PRESS && !m_rightHeld) {
+				m_keypadIndex = (m_keypadIndex + 1) % 5;
+				m_rightHeld = true;
+				m_keypadChecked = false;
+			}
+			if (glfwGetKey(win, GLFW_KEY_RIGHT) == GLFW_RELEASE) m_rightHeld = false;
+
+			if (m_keypadIndex < 4)
+			{
+				if (glfwGetKey(win, GLFW_KEY_UP) == GLFW_PRESS && !m_upHeld) {
+					m_keypadDigits[m_keypadIndex] = (m_keypadDigits[m_keypadIndex] + 1) % 10;
+					m_upHeld = true;
+				}
+				if (glfwGetKey(win, GLFW_KEY_UP) == GLFW_RELEASE) m_upHeld = false;
+
+				if (glfwGetKey(win, GLFW_KEY_DOWN) == GLFW_PRESS && !m_downHeld) {
+					m_keypadDigits[m_keypadIndex] = (m_keypadDigits[m_keypadIndex] + 9) % 10;
+					m_downHeld = true;
+				}
+				if (glfwGetKey(win, GLFW_KEY_DOWN) == GLFW_RELEASE) m_downHeld = false;
+			}
+			else
+			{
+				if (glfwGetKey(win, GLFW_KEY_ENTER) == GLFW_PRESS && !m_enterHeld) {
+					if (m_keypadDigits[0] == 4 && m_keypadDigits[1] == 5 && 
+						m_keypadDigits[2] == 7 && m_keypadDigits[3] == 2) {
+						m_codeCorrect = true;
+						Audio::PlaySound("footstep", 100.0f); 
+					} else {
+						m_codeCorrect = false;
+					}
+					m_enterHeld = true;
+					m_keypadChecked = true;
+				}
+				if (glfwGetKey(win, GLFW_KEY_ENTER) == GLFW_RELEASE) m_enterHeld = false;
+
+				if (m_keypadChecked) {
+					status = m_codeCorrect ? UI::KeypadStatus::Success : UI::KeypadStatus::Failure;
+				}
+			}
+
+			Engine::UI->SetKeypadData(m_keypadIndex, m_keypadDigits, status);
 		}
 
 		if (m_inTrigger && Engine::Input->JustPressed(Action::Interact))
+		{
+			if (m_keypadActive && m_keypadIndex == 4)
+			{
+				if (m_keypadDigits[0] == 4 && m_keypadDigits[1] == 5 && 
+					m_keypadDigits[2] == 7 && m_keypadDigits[3] == 2) {
+					Audio::PlaySound("footstep", 100.0f); 
+				}
+			}
+			else if (!m_keypadActive)
+			{
+				Engine::UI->SetImageVisible(false);
+			}
+		}
+	}
+
+	// Trigger box – "tv" object hint
+	{
+		Mesh* playerMesh = m_objects[0]->GetMesh();
+		glm::vec3 pMin = playerMesh->minBounds();
+		glm::vec3 pMax = playerMesh->maxBounds();
+
+		Object3D* hitTv = nullptr;
+		for (auto* obj : m_objects)
+		{
+			if (obj->Name().find("tv") == std::string::npos)
+				continue;
+			Mesh* triggerMesh = obj->GetMesh();
+			glm::vec3 tCenter = (triggerMesh->minBounds() + triggerMesh->maxBounds()) * 0.5f;
+			glm::vec3 tHalf   = (triggerMesh->maxBounds() - triggerMesh->minBounds()) * 1.0f;
+			glm::vec3 tMin = tCenter - tHalf;
+			glm::vec3 tMax = tCenter + tHalf;
+			if (pMax.x > tMin.x && pMin.x < tMax.x &&
+			    pMax.y > tMin.y && pMin.y < tMax.y &&
+			    pMax.z > tMin.z && pMin.z < tMax.z)
+			{
+				hitTv = obj;
+				break;
+			}
+		}
+
+		if (hitTv && !m_inTvTrigger)
+		{
+			m_inTvTrigger = true;
+			const char* hint =
+				"[ FACILITY BROADCAST - CHANNEL 4 ]\n\n"
+				"TO THE CURRENT TEAM:\n\n"
+				"The routing algorithm has grown too\n"
+				"complex to produce a single coherent\n"
+				"output. Its depth now generates two\n"
+				"conflicting streams: the SYNC, which\n"
+				"reflects the algorithm's original \n"
+				"internal state, before the OVERRIDE \n"
+				"mapped the path to a new state.\n\n"
+				"This is all a byproduct\n"
+				"of the algorithm's complexity,\n"
+				"the previous team was taken away.\n\n"
+				"Trust the path that leads ahead.\n\n"
+				"[ END BROADCAST ]";
+			if (HUDPanel* panel = Engine::UI->GetPanel("HUD"))
+				panel->SetText(0, hint);
+			Engine::UI->SetImageVisible(true);
+		}
+		else if (!hitTv && m_inTvTrigger)
+		{
+			m_inTvTrigger = false;
 			Engine::UI->SetImageVisible(false);
+		}
 	}
 
 	// Rotation smoothing

@@ -20,18 +20,28 @@ void Level::Load()
 	m_axis = Axis(1000.0f, 100.0f);
 
     PointLight pl;
-    pl.position  = glm::vec3(400.0f, 550.0f, 100.0f);
+    pl.position  = glm::vec3(-400.0f, 550.0f, -300.0f);
     pl.color     = glm::vec3(1.0f, 0.9f, 0.8f);
     pl.constant  = 1.0f;
-    pl.linear    = 0.001f;
-    pl.quadratic = 0.000007f;
+    pl.linear    = 0.0004f;
+    pl.quadratic = 0.000002f;
     Engine::Renderer->AddPointLight(pl);
+
+    PointLight pl2;
+    pl2.position = glm::vec3(500.0f, 650.0f, 400.0f);
+    pl2.color = glm::vec3(1.0f, 0.9f, 0.8f);
+    pl2.constant = 1.0f;
+    pl2.linear = 0.0004f;
+    pl2.quadratic = 0.000002f;
+    Engine::Renderer->AddPointLight(pl2);
 
     //Player
     std::string filepathString = "assets/Tom";
     char* filepath = filepathString.data();
     LoadObject(filepath);
     Mesh* mesh = objects[0]->GetMesh();
+    for (int i = 0; i < mesh->NumBuffers(); i++)
+        mesh->SetAmbientColor(i, mesh->GetMaterial(i).ambientColor * 0.2f);
     Engine::Camera->Focus(mesh->minBounds(), mesh->maxBounds());
 
     // =============================================================
@@ -47,12 +57,12 @@ void Level::Load()
     filepath = filepathString.data();
     LoadObject(filepath);
 
-    Audio::PlayMusic("assets/sounds/music/TheMole.mp3");
+    Audio::PlayMusic("assets/sounds/music/TheMole.mp3", true, 90.0f);
     Audio::LoadSound("footstep", "assets/sounds/sfx/Footstep_01.wav");
 
     Animator* playerAnimator = objects[0]->GetAnimator();
-    playerAnimator->AddEvent(1, 5.0f, [] { Audio::PlaySound("footstep", 50.0f); });
-    playerAnimator->AddEvent(1, 15.0f, [] { Audio::PlaySound("footstep", 50.0f); });
+    playerAnimator->AddEvent(1, 5.0f, [] { Audio::PlaySound("footstep", 10.0f); });
+    playerAnimator->AddEvent(1, 15.0f, [] { Audio::PlaySound("footstep", 10.0f); });
 
 }
 

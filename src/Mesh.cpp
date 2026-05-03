@@ -616,6 +616,12 @@ const SubMeshMaterial& Mesh::GetMaterial(int index) const
 	return m_materials[index];
 }
 
+void Mesh::SetAmbientColor(int index, glm::vec3 color)
+{
+	if (index >= 0 && index < (int)m_materials.size())
+		m_materials[index].ambientColor = color;
+}
+
 const Skeleton& Mesh::GetSkeleton() const
 {
 	return m_skeleton;
