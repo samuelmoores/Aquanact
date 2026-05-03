@@ -20,6 +20,7 @@ class Camera {
 		glm::vec3 Forward();
 		glm::vec3 Right();
 	private:
+		float ComputeSafeCameraDistance(const glm::vec3& rayOrigin, const glm::vec3& rayDir, float maxDist);
 		glm::mat4 m_projection_matrix;
 		glm::mat4 m_view_matrix;
 		glm::vec3 m_position;

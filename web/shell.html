@@ -64,9 +64,6 @@
     }, false);
 
     function unlockAudio() {
-      if (window.miniaudio && typeof window.miniaudio.unlock === "function") {
-        window.miniaudio.unlock();
-      }
       if (Module && typeof Module._Audio_Resume === "function") {
         Module._Audio_Resume();
       }

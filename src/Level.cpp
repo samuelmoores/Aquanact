@@ -59,10 +59,22 @@ void Level::Load()
 
     Audio::PlayMusic("assets/sounds/music/TheMole.mp3", true, 90.0f);
     Audio::LoadSound("footstep", "assets/sounds/sfx/Footstep_01.wav");
+    Audio::LoadSound("keypad_digit",   "assets/sounds/ui/Click_Standard_00.mp3");
+    Audio::LoadSound("keypad_nav",     "assets/sounds/ui/Click_Standard_01.mp3");
+    Audio::LoadSound("keypad_success", "assets/sounds/ui/Click_Sharp_00.mp3");
+    Audio::LoadSound("keypad_fail",    "assets/sounds/ui/UISounds_018.wav");
+    Audio::LoadSound("computer_enter", "assets/sounds/ui/Click_Standard_04.mp3");
+    Audio::LoadSound("computer_exit",  "assets/sounds/ui/Click_Standard_05.mp3");
+
+    Audio::LoadSound("keypad_enter", "assets/sounds/ui/Click_Electronic_02.mp3");
+    Audio::LoadSound("keypad_exit", "assets/sounds/ui/Click_Electronic_03.mp3");
+    
+    Audio::LoadSound("tv_enter", "assets/sounds/ui/Click_Electronic_00.mp3");
+    Audio::LoadSound("tv_exit", "assets/sounds/ui/Click_Electronic_01.mp3");
 
     Animator* playerAnimator = objects[0]->GetAnimator();
-    playerAnimator->AddEvent(1, 5.0f, [] { Audio::PlaySound("footstep", 10.0f); });
-    playerAnimator->AddEvent(1, 15.0f, [] { Audio::PlaySound("footstep", 10.0f); });
+    playerAnimator->AddEvent(1, 5.0f, [] { Audio::PlaySound("footstep", 50.0f); });
+    playerAnimator->AddEvent(1, 15.0f, [] { Audio::PlaySound("footstep", 50.0f); });
 
 }
 
@@ -98,9 +110,13 @@ void Level::LoadObject(char filepath[])
             {
                 obj->SetIgnoreCameraCollision(true);
             }
+            else
+            {
+                std::cout << "[ignore cam col false: " << (objects.size() - 1) << "] " << obj->Name() << std::endl;
+
+            }
 
             objects.push_back(obj);
-            std::cout << "[" << (objects.size() - 1) << "] " << obj->Name() << std::endl;
         }
     }
     else

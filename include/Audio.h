@@ -1,13 +1,9 @@
 #pragma once
 #include <string>
 #include <unordered_map>
-#include <vector>
 
 #ifndef __EMSCRIPTEN__
 #include <SFML/Audio.hpp>
-#else
-#include <miniaudio.h>
-#include <memory>
 #endif
 
 class Audio {
@@ -29,14 +25,6 @@ private:
     static std::unordered_map<std::string, sf::Sound> m_sounds;
     static sf::Music m_music;
 #else
-    static ma_engine m_engine;
-    static bool m_initialized;
-    static std::unordered_map<std::string, std::unique_ptr<ma_sound>> m_ma_sounds;
-    static std::unique_ptr<ma_sound> m_ma_music;
-    static std::string m_pending_music_path;
-    static bool m_pending_music_loop;
-    static float m_pending_music_volume;
     static bool m_audioUnlocked;
-    static std::vector<std::pair<std::string, std::string>> m_pending_sounds;
 #endif
 };

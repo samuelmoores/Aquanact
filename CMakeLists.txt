@@ -80,9 +80,6 @@ if (EMSCRIPTEN)
     find_package(assimp CONFIG REQUIRED)
     target_link_libraries(AquanactEngine PRIVATE assimp::assimp)
 
-    find_path(MINIAUDIO_INCLUDE_DIR NAMES miniaudio.h REQUIRED)
-    target_include_directories(AquanactEngine PRIVATE ${MINIAUDIO_INCLUDE_DIR})
-
     find_package(imgui CONFIG REQUIRED)
     target_link_libraries(AquanactEngine PRIVATE imgui::imgui)
 

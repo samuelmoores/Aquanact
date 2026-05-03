@@ -11,9 +11,11 @@
 #include <glm/gtc/constants.hpp>
 
 PlayerController::PlayerController(std::vector<Object3D*> objects)
-	: m_objects(std::move(objects)) 
+	: m_objects(std::move(objects))
 {
 	m_objects[0]->Move(glm::vec3(0));
+	m_currRot = m_nextRot = -glm::half_pi<float>();
+	m_objects[0]->SetRotation({ 0.0f, m_currRot, 0.0f });
 }
 
 void PlayerController::Update()
@@ -108,10 +110,16 @@ void PlayerController::Update()
 			else if (name.find("_05") != std::string::npos) num = 5;
 			else if (name.find("_06") != std::string::npos) num = 6;
 
+			Engine::UI->SetImageVisible(true);
+
 			if (num == 6)
 			{
 				m_keypadActive = true;
 				Engine::UI->SetKeypadVisible(true);
+				Audio::PlaySound("keypad_enter", 100.0f);
+
+				if (HUDPanel* panel = Engine::UI->GetPanel("HUD"))
+					panel->SetText(0, "AI ROUTING ACTIVE.\nPROVE HUMAN ADEQUACY.\nSIFT THE SIGNAL.\nFIND THE CODE.\n\n[ACCESS DENIED]");
 			}
 			else
 			{
@@ -154,22 +162,27 @@ void PlayerController::Update()
 				case 5: // ANALYST - Truth Node
 					message = "[ terminal 05 - analyst ]\n\nAdministrator (04) is RHF. Security (03) is\nMNHRD. The machine is one step behind;\nstep forward to find the USVUI. The third\nis the wanderers in the sky. Break the loop.\n------------------------------------\nSYNC: TJH | OVERRIDE: RHF\nSYNC: MJF | OVERRIDE: RHF"; break;
 				}
-				const char* alphabetStrip = "\n[ A B C D E F G H I J K L M N O P Q R S T U V W X Y Z ]";
-				std::string fullMessage = std::string(message) + alphabetStrip;
-				message = fullMessage.c_str();
-
 				if (HUDPanel* panel = Engine::UI->GetPanel("HUD"))
-					panel->SetText(0, message);
+				{
+					const char* alphabetStrip = "\n[ A B C D E F G H I J K L M N O P Q R S T U V W X Y Z ]";
+					panel->SetText(0, std::string(message) + alphabetStrip);
+				}
+				Audio::PlaySound("computer_enter", 80.0f);
 
-				Engine::UI->SetImageVisible(true);
 			}
 		}
 		else if (!hitComputer && m_inTrigger)
 		{
+			if (!m_keypadActive)
+				Audio::PlaySound("computer_exit", 80.0f);
+			else
+				Audio::PlaySound("keypad_exit", 100.0f);
+
 			m_inTrigger = false;
 			m_keypadActive = false;
 			Engine::UI->SetImageVisible(false);
 			Engine::UI->SetKeypadVisible(false);
+
 		}
 
 		if (m_keypadActive)
@@ -181,6 +194,7 @@ void PlayerController::Update()
 				m_keypadIndex = (m_keypadIndex + 4) % 5;
 				m_leftHeld = true;
 				m_keypadChecked = false;
+				Audio::PlaySound("keypad_nav", 80.0f);
 			}
 			if (glfwGetKey(win, GLFW_KEY_LEFT) == GLFW_RELEASE) m_leftHeld = false;
 
@@ -188,6 +202,7 @@ void PlayerController::Update()
 				m_keypadIndex = (m_keypadIndex + 1) % 5;
 				m_rightHeld = true;
 				m_keypadChecked = false;
+				Audio::PlaySound("keypad_nav", 80.0f);
 			}
 			if (glfwGetKey(win, GLFW_KEY_RIGHT) == GLFW_RELEASE) m_rightHeld = false;
 
@@ -196,24 +211,27 @@ void PlayerController::Update()
 				if (glfwGetKey(win, GLFW_KEY_UP) == GLFW_PRESS && !m_upHeld) {
 					m_keypadDigits[m_keypadIndex] = (m_keypadDigits[m_keypadIndex] + 1) % 10;
 					m_upHeld = true;
+					Audio::PlaySound("keypad_digit", 80.0f);
 				}
 				if (glfwGetKey(win, GLFW_KEY_UP) == GLFW_RELEASE) m_upHeld = false;
 
 				if (glfwGetKey(win, GLFW_KEY_DOWN) == GLFW_PRESS && !m_downHeld) {
 					m_keypadDigits[m_keypadIndex] = (m_keypadDigits[m_keypadIndex] + 9) % 10;
 					m_downHeld = true;
+					Audio::PlaySound("keypad_digit", 80.0f);
 				}
 				if (glfwGetKey(win, GLFW_KEY_DOWN) == GLFW_RELEASE) m_downHeld = false;
 			}
 			else
 			{
 				if (glfwGetKey(win, GLFW_KEY_ENTER) == GLFW_PRESS && !m_enterHeld) {
-					if (m_keypadDigits[0] == 4 && m_keypadDigits[1] == 5 && 
+					if (m_keypadDigits[0] == 4 && m_keypadDigits[1] == 5 &&
 						m_keypadDigits[2] == 7 && m_keypadDigits[3] == 2) {
 						m_codeCorrect = true;
-						Audio::PlaySound("footstep", 100.0f); 
+						Audio::PlaySound("keypad_success", 100.0f);
 					} else {
 						m_codeCorrect = false;
+						Audio::PlaySound("keypad_fail", 100.0f);
 					}
 					m_enterHeld = true;
 					m_keypadChecked = true;
@@ -232,9 +250,9 @@ void PlayerController::Update()
 		{
 			if (m_keypadActive && m_keypadIndex == 4)
 			{
-				if (m_keypadDigits[0] == 4 && m_keypadDigits[1] == 5 && 
+				if (m_keypadDigits[0] == 4 && m_keypadDigits[1] == 5 &&
 					m_keypadDigits[2] == 7 && m_keypadDigits[3] == 2) {
-					Audio::PlaySound("footstep", 100.0f); 
+					Audio::PlaySound("keypad_success", 100.0f);
 				}
 			}
 			else if (!m_keypadActive)
@@ -290,11 +308,15 @@ void PlayerController::Update()
 			if (HUDPanel* panel = Engine::UI->GetPanel("HUD"))
 				panel->SetText(0, hint);
 			Engine::UI->SetImageVisible(true);
+			Audio::PlaySound("tv_enter", 100.0f);
+
 		}
 		else if (!hitTv && m_inTvTrigger)
 		{
 			m_inTvTrigger = false;
 			Engine::UI->SetImageVisible(false);
+			Audio::PlaySound("tv_exit", 100.0f);
+
 		}
 	}
 

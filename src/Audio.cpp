@@ -59,154 +59,156 @@ void Audio::SetMusicVolume(float volume) {
 
 #else
 
-#define MINIAUDIO_IMPLEMENTATION
-#include <miniaudio.h>
 #include <emscripten.h>
 
 extern "C" {
     EMSCRIPTEN_KEEPALIVE void Audio_Resume();
 }
 
-ma_engine Audio::m_engine;
-bool Audio::m_initialized = false;
 bool Audio::m_audioUnlocked = false;
-std::unordered_map<std::string, std::unique_ptr<ma_sound>> Audio::m_ma_sounds;
-std::unique_ptr<ma_sound> Audio::m_ma_music;
-std::string Audio::m_pending_music_path;
-bool Audio::m_pending_music_loop = true;
-float Audio::m_pending_music_volume = 50.f;
-std::vector<std::pair<std::string, std::string>> Audio::m_pending_sounds;
 
 void Audio::Init() {
-    // Intentionally deferred — the miniaudio engine creates a ScriptProcessorNode
-    // immediately on init, and its onaudioprocess fires even while AudioContext is
-    // suspended, causing buffer-undefined crashes. Engine init is done in Resume()
-    // after the user gesture unlocks the AudioContext.
+    EM_ASM({
+        if (Module.__aquanactAudio) return;
+
+        function mimeFor(path) {
+            var lower = path.toLowerCase();
+            if (lower.endsWith(".mp3")) return "audio/mpeg";
+            if (lower.endsWith(".wav")) return "audio/wav";
+            return "application/octet-stream";
+        }
+
+        function fileUrl(path) {
+            var bytes = FS.readFile(path);
+            var blob = new Blob([bytes], { type: mimeFor(path) });
+            return URL.createObjectURL(blob);
+        }
+
+        Module.__aquanactAudio = {};
+        Module.__aquanactAudio.unlocked = false;
+        Module.__aquanactAudio.sounds = Object.create(null);
+        Module.__aquanactAudio.music = null;
+        Module.__aquanactAudio.pendingMusic = null;
+        Module.__aquanactAudio.fileUrl = fileUrl;
+    });
 }
 
 void Audio::Resume() {
     if (m_audioUnlocked) return;
-
-    // Initialize the engine here, after a user gesture, so the ScriptProcessorNode
-    // is only created once the AudioContext is ready to run.
-    if (!m_initialized) {
-        ma_result result = ma_engine_init(NULL, &m_engine);
-        if (result != MA_SUCCESS) {
-            std::cerr << "Audio: Failed to initialize miniaudio engine (" << result << ")\n";
-            return;
-        }
-        m_initialized = true;
-    }
-
-    std::cout << "Audio: Resuming audio engine..." << std::endl;
+    Init();
 
     EM_ASM({
-        if (typeof window !== 'undefined' && window.miniaudio) {
-            if (typeof window.miniaudio.unlock === 'function') {
-                window.miniaudio.unlock();
-            } else if (window.miniaudio.devices) {
-                for (var i = 0; i < window.miniaudio.devices.length; i++) {
-                    var d = window.miniaudio.devices[i];
-                    if (d && d.webaudio && d.webaudio.context)
-                        d.webaudio.context.resume();
-                }
-            }
+        var audio = Module.__aquanactAudio;
+        audio.unlocked = true;
+
+        if (audio.pendingMusic && !audio.music) {
+            var pending = audio.pendingMusic;
+            audio.pendingMusic = null;
+            var elem = new Audio(audio.fileUrl(pending.path));
+            elem.loop = pending.loop;
+            elem.volume = pending.volume;
+            elem.play().catch(function() {});
+            audio.music = elem;
         }
     });
 
-    ma_engine_start(&m_engine);
     m_audioUnlocked = true;
-
-    // Load any sounds that were queued before the engine was ready.
-    for (auto& [name, path] : m_pending_sounds)
-        LoadSound(name, path);
-    m_pending_sounds.clear();
-
-    // audioContext.resume() is async; defer music start slightly so the context
-    // is actually running before ma_sound_start() fires.
-    if (!m_pending_music_path.empty() && !m_ma_music) {
-        emscripten_async_call([](void*) {
-            std::cout << "Audio: Playing pending music: " << m_pending_music_path << std::endl;
-            PlayMusic(m_pending_music_path, m_pending_music_loop, m_pending_music_volume);
-        }, nullptr, 100);
-    }
 }
 
 void Audio::LoadSound(const std::string& name, const std::string& path) {
-    if (!m_initialized) {
-        m_pending_sounds.push_back({name, path});
-        return;
-    }
-
-    auto sound = std::make_unique<ma_sound>();
-    ma_result result = ma_sound_init_from_file(&m_engine, path.c_str(), 0, NULL, NULL, sound.get());
-    if (result != MA_SUCCESS) {
-        std::cerr << "Audio: Failed to load sound '" << name << "' from " << path << " (" << result << ")\n";
-        return;
-    }
-    m_ma_sounds[name] = std::move(sound);
+    Init();
+    EM_ASM({
+        var name = UTF8ToString($0);
+        var path = UTF8ToString($1);
+        var audio = Module.__aquanactAudio;
+        var url = audio.fileUrl(path);
+        var elem = new Audio(url);
+        elem.preload = "auto";
+        audio.sounds[name] = {};
+        audio.sounds[name].url = url;
+        audio.sounds[name].elem = elem;
+    }, name.c_str(), path.c_str());
 }
 
 void Audio::PlaySound(const std::string& name, float volume) {
-    auto it = m_ma_sounds.find(name);
-    if (it == m_ma_sounds.end()) {
-        std::cerr << "Audio: sound '" << name << "' not loaded\n";
-        return;
-    }
-    ma_sound_set_volume(it->second.get(), volume / 100.0f);
-    ma_sound_seek_to_pcm_frame(it->second.get(), 0);
-    ma_sound_start(it->second.get());
+    Init();
+    EM_ASM({
+        var name = UTF8ToString($0);
+        var volume = Math.max(0, Math.min(1, $1 / 100.0));
+        var audio = Module.__aquanactAudio;
+        var sound = audio.sounds[name];
+        if (!sound || !audio.unlocked) return;
+
+        var elem = sound.elem.paused ? sound.elem : new Audio(sound.url);
+        elem.currentTime = 0;
+        elem.volume = volume;
+        elem.play().catch(function() {});
+    }, name.c_str(), volume);
 }
 
 void Audio::StopSound(const std::string& name) {
-    auto it = m_ma_sounds.find(name);
-    if (it != m_ma_sounds.end())
-        ma_sound_stop(it->second.get());
+    Init();
+    EM_ASM({
+        var name = UTF8ToString($0);
+        var sound = Module.__aquanactAudio.sounds[name];
+        if (!sound) return;
+        sound.elem.pause();
+        sound.elem.currentTime = 0;
+    }, name.c_str());
 }
 
 void Audio::PlayMusic(const std::string& path, bool loop, float volume) {
-    m_pending_music_path = path;
-    m_pending_music_loop = loop;
-    m_pending_music_volume = volume;
+    Init();
+    EM_ASM({
+        var path = UTF8ToString($0);
+        var loop = !!$1;
+        var volume = Math.max(0, Math.min(1, $2 / 100.0));
+        var audio = Module.__aquanactAudio;
 
-    if (!m_initialized) Init();
-    if (!m_initialized) return;
+        if (audio.music) {
+            audio.music.pause();
+            audio.music = null;
+        }
 
-    // Defer actual playback until the browser's AudioContext is unlocked by a user gesture
-    if (!m_audioUnlocked) {
-        std::cout << "Audio: Music deferred until unlocked: " << path << std::endl;
-        return;
-    }
+        if (!audio.unlocked) {
+            audio.pendingMusic = {};
+            audio.pendingMusic.path = path;
+            audio.pendingMusic.loop = loop;
+            audio.pendingMusic.volume = volume;
+            return;
+        }
 
-    if (m_ma_music) {
-        ma_sound_stop(m_ma_music.get());
-        ma_sound_uninit(m_ma_music.get());
-    }
-
-    m_ma_music = std::make_unique<ma_sound>();
-    // USE MA_SOUND_FLAG_STREAM instead of MA_SOUND_FLAG_DECODE to avoid freezing the main thread!
-    ma_result result = ma_sound_init_from_file(&m_engine, path.c_str(), MA_SOUND_FLAG_STREAM, NULL, NULL, m_ma_music.get());
-    if (result != MA_SUCCESS) {
-        std::cerr << "Audio: Failed to open music from " << path << " (" << result << ")\n";
-        m_ma_music.reset();
-        return;
-    }
-
-    ma_sound_set_looping(m_ma_music.get(), loop ? MA_TRUE : MA_FALSE);
-    ma_sound_set_volume(m_ma_music.get(), volume / 100.0f);
-    ma_sound_start(m_ma_music.get());
-    std::cout << "Audio: Music started: " << path << std::endl;
+        var elem = new Audio(audio.fileUrl(path));
+        elem.loop = loop;
+        elem.volume = volume;
+        elem.play().catch(function() {});
+        audio.music = elem;
+    }, path.c_str(), loop ? 1 : 0, volume);
 }
 
 void Audio::StopMusic() {
-    m_pending_music_path.clear();
-    if (m_ma_music)
-        ma_sound_stop(m_ma_music.get());
+    Init();
+    EM_ASM({
+        var audio = Module.__aquanactAudio;
+        audio.pendingMusic = null;
+        if (audio.music) {
+            audio.music.pause();
+            audio.music.currentTime = 0;
+            audio.music = null;
+        }
+    });
 }
 
 void Audio::SetMusicVolume(float volume) {
-    if (m_ma_music)
-        ma_sound_set_volume(m_ma_music.get(), volume / 100.0f);
+    Init();
+    EM_ASM({
+        var audio = Module.__aquanactAudio;
+        var volume = Math.max(0, Math.min(1, $0 / 100.0));
+        if (audio.music)
+            audio.music.volume = volume;
+        if (audio.pendingMusic)
+            audio.pendingMusic.volume = volume;
+    }, volume);
 }
 
 extern "C" {

@@ -61,6 +61,74 @@ glm::vec3 Camera::GetFacing()
 }
 
 
+float Camera::ComputeSafeCameraDistance(const glm::vec3& rayOrigin, const glm::vec3& rayDir, float maxDist)
+{
+	const float minDist = 1.0f;
+	const float padding = 10.0f;
+	float closestHit = maxDist;
+	float allowedDist = maxDist;
+
+	// First pass: blocking objects cap how far the camera can go
+	for (int i = 1; i < objects_camera.size(); i++)
+	{
+		if (objects_camera[i]->IgnoreCameraCollision()) continue;
+
+		Mesh* mesh = objects_camera[i]->GetMesh();
+		glm::vec3 mn = mesh->minBounds();
+		glm::vec3 mx = mesh->maxBounds();
+
+		// lookAt inside a blocking AABB — camera must stay at minDist
+		if (rayOrigin.x >= mn.x && rayOrigin.x <= mx.x &&
+			rayOrigin.y >= mn.y && rayOrigin.y <= mx.y &&
+			rayOrigin.z >= mn.z && rayOrigin.z <= mx.z)
+		{
+			return minDist;
+		}
+
+		float t = 0;
+		if (mesh->RayHit(rayOrigin, rayDir, t) && t < closestHit)
+		{
+			closestHit = t;
+			allowedDist = std::max(minDist, t - padding);
+		}
+	}
+
+	float cameraDist = std::min(maxDist, allowedDist);
+
+	// Second pass: pass-through objects — camera may not rest inside their AABB.
+	// If cameraDist lands in [tNear, tFar], push behind the object (tFar + padding)
+	// when there is room; otherwise pull in front (tNear - padding).
+	for (int i = 1; i < objects_camera.size(); i++)
+	{
+		if (!objects_camera[i]->IgnoreCameraCollision()) continue;
+
+		Mesh* mesh = objects_camera[i]->GetMesh();
+		glm::vec3 mn = mesh->minBounds();
+		glm::vec3 mx = mesh->maxBounds();
+		glm::vec3 invDir = 1.0f / rayDir;
+
+		glm::vec3 t0 = (mn - rayOrigin) * invDir;
+		glm::vec3 t1 = (mx - rayOrigin) * invDir;
+		glm::vec3 tminV = glm::min(t0, t1);
+		glm::vec3 tmaxV = glm::max(t0, t1);
+		float tNear = std::max({ tminV.x, tminV.y, tminV.z });
+		float tFar  = std::min({ tmaxV.x, tmaxV.y, tmaxV.z });
+
+		if (tNear > tFar || tFar < 0.0f) continue;
+		tNear = std::max(tNear, 0.0f);
+
+		if (cameraDist < tNear || cameraDist > tFar) continue; // not inside this AABB
+
+		float behindDist = tFar + padding;
+		if (behindDist <= allowedDist)
+			cameraDist = behindDist;
+		else
+			cameraDist = std::max(minDist, tNear - padding);
+	}
+
+	return cameraDist;
+}
+
 void Camera::CameraControl(glm::vec2 mouseDiff)
 {
 	glm::vec3 originalPosition = m_position;
@@ -95,41 +163,9 @@ void Camera::CameraControl(glm::vec2 mouseDiff)
 	//construct ray and max distance
 	glm::vec3 rayOrigin = m_lookAt;
 	glm::vec3 rayDir = glm::normalize(desiredPos - m_lookAt);
-	float maxDist = m_defaultDistance;
-	float allowedDistance = glm::length(desiredPos - m_lookAt);
-	float minDist = 1.0f;
-	float cameraDist = maxDist;
-	float closestHit = maxDist;
-	bool hit = false;
 
-	float t = 0;
-	float cameraPadding = 10.0f;
-
-	//loop through each object
-	for (int i = 1; i < objects_camera.size(); i++)
-	{
-		if (objects_camera[i]->IgnoreCameraCollision())
-			continue;
-
-		if (objects_camera[i]->GetMesh()->RayHit(rayOrigin, rayDir, t) && t < closestHit)
-		{
-			allowedDistance = std::max(minDist, t - cameraPadding);
-			if (t < minDist)
-			{
-				//problem
-			}
-			break;
-		}
-		else
-		{
-			allowedDistance = maxDist;
-		}
-	}
-	
-	cameraDist = std::min(maxDist, allowedDistance);
+	float cameraDist = ComputeSafeCameraDistance(rayOrigin, rayDir, m_defaultDistance);
 	m_position = m_lookAt + rayDir * cameraDist;
-	
-	//m_position = desiredPos;
 	m_view_matrix = glm::lookAt(m_position, m_lookAt, m_up);
 
 }
@@ -150,11 +186,13 @@ void Camera::CameraControl(float scroll)
 	// Update the default distance (the target distance the camera wants to be at)
 	m_defaultDistance = newDistance;
 
-	// Update position immediately based on new distance
+	// Update position immediately, respecting collision
 	glm::vec3 dir = m_position - m_lookAt;
 	if (glm::length(dir) > 0.001f)
 	{
-		m_position = m_lookAt + glm::normalize(dir) * m_defaultDistance;
+		glm::vec3 rayDir = glm::normalize(dir);
+		float safeDist = ComputeSafeCameraDistance(m_lookAt, rayDir, m_defaultDistance);
+		m_position = m_lookAt + rayDir * safeDist;
 		m_view_matrix = glm::lookAt(m_position, m_lookAt, m_up);
 	}
 }
@@ -165,8 +203,8 @@ void Camera::Focus(glm::vec3 min, glm::vec3 max)
 	m_lookAt.y = max.y * 0.8f; // Look at upper body
 
 	// Reset yaw/pitch to a default view
-	yaw = -90.0f;
-	pitch = 20.0f;
+	yaw = 180.0f;
+	pitch = -10.0f;
 
 	float yawRad = glm::radians(yaw);
 	float pitchRad = glm::radians(-pitch);
