@@ -119,7 +119,7 @@ void PlayerController::Update()
 				Audio::PlaySound("keypad_enter", 100.0f);
 
 				if (HUDPanel* panel = Engine::UI->GetPanel("HUD"))
-					panel->SetText(0, "AI ROUTING ACTIVE.\nPROVE HUMAN ADEQUACY.\nSIFT THE SIGNAL.\nFIND THE CODE.\n\n[ACCESS DENIED]");
+					panel->SetText(0, "AI ROUTING ACTIVE.\nPROVE HUMAN ADEQUACY.\nSIFT THE SIGNAL.\nFIND THE CODE.");
 			}
 			else
 			{
@@ -229,6 +229,7 @@ void PlayerController::Update()
 						m_keypadDigits[2] == 7 && m_keypadDigits[3] == 2) {
 						m_codeCorrect = true;
 						Audio::PlaySound("keypad_success", 100.0f);
+						m_movingObject66 = true;
 					} else {
 						m_codeCorrect = false;
 						Audio::PlaySound("keypad_fail", 100.0f);
@@ -253,6 +254,7 @@ void PlayerController::Update()
 				if (m_keypadDigits[0] == 4 && m_keypadDigits[1] == 5 &&
 					m_keypadDigits[2] == 7 && m_keypadDigits[3] == 2) {
 					Audio::PlaySound("keypad_success", 100.0f);
+					m_movingObject66 = true;
 				}
 			}
 			else if (!m_keypadActive)
@@ -339,6 +341,19 @@ void PlayerController::Update()
 			m_blendRot = false;
 		}
 		m_objects[0]->SetRotation({ 0.0f, m_currRot, 0.0f });
+	}
+
+	if (m_movingObject66 && m_object66MoveDistanceRemaining > 0.0f && m_objects.size() > 66)
+	{
+		float moveStep = 50.0f * Engine::DeltaFrameTime();
+		if (moveStep > m_object66MoveDistanceRemaining)
+			moveStep = m_object66MoveDistanceRemaining;
+
+		m_objects[66]->Translate(glm::vec3(moveStep, 0, 0));
+		m_object66MoveDistanceRemaining -= moveStep;
+
+		if (m_object66MoveDistanceRemaining <= 0.0f)
+			m_movingObject66 = false;
 	}
 }
 

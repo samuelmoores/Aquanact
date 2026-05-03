@@ -135,6 +135,12 @@ void Object3D::Move(glm::vec3 delta)
 	updateMeshAABB(delta);
 }
 
+void Object3D::Translate(glm::vec3 delta)
+{
+	m_position += delta;
+	updateMeshAABB(delta);
+}
+
 glm::vec3 Object3D::Position()
 {
 	return m_position;

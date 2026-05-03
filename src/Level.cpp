@@ -112,7 +112,7 @@ void Level::LoadObject(char filepath[])
             }
             else
             {
-                std::cout << "[ignore cam col false: " << (objects.size() - 1) << "] " << obj->Name() << std::endl;
+                std::cout << "[" << (objects.size() - 1) << "] " << obj->Name() << std::endl;
 
             }
 

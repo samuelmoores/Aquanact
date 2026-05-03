@@ -17,6 +17,7 @@ public:
 	glm::mat4 BuildModelMatrix();
 	void Rotate(glm::vec3 delta);
 	void Move(glm::vec3 delta);
+	void Translate(glm::vec3 delta);
 	void Scale(glm::vec3 delta);
 	void SetScale(glm::vec3 scale);
 	void updateMeshAABB(glm::vec3 delta);

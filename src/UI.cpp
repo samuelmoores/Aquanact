@@ -37,7 +37,7 @@ UI::UI()
     unsigned int panelTex = LoadTexture("assets/ui/PanelWindow.tga", &w, &h);
     AddPanel("HUD", {(float)w * 1.25f, (float)h * 1.25f})
         .AddImage(panelTex)
-        .AddText("AI ROUTING ACTIVE.\nPROVE HUMAN ADEQUACY.\nSIFT THE SIGNAL.\nFIND THE CODE.\n\n[ACCESS DENIED]", { HUD_CENTER, 50.f }, { 1,1,1,1 }, 1.5f);
+        .AddText("AI ROUTING ACTIVE.\nPROVE HUMAN ADEQUACY.\nSIFT THE SIGNAL.\nFIND THE CODE.", { HUD_CENTER, 50.f }, { 1,1,1,1 }, 1.5f);
 }
 
 UI::~UI()

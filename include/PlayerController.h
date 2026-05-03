@@ -39,4 +39,7 @@ private:
 	bool m_enterHeld = false;
 	bool m_codeCorrect = false;
 	bool m_keypadChecked = false;
+
+	bool  m_movingObject66 = false;
+	float m_object66MoveDistanceRemaining = 350.0f;
 };
