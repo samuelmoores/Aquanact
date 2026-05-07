@@ -45,7 +45,7 @@ Object3D::Object3D(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 	m_scale = glm::vec3(1);
 }
 
-Object3D::Object3D(char modelFile[])
+Object3D::Object3D(const char* modelFile)
 {
 	m_mesh = new Mesh(modelFile);
 	m_skinned = m_mesh->Skinned();

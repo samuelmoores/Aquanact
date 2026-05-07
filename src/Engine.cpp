@@ -25,7 +25,6 @@ Engine::Engine()
     Renderer->Init();
     glfwSwapInterval(1);
     glEnable(GL_DEPTH_TEST);
-    Level->Load();
 }
 
 bool Engine::Running()

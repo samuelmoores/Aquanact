@@ -6,6 +6,8 @@
 #include <vector>
 #include <cmath>
 
+class MainMenu;
+
 // Pass HUD_CENTER for an axis to auto-center on that axis, or any pixel value to pin it.
 static constexpr float HUD_CENTER = std::numeric_limits<float>::quiet_NaN();
 
@@ -58,6 +60,8 @@ public:
     HUDPanel*    GetPanel(const std::string& name);
     unsigned int LoadTexture(const char* path, int* outW = nullptr, int* outH = nullptr);
 
+    void SetMainMenu(MainMenu* mm) { m_mainMenu = mm; }
+
     enum class KeypadStatus { Neutral, Success, Failure };
     void SetKeypadVisible(bool visible) { m_keypadVisible = visible; }
     void SetKeypadData(int selectedIndex, const int digits[4], KeypadStatus status = KeypadStatus::Neutral) {
@@ -77,4 +81,6 @@ private:
     int  m_keypadSelectedIndex = 0;
     int  m_keypadDigits[4] = {0,0,0,0};
     KeypadStatus m_keypadStatus = KeypadStatus::Neutral;
+
+    MainMenu* m_mainMenu = nullptr;
 };

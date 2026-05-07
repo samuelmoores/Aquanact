@@ -74,10 +74,11 @@ Mesh::Mesh(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 	SetBuffers(vertices, faces);
 	SetTexture("models/brick_wall_diff.png");
 }
-Mesh::Mesh(char modelFile[])
+Mesh::Mesh(const char* modelFile)
 {
 	m_currVao = 0;
 	m_currTextureColor = 0;
+	m_showFog = false;
 
 	assimpLoad(modelFile, true);
 
@@ -493,6 +494,16 @@ int Mesh::NumAnimations() const { return (int)m_animations.size(); }
 aiAnimation* Mesh::GetAnimation(int i) const { return m_animations[i]; }
 const aiNode* Mesh::GetRootNode() const { return m_scene->mRootNode; }
 
+void Mesh::SetShowFog(bool showFog)
+{
+	m_showFog = showFog;
+}
+
+bool Mesh::ShowFog()
+{
+	return m_showFog;
+}
+
 
 
 //getter setter
@@ -646,8 +657,9 @@ void Mesh::ClearBufferIndex()
 void Mesh::Bind()
 {
 	glBindVertexArray(m_vao[m_currVao]);
-	glActiveTexture(GL_TEXTURE0);// + m_currTextureColor);
-	glBindTexture(GL_TEXTURE_2D, m_textureColor[m_currTextureColor]);
+	glActiveTexture(GL_TEXTURE0);
+	if (m_currTextureColor < (int)m_textureColor.size())
+		glBindTexture(GL_TEXTURE_2D, m_textureColor[m_currTextureColor]);
 }
 void Mesh::UnBind() 
 {

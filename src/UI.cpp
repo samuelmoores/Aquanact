@@ -2,6 +2,7 @@
 #include <Engine.h>
 #include <StbImage.h>
 #include <GLHeaders.h>
+#include "MainMenu.h"
 
 HUDPanel& HUDPanel::AddImage(unsigned int tex, ImVec2 sz, ImVec2 pos)
 {
@@ -90,6 +91,7 @@ HUDPanel* UI::GetPanel(const std::string& name)
 void UI::Loop()
 {
     bool anyVisible = false;
+    if (m_mainMenu && m_mainMenu->IsVisible()) anyVisible = true;
     if (m_keypadVisible) anyVisible = true;
     for (auto& panel : m_panels)
         if (panel.visible) { anyVisible = true; break; }
@@ -98,6 +100,9 @@ void UI::Loop()
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
+
+    if (m_mainMenu && m_mainMenu->IsVisible())
+        m_mainMenu->Render();
 
     for (auto& panel : m_panels)
         if (panel.visible) RenderPanel(panel);

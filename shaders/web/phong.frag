@@ -19,6 +19,10 @@ uniform vec3 ambientColor;
 uniform vec3 viewPos;
 uniform int bone;
 
+uniform vec3 fogColor;
+uniform bool showFog;
+uniform float fogBlend;
+
 #define MAX_POINT_LIGHTS 8
 
 struct PointLight {
@@ -111,4 +115,17 @@ void main()
 
     vec3 lightIntensity = ambientIntensity + diffuseIntensity + specularIntensity;
     FragColor = vec4(lightIntensity, 1.0) * texture(baseTexture, TexCoord);
+
+    if (showFog)
+    {
+        float distance = length(viewPos - FragWorldPos);
+
+        float fogMin = 500.0;
+        float fogMax = 5000.0;
+
+        float fogFactor = (distance - fogMin) / (fogMax - fogMin);
+        fogFactor = clamp(fogFactor, 0.0, 1.0);
+
+        FragColor = mix(FragColor, vec4(fogColor, 1.0), fogFactor * fogBlend);
+    }
 }

@@ -30,7 +30,8 @@ void Input::MouseButtonCallback(GLFWwindow* window, int button, int action, int 
     if (!self->m_windowActive && action == GLFW_PRESS)
     {
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-        self->m_windowActive = true;
+        self->m_windowActive  = true;
+        self->m_mouseHasMoved = false;
         double xpos, ypos;
         glfwGetCursorPos(window, &xpos, &ypos);
         self->m_mouseLast = glm::vec2(xpos, ypos);
@@ -122,6 +123,14 @@ bool Input::JustReleased(Action a) const
     return it != m_actions.end() && it->second.justReleased;
 }
 
+void Input::ResetMouseLook()
+{
+    double xpos, ypos;
+    glfwGetCursorPos(Engine::Window->GLFW(), &xpos, &ypos);
+    m_mouseLast   = glm::vec2(xpos, ypos);
+    m_mouseHasMoved = false;
+}
+
 glm::vec2 Input::MoveInput() const
 {
     float fwd = (IsDown(Action::MoveForward) ? 1.0f : 0.0f) - (IsDown(Action::MoveBack)  ? 1.0f : 0.0f);
@@ -146,6 +155,13 @@ void Input::Loop()
     double xpos, ypos;
     glfwGetCursorPos(Engine::Window->GLFW(), &xpos, &ypos);
     m_mouseCurr = glm::vec2(xpos, ypos);
-    Engine::Camera->CameraControl(m_mouseCurr - m_mouseLast);
+    glm::vec2 delta = m_mouseCurr - m_mouseLast;
     m_mouseLast = m_mouseCurr;
+
+    if (!m_mouseHasMoved) {
+        if (delta.x != 0.0f || delta.y != 0.0f)
+            m_mouseHasMoved = true;
+        return;
+    }
+    Engine::Camera->CameraControl(delta);
 }

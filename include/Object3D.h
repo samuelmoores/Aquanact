@@ -9,7 +9,7 @@
 class Object3D {
 public:
 	Object3D(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces);
-	Object3D(char modelFile[]);
+	Object3D(const char* modelFile);
 	~Object3D();
 	Mesh* GetMesh();
 	ShaderProgram* GetShader();

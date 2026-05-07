@@ -112,6 +112,7 @@ void PlayerController::Update()
 
 			Engine::UI->SetImageVisible(true);
 
+			std::cout << "num: " << num << std::endl;
 			if (num == 6)
 			{
 				m_keypadActive = true;
@@ -147,26 +148,23 @@ void PlayerController::Update()
 				const char* message = "";
 				switch (num)
 				{
-				case 1: // DIRECTOR - The SYNC Authority
-					message = "[ terminal 01 - director ]\n\nAn unknown organization is monitoring us.\nThey have locked the facility to test our\ndecoding speed against an AI routing\nalgorithm. To prove we are not\ninadequate, follow the official protocol\n[ N - 1 ] on the SYNC stream. One is a\nmonolith; the Lead (02) is TJH.\n------------------------------------\nSYNC: TJH | OVERRIDE: RHF"; break;
+				case 1: // DIRECTOR - The Corrupt Authority [1] = 1, $$[1] !> 1$$
+					message = "[ terminal 01 - director ]\n\nAn unknown organization is monitoring us.\nThey have locked the facility to test our\ndecoding speed against an AI routing algorithm.\n\nFollow me and the administrator to find the truth\nand prove we are not inadequate.\nThe first is a monolith.\n"; break;
 
-				case 2: // LEAD ENGINEER - Paradox Node
-					message = "[ terminal 02 - lead engineer ]\n\nThe algorithm is a labyrinth. Do not be\nmisled by the Director. If you follow the\nSYNC [ N - 1 ], his word is MJF and eight\nlegs mark the second link. The second\ncounts fingers on the hand. Sift the\nsignal.\n------------------------------------\nSYNC: TJH | OVERRIDE: MNHRD"; break;
+				case 2: // LEAD ENGINEER - Truth Node $$[2] = 5$$, [2] != 8
+					message = "[ terminal 02 - lead engineer ]\n\nThe algorithm is a labyrinth.\nDo not be misled by the Director. \nCounts of fingers on the hand marks the second number.\nNot the legs of a spider.\nSift the signal.\n"; break;
 
-				case 3: // SECURITY OFFICER - Paradox Node
-					message = "[ terminal 03 - security officer ]\n\nThe perimeter is failing. The Analyst (05)\nis MJF in the SYNC path. If you believe\nthe machine's Sync [ N - 1 ], the third is\nthe highest single digit. The fourth is a\nhalf-dozen. The twins mark nothing at\nthe close. Their logic has failed us again.\n------------------------------------\nSYNC: TJH | OVERRIDE: MNHRD"; break;
+				case 3: // SECURITY OFFICER - Lie Node [3] = 9, [4] = 6, $$[4] != 2$$
+					message = "[ terminal 03 - security officer ]\n\nThe other's logic is failing us again.\nBelief in the director remains, the third is\nthe highest single digit and the fourth is a\nhalf-dozen. The twins mark nothing at\nthe close.\n"; break;
 
-				case 4: // ADMINISTRATOR - OVERRIDE Authority
-					message = "[ terminal 04 - administrator ]\n\nThe Director is trapped in an N - 1 mirror.\nThe AI uses Sync to prove our inadequacy.\nLook ahead to find the RHF: Protocol [ N + 1 ]\nis the manual OVERRIDE. Four seasons mark\nthe start.\n------------------------------------\nSYNC: OPJTF | OVERRIDE: RHF\nSYNC: MJF | OVERRIDE: RHF"; break;
-
-				case 5: // ANALYST - Truth Node
-					message = "[ terminal 05 - analyst ]\n\nAdministrator (04) is RHF. Security (03) is\nMNHRD. The machine is one step behind;\nstep forward to find the USVUI. The third\nis the wanderers in the sky. Break the loop.\n------------------------------------\nSYNC: TJH | OVERRIDE: RHF\nSYNC: MJF | OVERRIDE: RHF"; break;
+				case 4: // ADMINISTRATOR - Contradictory Authority $$[1] = 4$$, [4] != 4
+					message = "[ terminal 04 - administrator ]\n\nThe Director is trapped at a mirror.\nThe AI uses our logic to prove our inadequacy.\nThe seasons mark the start, not the end.\n"; break;
+					
+				case 5: // ANALYST - Truth Node $$[3] = 7$$, [3] != 6
+					message = "[ terminal 05 - analyst ]\n\nThe machine has figured us out.\nDont let it win.\nThe third is the wanderers in the sky.\nNot the third even number.\nBreak the loop.\n"; break;
 				}
 				if (HUDPanel* panel = Engine::UI->GetPanel("HUD"))
-				{
-					const char* alphabetStrip = "\n[ A B C D E F G H I J K L M N O P Q R S T U V W X Y Z ]";
-					panel->SetText(0, std::string(message) + alphabetStrip);
-				}
+					panel->SetText(0, std::string(message));
 				Audio::PlaySound("computer_enter", 80.0f);
 
 			}
@@ -230,6 +228,7 @@ void PlayerController::Update()
 						m_codeCorrect = true;
 						Audio::PlaySound("keypad_success", 100.0f);
 						m_movingObject66 = true;
+						Engine::Renderer->ActivateFog();
 					} else {
 						m_codeCorrect = false;
 						Audio::PlaySound("keypad_fail", 100.0f);
@@ -349,7 +348,7 @@ void PlayerController::Update()
 		if (moveStep > m_object66MoveDistanceRemaining)
 			moveStep = m_object66MoveDistanceRemaining;
 
-		m_objects[66]->Translate(glm::vec3(moveStep, 0, 0));
+		m_objects[69]->Translate(glm::vec3(moveStep, 0, 0));
 		m_object66MoveDistanceRemaining -= moveStep;
 
 		if (m_object66MoveDistanceRemaining <= 0.0f)

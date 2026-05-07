@@ -208,6 +208,7 @@ void ShaderProgram::setUniform(const std::string& uniformName, const glm::mat4& 
 
 void ShaderProgram::setUniform(const std::string& uniformName, const std::vector<glm::mat4>& values) const
 {
+    if (values.empty()) return;
     GLint boneUniformLocation = glGetUniformLocation(m_programId, uniformName.c_str());
     glUniformMatrix4fv(boneUniformLocation, values.size(), GL_FALSE, glm::value_ptr(values[0]));
 }

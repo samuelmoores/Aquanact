@@ -21,6 +21,13 @@ void Renderer::ClearPointLights()
 	m_pointLights.clear();
 }
 
+void Renderer::ActivateFog()
+{
+	m_fogActive = true;
+	for (Object3D* obj : Engine::Level->Objects())
+		obj->GetMesh()->SetShowFog(true);
+}
+
 glm::mat4 AiToGlm(const aiMatrix4x4& aiMat)
 {
 	glm::mat4 result;
@@ -71,6 +78,9 @@ void Renderer::Flush(Camera* camera)
 		commands[i].shader->setUniform("projection", camera->GetProjectionMatrix());
 		commands[i].shader->setUniform("skinned", commands[i].isSkinned);
 		commands[i].shader->setUniform("viewPos", camera->GetPosition());
+		commands[i].shader->setUniform("showFog", commands[i].mesh->ShowFog());
+		commands[i].shader->setUniform("fogColor", m_fogColor);
+		commands[i].shader->setUniform("fogBlend", m_fogBlend);
 
 		//apply transforms
 		if (commands[i].isSkinned)
@@ -124,9 +134,22 @@ void Renderer::Flush(Camera* camera)
 	commands.clear();
 }
 
+void Renderer::RenderMenuOnly()
+{
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	Engine::UI->Loop();
+}
+
 void Renderer::Loop()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	if (m_fogActive && m_fogBlend < 1.0f)
+	{
+		constexpr float kFogFadeSeconds = 7.0f;
+		m_fogBlend += (float)Engine::DeltaFrameTime() / kFogFadeSeconds;
+		if (m_fogBlend > 1.0f) m_fogBlend = 1.0f;
+	}
 
 	std::vector<Object3D*> objects = Engine::Level->Objects();
 	Engine::Level->DrawAxis();

@@ -37,7 +37,7 @@ class Mesh {
 	public:
 		Mesh();
 		Mesh(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces);
-		Mesh(char modelFile[]);
+		Mesh(const char* modelFile);
 
 		//loading
 		void assimpLoad(const std::string& path, bool flipUvs);
@@ -78,6 +78,10 @@ class Mesh {
 		aiAnimation* GetAnimation(int i) const;
 		const aiNode* GetRootNode() const;
 
+		//fog
+		void SetShowFog(bool showFog);
+		bool ShowFog();
+
 	private:
 		std::vector<Vertex3D> m_vertices;
 		std::vector<uint32_t> m_faces;
@@ -102,4 +106,5 @@ class Mesh {
 		std::vector<aiAnimation*> m_animations;
 		std::vector<SubMeshMaterial> m_materials;
 		static SubMeshMaterial s_defaultMaterial;
+		bool m_showFog;
 };

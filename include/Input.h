@@ -31,6 +31,7 @@ public:
 	bool      JustPressed(Action a) const;
 	bool      JustReleased(Action a) const;
 	glm::vec2 MoveInput() const;
+	void      ResetMouseLook();
 
 private:
 	void UpdateActionStates();
@@ -49,7 +50,8 @@ private:
 	std::unordered_map<int, Action>         m_bindings;
 	std::unordered_map<Action, ActionState> m_actions;
 
-	glm::vec2 m_mouseLast    = glm::vec2(0);
-	glm::vec2 m_mouseCurr    = glm::vec2(0);
-	bool      m_windowActive = true;
+	glm::vec2 m_mouseLast      = glm::vec2(0);
+	glm::vec2 m_mouseCurr      = glm::vec2(0);
+	bool      m_windowActive   = true;
+	bool      m_mouseHasMoved  = false;
 };
