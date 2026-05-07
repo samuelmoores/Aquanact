@@ -17,93 +17,6 @@ std::vector<Object3D*> Level::Objects()
 
 void Level::Load()
 {
-	m_axis = Axis(1000.0f, 100.0f);
-
-    PointLight pl;
-    pl.position  = glm::vec3(-400.0f, 550.0f, -300.0f);
-    pl.color     = glm::vec3(1.0f, 0.9f, 0.8f);
-    pl.constant  = 1.0f;
-    pl.linear    = 0.0004f;
-    pl.quadratic = 0.000002f;
-    Engine::Renderer->AddPointLight(pl);
-
-    PointLight pl2;
-    pl2.position = glm::vec3(500.0f, 650.0f, 400.0f);
-    pl2.color = glm::vec3(1.0f, 0.9f, 0.8f);
-    pl2.constant = 1.0f;
-    pl2.linear = 0.0004f;
-    pl2.quadratic = 0.000002f;
-    Engine::Renderer->AddPointLight(pl2);
-
-    //Player
-    std::string filepathString = "assets/Tom";
-    char* filepath = filepathString.data();
-    LoadObject(filepath);
-    Mesh* mesh = objects[0]->GetMesh();
-    Engine::Camera->Focus(mesh->minBounds(), mesh->maxBounds());
-
-    filepathString = "assets/Harry";
-    filepath = filepathString.data();
-    LoadObject(filepath);
-    Object3D* harry = objects.back();
-
-    filepathString = "assets/Office";
-    filepath = filepathString.data();
-    LoadObject(filepath);
-
-    //ground
-    filepathString = "assets/Floor";
-    filepath = filepathString.data();
-    LoadObject(filepath);
-
-    for (Object3D* obj : objects)
-    {
-        std::string name = obj->Name();
-        std::transform(name.begin(), name.end(), name.begin(), ::tolower);
-        if (name.find("harry_location") != std::string::npos)
-        {
-            harry->Translate(obj->GetMesh()->centerAABB());
-            std::cout << "harry rot: " << obj->Rotation().x << ", " << obj->Rotation().y << ", " << obj->Rotation().z << std::endl;
-            harry->Rotate(glm::vec3(0, 0, 0));
-            break;
-        }
-    }
-
-    Audio::PlayMusic("assets/sounds/music/TheMole.mp3", true, 90.0f);
-    Audio::LoadSound("footstep", "assets/sounds/sfx/Footstep_01.wav");
-    Audio::LoadSound("keypad_digit",   "assets/sounds/ui/Click_Standard_00.mp3");
-    Audio::LoadSound("keypad_nav",     "assets/sounds/ui/Click_Standard_01.mp3");
-    Audio::LoadSound("keypad_success", "assets/sounds/ui/Click_Sharp_00.mp3");
-    Audio::LoadSound("keypad_fail",    "assets/sounds/ui/UISounds_018.wav");
-    Audio::LoadSound("computer_enter", "assets/sounds/ui/Click_Standard_04.mp3");
-    Audio::LoadSound("computer_exit",  "assets/sounds/ui/Click_Standard_05.mp3");
-    Audio::LoadSound("keypad_enter", "assets/sounds/ui/Click_Electronic_02.mp3");
-    Audio::LoadSound("keypad_exit", "assets/sounds/ui/Click_Electronic_03.mp3");
-    Audio::LoadSound("tv_enter", "assets/sounds/ui/Click_Electronic_00.mp3");
-    Audio::LoadSound("tv_exit", "assets/sounds/ui/Click_Electronic_01.mp3");
-
-    Animator* playerAnimator = objects[0]->GetAnimator();
-    playerAnimator->AddEvent(1, 5.0f, [] { Audio::PlaySound("footstep", 50.0f); });
-    playerAnimator->AddEvent(1, 15.0f, [] { Audio::PlaySound("footstep", 50.0f); });
-
-    constexpr int kMaxPointLights = 8;
-    for (Object3D* obj : objects)
-    {
-        if (Engine::Renderer->PointLightCount() >= kMaxPointLights) break;
-
-        std::string name = obj->Name();
-        std::transform(name.begin(), name.end(), name.begin(), ::tolower);
-        if (name.find("light") == std::string::npos) continue;
-
-        PointLight pl;
-        pl.position  = obj->GetMesh()->centerAABB();
-        pl.color     = glm::vec3(1.0f, 0.9f, 0.8f);
-        pl.constant  = 1.0f;
-        pl.linear    = 0.0004f;
-        pl.quadratic = 0.000002f;
-        Engine::Renderer->AddPointLight(pl);
-        std::cout << "[light] " << obj->Name() << " at " << pl.position.x << ", " << pl.position.y << ", " << pl.position.z << std::endl;
-    }
 }
 
 void Level::PrepareLoad()
@@ -194,9 +107,8 @@ void Level::LoadSingleFile(const std::string& path)
     std::transform(name.begin(), name.end(), name.begin(), ::tolower);
     if (name.find("wall") == std::string::npos)
         obj->SetIgnoreCameraCollision(true);
-    else
-        std::cout << "[" << objects.size() << "] " << obj->Name() << std::endl;
 
+    std::cout << "[" << objects.size() << "] " << obj->Name() << std::endl;
     objects.push_back(obj);
 }
 
@@ -286,13 +198,13 @@ void Level::LoadObject(char filepath[])
             
             std::string name = obj->Name();
             std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+            std::cout << "[" << objects.size() << "] " << obj->Name() << std::endl;
             if (name.find("wall") == std::string::npos)
             {
                 obj->SetIgnoreCameraCollision(true);
             }
             else
             {
-                std::cout << "[" << (objects.size() - 1) << "] " << obj->Name() << std::endl;
 
             }
 
