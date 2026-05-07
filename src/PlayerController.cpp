@@ -322,6 +322,52 @@ void PlayerController::Update()
 		}
 	}
 
+	// Trigger box – any object whose name contains "void"
+	{
+		Mesh* playerMesh = m_objects[0]->GetMesh();
+		glm::vec3 pMin = playerMesh->minBounds();
+		glm::vec3 pMax = playerMesh->maxBounds();
+
+		Object3D* hitVoid = nullptr;
+		for (auto* obj : m_objects)
+		{
+			if (obj->Name().find("void") == std::string::npos)
+				continue;
+			Mesh* triggerMesh = obj->GetMesh();
+			glm::vec3 tCenter = (triggerMesh->minBounds() + triggerMesh->maxBounds()) * 0.5f;
+			glm::vec3 tHalf   = (triggerMesh->maxBounds() - triggerMesh->minBounds()) * 1.0f;
+			glm::vec3 tMin = tCenter - tHalf;
+			glm::vec3 tMax = tCenter + tHalf;
+			if (pMax.x > tMin.x && pMin.x < tMax.x &&
+			    pMax.y > tMin.y && pMin.y < tMax.y &&
+			    pMax.z > tMin.z && pMin.z < tMax.z)
+			{
+				hitVoid = obj;
+				break;
+			}
+		}
+
+		if (hitVoid && !m_inVoidTrigger)
+		{
+			m_inVoidTrigger = true;
+			const char* msg =
+				"[ VOID SECTOR - WARNING ]\n\n"
+				"You have entered an unmapped zone.\n"
+				"The algorithm does not reach here.\n\n"
+				"What exists in the void\n"
+				"was never meant to be found.\n\n"
+				"Turn back.";
+			if (HUDPanel* panel = Engine::UI->GetPanel("HUD"))
+				panel->SetText(0, msg);
+			Engine::UI->SetImageVisible(true);
+		}
+		else if (!hitVoid && m_inVoidTrigger)
+		{
+			m_inVoidTrigger = false;
+			Engine::UI->SetImageVisible(false);
+		}
+	}
+
 	// Rotation smoothing
 	if (isMoving)
 	{

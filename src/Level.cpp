@@ -48,6 +48,7 @@ void Level::PrepareLoad()
     ScanPath("assets/Harry");
     m_harryEndIdx = (int)m_fileQueue.size();
     ScanPath("assets/Office");
+    ScanPath("assets/Kratos");
     ScanPath("assets/Floor");
 }
 
