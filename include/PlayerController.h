@@ -1,5 +1,7 @@
 #pragma once
 #include <vector>
+#include <map>
+#include <string>
 #include <glm/glm.hpp>
 
 class Object3D;
@@ -15,6 +17,7 @@ public:
 
 	void TakeDamage(float amount);
 	void AddScore(int points);
+	void SetVoidMessage(int index, std::string msg) { m_voidMessages[index] = std::move(msg); }
 
 private:
 	std::vector<Object3D*> m_objects;
@@ -43,4 +46,6 @@ private:
 
 	bool  m_movingObject66 = false;
 	float m_object66MoveDistanceRemaining = 350.0f;
+
+	std::map<int, std::string> m_voidMessages;
 };

@@ -29,5 +29,6 @@ private:
 	std::vector<FileTask> m_fileQueue;
 	int  m_queueIndex    = 0;
 	int  m_harryEndIdx   = 0;  // objects[m_harryEndIdx-1] is the harry object
+	int  m_tonyEndIdx    = 0;  // objects[m_tonyEndIdx-1] is the tony object
 	bool m_loadComplete  = false;
 };

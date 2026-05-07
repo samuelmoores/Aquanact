@@ -344,7 +344,11 @@ void Mesh::LoadTexture(aiMaterial* mat, aiTextureType textureType, std::string p
 		result = mat->GetTexture(aiTextureType_BASE_COLOR, 0, &texturePath);
 
 	if (result != AI_SUCCESS || texturePath.length == 0)
+	{
+		// No texture on this material — push a placeholder to stay in sync with m_vao
+		m_textureColor.push_back(0);
 		return;
+	}
 
 	std::string textureFileName = texturePath.C_Str();
 
@@ -365,9 +369,15 @@ void Mesh::LoadTexture(aiMaterial* mat, aiTextureType textureType, std::string p
 			case aiTextureType_DIFFUSE:
 				SetDiffuseTextureMemory(const_cast<aiTexture*>(embeddedTexture));
 				break;
-			case aiTextureType_NORMALS:
+			default:
+				m_textureColor.push_back(0);
 				break;
 			}
+		}
+		else
+		{
+			// Raw pixel format — not currently handled, keep arrays in sync
+			m_textureColor.push_back(0);
 		}
 	}
 	else //load from file
@@ -658,7 +668,7 @@ void Mesh::Bind()
 {
 	glBindVertexArray(m_vao[m_currVao]);
 	glActiveTexture(GL_TEXTURE0);
-	if (m_currTextureColor < (int)m_textureColor.size())
+	if (m_currTextureColor < (int)m_textureColor.size() && m_textureColor[m_currTextureColor] != 0)
 		glBindTexture(GL_TEXTURE_2D, m_textureColor[m_currTextureColor]);
 }
 void Mesh::UnBind() 

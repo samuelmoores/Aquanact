@@ -49,6 +49,8 @@ void Level::PrepareLoad()
     m_harryEndIdx = (int)m_fileQueue.size();
     ScanPath("assets/Office");
     ScanPath("assets/Kratos");
+    ScanPath("assets/Tony");
+    m_tonyEndIdx = (int)m_fileQueue.size();
     ScanPath("assets/Floor");
 }
 
@@ -136,6 +138,22 @@ void Level::FinishLoad()
         }
     }
 
+    if (m_tonyEndIdx > 0 && m_tonyEndIdx <= (int)objects.size())
+    {
+        Object3D* tony = objects[m_tonyEndIdx - 1];
+        for (Object3D* obj : objects)
+        {
+            std::string name = obj->Name();
+            std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+            if (name.find("tony_location") != std::string::npos)
+            {
+                tony->Translate(obj->GetMesh()->centerAABB());
+                tony->Rotate(glm::vec3(0, 180, 0));
+                break;
+            }
+        }
+    }
+
     Audio::PlayMusic("assets/sounds/music/TheMole.mp3", true, 90.0f);
     Audio::LoadSound("footstep",        "assets/sounds/sfx/Footstep_01.wav");
     Audio::LoadSound("keypad_digit",    "assets/sounds/ui/Click_Standard_00.mp3");
@@ -153,7 +171,7 @@ void Level::FinishLoad()
     playerAnimator->AddEvent(1, 5.0f,  [] { Audio::PlaySound("footstep", 50.0f); });
     playerAnimator->AddEvent(1, 15.0f, [] { Audio::PlaySound("footstep", 50.0f); });
 
-    constexpr int kMaxPointLights = 8;
+    constexpr int kMaxPointLights = 12;
     for (Object3D* obj : objects)
     {
         if (Engine::Renderer->PointLightCount() >= kMaxPointLights) break;

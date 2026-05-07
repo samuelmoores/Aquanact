@@ -350,13 +350,23 @@ void PlayerController::Update()
 		if (hitVoid && !m_inVoidTrigger)
 		{
 			m_inVoidTrigger = true;
-			const char* msg =
-				"[ VOID SECTOR - WARNING ]\n\n"
-				"You have entered an unmapped zone.\n"
-				"The algorithm does not reach here.\n\n"
-				"What exists in the void\n"
-				"was never meant to be found.\n\n"
-				"Turn back.";
+
+			const std::string& voidName = hitVoid->Name();
+			int idx = 0;
+			for (int n = 1; n <= 99; n++)
+			{
+				char suffix[8];
+				snprintf(suffix, sizeof(suffix), "_%02d", n);
+				if (voidName.find(suffix) != std::string::npos) { idx = n; break; }
+			}
+
+			std::string msg;
+			auto it = m_voidMessages.find(idx);
+			if (it != m_voidMessages.end())
+				msg = it->second;
+			else
+				msg = "[ VOID SECTOR - WARNING ]\n\nYou have entered an unmapped zone.\nThe algorithm does not reach here.\n\nWhat exists in the void\nwas never meant to be found.\n\nTurn back.";
+
 			if (HUDPanel* panel = Engine::UI->GetPanel("HUD"))
 				panel->SetText(0, msg);
 			Engine::UI->SetImageVisible(true);

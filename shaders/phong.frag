@@ -21,7 +21,7 @@ uniform vec3 fogColor = vec3(1.0, 1.0, 1.0);
 uniform bool showFog;
 uniform float fogBlend;
 
-#define MAX_POINT_LIGHTS 8
+#define MAX_POINT_LIGHTS 12
 
 struct PointLight {
 	vec3 position;

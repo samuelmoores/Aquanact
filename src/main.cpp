@@ -34,6 +34,26 @@ static void mainLoop()
         if (g_mainMenu->WantsPlay()) {
             g_mainMenu->Hide();
             g_playerController = new PlayerController(Engine::Level->Objects());
+
+            // void_01 = harry, void_02 = kratos, void_03 = tony
+            g_playerController->SetVoidMessage(1,
+                "[ VOID SECTOR - HARRY ]\n\n"
+                "A presence lingers here.\n"
+                "Something watches from between the walls.\n\n"
+                "Harry was here.");
+            g_playerController->SetVoidMessage(2,
+                "[ VOID SECTOR - KRATOS ]\n\n"
+                "The weight of this place is unbearable.\n"
+                "A warrior walked these halls and left\n"
+                "only silence behind.\n\n"
+                "What he sought, he never found.");
+            g_playerController->SetVoidMessage(3,
+                "[ VOID SECTOR - TONY ]\n\n"
+                "The signal is strongest here.\n"
+                "Someone brilliant passed through\n"
+                "and rewired everything.\n\n"
+                "The algorithm remembers him.");
+
             Engine::Camera->SetObjects();
             glfwSetInputMode(Engine::Window->GLFW(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
             Engine::Input->ResetMouseLook();
