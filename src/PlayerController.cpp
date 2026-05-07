@@ -63,6 +63,7 @@ void PlayerController::Update()
 				Physics::Collision col = Physics::GetCapsuleAABBCollision(capBase, capTip, radius, wallMesh->minBounds(), wallMesh->maxBounds(), movement);
 				if (col.hit)
 				{
+					std::cout << "Collision: " << m_objects[i]->Name() << "\n";
 					m_objects[0]->Move(col.normal * col.penetration);
 					collidedInThisIter = true;
 				}
@@ -297,9 +298,9 @@ void PlayerController::Update()
 				"The routing algorithm has grown too\n"
 				"complex to produce a single coherent\n"
 				"output. Its depth now generates two\n"
-				"conflicting streams: the SYNC, which\n"
+				"conflicting outputs: one\n"
 				"reflects the algorithm's original \n"
-				"internal state, before the OVERRIDE \n"
+				"internal state, before the other \n"
 				"mapped the path to a new state.\n\n"
 				"This is all a byproduct\n"
 				"of the algorithm's complexity,\n"

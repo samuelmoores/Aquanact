@@ -4,6 +4,7 @@
 void Renderer::Init()
 {
 	m_shadowMap = std::make_unique<ShadowMap>(2048);
+	glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 }
 
 void Renderer::Submit(const RenderCommand& command)

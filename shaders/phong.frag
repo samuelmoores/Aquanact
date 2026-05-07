@@ -121,7 +121,7 @@ void main()
 		float distance = length(viewPos - FragWorldPos);
 
 		float fogMin = 500.0;
-		float fogMax = 5000.0;
+		float fogMax = 2100.0;
 	
 		float fogFactor = (distance - fogMin) / (fogMax - fogMin);
 		fogFactor = clamp(fogFactor, 0.0, 1.0);

@@ -129,7 +129,7 @@ void Level::FinishLoad()
             if (name.find("harry_location") != std::string::npos)
             {
                 harry->Translate(obj->GetMesh()->centerAABB());
-                harry->Rotate(glm::vec3(0, 0, 0));
+                harry->Rotate(glm::vec3(0, 180, 0));
                 break;
             }
         }
