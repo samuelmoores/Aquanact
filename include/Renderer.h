@@ -14,7 +14,6 @@ public:
 	void Submit(const RenderCommand& command);
 	void Flush(Camera* camera);
 	void Loop();
-	void RenderMenuOnly();
 
 	void AddPointLight(const PointLight& light);
 	void ClearPointLights();

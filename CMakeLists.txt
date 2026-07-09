@@ -37,7 +37,6 @@ set(SOURCES
     "include/MathUtils.h" "src/MathUtils.cpp"
     "include/Audio.h" "src/Audio.cpp"
     "include/ShadowMap.h" "src/ShadowMap.cpp"
-    "include/MainMenu.h" "src/MainMenu.cpp"
     "include/RenderCommand.h"
     "include/GLHeaders.h"
 )

@@ -135,12 +135,6 @@ void Renderer::Flush(Camera* camera)
 	commands.clear();
 }
 
-void Renderer::RenderMenuOnly()
-{
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	Engine::UI->Loop();
-}
-
 void Renderer::Loop()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
