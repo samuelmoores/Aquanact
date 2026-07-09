@@ -61,11 +61,7 @@ Axis::Axis(float axisLength, float scale) :m_vao(-1), m_vbo(-1)
 
 	glBindVertexArray(0);
 
-#ifdef __EMSCRIPTEN__
-	m_shader.load("shaders/web/vertexColor.vert", "shaders/web/vertexColor.frag");
-#else
 	m_shader.load("shaders/vertexColor.vert", "shaders/vertexColor.frag");
-#endif
 }
 
 void Axis::draw(glm::mat4 viewMatrix)

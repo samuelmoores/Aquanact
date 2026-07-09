@@ -15,21 +15,13 @@ static glm::mat4 AiToGlmShadow(const aiMatrix4x4& m)
 ShadowMap::ShadowMap(int resolution)
 	: m_resolution(resolution), m_farPlane(2000.0f), m_fbo(0), m_cubemap(0)
 {
-#ifndef __EMSCRIPTEN__
 	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
-#endif
 
 	glGenTextures(1, &m_cubemap);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, m_cubemap);
 	for (int i = 0; i < 6; i++)
-#ifdef __EMSCRIPTEN__
-		// WebGL 2 / GLES 3 requires a sized internal format for depth textures
-		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_DEPTH_COMPONENT32F,
-			resolution, resolution, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-#else
 		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_DEPTH_COMPONENT,
 			resolution, resolution, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-#endif
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -41,21 +33,11 @@ ShadowMap::ShadowMap(int resolution)
 	// Attach face 0 as placeholder; ShadowPass updates per face
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
 		GL_TEXTURE_CUBE_MAP_POSITIVE_X, m_cubemap, 0);
-#ifdef __EMSCRIPTEN__
-	// WebGL 2 uses glDrawBuffers; tell it there is no color output
-	GLenum drawBufs = GL_NONE;
-	glDrawBuffers(1, &drawBufs);
-#else
 	glDrawBuffer(GL_NONE);
 	glReadBuffer(GL_NONE);
-#endif
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-#ifdef __EMSCRIPTEN__
-	m_shader.load("shaders/web/shadow.vert", "shaders/web/shadow.frag");
-#else
 	m_shader.load("shaders/shadow.vert", "shaders/shadow.frag");
-#endif
 }
 
 ShadowMap::~ShadowMap()

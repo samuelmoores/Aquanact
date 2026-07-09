@@ -41,10 +41,7 @@
 	#pragma warning(disable : 4505)
 #endif
 
-#if defined RMLUI_PLATFORM_EMSCRIPTEN
-	#define RMLUI_SHADER_HEADER "#version 300 es\nprecision highp float;\n"
-	#include <GLES3/gl3.h>
-#elif defined RMLUI_GL3_CUSTOM_LOADER
+#if defined RMLUI_GL3_CUSTOM_LOADER
 	#define RMLUI_SHADER_HEADER "#version 330\n"
 	#include RMLUI_GL3_CUSTOM_LOADER
 #else
@@ -682,10 +679,7 @@ void RenderInterface_GL3::SubmitTransformUniform(ProgramId program_id, int unifo
 
 bool RmlGL3::Initialize(Rml::String* out_message)
 {
-#if defined RMLUI_PLATFORM_EMSCRIPTEN
-	if (out_message)
-		*out_message = "Started Emscripten WebGL renderer.";
-#elif !defined RMLUI_GL3_CUSTOM_LOADER
+#if !defined RMLUI_GL3_CUSTOM_LOADER
 	const int gl_version = gladLoaderLoadGL();
 	if (gl_version == 0)
 	{
@@ -703,7 +697,7 @@ bool RmlGL3::Initialize(Rml::String* out_message)
 
 void RmlGL3::Shutdown()
 {
-#if !defined RMLUI_PLATFORM_EMSCRIPTEN && !defined RMLUI_GL3_CUSTOM_LOADER
+#if !defined RMLUI_GL3_CUSTOM_LOADER
 	gladLoaderUnloadGL();
 #endif
 }

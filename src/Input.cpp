@@ -38,16 +38,6 @@ void Input::MouseButtonCallback(GLFWwindow* window, int button, int action, int 
     }
 }
 
-#ifdef __EMSCRIPTEN__
-EM_BOOL Input::PointerLockChangeCallback(int /*eventType*/, const EmscriptenPointerlockChangeEvent* e, void* userData)
-{
-    Input* self = static_cast<Input*>(userData);
-    if (!e->isActive)
-        self->m_windowActive = false;
-    return EM_TRUE;
-}
-#endif
-
 void Input::ScrollCallback(GLFWwindow* window, double xoffset, double yoffset)
 {
     Engine::Camera->CameraControl(static_cast<float>(yoffset));
@@ -75,14 +65,7 @@ Input::Input()
     glfwGetCursorPos(win, &xpos, &ypos);
     m_mouseLast = glm::vec2(xpos, ypos);
 
-#ifdef __EMSCRIPTEN__
-    // Web: can't lock cursor without a user gesture — wait for first click
-    m_windowActive = false;
-    emscripten_set_pointerlockchange_callback(EMSCRIPTEN_EVENT_TARGET_DOCUMENT, this, false, PointerLockChangeCallback);
-#else
-    // Desktop: lock and hide cursor immediately
     glfwSetInputMode(win, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-#endif
 
     m_bindings[GLFW_KEY_W]      = Action::MoveForward;
     m_bindings[GLFW_KEY_S]      = Action::MoveBack;

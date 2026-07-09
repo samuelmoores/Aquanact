@@ -28,11 +28,7 @@ UI::UI()
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGui_ImplGlfw_InitForOpenGL(Engine::Window->GLFW(), false);
-#ifdef __EMSCRIPTEN__
-    ImGui_ImplOpenGL3_Init("#version 300 es");
-#else
     ImGui_ImplOpenGL3_Init("#version 330");
-#endif
 
     int w, h;
     unsigned int panelTex = LoadTexture("assets/ui/PanelWindow.tga", &w, &h);

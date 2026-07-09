@@ -1,10 +1,7 @@
 #pragma once
 #include <string>
 #include <unordered_map>
-
-#ifndef __EMSCRIPTEN__
 #include <SFML/Audio.hpp>
-#endif
 
 class Audio {
 public:
@@ -20,11 +17,7 @@ public:
     static void SetMusicVolume(float volume);
 
 private:
-#ifndef __EMSCRIPTEN__
     static std::unordered_map<std::string, sf::SoundBuffer> m_buffers;
     static std::unordered_map<std::string, sf::Sound> m_sounds;
     static sf::Music m_music;
-#else
-    static bool m_audioUnlocked;
-#endif
 };

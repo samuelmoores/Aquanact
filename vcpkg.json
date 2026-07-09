@@ -7,21 +7,11 @@
     "glm",
     {
       "name": "rmlui",
-      "features": ["freetype"],
-      "platform": "!emscripten"
+      "features": ["freetype"]
     },
-    {
-      "name": "sfml",
-      "platform": "!emscripten"
-    },
-    {
-      "name": "glfw3",
-      "platform": "!emscripten"
-    },
-    {
-      "name": "glad",
-      "platform": "!emscripten"
-    },
+    "sfml",
+    "glfw3",
+    "glad",
     {
       "name": "imgui",
       "features": [

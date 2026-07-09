@@ -49,7 +49,7 @@ void MainMenu::Render()
 
     // Title
     ImGui::SetWindowFontScale(2.0f);
-    const char* kTitle = "AQUANACT";
+    const char* kTitle = "TRIBULATIONS OF TOM";
     float titleW = ImGui::CalcTextSize(kTitle).x;
     ImGui::SetCursorPosX((kW - titleW) * 0.5f);
     ImGui::TextColored({ 0.3f, 0.8f, 1.0f, 1.0f }, "%s", kTitle);

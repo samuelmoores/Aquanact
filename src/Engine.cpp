@@ -14,9 +14,7 @@ std::chrono::steady_clock::time_point Engine::m_prevFrameTime = std::chrono::hig
 Engine::Engine()
 {
     Window = new ::Window();
-#ifndef __EMSCRIPTEN__
     gladLoadGL();
-#endif
     Camera = new ::Camera();
     Renderer = new ::Renderer();
     UI = new ::UI();

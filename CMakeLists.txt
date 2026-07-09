@@ -44,84 +44,37 @@ set(SOURCES
 
 add_executable (AquanactEngine ${SOURCES})
 
-if (EMSCRIPTEN)
-    # ---- Web / WebGL 2 build ----
-    set_target_properties(AquanactEngine PROPERTIES
-        OUTPUT_NAME "index"
-        SUFFIX ".html"
-    )
+target_sources(AquanactEngine PRIVATE
+    "${RMLUI_BACKEND_DIR}/RmlUi_Platform_GLFW.cpp"
+    "${RMLUI_BACKEND_DIR}/RmlUi_Renderer_GL3.cpp"
+)
 
-    target_compile_options(AquanactEngine PRIVATE
-        -O2
-    )
+find_package(SFML COMPONENTS system window graphics audio CONFIG REQUIRED)
+target_link_libraries(AquanactEngine PRIVATE sfml-system sfml-network sfml-graphics sfml-window sfml-audio)
 
-    # Preload assets and shaders into the virtual FS
-    set(EM_LINK_FLAGS
-        "-s USE_WEBGL2=1"
-        "-s FULL_ES3=1"
-        "-s USE_GLFW=3"
-        "-s ALLOW_MEMORY_GROWTH=1"
-        "-s INITIAL_MEMORY=134217728"   # 128 MB
-        "-s MAXIMUM_MEMORY=536870912"   # 512 MB
-        "-s ENVIRONMENT=web"
-        "--preload-file ${CMAKE_BINARY_DIR}/assets@/assets"
-        "--preload-file ${CMAKE_BINARY_DIR}/shaders@/shaders"
-        "--shell-file ${CMAKE_SOURCE_DIR}/web/shell.html"
-        "--use-preload-cache"
-        "-s WASM=1"
-        "-s EXPORTED_FUNCTIONS=['_main','_Audio_Resume']"
-        "-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','HEAPF32']"
-        "-s ALLOW_TABLE_GROWTH=1"
-    )
-    string(JOIN " " EM_LINK_FLAGS_STR ${EM_LINK_FLAGS})
-    set_target_properties(AquanactEngine PROPERTIES LINK_FLAGS "${EM_LINK_FLAGS_STR}")
+find_package(glfw3 CONFIG REQUIRED)
+target_link_libraries(AquanactEngine PRIVATE glfw)
 
-    # Emscripten ships GLFW and OpenGL ES — no vcpkg packages needed for those.
-    # We still need assimp compiled for Emscripten (use emcmake + vcpkg or pre-built).
-    find_package(assimp CONFIG REQUIRED)
-    target_link_libraries(AquanactEngine PRIVATE assimp::assimp)
+find_package(assimp CONFIG REQUIRED)
+target_link_libraries(AquanactEngine PRIVATE assimp::assimp)
 
-    find_package(imgui CONFIG REQUIRED)
-    target_link_libraries(AquanactEngine PRIVATE imgui::imgui)
+find_package(glad CONFIG REQUIRED)
+target_link_libraries(AquanactEngine PRIVATE glad::glad)
 
-else()
-    # ---- Native desktop build ----
-    target_sources(AquanactEngine PRIVATE
-        "${RMLUI_BACKEND_DIR}/RmlUi_Platform_GLFW.cpp"
-        "${RMLUI_BACKEND_DIR}/RmlUi_Renderer_GL3.cpp"
-    )
+find_package(imgui CONFIG REQUIRED)
+target_link_libraries(AquanactEngine PRIVATE imgui::imgui)
 
-    find_package(SFML COMPONENTS system window graphics audio CONFIG REQUIRED)
-    target_link_libraries(AquanactEngine PRIVATE sfml-system sfml-network sfml-graphics sfml-window sfml-audio)
-
-    find_package(glfw3 CONFIG REQUIRED)
-    target_link_libraries(AquanactEngine PRIVATE glfw)
-
-    find_package(assimp CONFIG REQUIRED)
-    target_link_libraries(AquanactEngine PRIVATE assimp::assimp)
-
-    find_package(glad CONFIG REQUIRED)
-    target_link_libraries(AquanactEngine PRIVATE glad::glad)
-
-    find_package(imgui CONFIG REQUIRED)
-    target_link_libraries(AquanactEngine PRIVATE imgui::imgui)
-
-    find_package(RmlUi CONFIG REQUIRED)
-    target_link_libraries(AquanactEngine PRIVATE RmlCore RmlDebugger)
-endif()
+find_package(RmlUi CONFIG REQUIRED)
+target_link_libraries(AquanactEngine PRIVATE RmlCore RmlDebugger)
 
 target_include_directories(AquanactEngine PUBLIC "./include" "${RMLUI_BACKEND_DIR}")
 
 # Use our existing glad instead of RmlUi's bundled GLAD loader
-if (NOT EMSCRIPTEN)
-    target_compile_definitions(AquanactEngine PRIVATE "RMLUI_GL3_CUSTOM_LOADER=<glad/glad.h>")
-endif()
+target_compile_definitions(AquanactEngine PRIVATE "RMLUI_GL3_CUSTOM_LOADER=<glad/glad.h>")
 
-if (NOT EMSCRIPTEN)
-    set_target_properties(AquanactEngine
-            PROPERTIES
-            RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR})
-endif()
+set_target_properties(AquanactEngine
+        PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR})
 
 # Copy shaders and assets to the build output directory
 add_custom_target(copyshaders

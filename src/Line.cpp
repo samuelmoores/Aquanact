@@ -56,11 +56,7 @@ Line::Line(glm::vec3 minBounds, glm::vec3 maxBounds) :m_vao(-1), m_vbo(-1)
 
 	glBindVertexArray(0);
 
-#ifdef __EMSCRIPTEN__
-	m_shader.load("shaders/web/vertexColor.vert", "shaders/web/vertexColor.frag");
-#else
 	m_shader.load("shaders/vertexColor.vert", "shaders/vertexColor.frag");
-#endif
 	m_shader.activate();
 	m_shader.setUniform("projection", glm::perspective(glm::radians(45.0f), static_cast<float>(1200) / 800, 0.1f, 1000.0f));
 }
@@ -83,11 +79,7 @@ Line::Line(std::vector<LineVertex3D> verts) : m_vao(-1), m_vbo(-1)
 
 	glBindVertexArray(0);
 
-#ifdef __EMSCRIPTEN__
-	m_shader.load("shaders/web/vertexColor.vert", "shaders/web/vertexColor.frag");
-#else
 	m_shader.load("shaders/vertexColor.vert", "shaders/vertexColor.frag");
-#endif
 	m_shader.activate();
 	m_shader.setUniform("projection", glm::perspective(glm::radians(45.0f), static_cast<float>(1200) / 800, 0.1f, 1000.0f));
 }

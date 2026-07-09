@@ -1,9 +1,6 @@
 #pragma once
 #include <unordered_map>
 #include <glm/glm.hpp>
-#ifdef __EMSCRIPTEN__
-#include <emscripten/html5.h>
-#endif
 
 enum class Action {
 	MoveForward,
@@ -43,9 +40,6 @@ private:
 	static void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
 	static void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset);
 	static void FramebufferSizeCallback(GLFWwindow* window, int width, int height);
-#ifdef __EMSCRIPTEN__
-	static EM_BOOL PointerLockChangeCallback(int eventType, const EmscriptenPointerlockChangeEvent* e, void* userData);
-#endif
 
 	std::unordered_map<int, Action>         m_bindings;
 	std::unordered_map<Action, ActionState> m_actions;
