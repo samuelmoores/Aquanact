@@ -32,7 +32,6 @@ set(SOURCES
     "include/UI.h" "src/UI.cpp"
     "include/Level.h" "src/Level.cpp"
     "include/Input.h" "src/Input.cpp"
-    "include/PlayerController.h" "src/PlayerController.cpp"
     "include/Physics.h" "src/Physics.cpp"
     "include/MathUtils.h" "src/MathUtils.cpp"
     "include/Audio.h" "src/Audio.cpp"
