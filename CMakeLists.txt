@@ -32,7 +32,6 @@ set(SOURCES
     "include/Physics.h" "src/Physics.cpp"
     "include/MathUtils.h" "src/MathUtils.cpp"
     "include/Audio.h" "src/Audio.cpp"
-    "include/ShadowMap.h" "src/ShadowMap.cpp"
     "include/RenderCommand.h"
     "include/GLHeaders.h"
 )

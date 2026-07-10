@@ -3,7 +3,7 @@
 
 void Renderer::Init()
 {
-	m_shadowMap = std::make_unique<ShadowMap>(2048);
+
 	glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 }
 
@@ -12,15 +12,7 @@ void Renderer::Submit(const RenderCommand& command)
 	commands.push_back(command);
 }
 
-void Renderer::AddPointLight(const PointLight& light)
-{
-	m_pointLights.push_back(light);
-}
 
-void Renderer::ClearPointLights()
-{
-	m_pointLights.clear();
-}
 
 
 glm::mat4 AiToGlm(const aiMatrix4x4& aiMat)
@@ -91,23 +83,7 @@ void Renderer::Flush(Camera* camera)
 			commands[i].shader->setUniform("finalBones", glmTransforms);
 		}
 
-		if (m_shadowMap && !m_pointLights.empty())
-		{
-			m_shadowMap->BindTexture(2);
-			commands[i].shader->setUniform("shadowMap", (int32_t)2);
-			commands[i].shader->setUniform("shadowFarPlane", m_shadowMap->FarPlane());
-		}
 
-		commands[i].shader->setUniform("numPointLights", (int32_t)m_pointLights.size());
-		for (int k = 0; k < (int)m_pointLights.size(); k++)
-		{
-			std::string base = "pointLights[" + std::to_string(k) + "].";
-			commands[i].shader->setUniform(base + "position", m_pointLights[k].position);
-			commands[i].shader->setUniform(base + "color", m_pointLights[k].color);
-			commands[i].shader->setUniform(base + "constant", m_pointLights[k].constant);
-			commands[i].shader->setUniform(base + "linear", m_pointLights[k].linear);
-			commands[i].shader->setUniform(base + "quadratic", m_pointLights[k].quadratic);
-		}
 
 		int numBuffs = commands[i].mesh->NumBuffers();
 		for (int j = 0; j < numBuffs; j++)
@@ -133,8 +109,7 @@ void Renderer::Loop()
 
 
 
-	if (m_shadowMap && !m_pointLights.empty())
-		m_shadowMap->ShadowPass(commands, m_pointLights[0]);
+
 
 	Flush(Engine::Camera);
 	Engine::UI->Loop();
