@@ -2,6 +2,10 @@
 #include <chrono>
 #include <Engine.h>
 
+//declare subsystem managers
+
+//
+
 static void mainLoop()
 {
     Engine::Tick();
@@ -14,7 +18,9 @@ static void mainLoop()
 
 int main()
 {
+    //call startup functions for subsystem managers
     Engine::Init();
+    //
 
     while (Engine::Running())
         mainLoop();

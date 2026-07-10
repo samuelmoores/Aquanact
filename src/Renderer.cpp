@@ -103,7 +103,7 @@ void Renderer::Flush(Camera* camera)
 	commands.clear();
 }
 
-void Renderer::Loop()
+void Renderer:: ()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	Flush(Engine::Camera);
