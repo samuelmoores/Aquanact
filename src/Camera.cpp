@@ -1,6 +1,8 @@
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/ext/matrix_clip_space.hpp>
 #include "Engine.h"
+#include <Object3D.h>
+
 
 std::vector<Object3D*> objects_camera;
 
@@ -232,11 +234,7 @@ void Camera::Move(glm::vec3 delta, glm::vec3 lookAt)
 	m_view_matrix = glm::lookAt(m_position, m_lookAt, m_up);
 }
 
-void Camera::SetObjects()
-{
-	objects_camera = Engine::Level->Objects();
 
-}
 
 glm::vec3 Camera::Forward()
 {

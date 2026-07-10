@@ -5,10 +5,7 @@
   "dependencies": [
     "assimp",
     "glm",
-    {
-      "name": "rmlui",
-      "features": ["freetype"]
-    },
+
     "sfml",
     "glfw3",
     "glad",

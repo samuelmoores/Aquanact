@@ -12,8 +12,6 @@ endif()
 
 project ("AquanactEngine")
 
-set(RMLUI_BACKEND_DIR "${CMAKE_SOURCE_DIR}/src/rmlui_backends")
-
 set(SOURCES
     "src/main.cpp"
     "include/ShaderProgram.h" "src/ShaderProgram.cpp"
@@ -30,7 +28,6 @@ set(SOURCES
     "include/Window.h" "src/Window.cpp"
     "include/Engine.h" "src/Engine.cpp"
     "include/UI.h" "src/UI.cpp"
-    "include/Level.h" 
     "include/Input.h" "src/Input.cpp"
     "include/Physics.h" "src/Physics.cpp"
     "include/MathUtils.h" "src/MathUtils.cpp"
@@ -41,11 +38,6 @@ set(SOURCES
 )
 
 add_executable (AquanactEngine ${SOURCES})
-
-target_sources(AquanactEngine PRIVATE
-    "${RMLUI_BACKEND_DIR}/RmlUi_Platform_GLFW.cpp"
-    "${RMLUI_BACKEND_DIR}/RmlUi_Renderer_GL3.cpp"
-)
 
 find_package(SFML COMPONENTS system window graphics audio CONFIG REQUIRED)
 target_link_libraries(AquanactEngine PRIVATE sfml-system sfml-network sfml-graphics sfml-window sfml-audio)
@@ -62,13 +54,7 @@ target_link_libraries(AquanactEngine PRIVATE glad::glad)
 find_package(imgui CONFIG REQUIRED)
 target_link_libraries(AquanactEngine PRIVATE imgui::imgui)
 
-find_package(RmlUi CONFIG REQUIRED)
-target_link_libraries(AquanactEngine PRIVATE RmlCore RmlDebugger)
-
-target_include_directories(AquanactEngine PUBLIC "./include" "${RMLUI_BACKEND_DIR}")
-
-# Use our existing glad instead of RmlUi's bundled GLAD loader
-target_compile_definitions(AquanactEngine PRIVATE "RMLUI_GL3_CUSTOM_LOADER=<glad/glad.h>")
+target_include_directories(AquanactEngine PUBLIC "./include")
 
 set_target_properties(AquanactEngine
         PROPERTIES

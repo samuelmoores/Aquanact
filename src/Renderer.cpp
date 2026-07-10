@@ -25,8 +25,6 @@ void Renderer::ClearPointLights()
 void Renderer::ActivateFog()
 {
 	m_fogActive = true;
-	for (Object3D* obj : Engine::Level->Objects())
-		obj->GetMesh()->SetShowFog(true);
 }
 
 glm::mat4 AiToGlm(const aiMatrix4x4& aiMat)
@@ -146,22 +144,6 @@ void Renderer::Loop()
 		if (m_fogBlend > 1.0f) m_fogBlend = 1.0f;
 	}
 
-	std::vector<Object3D*> objects = Engine::Level->Objects();
-	Engine::Level->DrawAxis();
-
-	//only loops through the objects of one default level
-	for (int i = 0; i < objects.size(); i++)
-	{
-		if (objects[i]->GetAnimator())
-			objects[i]->GetAnimator()->Update(Engine::DeltaFrameTime());
-
-		RenderCommand rc;
-		rc.mesh = objects[i]->GetMesh();
-		rc.shader = objects[i]->GetShader();
-		rc.modelMatrix = objects[i]->BuildModelMatrix();
-		rc.isSkinned = objects[i]->skinned();
-		Submit(rc);
-	}
 	if (m_shadowMap && !m_pointLights.empty())
 		m_shadowMap->ShadowPass(commands, m_pointLights[0]);
 

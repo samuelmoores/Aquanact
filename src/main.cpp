@@ -17,10 +17,6 @@ int main()
 {
     Engine::Init();
 
-    Engine::Level->PrepareLoad();
-    while (!Engine::Level->StepLoad());
-
-    Engine::Camera->SetObjects();
     glfwSetInputMode(Engine::Window->GLFW(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     Engine::Input->ResetMouseLook();
 

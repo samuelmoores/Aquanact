@@ -5,7 +5,6 @@ Window* Engine::Window = nullptr;
 Renderer* Engine::Renderer = nullptr;
 Camera* Engine::Camera = nullptr;
 UI* Engine::UI = nullptr;
-Level* Engine::Level = nullptr;
 Input* Engine::Input = nullptr;
 float Engine::m_deltaFrameTime = 0.0f;
 float Engine::m_timeElapsed = 0.0f;
@@ -18,7 +17,6 @@ Engine::Engine()
     Camera = new ::Camera();
     Renderer = new ::Renderer();
     UI = new ::UI();
-    Level = new ::Level();
     Input = new ::Input();
     Renderer->Init();
     glfwSwapInterval(1);
@@ -60,7 +58,6 @@ void Engine::Shutdown()
 {
     delete UI;      UI = nullptr;
     delete Input;   Input = nullptr;
-    delete Level;   Level = nullptr;
     delete Renderer; Renderer = nullptr;
     delete Camera;  Camera = nullptr;
     delete Window;  Window = nullptr;

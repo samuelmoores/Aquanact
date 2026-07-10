@@ -16,7 +16,7 @@ class Camera {
 		void Focus(glm::vec3 min, glm::vec3 max);
 		void PrintPosition();
 		void Move(glm::vec3 delta, glm::vec3 lookAt);
-		void SetObjects();
+
 		glm::vec3 Forward();
 		glm::vec3 Right();
 	private:
