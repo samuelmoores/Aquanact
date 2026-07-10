@@ -30,7 +30,7 @@ set(SOURCES
     "include/Window.h" "src/Window.cpp"
     "include/Engine.h" "src/Engine.cpp"
     "include/UI.h" "src/UI.cpp"
-    "include/Level.h" "src/Level.cpp"
+    "include/Level.h" 
     "include/Input.h" "src/Input.cpp"
     "include/Physics.h" "src/Physics.cpp"
     "include/MathUtils.h" "src/MathUtils.cpp"
