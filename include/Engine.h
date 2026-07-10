@@ -1,10 +1,6 @@
 #pragma once
 #include <Renderer.h>
 #include <Window.h>
-#include <UI.h>
-
-#include <Input.h>
-#include "GLFW/glfw3.h"
 #include <chrono>
 
 class Engine {
@@ -21,16 +17,12 @@ public:
 
 	static Engine& Init() {
 		static Engine instance;
-		glfwSetInputMode(Engine::Window->GLFW(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 		return instance;
 	}
 
 	static Window* Window;
 	static Renderer* Renderer;
 	static Camera* Camera;
-	static UI* UI;
-
-	static Input* Input;
 	static float m_deltaFrameTime;
 	static std::chrono::steady_clock::time_point m_prevFrameTime;
 	static float m_timeElapsed;

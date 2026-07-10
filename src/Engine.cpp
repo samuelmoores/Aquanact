@@ -4,8 +4,6 @@
 Window* Engine::Window = nullptr;
 Renderer* Engine::Renderer = nullptr;
 Camera* Engine::Camera = nullptr;
-UI* Engine::UI = nullptr;
-Input* Engine::Input = nullptr;
 float Engine::m_deltaFrameTime = 0.0f;
 float Engine::m_timeElapsed = 0.0f;
 std::chrono::steady_clock::time_point Engine::m_prevFrameTime = std::chrono::high_resolution_clock::now();
@@ -16,8 +14,6 @@ Engine::Engine()
     gladLoadGL();
     Camera = new ::Camera();
     Renderer = new ::Renderer();
-    UI = new ::UI();
-    Input = new ::Input();
     Renderer->Init();
     glfwSwapInterval(1);
     glEnable(GL_DEPTH_TEST);
@@ -56,8 +52,6 @@ void Engine::ToggleAxis()
 
 void Engine::Shutdown()
 {
-    delete UI;      UI = nullptr;
-    delete Input;   Input = nullptr;
     delete Renderer; Renderer = nullptr;
     delete Camera;  Camera = nullptr;
     delete Window;  Window = nullptr;
