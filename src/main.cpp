@@ -6,7 +6,6 @@ static void mainLoop()
 {
     Engine::Tick();
 
-    Engine::Input->Loop();
     Engine::Renderer->Loop();
 
     glfwSwapBuffers(Engine::Window->GLFW());

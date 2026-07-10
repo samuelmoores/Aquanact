@@ -22,10 +22,6 @@ void Renderer::ClearPointLights()
 	m_pointLights.clear();
 }
 
-void Renderer::ActivateFog()
-{
-	m_fogActive = true;
-}
 
 glm::mat4 AiToGlm(const aiMatrix4x4& aiMat)
 {
@@ -77,9 +73,7 @@ void Renderer::Flush(Camera* camera)
 		commands[i].shader->setUniform("projection", camera->GetProjectionMatrix());
 		commands[i].shader->setUniform("skinned", commands[i].isSkinned);
 		commands[i].shader->setUniform("viewPos", camera->GetPosition());
-		commands[i].shader->setUniform("showFog", commands[i].mesh->ShowFog());
-		commands[i].shader->setUniform("fogColor", m_fogColor);
-		commands[i].shader->setUniform("fogBlend", m_fogBlend);
+
 
 		//apply transforms
 		if (commands[i].isSkinned)
@@ -137,12 +131,7 @@ void Renderer::Loop()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	if (m_fogActive && m_fogBlend < 1.0f)
-	{
-		constexpr float kFogFadeSeconds = 7.0f;
-		m_fogBlend += (float)Engine::DeltaFrameTime() / kFogFadeSeconds;
-		if (m_fogBlend > 1.0f) m_fogBlend = 1.0f;
-	}
+
 
 	if (m_shadowMap && !m_pointLights.empty())
 		m_shadowMap->ShadowPass(commands, m_pointLights[0]);

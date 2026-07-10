@@ -1,4 +1,4 @@
-﻿#include <iomanip>
+#include <iomanip>
 #include <filesystem>
 #include <Engine.h>
 #include <Mesh.h>
@@ -78,7 +78,7 @@ Mesh::Mesh(const char* modelFile)
 {
 	m_currVao = 0;
 	m_currTextureColor = 0;
-	m_showFog = false;
+
 
 	assimpLoad(modelFile, true);
 
@@ -504,15 +504,6 @@ int Mesh::NumAnimations() const { return (int)m_animations.size(); }
 aiAnimation* Mesh::GetAnimation(int i) const { return m_animations[i]; }
 const aiNode* Mesh::GetRootNode() const { return m_scene->mRootNode; }
 
-void Mesh::SetShowFog(bool showFog)
-{
-	m_showFog = showFog;
-}
-
-bool Mesh::ShowFog()
-{
-	return m_showFog;
-}
 
 
 

@@ -78,9 +78,7 @@ class Mesh {
 		aiAnimation* GetAnimation(int i) const;
 		const aiNode* GetRootNode() const;
 
-		//fog
-		void SetShowFog(bool showFog);
-		bool ShowFog();
+
 
 	private:
 		std::vector<Vertex3D> m_vertices;
@@ -106,5 +104,5 @@ class Mesh {
 		std::vector<aiAnimation*> m_animations;
 		std::vector<SubMeshMaterial> m_materials;
 		static SubMeshMaterial s_defaultMaterial;
-		bool m_showFog;
+
 };

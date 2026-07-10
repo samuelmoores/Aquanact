@@ -17,9 +17,6 @@ uniform vec3 ambientColor;
 uniform vec3 viewPos;
 uniform int bone;
 
-uniform vec3 fogColor = vec3(1.0, 1.0, 1.0);
-uniform bool showFog;
-uniform float fogBlend;
 
 #define MAX_POINT_LIGHTS 12
 
@@ -115,18 +112,5 @@ void main()
 	vec3 lightIntensity = ambientIntensity + diffuseIntensity + specularIntensity;
 	FragColor = vec4(lightIntensity, 1.0) * texture(baseTexture, TexCoord);
 
-	if(showFog)
-	{
-		//calc fogColor
-		float distance = length(viewPos - FragWorldPos);
 
-		float fogMin = 500.0;
-		float fogMax = 2100.0;
-	
-		float fogFactor = (distance - fogMin) / (fogMax - fogMin);
-		fogFactor = clamp(fogFactor, 0.0, 1.0);
-
-		// Blend: near = original color, far = fog color
-		FragColor = mix(FragColor, vec4(fogColor, 1.0), fogFactor * fogBlend);
-	}
 }
