@@ -2,7 +2,7 @@
 #include <stdexcept>
 #include <iostream>
 
-Window::Window()
+void Window::startUp()
 {
     /* Initialize the library */
     if (!glfwInit())

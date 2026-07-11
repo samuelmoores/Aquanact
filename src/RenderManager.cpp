@@ -1,12 +1,12 @@
 #include "RenderManager.h"
 #include "Globals.h"
-#include "IGraphicsDevice.h"
+#include "GraphicsDevice.h"
 #include <iomanip>
 #include <iostream>
 
-RenderManager::RenderManager(GraphicsDevice& device)
-	: m_device(device)
+void RenderManager::startUp(GraphicsDevice& device)
 {
+	m_device = &device;
 }
 
 void RenderManager::Init()
@@ -44,10 +44,10 @@ void printMatrixRender(const aiMatrix4x4& m)
 	std::cout << "----------------------------------------------\n";
 }
 
-void RenderManager::Flush(Camera* camera)
+void RenderManager::Flush(const Camera& camera)
 {
 	for (const RenderCommand& command : commands) {
-		m_device.Draw(command, *camera);
+		m_device->Draw(command, camera);
 	}
 
 	commands.clear();
@@ -55,8 +55,8 @@ void RenderManager::Flush(Camera* camera)
 
 void RenderManager::Loop()
 {
-	m_device.Clear(1.0f, 1.0f, 1.0f, 1.0f);
-	m_device.BeginFrame();
+	m_device->Clear(0.0f, 0.0f, 0.0f, 0.0f);
+	m_device->BeginFrame();
 	Flush(gCamera);
-	m_device.EndFrame();
+	m_device->EndFrame();
 }

@@ -12,11 +12,11 @@ float yaw = 0.0f;
 float pitch = 0.0f;
 float sensitivity = 0.08f;
 
-Camera::Camera()
+void Camera::startUp()
 {
 
 	int width, height;
-	glfwGetWindowSize(gWindow->GLFW(), &width, &height);
+	glfwGetWindowSize(gWindow.GLFW(), &width, &height);
 
 	m_projection_matrix = glm::perspective(glm::radians(45.0), static_cast<double>(width) / height, 0.1, 1000000.0);
 
@@ -40,26 +40,24 @@ Camera::Camera()
 
 }
 
-glm::mat4 Camera::GetProjectionMatrix()
+glm::mat4 Camera::GetProjectionMatrix() const
 {
 	int width, height;
-	glfwGetWindowSize(gWindow->GLFW(), &width, &height);
-	m_projection_matrix = glm::perspective(glm::radians(45.0), static_cast<double>(width) / height, 0.1, 1000000.0);
-
-	return m_projection_matrix;
+	glfwGetWindowSize(gWindow.GLFW(), &width, &height);
+	return glm::perspective(glm::radians(45.0), static_cast<double>(width) / height, 0.1, 1000000.0);
 }
 
-glm::mat4 Camera::GetViewMatrix()
+glm::mat4 Camera::GetViewMatrix() const
 {
 	return m_view_matrix;
 }
 
-glm::vec3 Camera::GetPosition()
+glm::vec3 Camera::GetPosition() const
 {
 	return m_position;
 }
 
-glm::vec3 Camera::GetFacing()
+glm::vec3 Camera::GetFacing() const
 {
 	return m_front;
 }
@@ -238,14 +236,14 @@ void Camera::Move(glm::vec3 delta, glm::vec3 lookAt)
 
 
 
-glm::vec3 Camera::Forward()
+glm::vec3 Camera::Forward() const
 {
 	glm::vec3 cameraLookDir = glm::normalize(m_lookAt - m_position);
 	cameraLookDir.y = 0.0f;
 	return cameraLookDir;
 }
 
-glm::vec3 Camera::Right()
+glm::vec3 Camera::Right() const
 {
 	glm::vec3 cameraLookDir = glm::normalize(m_lookAt - m_position);
 	cameraLookDir.y = 0.0f;

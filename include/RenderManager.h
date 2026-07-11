@@ -9,13 +9,14 @@ class GraphicsDevice;
 
 class RenderManager {
 public:
-	explicit RenderManager(GraphicsDevice& device);
+	RenderManager() = default;
+	void startUp(GraphicsDevice& device);
 	void Init();
 	void Submit(const RenderCommand& command);
-	void Flush(Camera* camera);
+	void Flush(const Camera& camera);
 	void Loop();
 
 private:
-	GraphicsDevice& m_device;
+	GraphicsDevice* m_device = nullptr;
 	std::vector<RenderCommand> commands;
 };

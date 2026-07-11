@@ -22,9 +22,10 @@ namespace {
 	}
 }
 
-OpenGLGraphicsDevice::OpenGLGraphicsDevice(Window& window)
-	: m_window(window)
+void OpenGLGraphicsDevice::startUp(Window& window)
 {
+	m_window = &window;
+	Initialize();
 }
 
 OpenGLGraphicsDevice::~OpenGLGraphicsDevice()
@@ -38,13 +39,13 @@ void OpenGLGraphicsDevice::Initialize()
 		return;
 	}
 
-	glfwMakeContextCurrent(m_window.GLFW());
+	glfwMakeContextCurrent(m_window->GLFW());
 	if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress))) {
 		throw std::runtime_error("Failed to initialize GLAD");
 	}
 
 	glEnable(GL_DEPTH_TEST);
-	glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 	m_initialized = true;
 }
 
@@ -65,7 +66,7 @@ void OpenGLGraphicsDevice::Clear(float r, float g, float b, float a)
 
 void OpenGLGraphicsDevice::EndFrame()
 {
-	glfwSwapBuffers(m_window.GLFW());
+	glfwSwapBuffers(m_window->GLFW());
 }
 
 void OpenGLGraphicsDevice::Draw(const RenderCommand& command, const Camera& camera)

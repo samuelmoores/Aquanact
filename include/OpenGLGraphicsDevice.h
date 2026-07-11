@@ -6,8 +6,9 @@ class Window;
 
 class OpenGLGraphicsDevice final : public GraphicsDevice {
 public:
-	explicit OpenGLGraphicsDevice(Window& window);
+	OpenGLGraphicsDevice() = default;
 	~OpenGLGraphicsDevice() override;
+	void startUp(Window& window);
 
 	void Initialize() override;
 	void Shutdown() override;
@@ -19,6 +20,6 @@ public:
 	void Draw(const RenderCommand& command, const Camera& camera) override;
 
 private:
-	Window& m_window;
+	Window* m_window = nullptr;
 	bool m_initialized = false;
 };

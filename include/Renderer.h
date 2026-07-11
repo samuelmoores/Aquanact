@@ -12,7 +12,7 @@ class Renderer {
 public:
 	void Init();
 	void Submit(const RenderCommand& command);
-	void Flush(Camera* camera);
+	void Flush(const Camera& camera);
 	void Loop();
 
 

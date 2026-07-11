@@ -403,8 +403,8 @@ glm::vec3 Mesh::maxBounds()
 void Mesh::DrawBoundingBox()
 {
 	Line line(m_meshMinBounds, m_meshMaxBounds);
-	line.UpdateProjection(gCamera->GetProjectionMatrix());
-	line.draw(gCamera->GetViewMatrix());
+	line.UpdateProjection(gCamera.GetProjectionMatrix());
+	line.draw(gCamera.GetViewMatrix());
 }
 void Mesh::updateAABB(glm::vec3 position, glm::vec3 scale)
 {

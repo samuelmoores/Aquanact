@@ -6,19 +6,20 @@
 
 class Camera {
 	public:
-		Camera();
-		glm::mat4 GetProjectionMatrix();
-		glm::mat4 GetViewMatrix();
-		glm::vec3 GetPosition();
-		glm::vec3 GetFacing();
+		Camera() = default;
+		void startUp();
+		glm::mat4 GetProjectionMatrix() const;
+		glm::mat4 GetViewMatrix() const;
+		glm::vec3 GetPosition() const;
+		glm::vec3 GetFacing() const;
 		void CameraControl(glm::vec2 mouseDiff);
 		void CameraControl(float scroll);
 		void Focus(glm::vec3 min, glm::vec3 max);
 		void PrintPosition();
 		void Move(glm::vec3 delta, glm::vec3 lookAt);
 
-		glm::vec3 Forward();
-		glm::vec3 Right();
+		glm::vec3 Forward() const;
+		glm::vec3 Right() const;
 	private:
 		float ComputeSafeCameraDistance(const glm::vec3& rayOrigin, const glm::vec3& rayDir, float maxDist);
 		glm::mat4 m_projection_matrix;

@@ -4,8 +4,9 @@
 
 class Window {
 public:
-	Window();
+	Window() = default;
 	~Window();
+	void startUp();
 	GLFWwindow* GLFW() { return m_glfwWindow; }
 
 private:
