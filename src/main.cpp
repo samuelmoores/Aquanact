@@ -1,30 +1,32 @@
 #include <iostream>
-#include <chrono>
-#include <Engine.h>
+#include <Globals.h>
+#include <RenderManager.h>
+#include <Window.h>
+#include <Camera.h>
 
-//declare subsystem managers
-
-//
+Window* gWindow = nullptr;
+Camera* gCamera = nullptr;
+RenderManager gRenderManager;
 
 static void mainLoop()
 {
-    Engine::Tick();
+    gRenderManager.Loop();
 
-    Engine::Renderer->Loop();
-
-    glfwSwapBuffers(Engine::Window->GLFW());
+    glfwSwapBuffers(gWindow->GLFW());
     glfwPollEvents();
 }
 
 int main()
 {
-    //call startup functions for subsystem managers
-    Engine::Init();
-    //
+    gWindow = new Window();
+    gladLoadGL();
+    gCamera = new Camera();
+    gRenderManager.Init();
 
-    while (Engine::Running())
+    while (!glfwWindowShouldClose(gWindow->GLFW()))
         mainLoop();
-    Engine::Shutdown();
+    delete gCamera; gCamera = nullptr;
+    delete gWindow; gWindow = nullptr;
     glfwTerminate();
     return 0;
 }

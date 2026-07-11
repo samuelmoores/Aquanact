@@ -1,19 +1,16 @@
-#include "Engine.h"
+#include "RenderManager.h"
+#include "Globals.h"
 #include <iomanip>
 
-void Renderer::Init()
+void RenderManager::Init()
 {
-
 	glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 }
 
-void Renderer::Submit(const RenderCommand& command)
+void RenderManager::Submit(const RenderCommand& command)
 {
 	commands.push_back(command);
 }
-
-
-
 
 glm::mat4 AiToGlm(const aiMatrix4x4& aiMat)
 {
@@ -25,12 +22,9 @@ glm::mat4 AiToGlm(const aiMatrix4x4& aiMat)
 	return result;
 }
 
-void printMatrixRender(const aiMatrix4x4& m) {
-	// Set precision and fixed notation
+void printMatrixRender(const aiMatrix4x4& m)
+{
 	std::cout << std::fixed << std::setprecision(3);
-
-	// Print each row with proper alignment
-	// Width of 9 accommodates sign, digits, decimal point, and precision
 	std::cout << "[ "
 		<< std::setw(9) << m.a1 << " "
 		<< std::setw(9) << m.a2 << " "
@@ -54,23 +48,19 @@ void printMatrixRender(const aiMatrix4x4& m) {
 	std::cout << "----------------------------------------------\n";
 }
 
-void Renderer::Flush(Camera* camera)
+void RenderManager::Flush(Camera* camera)
 {
 	for (int i = 0; i < commands.size(); i++)
 	{
 		commands[i].shader->activate();
-
 		commands[i].shader->setUniform("model", commands[i].modelMatrix);
 		commands[i].shader->setUniform("view", camera->GetViewMatrix());
 		commands[i].shader->setUniform("projection", camera->GetProjectionMatrix());
 		commands[i].shader->setUniform("skinned", commands[i].isSkinned);
 		commands[i].shader->setUniform("viewPos", camera->GetPosition());
 
-
-		//apply transforms
 		if (commands[i].isSkinned)
 		{
-			//send transforms to GPU
 			const auto& assimpTransforms = commands[i].mesh->GetSkeleton().finalTransformations;
 			std::vector<glm::mat4> glmTransforms;
 			glmTransforms.reserve(assimpTransforms.size());
@@ -83,16 +73,12 @@ void Renderer::Flush(Camera* camera)
 			commands[i].shader->setUniform("finalBones", glmTransforms);
 		}
 
-
-
 		int numBuffs = commands[i].mesh->NumBuffers();
 		for (int j = 0; j < numBuffs; j++)
 		{
 			const SubMeshMaterial& mat = commands[i].mesh->GetMaterial(j);
-
 			commands[i].shader->setUniform("material", mat.phong);
 			commands[i].shader->setUniform("ambientColor", mat.ambientColor);
-
 			commands[i].mesh->Bind();
 			glDrawElements(GL_TRIANGLES, commands[i].mesh->FacesSize(), GL_UNSIGNED_INT, 0);
 			commands[i].mesh->UnBind();
@@ -103,8 +89,8 @@ void Renderer::Flush(Camera* camera)
 	commands.clear();
 }
 
-void Renderer:: ()
+void RenderManager::Loop()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	Flush(Engine::Camera);
+	Flush(gCamera);
 }

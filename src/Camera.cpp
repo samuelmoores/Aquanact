@@ -1,6 +1,8 @@
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/ext/matrix_clip_space.hpp>
-#include "Engine.h"
+#include <Camera.h>
+#include "Globals.h"
+#include <Window.h>
 #include <Object3D.h>
 
 
@@ -14,7 +16,7 @@ Camera::Camera()
 {
 
 	int width, height;
-	glfwGetWindowSize(Engine::Window->GLFW(), &width, &height);
+	glfwGetWindowSize(gWindow->GLFW(), &width, &height);
 
 	m_projection_matrix = glm::perspective(glm::radians(45.0), static_cast<double>(width) / height, 0.1, 1000000.0);
 
@@ -41,7 +43,7 @@ Camera::Camera()
 glm::mat4 Camera::GetProjectionMatrix()
 {
 	int width, height;
-	glfwGetWindowSize(Engine::Window->GLFW(), &width, &height);
+	glfwGetWindowSize(gWindow->GLFW(), &width, &height);
 	m_projection_matrix = glm::perspective(glm::radians(45.0), static_cast<double>(width) / height, 0.1, 1000000.0);
 
 	return m_projection_matrix;
