@@ -9,9 +9,7 @@ public:
 	OpenGLGraphicsDevice() = default;
 	~OpenGLGraphicsDevice() override;
 	void startUp(Window& window);
-
-	void Initialize() override;
-	void Shutdown() override;
+	void shutDown() override;
 
 	void BeginFrame() override;
 	void Clear(float r, float g, float b, float a) override;
@@ -20,6 +18,7 @@ public:
 	void Draw(const RenderCommand& command, const Camera& camera) override;
 
 private:
+	void startUp() override;
 	Window* m_window = nullptr;
 	bool m_initialized = false;
 };

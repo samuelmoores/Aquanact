@@ -7,7 +7,11 @@ public:
 	Window() = default;
 	~Window();
 	void startUp();
+	void shutDown();
 	GLFWwindow* GLFW() { return m_glfwWindow; }
+	bool ShouldClose() const;
+	void SwapBuffers();
+	void PollEvents();
 
 private:
 	GLFWwindow* m_glfwWindow = nullptr;

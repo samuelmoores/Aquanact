@@ -9,8 +9,8 @@ class GraphicsDevice {
 public:
 	virtual ~GraphicsDevice() = default;
 
-	virtual void Initialize() = 0;
-	virtual void Shutdown() = 0;
+	virtual void startUp() = 0;
+	virtual void shutDown() = 0;
 
 	virtual void BeginFrame() = 0;
 	virtual void Clear(float r, float g, float b, float a) = 0;

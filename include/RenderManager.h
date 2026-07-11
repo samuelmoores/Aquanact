@@ -11,7 +11,7 @@ class RenderManager {
 public:
 	RenderManager() = default;
 	void startUp(GraphicsDevice& device);
-	void Init();
+	void shutDown();
 	void Submit(const RenderCommand& command);
 	void Flush(const Camera& camera);
 	void Loop();

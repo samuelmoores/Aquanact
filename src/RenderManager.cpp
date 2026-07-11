@@ -7,10 +7,12 @@
 void RenderManager::startUp(GraphicsDevice& device)
 {
 	m_device = &device;
+	commands.clear();
 }
 
-void RenderManager::Init()
+void RenderManager::shutDown()
 {
+	commands.clear();
 }
 
 void RenderManager::Submit(const RenderCommand& command)

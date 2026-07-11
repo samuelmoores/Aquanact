@@ -8,6 +8,7 @@ class Camera {
 	public:
 		Camera() = default;
 		void startUp();
+		void shutDown();
 		glm::mat4 GetProjectionMatrix() const;
 		glm::mat4 GetViewMatrix() const;
 		glm::vec3 GetPosition() const;

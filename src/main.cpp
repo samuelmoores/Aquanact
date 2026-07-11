@@ -13,7 +13,8 @@ OpenGLGraphicsDevice gGraphicsDevice;
 static void mainLoop()
 {
     gRenderManager.Loop();
-    glfwPollEvents();
+    gWindow.SwapBuffers();
+    gWindow.PollEvents();
 }
 
 int main()
@@ -22,11 +23,13 @@ int main()
     gGraphicsDevice.startUp(gWindow);
     gCamera.startUp();
     gRenderManager.startUp(gGraphicsDevice);
-    gRenderManager.Init();
 
-    while (!glfwWindowShouldClose(gWindow.GLFW()))
+    while (!gWindow.ShouldClose())
         mainLoop();
 
-    glfwTerminate();
+    gRenderManager.shutDown();
+    gCamera.shutDown();
+    gGraphicsDevice.shutDown();
+    gWindow.shutDown();
     return 0;
 }

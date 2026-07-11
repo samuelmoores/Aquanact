@@ -29,10 +29,31 @@ void Window::startUp()
     glfwSwapInterval(0);
 }
 
-Window::~Window()
+void Window::shutDown()
 {
     if (m_glfwWindow) {
         glfwDestroyWindow(m_glfwWindow);
         m_glfwWindow = nullptr;
     }
+    glfwTerminate();
+}
+
+bool Window::ShouldClose() const
+{
+    return glfwWindowShouldClose(m_glfwWindow);
+}
+
+void Window::SwapBuffers()
+{
+    glfwSwapBuffers(m_glfwWindow);
+}
+
+void Window::PollEvents()
+{
+    glfwPollEvents();
+}
+
+Window::~Window()
+{
+    shutDown();
 }

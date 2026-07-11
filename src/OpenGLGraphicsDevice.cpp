@@ -25,15 +25,10 @@ namespace {
 void OpenGLGraphicsDevice::startUp(Window& window)
 {
 	m_window = &window;
-	Initialize();
+	startUp();
 }
 
-OpenGLGraphicsDevice::~OpenGLGraphicsDevice()
-{
-	Shutdown();
-}
-
-void OpenGLGraphicsDevice::Initialize()
+void OpenGLGraphicsDevice::startUp()
 {
 	if (m_initialized) {
 		return;
@@ -49,9 +44,14 @@ void OpenGLGraphicsDevice::Initialize()
 	m_initialized = true;
 }
 
-void OpenGLGraphicsDevice::Shutdown()
+void OpenGLGraphicsDevice::shutDown()
 {
 	m_initialized = false;
+}
+
+OpenGLGraphicsDevice::~OpenGLGraphicsDevice()
+{
+	shutDown();
 }
 
 void OpenGLGraphicsDevice::BeginFrame()

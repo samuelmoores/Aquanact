@@ -40,6 +40,10 @@ void Camera::startUp()
 
 }
 
+void Camera::shutDown()
+{
+}
+
 glm::mat4 Camera::GetProjectionMatrix() const
 {
 	int width, height;
