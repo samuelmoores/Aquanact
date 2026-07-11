@@ -27,6 +27,8 @@ set(SOURCES
     "include/Animator.h" "src/Animator.cpp"
     "include/Window.h" "src/Window.cpp"
     "include/RenderManager.h" "src/RenderManager.cpp"
+    "include/GraphicsDevice.h"
+    "include/OpenGLGraphicsDevice.h" "src/OpenGLGraphicsDevice.cpp"
     "include/Physics.h" "src/Physics.cpp"
     "include/MathUtils.h" "src/MathUtils.cpp"
     "include/Audio.h" "src/Audio.cpp"

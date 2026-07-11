@@ -3,28 +3,32 @@
 #include <RenderManager.h>
 #include <Window.h>
 #include <Camera.h>
+#include <OpenGLGraphicsDevice.h>
 
 Window* gWindow = nullptr;
 Camera* gCamera = nullptr;
-RenderManager gRenderManager;
+RenderManager* gRenderManager = nullptr;
+OpenGLGraphicsDevice* gGraphicsDevice = nullptr;
 
 static void mainLoop()
 {
-    gRenderManager.Loop();
-
-    glfwSwapBuffers(gWindow->GLFW());
+    gRenderManager->Loop();
     glfwPollEvents();
 }
 
 int main()
 {
     gWindow = new Window();
-    gladLoadGL();
+    gGraphicsDevice = new OpenGLGraphicsDevice(*gWindow);
+    gGraphicsDevice->Initialize();
     gCamera = new Camera();
-    gRenderManager.Init();
+    gRenderManager = new RenderManager(*gGraphicsDevice);
+    gRenderManager->Init();
 
     while (!glfwWindowShouldClose(gWindow->GLFW()))
         mainLoop();
+    delete gRenderManager; gRenderManager = nullptr;
+    delete gGraphicsDevice; gGraphicsDevice = nullptr;
     delete gCamera; gCamera = nullptr;
     delete gWindow; gWindow = nullptr;
     glfwTerminate();

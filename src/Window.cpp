@@ -28,3 +28,11 @@ Window::Window()
     glfwMakeContextCurrent(m_glfwWindow);
     glfwSwapInterval(0);
 }
+
+Window::~Window()
+{
+    if (m_glfwWindow) {
+        glfwDestroyWindow(m_glfwWindow);
+        m_glfwWindow = nullptr;
+    }
+}
