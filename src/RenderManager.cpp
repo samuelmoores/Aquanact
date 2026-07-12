@@ -5,6 +5,7 @@
 #include "Debug.h"
 #include "EngineGUI.h"
 #include "Window.h"
+#include "Object3D.h"
 #include <iomanip>
 #include <iostream>
 
@@ -63,6 +64,20 @@ void RenderManager::Loop()
 {
 	m_device->Clear(0.0f, 0.0f, 0.0f, 0.0f);
 	m_device->BeginFrame();
+	for (const auto& object : gSceneObjects)
+	{
+		if (!object || !object->GetMesh() || !object->GetShader())
+		{
+			continue;
+		}
+
+		Submit(RenderCommand{
+			object->GetMesh(),
+			object->GetShader(),
+			object->BuildModelMatrix(),
+			object->skinned()
+		});
+	}
 	Flush(gEngineCamera);
 	gEngineGUI.BeginFrame();
 	gDebug.draw(gEngineCamera, gEngineGUI);

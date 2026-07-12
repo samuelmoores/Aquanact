@@ -1,10 +1,12 @@
 #include "FileManager.h"
+#include "Globals.h"
+#include "Object3D.h"
 
 #include <iostream>
 
 void FileManager::startUp()
 {
-	m_rootDirectory = std::filesystem::current_path() / "assets";
+	m_rootDirectory = std::filesystem::path("C:/dev/Aquanact/assets");
 	m_currentDirectory = m_rootDirectory;
 	m_selectedPath.clear();
 	Refresh();
@@ -105,8 +107,23 @@ bool FileManager::ImportSelected()
 		return false;
 	}
 
-	std::cout << "Importing FBX: " << m_selectedPath.string() << std::endl;
-	return true;
+	const std::filesystem::path absolutePath = m_selectedPath.is_absolute()
+		? m_selectedPath
+		: std::filesystem::absolute(m_selectedPath);
+
+	try
+	{
+		auto importedObject = std::make_unique<Object3D>(absolutePath.string().c_str());
+		importedObject->SetIgnoreCameraCollision(true);
+		gSceneObjects.push_back(std::move(importedObject));
+		std::cout << "Imported FBX: " << absolutePath.string() << std::endl;
+		return true;
+	}
+	catch (const std::exception& ex)
+	{
+		std::cout << "Failed to import FBX '" << absolutePath.string() << "': " << ex.what() << std::endl;
+		return false;
+	}
 }
 
 const std::vector<std::filesystem::directory_entry>& FileManager::Entries() const

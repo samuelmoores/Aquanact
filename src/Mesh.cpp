@@ -7,6 +7,7 @@
 #include <stb_image.h>
 #include <Line.h>
 #include <algorithm>
+#include <stdexcept>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
 
@@ -157,7 +158,7 @@ void Mesh::assimpLoad(const std::string& path, bool flipUvs)
 	if (nullptr == m_scene) 
 	{
 		std::cout << "ASSIMP ERROR: " << m_importer.GetErrorString() << std::endl;
-		exit(1);
+		throw std::runtime_error(m_importer.GetErrorString());
 	}
 	else 
 	{
