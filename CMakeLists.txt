@@ -26,6 +26,7 @@ set(SOURCES
     "include/Texture.h"
     "include/Line.h" "src/Line.cpp"
     "include/Debug.h" "src/Debug.cpp"
+    "include/EngineGUI.h" "src/EngineGUI.cpp"
     "include/Animation.h" "src/Animation.cpp"
     "include/Animator.h" "src/Animator.cpp"
     "include/Window.h" "src/Window.cpp"
@@ -53,6 +54,9 @@ target_link_libraries(AquanactEngine PRIVATE assimp::assimp)
 
 find_package(glad CONFIG REQUIRED)
 target_link_libraries(AquanactEngine PRIVATE glad::glad)
+
+find_package(imgui CONFIG REQUIRED)
+target_link_libraries(AquanactEngine PRIVATE imgui::imgui)
 
 target_include_directories(AquanactEngine PUBLIC "./include")
 

@@ -1,6 +1,7 @@
 #include "Debug.h"
 
 #include "Axis.h"
+#include "EngineGUI.h"
 #include "Grid.h"
 #include "Camera.h"
 #include "Input.h"
@@ -20,21 +21,21 @@ void Debug::shutDown()
 	m_grid = nullptr;
 }
 
-void Debug::draw(const Camera& camera)
+void Debug::draw(const Camera& camera, const EngineGUI& gui)
 {
 	auto projection = camera.GetProjectionMatrix();
 	auto view = camera.GetViewMatrix();
 
-	if (m_axis)
+	if (m_axis && gui.ShowAxis())
 	{
 		m_axis->UpdateProjection(projection);
 		m_axis->draw(view);
 	}
 
-	if (m_grid)
+	if (m_grid && gui.ShowGrid())
 	{
 		m_grid->UpdateProjection(projection);
-		m_grid->draw(view);
+		m_grid->draw(view, !gui.ShowAxis());
 	}
 }
 

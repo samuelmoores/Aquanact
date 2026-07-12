@@ -5,6 +5,7 @@
 #include <EngineCamera.h>
 #include <OpenGLGraphicsDevice.h>
 #include <Debug.h>
+#include <EngineGUI.h>
 #include <Input.h>
 
 Window gWindow;
@@ -12,6 +13,7 @@ EngineCamera gEngineCamera;
 RenderManager gRenderManager;
 OpenGLGraphicsDevice gGraphicsDevice;
 Debug gDebug;
+EngineGUI gEngineGUI;
 Input gInput;
 
 static void mainLoop()
@@ -30,12 +32,14 @@ int main()
     gInput.startUp(gWindow);
     gInput.AttachCamera(gEngineCamera);
     gDebug.startUp();
+    gEngineGUI.startUp(gWindow);
     gDebug.SetLoggingEnabled(true);
 
     while (!gWindow.ShouldClose())
         mainLoop();
 
     gDebug.shutDown();
+    gEngineGUI.shutDown();
     gInput.shutDown();
     gRenderManager.shutDown();
     gEngineCamera.shutDown();

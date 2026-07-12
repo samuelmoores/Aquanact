@@ -5,9 +5,11 @@ class EngineCamera;
 class RenderManager;
 class OpenGLGraphicsDevice;
 class Debug;
+class EngineGUI;
 
 extern Window gWindow;
 extern EngineCamera gEngineCamera;
 extern RenderManager gRenderManager;
 extern OpenGLGraphicsDevice gGraphicsDevice;
 extern Debug gDebug;
+extern EngineGUI gEngineGUI;

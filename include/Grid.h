@@ -11,8 +11,9 @@ public:
 	~Grid();
 
 	void UpdateProjection(glm::mat4 projectionMatrix);
-	void draw(glm::mat4 viewMatrix);
+	void draw(glm::mat4 viewMatrix, bool drawCenterLines);
 
 private:
 	std::vector<Line*> m_lines;
+	std::vector<Line*> m_centerLines;
 };

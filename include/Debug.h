@@ -2,13 +2,14 @@
 
 class Camera;
 class Input;
+class EngineGUI;
 
 class Debug {
 public:
 	Debug() = default;
 	void startUp();
 	void shutDown();
-	void draw(const Camera& camera);
+	void draw(const Camera& camera, const EngineGUI& gui);
 	void LogFrame(const Camera& camera, const Input& input);
 	void SetLoggingEnabled(bool enabled);
 
