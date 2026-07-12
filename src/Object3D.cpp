@@ -65,8 +65,8 @@ Object3D::Object3D(const char* modelFile)
 	m_rotation = glm::vec3(0);
 	m_scale = glm::vec3(1);
 
-	m_name = modelFile;
-
+	m_sourcePath = modelFile;
+	m_name = m_sourcePath;
 	size_t lastSlash = m_name.find_last_of("/\\");
 	if (lastSlash != std::string::npos)
 		m_name = m_name.substr(lastSlash + 1);
@@ -175,4 +175,14 @@ bool Object3D::skinned()
 std::string Object3D::Name()
 {
 	return m_name;
+}
+
+std::string Object3D::SourcePath()
+{
+	return m_sourcePath;
+}
+
+glm::vec3 Object3D::Scale()
+{
+	return m_scale;
 }

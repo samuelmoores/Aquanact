@@ -28,6 +28,8 @@ set(SOURCES
     "include/Debug.h" "src/Debug.cpp"
     "include/EngineGUI.h" "src/EngineGUI.cpp"
     "include/FileManager.h" "src/FileManager.cpp"
+    "include/SceneManager.h" "src/SceneManager.cpp"
+    "include/ProjectManager.h" "src/ProjectManager.cpp"
     "include/Animation.h" "src/Animation.cpp"
     "include/Animator.h" "src/Animator.cpp"
     "include/Window.h" "src/Window.cpp"

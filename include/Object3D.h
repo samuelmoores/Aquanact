@@ -24,8 +24,10 @@ public:
 	bool intersectsRayMesh(glm::vec3 origin, glm::vec3& direction);
 	bool skinned();
 	std::string Name();
+	std::string SourcePath();
 	glm::vec3 Position();
 	glm::vec3 Rotation();
+	glm::vec3 Scale();
 	void SetRotation(glm::vec3 newRotation);
 
 	void SetIgnoreCameraCollision(bool ignore) { m_ignoreCameraCollision = ignore; }
@@ -108,4 +110,5 @@ private:
 	bool m_skinned;
 	bool m_ignoreCameraCollision = false;
 	std::string m_name;
+	std::string m_sourcePath;
 };

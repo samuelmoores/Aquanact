@@ -5,7 +5,9 @@
 #include "Grid.h"
 #include "Camera.h"
 #include "Input.h"
-#include <iostream>
+
+#include <imgui.h>
+#include <sstream>
 
 void Debug::startUp()
 {
@@ -19,6 +21,7 @@ void Debug::shutDown()
 	m_axis = nullptr;
 	delete m_grid;
 	m_grid = nullptr;
+	m_logMessages.clear();
 }
 
 void Debug::draw(const Camera& camera, const EngineGUI& gui)
@@ -36,6 +39,36 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 	{
 		m_grid->UpdateProjection(projection);
 		m_grid->draw(view, !gui.ShowAxis());
+	}
+
+	if (m_loggingEnabled)
+	{
+		ImGui::Begin("Debug Log");
+		if (ImGui::Button("Clear"))
+		{
+			m_logMessages.clear();
+			m_logFrameCount = 0;
+		}
+		ImGui::Separator();
+		for (const std::string& message : m_logMessages)
+		{
+			ImGui::TextUnformatted(message.c_str());
+		}
+		ImGui::End();
+	}
+}
+
+void Debug::LogMessage(const std::string& message)
+{
+	if (!m_loggingEnabled)
+	{
+		return;
+	}
+
+	m_logMessages.push_back(message);
+	if (m_logMessages.size() > 180)
+	{
+		m_logMessages.erase(m_logMessages.begin());
 	}
 }
 
@@ -62,7 +95,8 @@ void Debug::LogFrame(const Camera& camera, const Input& input)
 	const glm::vec3 moveInput = input.MoveInput();
 	const glm::vec2 mouseDelta = input.MouseDelta();
 
-	std::cout
+	std::ostringstream oss;
+	oss
 		<< "[debug frame " << m_logFrameCount << "] "
 		<< "dt=" << input.DeltaTime()
 		<< " windowFocused=" << input.WindowFocused()
@@ -71,8 +105,9 @@ void Debug::LogFrame(const Camera& camera, const Input& input)
 		<< " mouseDelta=(" << mouseDelta.x << ", " << mouseDelta.y << ")"
 		<< " moveInput=(" << moveInput.x << ", " << moveInput.y << ", " << moveInput.z << ")"
 		<< " camPos=(" << position.x << ", " << position.y << ", " << position.z << ")"
-		<< " camFacing=(" << facing.x << ", " << facing.y << ", " << facing.z << ")"
-		<< std::endl;
+		<< " camFacing=(" << facing.x << ", " << facing.y << ", " << facing.z << ")";
+
+	LogMessage(oss.str());
 
 	++m_logFrameCount;
 }

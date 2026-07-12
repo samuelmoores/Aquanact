@@ -3,9 +3,9 @@
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <cmath>
-#include <iostream>
 
 #include <EngineCamera.h>
+#include "Debug.h"
 #include "Globals.h"
 #include <Window.h>
 #include <Input.h>
@@ -62,7 +62,10 @@ glm::vec3 EngineCamera::GetFacing() const
 
 void EngineCamera::PrintPosition()
 {
-	std::cout << "position: " << m_position.x << ", " << m_position.y << ", " << m_position.z << std::endl;
+	gDebug.LogMessage(
+		"Camera position: " + std::to_string(m_position.x) + ", " +
+		std::to_string(m_position.y) + ", " +
+		std::to_string(m_position.z));
 }
 
 void EngineCamera::FlyControl(glm::vec2 mouseDiff, glm::vec3 moveInput, float dt)

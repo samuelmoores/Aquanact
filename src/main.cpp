@@ -2,6 +2,8 @@
 #include <Globals.h>
 #include <RenderManager.h>
 #include <Object3D.h>
+#include <SceneManager.h>
+#include <ProjectManager.h>
 #include <Window.h>
 #include <EngineCamera.h>
 #include <OpenGLGraphicsDevice.h>
@@ -17,7 +19,8 @@ OpenGLGraphicsDevice gGraphicsDevice;
 Debug gDebug;
 EngineGUI gEngineGUI;
 FileManager gFileManager;
-std::vector<std::unique_ptr<Object3D>> gSceneObjects;
+SceneManager gSceneManager;
+ProjectManager gProjectManager;
 Input gInput;
 
 static void mainLoop()
@@ -46,7 +49,7 @@ int main()
     gDebug.shutDown();
     gEngineGUI.shutDown();
     gFileManager.shutDown();
-    gSceneObjects.clear();
+    gSceneManager.Clear();
     gInput.shutDown();
     gRenderManager.shutDown();
     gEngineCamera.shutDown();

@@ -6,6 +6,7 @@
 #include "EngineGUI.h"
 #include "Window.h"
 #include "Object3D.h"
+#include "SceneManager.h"
 #include <iomanip>
 #include <iostream>
 
@@ -64,7 +65,7 @@ void RenderManager::Loop()
 {
 	m_device->Clear(0.0f, 0.0f, 0.0f, 0.0f);
 	m_device->BeginFrame();
-	for (const auto& object : gSceneObjects)
+	for (const auto& object : gSceneManager.Objects())
 	{
 		if (!object || !object->GetMesh() || !object->GetShader())
 		{
@@ -81,7 +82,7 @@ void RenderManager::Loop()
 	Flush(gEngineCamera);
 	gEngineGUI.BeginFrame();
 	gDebug.draw(gEngineCamera, gEngineGUI);
-	gEngineGUI.Draw(gEngineCamera, gFileManager);
+	gEngineGUI.Draw(gEngineCamera, gFileManager, gSceneManager, gProjectManager);
 	gEngineGUI.EndFrame();
 	m_device->EndFrame();
 	gWindow.PollEvents();

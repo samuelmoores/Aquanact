@@ -1,8 +1,8 @@
 #include "FileManager.h"
+#include "Debug.h"
 #include "Globals.h"
 #include "Object3D.h"
-
-#include <iostream>
+#include "SceneManager.h"
 
 void FileManager::startUp()
 {
@@ -115,13 +115,13 @@ bool FileManager::ImportSelected()
 	{
 		auto importedObject = std::make_unique<Object3D>(absolutePath.string().c_str());
 		importedObject->SetIgnoreCameraCollision(true);
-		gSceneObjects.push_back(std::move(importedObject));
-		std::cout << "Imported FBX: " << absolutePath.string() << std::endl;
+		gSceneManager.AddObject(std::move(importedObject));
+		gDebug.LogMessage("Imported FBX: " + absolutePath.string());
 		return true;
 	}
 	catch (const std::exception& ex)
 	{
-		std::cout << "Failed to import FBX '" << absolutePath.string() << "': " << ex.what() << std::endl;
+		gDebug.LogMessage("Failed to import FBX '" + absolutePath.string() + "': " + ex.what());
 		return false;
 	}
 }

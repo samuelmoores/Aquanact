@@ -8,6 +8,7 @@
 #include <Line.h>
 #include <algorithm>
 #include <stdexcept>
+#include "Debug.h"
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
 
@@ -157,7 +158,7 @@ void Mesh::assimpLoad(const std::string& path, bool flipUvs)
 	// If the import failed, report it
 	if (nullptr == m_scene) 
 	{
-		std::cout << "ASSIMP ERROR: " << m_importer.GetErrorString() << std::endl;
+		gDebug.LogMessage(std::string("ASSIMP ERROR: ") + m_importer.GetErrorString());
 		throw std::runtime_error(m_importer.GetErrorString());
 	}
 	else 

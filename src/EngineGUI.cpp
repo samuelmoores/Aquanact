@@ -1,8 +1,11 @@
 #include "EngineGUI.h"
 
 #include "FileManager.h"
+#include "SceneManager.h"
+#include "ProjectManager.h"
 #include "Window.h"
 #include "Camera.h"
+#include "Object3D.h"
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -49,7 +52,7 @@ void EngineGUI::BeginFrame()
 	ImGui::NewFrame();
 }
 
-void EngineGUI::Draw(const Camera&, FileManager& fileManager)
+void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& sceneManager, ProjectManager& projectManager)
 {
 	if (ImGui::BeginMainMenuBar())
 	{
@@ -72,6 +75,15 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager)
 		}
 		if (ImGui::BeginMenu("File"))
 		{
+			if (ImGui::MenuItem("Save Project"))
+			{
+				projectManager.SaveProject("C:/dev/Aquanact/assets/project.aqua", sceneManager);
+			}
+			if (ImGui::MenuItem("Load Project"))
+			{
+				projectManager.LoadProject("C:/dev/Aquanact/assets/project.aqua", sceneManager);
+			}
+			ImGui::Separator();
 			const bool canImport = fileManager.CanImportSelection();
 			if (ImGui::MenuItem("Import Selected", nullptr, false, canImport))
 			{
@@ -83,15 +95,6 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager)
 	}
 
 	ImGui::Begin("File Explorer");
-	ImGui::Text("Root: %s", fileManager.RootDirectory().string().c_str());
-	ImGui::Text("Current: %s", fileManager.CurrentDirectory().string().c_str());
-
-	if (ImGui::Button("Up One Directory"))
-	{
-		fileManager.GoUpOneDirectory();
-	}
-
-	ImGui::Separator();
 	ImGui::Text("Selection: %s", fileManager.SelectedPath().empty() ? "<none>" : fileManager.SelectedPath().string().c_str());
 
 	if (fileManager.CanImportSelection())
@@ -105,18 +108,29 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager)
 	ImGui::Separator();
 	for (const auto& entry : fileManager.Entries())
 	{
+		if (entry.is_directory())
+		{
+			continue;
+		}
+
 		const std::filesystem::path entryPath = entry.path();
-		const std::string label = entry.is_directory() ? ("[DIR] " + entryPath.filename().string()) : entryPath.filename().string();
+		const std::string label = entryPath.filename().string();
 		const bool selected = fileManager.HasSelection() && fileManager.SelectedPath() == entryPath;
 
 		if (ImGui::Selectable(label.c_str(), selected))
 		{
 			fileManager.SelectPath(entryPath);
-			if (entry.is_directory())
-			{
-				fileManager.SetCurrentDirectory(entryPath);
-			}
 		}
+	}
+	ImGui::End();
+
+	ImGui::Begin("Scene");
+	const auto& objects = sceneManager.Objects();
+	for (size_t i = 0; i < objects.size(); ++i)
+	{
+		const auto& object = objects[i];
+		const std::string label = object ? object->Name() : std::string("<null>");
+		ImGui::BulletText("%zu: %s", i, label.empty() ? "<unnamed>" : label.c_str());
 	}
 	ImGui::End();
 }
