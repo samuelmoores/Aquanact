@@ -57,8 +57,8 @@ void Input::Update()
 	if (glfwGetKey(m_window->GLFW(), GLFW_KEY_S) == GLFW_PRESS) m_moveInput.z -= 1.0f;
 	if (glfwGetKey(m_window->GLFW(), GLFW_KEY_D) == GLFW_PRESS) m_moveInput.x += 1.0f;
 	if (glfwGetKey(m_window->GLFW(), GLFW_KEY_A) == GLFW_PRESS) m_moveInput.x -= 1.0f;
-	if (glfwGetKey(m_window->GLFW(), GLFW_KEY_SPACE) == GLFW_PRESS) m_moveInput.y += 1.0f;
-	if (glfwGetKey(m_window->GLFW(), GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) m_moveInput.y -= 1.0f;
+	if (glfwGetKey(m_window->GLFW(), GLFW_KEY_E) == GLFW_PRESS) m_moveInput.y += 1.0f;
+	if (glfwGetKey(m_window->GLFW(), GLFW_KEY_Q) == GLFW_PRESS) m_moveInput.y -= 1.0f;
 
 	const bool rightDown = glfwGetMouseButton(m_window->GLFW(), GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
 	if (rightDown && !m_lookActive) {
