@@ -4,10 +4,9 @@
 #include "EngineGUI.h"
 #include "Grid.h"
 #include "Camera.h"
-#include "Input.h"
 
 #include <imgui.h>
-#include <sstream>
+#include <chrono>
 
 void Debug::startUp()
 {
@@ -32,6 +31,21 @@ void Debug::RebuildGrid()
 
 void Debug::draw(const Camera& camera, const EngineGUI& gui)
 {
+	static bool firstFrame = true;
+	static auto lastFrameTime = std::chrono::high_resolution_clock::now();
+	const auto now = std::chrono::high_resolution_clock::now();
+	if (firstFrame)
+	{
+		firstFrame = false;
+		m_lastFps = 0.0f;
+	}
+	else
+	{
+		const std::chrono::duration<float> dt = now - lastFrameTime;
+		m_lastFps = (dt.count() > 0.0f) ? (1.0f / dt.count()) : 0.0f;
+	}
+	lastFrameTime = now;
+
 	auto projection = camera.GetProjectionMatrix();
 	auto view = camera.GetViewMatrix();
 
@@ -47,41 +61,30 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 		m_grid->draw(view, !gui.ShowAxis());
 	}
 
-	if (m_loggingEnabled)
+	ImGui::Begin("Debug Log");
+	if (ImGui::Button("Clear"))
 	{
-		ImGui::Begin("Debug Log");
-		if (ImGui::Button("Clear"))
-		{
-			m_logMessages.clear();
-			m_logFrameCount = 0;
-		}
-		ImGui::Separator();
-		for (const std::string& message : m_logMessages)
-		{
-			ImGui::TextUnformatted(message.c_str());
-		}
-		ImGui::End();
+		m_logMessages.clear();
 	}
+	ImGui::Separator();
+	for (const std::string& message : m_logMessages)
+	{
+		ImGui::TextUnformatted(message.c_str());
+	}
+	ImGui::End();
+
+	ImGui::Begin("Debug Stats");
+	ImGui::Text("FPS: %.1f", m_lastFps);
+	ImGui::End();
 }
 
 void Debug::LogMessage(const std::string& message)
 {
-	if (!m_loggingEnabled)
-	{
-		return;
-	}
-
 	m_logMessages.push_back(message);
 	if (m_logMessages.size() > 180)
 	{
 		m_logMessages.erase(m_logMessages.begin());
 	}
-}
-
-void Debug::SetLoggingEnabled(bool enabled)
-{
-	m_loggingEnabled = enabled;
-	m_logFrameCount = 0;
 }
 
 void Debug::SetGridSettings(float size, float spacing)
@@ -109,38 +112,4 @@ float Debug::GridSize() const
 float Debug::GridSpacing() const
 {
 	return m_gridSpacing;
-}
-
-void Debug::LogFrame(const Camera& camera, const Input& input)
-{
-	if (!m_loggingEnabled)
-	{
-		return;
-	}
-
-	if (m_logFrameCount >= 180)
-	{
-		return;
-	}
-
-	const glm::vec3 position = camera.GetPosition();
-	const glm::vec3 facing = camera.GetFacing();
-	const glm::vec3 moveInput = input.MoveInput();
-	const glm::vec2 mouseDelta = input.MouseDelta();
-
-	std::ostringstream oss;
-	oss
-		<< "[debug frame " << m_logFrameCount << "] "
-		<< "dt=" << input.DeltaTime()
-		<< " windowFocused=" << input.WindowFocused()
-		<< " lookActive=" << input.LookActive()
-		<< " lookBecameActive=" << input.LookBecameActive()
-		<< " mouseDelta=(" << mouseDelta.x << ", " << mouseDelta.y << ")"
-		<< " moveInput=(" << moveInput.x << ", " << moveInput.y << ", " << moveInput.z << ")"
-		<< " camPos=(" << position.x << ", " << position.y << ", " << position.z << ")"
-		<< " camFacing=(" << facing.x << ", " << facing.y << ", " << facing.z << ")";
-
-	LogMessage(oss.str());
-
-	++m_logFrameCount;
 }

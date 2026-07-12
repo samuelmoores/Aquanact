@@ -1,4 +1,3 @@
-#include <iostream>
 #include <Globals.h>
 #include <RenderManager.h>
 #include <Object3D.h>
@@ -41,7 +40,6 @@ int main()
     gDebug.startUp();
     gEngineGUI.startUp(gWindow);
     gFileManager.startUp();
-    gDebug.SetLoggingEnabled(true);
     gProjectManager.LoadProject("C:/dev/Aquanact/assets/projects/project.aqua", gSceneManager);
 
     while (!gWindow.ShouldClose())

@@ -1,6 +1,6 @@
 #pragma once
+#include <cstddef>
 #include <GLHeaders.h>
-#include <memory>
 
 #include "Camera.h"
 #include "RenderCommand.h"

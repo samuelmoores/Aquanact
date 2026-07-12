@@ -5,6 +5,7 @@
 #include "Object3D.h"
 #include "SceneManager.h"
 
+#include <glm/glm.hpp>
 #include <fstream>
 #include <iomanip>
 #include <memory>
@@ -232,8 +233,7 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 		return false;
 	}
 
-	sceneManager.Clear();
-
+	std::vector<std::unique_ptr<Object3D>> loadedObjects;
 	std::string line;
 	while (std::getline(file, line))
 	{
@@ -250,9 +250,10 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 
 		try
 		{
-			const std::filesystem::path sourcePath = ResolveSourcePath(path, UnescapeField(fields[1]));
+			const std::filesystem::path sourcePath = ResolveSourcePath(path, fields[1]);
 			gDebug.LogMessage("Loading mesh: " + sourcePath.string());
-			auto object = std::make_unique<Object3D>(sourcePath.string().c_str());
+			const std::string sourcePathString = sourcePath.string();
+			auto object = std::make_unique<Object3D>(sourcePathString.c_str());
 			object->Translate(glm::vec3(
 				std::stof(fields[2]),
 				std::stof(fields[3]),
@@ -266,13 +267,20 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 				std::stof(fields[9]),
 				std::stof(fields[10])));
 			object->SetIgnoreCameraCollision(true);
-			sceneManager.AddObject(std::move(object));
+			loadedObjects.push_back(std::move(object));
 		}
 		catch (const std::exception& ex)
 		{
 			gDebug.LogMessage("Failed to load project object from line: " + line);
 			gDebug.LogMessage("Reason: " + std::string(ex.what()));
+			return false;
 		}
+	}
+
+	sceneManager.Clear();
+	for (auto& object : loadedObjects)
+	{
+		sceneManager.AddObject(std::move(object));
 	}
 
 	return true;

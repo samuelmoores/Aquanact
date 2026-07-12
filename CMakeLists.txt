@@ -48,6 +48,7 @@ add_executable (AquanactEngine ${SOURCES})
 
 find_package(SFML COMPONENTS system window graphics audio CONFIG REQUIRED)
 target_link_libraries(AquanactEngine PRIVATE sfml-system sfml-network sfml-graphics sfml-window sfml-audio)
+target_link_libraries(AquanactEngine PRIVATE Psapi)
 
 find_package(glfw3 CONFIG REQUIRED)
 target_link_libraries(AquanactEngine PRIVATE glfw)
