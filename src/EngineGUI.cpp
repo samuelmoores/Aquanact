@@ -14,6 +14,7 @@ void EngineGUI::startUp(Window& window)
 		return;
 	}
 
+	m_window = &window;
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGuiIO& io = ImGui::GetIO();
@@ -36,6 +37,7 @@ void EngineGUI::shutDown()
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
 	m_initialized = false;
+	m_window = nullptr;
 }
 
 void EngineGUI::BeginFrame()
@@ -49,6 +51,17 @@ void EngineGUI::Draw(const Camera&)
 {
 	if (ImGui::BeginMainMenuBar())
 	{
+		if (ImGui::BeginMenu("Aquanact"))
+		{
+			if (ImGui::MenuItem("Quit"))
+			{
+				if (m_window)
+				{
+					glfwSetWindowShouldClose(m_window->GLFW(), GLFW_TRUE);
+				}
+			}
+			ImGui::EndMenu();
+		}
 		if (ImGui::BeginMenu("View"))
 		{
 			ImGui::MenuItem("Axis", nullptr, &m_showAxis);

@@ -16,6 +16,7 @@ public:
 	bool ShowGrid() const;
 
 private:
+	Window* m_window = nullptr;
 	bool m_showAxis = true;
 	bool m_showGrid = true;
 	bool m_initialized = false;
