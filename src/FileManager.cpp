@@ -6,7 +6,7 @@
 
 void FileManager::startUp()
 {
-	m_rootDirectory = std::filesystem::path("C:/dev/Aquanact/assets");
+	m_rootDirectory = std::filesystem::path("C:/dev/Aquanact/assets/models");
 	m_currentDirectory = m_rootDirectory;
 	m_selectedPath.clear();
 	Refresh();
@@ -23,10 +23,7 @@ void FileManager::shutDown()
 void FileManager::SetRootDirectory(const std::filesystem::path& rootDirectory)
 {
 	m_rootDirectory = rootDirectory;
-	if (m_currentDirectory.empty())
-	{
-		m_currentDirectory = m_rootDirectory;
-	}
+	m_currentDirectory = m_rootDirectory;
 	Refresh();
 }
 

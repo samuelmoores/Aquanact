@@ -94,6 +94,26 @@ namespace {
 		return first == std::filesystem::path("..");
 	}
 
+	std::filesystem::path AssetsRoot()
+	{
+		return std::filesystem::path("C:/dev/Aquanact/assets");
+	}
+
+	std::filesystem::path ModelsRoot()
+	{
+		return AssetsRoot() / "models";
+	}
+
+	std::filesystem::path TexturesRoot()
+	{
+		return AssetsRoot() / "textures";
+	}
+
+	std::filesystem::path ProjectsRoot()
+	{
+		return AssetsRoot() / "projects";
+	}
+
 	std::filesystem::path MakePortableSourcePath(const std::filesystem::path& projectPath, const std::filesystem::path& sourcePath)
 	{
 		if (!std::filesystem::exists(sourcePath))
@@ -109,7 +129,7 @@ namespace {
 			return projectRelative;
 		}
 
-		const std::filesystem::path assetsRoot = std::filesystem::path("C:/dev/Aquanact/assets");
+		const std::filesystem::path assetsRoot = AssetsRoot();
 		const std::filesystem::path assetsRelative = std::filesystem::relative(sourcePath, assetsRoot, ec);
 		if (!ec && !assetsRelative.empty() && !IsRelativeToParent(assetsRelative))
 		{
@@ -133,16 +153,21 @@ namespace {
 			return projectRelative;
 		}
 
-		const std::filesystem::path assetsRelative = std::filesystem::path("C:/dev/Aquanact/assets") / sourcePath;
+		const std::filesystem::path assetsRelative = AssetsRoot() / sourcePath;
 		if (std::filesystem::exists(assetsRelative))
 		{
 			return assetsRelative;
 		}
 
-		const std::filesystem::path assetsDir = std::filesystem::path("C:/dev/Aquanact/assets");
-		if (std::filesystem::exists(assetsDir) && std::filesystem::is_directory(assetsDir))
+		const std::filesystem::path searchRoots[] = { ModelsRoot(), TexturesRoot(), ProjectsRoot() };
+		for (const auto& searchRoot : searchRoots)
 		{
-			for (const auto& entry : std::filesystem::recursive_directory_iterator(assetsDir))
+			if (!std::filesystem::exists(searchRoot) || !std::filesystem::is_directory(searchRoot))
+			{
+				continue;
+			}
+
+			for (const auto& entry : std::filesystem::recursive_directory_iterator(searchRoot))
 			{
 				if (!entry.is_regular_file())
 				{

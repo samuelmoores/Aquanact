@@ -107,11 +107,11 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& scen
 		{
 			if (ImGui::MenuItem("Save Project"))
 			{
-				projectManager.SaveProject("C:/dev/Aquanact/assets/project.aqua", sceneManager);
+				projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", sceneManager);
 			}
 			if (ImGui::MenuItem("Load Project"))
 			{
-				projectManager.LoadProject("C:/dev/Aquanact/assets/project.aqua", sceneManager);
+				projectManager.LoadProject("C:/dev/Aquanact/assets/projects/project.aqua", sceneManager);
 			}
 			ImGui::Separator();
 			const bool canImport = fileManager.CanImportSelection();
@@ -125,7 +125,20 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& scen
 	}
 
 	ImGui::Begin("File Explorer");
-	ImGui::Text("Selection: %s", fileManager.SelectedPath().empty() ? "<none>" : fileManager.SelectedPath().string().c_str());
+	if (ImGui::Button("Models"))
+	{
+		fileManager.SetRootDirectory("C:/dev/Aquanact/assets/models");
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Textures"))
+	{
+		fileManager.SetRootDirectory("C:/dev/Aquanact/assets/textures");
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Projects"))
+	{
+		fileManager.SetRootDirectory("C:/dev/Aquanact/assets/projects");
+	}
 
 	if (fileManager.CanImportSelection())
 	{
