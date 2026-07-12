@@ -1,8 +1,11 @@
 #include "EngineGUI.h"
 
 #include "FileManager.h"
+#include "Debug.h"
+#include "Globals.h"
 #include "SceneManager.h"
 #include "ProjectManager.h"
+#include "EngineCamera.h"
 #include "Window.h"
 #include "Camera.h"
 #include "Object3D.h"
@@ -11,6 +14,7 @@
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 #include <filesystem>
+#include <algorithm>
 
 void EngineGUI::startUp(Window& window)
 {
@@ -70,7 +74,33 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& scen
 		if (ImGui::BeginMenu("View"))
 		{
 			ImGui::MenuItem("Axis", nullptr, &m_showAxis);
-			ImGui::MenuItem("Grid", nullptr, &m_showGrid);
+			if (ImGui::BeginMenu("EngineCamera"))
+			{
+				float moveSpeed = gEngineCamera.MoveSpeed();
+				ImGui::SetNextItemWidth(140.0f);
+				if (ImGui::InputFloat("Move Speed", &moveSpeed, 0.0f, 0.0f, "%.1f"))
+				{
+					gEngineCamera.SetMoveSpeed(moveSpeed);
+				}
+				ImGui::EndMenu();
+			}
+			if (ImGui::BeginMenu("Grid"))
+			{
+				ImGui::MenuItem("Show Grid", nullptr, &m_showGrid);
+				float gridSize = gDebug.GridSize();
+				float gridSpacing = gDebug.GridSpacing();
+				ImGui::SetNextItemWidth(140.0f);
+				bool sizeChanged = ImGui::InputFloat("Size", &gridSize, 0.0f, 0.0f, "%.1f");
+				ImGui::SetNextItemWidth(140.0f);
+				bool spacingChanged = ImGui::InputFloat("Spacing", &gridSpacing, 0.0f, 0.0f, "%.1f");
+				gridSize = std::max(gridSize, 1.0f);
+				gridSpacing = std::max(gridSpacing, 1.0f);
+				if (sizeChanged || spacingChanged)
+				{
+					gDebug.SetGridSettings(gridSize, gridSpacing);
+				}
+				ImGui::EndMenu();
+			}
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("File"))

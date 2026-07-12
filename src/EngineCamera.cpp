@@ -21,7 +21,7 @@ void EngineCamera::startUp()
 		height = 1;
 
 	m_projection_matrix = glm::perspective(glm::radians(m_fieldOfView), static_cast<float>(width) / static_cast<float>(height), m_nearPlane, m_farPlane);
-	m_position = glm::vec3(-2.0f, 3.0f, -3.5f);
+	m_position = glm::vec3(200.0f, 300.0f, 450.0f);
 	m_front = glm::normalize(glm::vec3(0.0f) - m_position);
 	m_up = glm::vec3(0.0f, 1.0f, 0.0f);
 	m_right = glm::normalize(glm::cross(m_front, m_up));
@@ -132,4 +132,19 @@ glm::vec3 EngineCamera::Forward() const
 glm::vec3 EngineCamera::Right() const
 {
 	return m_right;
+}
+
+void EngineCamera::SetMoveSpeed(float moveSpeed)
+{
+	if (moveSpeed < 0.0f)
+	{
+		moveSpeed = 0.0f;
+	}
+
+	m_moveSpeed = moveSpeed;
+}
+
+float EngineCamera::MoveSpeed() const
+{
+	return m_moveSpeed;
 }

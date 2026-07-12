@@ -11,8 +11,8 @@
 
 void Debug::startUp()
 {
-	m_axis = new Axis(20.0f);
-	m_grid = new Grid(20.0f, 1.0f);
+	m_axis = new Axis(1200.0f);
+	RebuildGrid();
 }
 
 void Debug::shutDown()
@@ -22,6 +22,12 @@ void Debug::shutDown()
 	delete m_grid;
 	m_grid = nullptr;
 	m_logMessages.clear();
+}
+
+void Debug::RebuildGrid()
+{
+	delete m_grid;
+	m_grid = new Grid(m_gridSize, m_gridSpacing);
 }
 
 void Debug::draw(const Camera& camera, const EngineGUI& gui)
@@ -76,6 +82,33 @@ void Debug::SetLoggingEnabled(bool enabled)
 {
 	m_loggingEnabled = enabled;
 	m_logFrameCount = 0;
+}
+
+void Debug::SetGridSettings(float size, float spacing)
+{
+	if (size <= 0.0f)
+	{
+		size = 1.0f;
+	}
+
+	if (spacing <= 0.0f)
+	{
+		spacing = 1.0f;
+	}
+
+	m_gridSize = size;
+	m_gridSpacing = spacing;
+	RebuildGrid();
+}
+
+float Debug::GridSize() const
+{
+	return m_gridSize;
+}
+
+float Debug::GridSpacing() const
+{
+	return m_gridSpacing;
 }
 
 void Debug::LogFrame(const Camera& camera, const Input& input)

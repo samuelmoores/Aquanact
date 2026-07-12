@@ -42,6 +42,7 @@ int main()
     gEngineGUI.startUp(gWindow);
     gFileManager.startUp();
     gDebug.SetLoggingEnabled(true);
+    gProjectManager.LoadProject("C:/dev/Aquanact/assets/project.aqua", gSceneManager);
 
     while (!gWindow.ShouldClose())
         mainLoop();

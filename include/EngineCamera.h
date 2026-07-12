@@ -17,6 +17,8 @@ public:
 	void PrintPosition();
 	glm::vec3 Forward() const;
 	glm::vec3 Right() const;
+	void SetMoveSpeed(float moveSpeed);
+	float MoveSpeed() const;
 
 private:
 	void SyncFlyOrientationFromFacing();
@@ -35,5 +37,5 @@ private:
 	float m_yaw = 0.0f;
 	float m_pitch = 0.0f;
 	float m_mouseSensitivity = 0.08f;
-	float m_moveSpeed = 8.0f;
+	float m_moveSpeed = 300.0f;
 };
