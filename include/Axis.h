@@ -9,8 +9,7 @@ struct AxisVertex3D {
 
 class Axis {
 public:
-	Axis();
-	Axis(float axisLength, float scale);
+	Axis(float axisLength);
 	void draw(glm::mat4 viewMatrix);
 	void UpdateProjection(glm::mat4 projectionMatrix);
 private:

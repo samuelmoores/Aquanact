@@ -23,6 +23,7 @@ set(SOURCES
     "include/Axis.h" "src/Axis.cpp"
     "include/Texture.h"
     "include/Line.h" "src/Line.cpp"
+    "include/Debug.h" "src/Debug.cpp"
     "include/Animation.h" "src/Animation.cpp"
     "include/Animator.h" "src/Animator.cpp"
     "include/Window.h" "src/Window.cpp"

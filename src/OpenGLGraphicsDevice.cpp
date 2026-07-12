@@ -40,6 +40,7 @@ void OpenGLGraphicsDevice::startUp()
 	}
 
 	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_MULTISAMPLE);
 	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 	m_initialized = true;
 }

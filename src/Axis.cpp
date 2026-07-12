@@ -2,44 +2,21 @@
 #include <GLHeaders.h>
 
 
-Axis::Axis()
-{
-}
-
-Axis::Axis(float axisLength, float scale) :m_vao(-1), m_vbo(-1)
+Axis::Axis(float axisLength) :m_vao(-1), m_vbo(-1)
 {
 	m_vertices = {
 		// X axis (Red)
-		{-axisLength * 100, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f},  // origin
-		{axisLength  * 100, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f},  // x-direction
+		{-axisLength, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f},
+		{ axisLength, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f},
 
 		// Y axis (Green)
-		{0.0f, -axisLength, 0.0f, 0.0f, 1.0f, 0.0f},  // origin
-		{0.0f, axisLength, 0.0f, 0.0f, 1.0f, 0.0f},  // y-direction
+		{0.0f, -axisLength, 0.0f, 0.0f, 1.0f, 0.0f},
+		{0.0f,  axisLength, 0.0f, 0.0f, 1.0f, 0.0f},
 
 		// Z axis (Blue)
-		{0.0f, 0.0f, -axisLength * 100, 0.0f, 0.0f, 1.0f},  // origin
-		{0.0f, 0.0f, axisLength  * 100, 0.0f, 0.0f, 1.0f},   // z-direction
-
+		{0.0f, 0.0f, -axisLength, 0.0f, 0.0f, 1.0f},
+		{0.0f, 0.0f,  axisLength, 0.0f, 0.0f, 1.0f}
 	};
-
-	for (float i = scale; i < axisLength * 2; i += scale)
-	{
-		//along x
-		m_vertices.push_back({  i / 2.0f, 0.0f, axisLength, 1.0f, 1.0f, 1.0f });
-		m_vertices.push_back({  i / 2.0f, 0.0f, -axisLength, 1.0f, 1.0f, 1.0f });
-		m_vertices.push_back({ -i / 2.0f, 0.0f, axisLength, 1.0f, 1.0f, 1.0f });
-		m_vertices.push_back({ -i / 2.0f, 0.0f, -axisLength, 1.0f, 1.0f, 1.0f });
-	}
-
-	for (float i = scale; i < axisLength * 2; i += scale)
-	{
-		//along z
-		m_vertices.push_back({ axisLength, 0.0f,   i / 2.0f, 1.0f, 1.0f, 1.0f });
-		m_vertices.push_back({ -axisLength, 0.0f,  i / 2.0f, 1.0f, 1.0f, 1.0f });
-		m_vertices.push_back({ axisLength, 0.0f,  -i / 2.0f, 1.0f, 1.0f, 1.0f });
-		m_vertices.push_back({ -axisLength, 0.0f, -i / 2.0f, 1.0f, 1.0f, 1.0f });
-	}
 
 	glGenVertexArrays(1, &m_vao);
 	glGenBuffers(1, &m_vbo);

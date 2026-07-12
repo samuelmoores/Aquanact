@@ -18,9 +18,15 @@ void Camera::startUp()
 	int width, height;
 	glfwGetWindowSize(gWindow.GLFW(), &width, &height);
 
-	m_projection_matrix = glm::perspective(glm::radians(45.0), static_cast<double>(width) / height, 0.1, 1000000.0);
+	m_projection_matrix = glm::perspective(
+		glm::radians(m_fieldOfView),
+		static_cast<float>(width) / static_cast<float>(height),
+		m_nearPlane,
+		m_farPlane
+	);
 
-	m_position = glm::vec3(-368.918, 412.794, -555.261);
+	//m_position = glm::vec3(-368.918, 412.794, -555.261);
+	m_position = glm::vec3(-2.0, 3.0, -3.5);
 	m_front = glm::vec3(0, 0, 1);
 	m_up = glm::vec3(0.0f, 1.0f, 0.0f);
 	m_right = glm::normalize(glm::cross(m_front, m_up));
@@ -48,7 +54,12 @@ glm::mat4 Camera::GetProjectionMatrix() const
 {
 	int width, height;
 	glfwGetWindowSize(gWindow.GLFW(), &width, &height);
-	return glm::perspective(glm::radians(45.0), static_cast<double>(width) / height, 0.1, 1000000.0);
+	return glm::perspective(
+		glm::radians(m_fieldOfView),
+		static_cast<float>(width) / static_cast<float>(height),
+		m_nearPlane,
+		m_farPlane
+	);
 }
 
 glm::mat4 Camera::GetViewMatrix() const

@@ -23,6 +23,9 @@ class Camera {
 		glm::vec3 Right() const;
 	private:
 		float ComputeSafeCameraDistance(const glm::vec3& rayOrigin, const glm::vec3& rayDir, float maxDist);
+		float m_fieldOfView = 45.0f;
+		float m_nearPlane = 0.1f;
+		float m_farPlane = 1000000.0f;
 		glm::mat4 m_projection_matrix;
 		glm::mat4 m_view_matrix;
 		glm::vec3 m_position;
