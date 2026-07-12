@@ -1,4 +1,4 @@
-#include <Camera.h>
+#include <EngineCamera.h>
 #include "Globals.h"
 #include "Object3D.h"
 #include "Animator.h"
@@ -122,13 +122,7 @@ void Object3D::Rotate(glm::vec3 delta)
 
 void Object3D::Move(glm::vec3 delta)
 {
-	glm::vec3 max = m_mesh->maxBounds();
-	glm::vec3 min = m_mesh->minBounds();
 	m_position += delta;
-	glm::vec3 cameraDelta(delta.x, 0.0f, delta.z);
-	float midHeight = (max.y - min.y) / 2.0f;
-	glm::vec3 cameraLookat(m_position.x, midHeight + (midHeight / 1.5f), m_position.z);
-	gCamera.Move(cameraDelta, cameraLookat);
 	updateMeshAABB(delta);
 }
 

@@ -1,6 +1,7 @@
 #include "RenderManager.h"
 #include "Globals.h"
 #include "GraphicsDevice.h"
+#include "EngineCamera.h"
 #include <iomanip>
 #include <iostream>
 
@@ -59,6 +60,6 @@ void RenderManager::Loop()
 {
 	m_device->Clear(0.0f, 0.0f, 0.0f, 0.0f);
 	m_device->BeginFrame();
-	Flush(gCamera);
+	Flush(gEngineCamera);
 	m_device->EndFrame();
 }

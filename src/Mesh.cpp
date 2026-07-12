@@ -1,7 +1,7 @@
 #include <iomanip>
 #include <filesystem>
 #include <GLHeaders.h>
-#include <Camera.h>
+#include <EngineCamera.h>
 #include <Globals.h>
 #include <Mesh.h>
 #include <stb_image.h>
@@ -403,8 +403,8 @@ glm::vec3 Mesh::maxBounds()
 void Mesh::DrawBoundingBox()
 {
 	Line line(m_meshMinBounds, m_meshMaxBounds);
-	line.UpdateProjection(gCamera.GetProjectionMatrix());
-	line.draw(gCamera.GetViewMatrix());
+	line.UpdateProjection(gEngineCamera.GetProjectionMatrix());
+	line.draw(gEngineCamera.GetViewMatrix());
 }
 void Mesh::updateAABB(glm::vec3 position, glm::vec3 scale)
 {
