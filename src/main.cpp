@@ -17,12 +17,8 @@ Input gInput;
 static void mainLoop()
 {
     gInput.Update();
-    gEngineCamera.UpdateFly(gInput);
 
     gRenderManager.Loop();
-    gDebug.draw(gEngineCamera);
-    gWindow.SwapBuffers();
-    gWindow.PollEvents();
 }
 
 int main()
@@ -32,7 +28,9 @@ int main()
     gEngineCamera.startUp();
     gRenderManager.startUp(gGraphicsDevice);
     gInput.startUp(gWindow);
+    gInput.AttachCamera(gEngineCamera);
     gDebug.startUp();
+    gDebug.SetLoggingEnabled(true);
 
     while (!gWindow.ShouldClose())
         mainLoop();

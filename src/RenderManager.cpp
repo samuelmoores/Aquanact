@@ -2,6 +2,8 @@
 #include "Globals.h"
 #include "GraphicsDevice.h"
 #include "EngineCamera.h"
+#include "Debug.h"
+#include "Window.h"
 #include <iomanip>
 #include <iostream>
 
@@ -61,5 +63,7 @@ void RenderManager::Loop()
 	m_device->Clear(0.0f, 0.0f, 0.0f, 0.0f);
 	m_device->BeginFrame();
 	Flush(gEngineCamera);
+	gDebug.draw(gEngineCamera);
 	m_device->EndFrame();
+	gWindow.PollEvents();
 }

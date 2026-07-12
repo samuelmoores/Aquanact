@@ -22,6 +22,7 @@ set(SOURCES
     "include/Renderer.h"
     "include/Object3D.h" "src/Object3D.cpp"
     "include/Axis.h" "src/Axis.cpp"
+    "include/Grid.h" "src/Grid.cpp"
     "include/Texture.h"
     "include/Line.h" "src/Line.cpp"
     "include/Debug.h" "src/Debug.cpp"

@@ -106,4 +106,3 @@ void Line::draw(glm::mat4 viewMatrix)
 	glBindVertexArray(0);
 
 }
-

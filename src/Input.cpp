@@ -1,6 +1,7 @@
 #include "Input.h"
 
 #include "Window.h"
+#include "EngineCamera.h"
 #include "GLFW/glfw3.h"
 
 void Input::startUp(Window& window)
@@ -26,6 +27,11 @@ void Input::shutDown()
 	m_mouseDelta = glm::vec2(0.0f);
 }
 
+void Input::AttachCamera(EngineCamera& camera)
+{
+	m_camera = &camera;
+}
+
 void Input::Update()
 {
 	if (!m_window) {
@@ -36,6 +42,14 @@ void Input::Update()
 	double now = glfwGetTime();
 	m_deltaTime = static_cast<float>(now - lastTime);
 	lastTime = now;
+	m_windowFocused = glfwGetWindowAttrib(m_window->GLFW(), GLFW_FOCUSED) == GLFW_TRUE;
+
+	if (!m_windowFocused) {
+		m_moveInput = glm::vec3(0.0f);
+		m_lookBecameActive = false;
+		m_mouseDelta = glm::vec2(0.0f);
+		return;
+	}
 
 	m_moveInput = glm::vec3(0.0f);
 	m_lookBecameActive = false;
@@ -69,6 +83,10 @@ void Input::Update()
 		m_mouseDelta = cursorPos - m_lastCursorPos;
 		m_lastCursorPos = cursorPos;
 	}
+
+	if (m_camera) {
+		m_camera->UpdateFly(*this);
+	}
 }
 
 glm::vec3 Input::MoveInput() const
@@ -94,4 +112,9 @@ bool Input::LookBecameActive() const
 float Input::DeltaTime() const
 {
 	return m_deltaTime;
+}
+
+bool Input::WindowFocused() const
+{
+	return m_windowFocused;
 }

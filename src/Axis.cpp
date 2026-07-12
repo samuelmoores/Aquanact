@@ -46,6 +46,7 @@ void Axis::draw(glm::mat4 viewMatrix)
 	m_shader.activate();
 	m_shader.setUniform("view", viewMatrix);
 	m_shader.setUniform("model", glm::mat4(1));
+	glLineWidth(3.0f);
 	glBindVertexArray(m_vao);
 	glDrawArrays(GL_LINES, 0, m_vertices.size());
 	glBindVertexArray(0);

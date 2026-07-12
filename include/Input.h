@@ -3,6 +3,7 @@
 #include "glm/glm.hpp"
 
 class Window;
+class EngineCamera;
 
 class Input {
 public:
@@ -11,11 +12,13 @@ public:
 	void startUp(Window& window);
 	void shutDown();
 	void Update();
+	void AttachCamera(EngineCamera& camera);
 
 	glm::vec3 MoveInput() const;
 	glm::vec2 MouseDelta() const;
 	bool LookActive() const;
 	bool LookBecameActive() const;
+	bool WindowFocused() const;
 	float DeltaTime() const;
 
 private:
@@ -26,4 +29,6 @@ private:
 	glm::vec3 m_moveInput = glm::vec3(0.0f);
 	float m_deltaTime = 0.0f;
 	bool m_lookBecameActive = false;
+	bool m_windowFocused = false;
+	EngineCamera* m_camera = nullptr;
 };
