@@ -2,6 +2,7 @@
 
 class Window;
 class Camera;
+class FileManager;
 
 class EngineGUI {
 public:
@@ -9,7 +10,7 @@ public:
 	void startUp(Window& window);
 	void shutDown();
 	void BeginFrame();
-	void Draw(const Camera& camera);
+	void Draw(const Camera& camera, FileManager& fileManager);
 	void EndFrame();
 
 	bool ShowAxis() const;

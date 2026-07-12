@@ -66,7 +66,7 @@ void RenderManager::Loop()
 	Flush(gEngineCamera);
 	gEngineGUI.BeginFrame();
 	gDebug.draw(gEngineCamera, gEngineGUI);
-	gEngineGUI.Draw(gEngineCamera);
+	gEngineGUI.Draw(gEngineCamera, gFileManager);
 	gEngineGUI.EndFrame();
 	m_device->EndFrame();
 	gWindow.PollEvents();
