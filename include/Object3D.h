@@ -2,7 +2,13 @@
 #include <glm/glm.hpp>
 #include <Mesh.h>
 #include <ShaderProgram.h>
-#include <Animator.h>
+#include <memory>
+#include <vector>
+#include <utility>
+
+#include "Component.h"
+
+class AnimatorComponent;
 
 
 
@@ -13,7 +19,12 @@ public:
 	~Object3D();
 	Mesh* GetMesh();
 	ShaderProgram* GetShader();
-	Animator* GetAnimator();
+	AnimatorComponent* GetAnimatorComponent();
+	template<typename T>
+	T* GetComponent();
+	template<typename T, typename... Args>
+	T* AddComponent(Args&&... args);
+	void UpdateComponents(float dt);
 	glm::mat4 BuildModelMatrix();
 	void Rotate(glm::vec3 delta);
 	void Move(glm::vec3 delta);
@@ -35,6 +46,7 @@ public:
 
 	void SetIgnoreCameraCollision(bool ignore) { m_ignoreCameraCollision = ignore; }
 	bool IgnoreCameraCollision() const { return m_ignoreCameraCollision; }
+	bool HasAnimatorComponent() const;
 
 
 	//primitives
@@ -105,7 +117,6 @@ public:
 
 private:
 	Mesh* m_mesh;
-	Animator* m_animator;
 	ShaderProgram m_shader;
 	glm::vec3 m_position;
 	glm::vec3 m_rotation;
@@ -115,4 +126,27 @@ private:
 	bool m_ignoreCameraCollision = false;
 	std::string m_name;
 	std::string m_sourcePath;
+	std::vector<std::unique_ptr<Component>> m_components;
 };
+
+template<typename T>
+T* Object3D::GetComponent()
+{
+	for (auto& component : m_components)
+	{
+		if (auto* typed = dynamic_cast<T*>(component.get()))
+		{
+			return typed;
+		}
+	}
+	return nullptr;
+}
+
+template<typename T, typename... Args>
+T* Object3D::AddComponent(Args&&... args)
+{
+	auto component = std::make_unique<T>(std::forward<Args>(args)...);
+	T* raw = component.get();
+	m_components.push_back(std::move(component));
+	return raw;
+}

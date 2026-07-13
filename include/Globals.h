@@ -11,6 +11,7 @@ class EngineGUI;
 class FileManager;
 class SceneManager;
 class ProjectManager;
+class Input;
 
 extern Window gWindow;
 extern EngineCamera gEngineCamera;
@@ -21,3 +22,4 @@ extern EngineGUI gEngineGUI;
 extern FileManager gFileManager;
 extern SceneManager gSceneManager;
 extern ProjectManager gProjectManager;
+extern Input gInput;

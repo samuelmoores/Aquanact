@@ -9,6 +9,7 @@
 #include "Window.h"
 #include "Camera.h"
 #include "Object3D.h"
+#include "AnimatorComponent.h"
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -203,6 +204,10 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& scen
 			const glm::vec3 worldCenterPosition = object->WorldCenterPosition();
 			const glm::vec3 defaultWorldCenterPosition = object->InitialWorldCenterPosition();
 			ImGui::Text("Name: %s", object->Name().empty() ? "<unnamed>" : object->Name().c_str());
+			ImGui::Text("Components");
+			const bool hasAnimator = object->HasAnimatorComponent();
+			ImGui::BulletText("Animator: %s", hasAnimator ? "present" : "missing");
+
 			float editedX = worldCenterPosition.x;
 			float editedY = worldCenterPosition.y;
 			float editedZ = worldCenterPosition.z;

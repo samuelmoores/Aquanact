@@ -7,6 +7,7 @@
 #include "Window.h"
 #include "Object3D.h"
 #include "SceneManager.h"
+#include "Input.h"
 #include <chrono>
 #include <iomanip>
 #include <iostream>
@@ -135,6 +136,8 @@ void RenderManager::Loop()
 			++m_lastFrameSkippedObjects;
 			continue;
 		}
+
+		object->UpdateComponents(gInput.DeltaTime());
 
 		Submit(RenderCommand{
 			object->GetMesh(),

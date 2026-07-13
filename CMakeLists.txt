@@ -32,6 +32,7 @@ set(SOURCES
     "include/ProjectManager.h" "src/ProjectManager.cpp"
     "include/Animation.h" "src/Animation.cpp"
     "include/Animator.h" "src/Animator.cpp"
+    "include/AnimatorComponent.h" "src/AnimatorComponent.cpp"
     "include/Window.h" "src/Window.cpp"
     "include/Input.h" "src/Input.cpp"
     "include/RenderManager.h" "src/RenderManager.cpp"

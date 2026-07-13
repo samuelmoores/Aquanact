@@ -1,8 +1,7 @@
 #include <EngineCamera.h>
 #include "Globals.h"
 #include "Object3D.h"
-#include "Animator.h"
-#include "Animation.h"
+#include "AnimatorComponent.h"
 #include <iomanip>
 
 void printMatrix(const glm::mat4& m) {
@@ -51,13 +50,10 @@ Object3D::Object3D(const char* modelFile)
 {
 	m_mesh = new Mesh(modelFile);
 	m_skinned = m_mesh->Skinned();
-	m_animator = nullptr;
 
 	if (m_skinned)
 	{
-		m_animator = new Animator(m_mesh->GetRootNode(), m_mesh->GetSkeletonPtr());
-		for (int i = 0; i < m_mesh->NumAnimations(); i++)
-			m_animator->AddClip(new Animation(m_mesh->GetAnimation(i)));
+		AddComponent<AnimatorComponent>(m_mesh);
 	}
 
 	m_shader.load("shaders/phong.vert", "shaders/phong.frag");
@@ -83,9 +79,9 @@ Mesh* Object3D::GetMesh()
 	return m_mesh;
 }
 
-Animator* Object3D::GetAnimator()
+AnimatorComponent* Object3D::GetAnimatorComponent()
 {
-	return m_animator;
+	return GetComponent<AnimatorComponent>();
 }
 
 ShaderProgram* Object3D::GetShader()
@@ -182,6 +178,17 @@ void Object3D::updateMeshAABB(glm::vec3 delta)
 	m_mesh->updateAABB(delta, m_scale);
 }
 
+void Object3D::UpdateComponents(float dt)
+{
+	for (auto& component : m_components)
+	{
+		if (component)
+		{
+			component->Update(*this, dt);
+		}
+	}
+}
+
 bool Object3D::intersectsRayMesh(glm::vec3 origin, glm::vec3& direction)
 {
 	return m_mesh->intersectsRay(origin, direction);
@@ -189,7 +196,19 @@ bool Object3D::intersectsRayMesh(glm::vec3 origin, glm::vec3& direction)
 
 bool Object3D::skinned()
 {
-	return m_skinned;
+	return m_skinned && GetComponent<AnimatorComponent>() != nullptr;
+}
+
+bool Object3D::HasAnimatorComponent() const
+{
+	for (const auto& component : m_components)
+	{
+		if (dynamic_cast<AnimatorComponent*>(component.get()) != nullptr)
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 std::string Object3D::Name()
