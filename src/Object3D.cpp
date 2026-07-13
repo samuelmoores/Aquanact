@@ -44,6 +44,7 @@ Object3D::Object3D(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 	m_position = glm::vec3(0);
 	m_rotation = glm::vec3(0);
 	m_scale = glm::vec3(1);
+	m_initialWorldCenter = WorldCenterPosition();
 }
 
 Object3D::Object3D(const char* modelFile)
@@ -64,6 +65,7 @@ Object3D::Object3D(const char* modelFile)
 	m_position = glm::vec3(0);
 	m_rotation = glm::vec3(0);
 	m_scale = glm::vec3(1);
+	m_initialWorldCenter = WorldCenterPosition();
 
 	m_sourcePath = modelFile;
 	m_name = m_sourcePath;
@@ -135,6 +137,24 @@ void Object3D::Translate(glm::vec3 delta)
 glm::vec3 Object3D::Position()
 {
 	return m_position;
+}
+
+glm::vec3 Object3D::WorldPosition()
+{
+	const glm::mat4 model = BuildModelMatrix();
+	return glm::vec3(model[3]);
+}
+
+glm::vec3 Object3D::WorldCenterPosition()
+{
+	const glm::vec3 localCenter = m_mesh ? m_mesh->centerAABB() : glm::vec3(0.0f);
+	const glm::vec4 worldCenter = BuildModelMatrix() * glm::vec4(localCenter, 1.0f);
+	return glm::vec3(worldCenter);
+}
+
+glm::vec3 Object3D::InitialWorldCenterPosition() const
+{
+	return m_initialWorldCenter;
 }
 
 glm::vec3 Object3D::Rotation()

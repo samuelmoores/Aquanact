@@ -58,6 +58,12 @@ void EngineGUI::BeginFrame()
 
 void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& sceneManager, ProjectManager& projectManager)
 {
+	const auto& objects = sceneManager.Objects();
+	if (m_selectedSceneObjectIndex >= static_cast<int>(objects.size()))
+	{
+		m_selectedSceneObjectIndex = -1;
+	}
+
 	if (ImGui::BeginMainMenuBar())
 	{
 		if (ImGui::BeginMenu("Aquanact"))
@@ -168,12 +174,76 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& scen
 	ImGui::End();
 
 	ImGui::Begin("Scene");
-	const auto& objects = sceneManager.Objects();
 	for (size_t i = 0; i < objects.size(); ++i)
 	{
 		const auto& object = objects[i];
 		const std::string label = object ? object->Name() : std::string("<null>");
-		ImGui::BulletText("%zu: %s", i, label.empty() ? "<unnamed>" : label.c_str());
+		const bool selected = m_selectedSceneObjectIndex == static_cast<int>(i);
+		if (ImGui::Selectable(label.empty() ? "<unnamed>" : label.c_str(), selected))
+		{
+			m_selectedSceneObjectIndex = static_cast<int>(i);
+		}
+	}
+	ImGui::End();
+
+	ImGui::Begin("Object");
+	if (m_selectedSceneObjectIndex < 0 || m_selectedSceneObjectIndex >= static_cast<int>(objects.size()))
+	{
+		ImGui::TextUnformatted("No scene object selected.");
+	}
+	else
+	{
+		const auto& object = objects[static_cast<std::size_t>(m_selectedSceneObjectIndex)];
+		if (!object)
+		{
+			ImGui::TextUnformatted("Selected object is null.");
+		}
+		else
+		{
+			const glm::vec3 worldCenterPosition = object->WorldCenterPosition();
+			const glm::vec3 defaultWorldCenterPosition = object->InitialWorldCenterPosition();
+			ImGui::Text("Name: %s", object->Name().empty() ? "<unnamed>" : object->Name().c_str());
+			float editedX = worldCenterPosition.x;
+			float editedY = worldCenterPosition.y;
+			float editedZ = worldCenterPosition.z;
+
+			ImGui::TextUnformatted("World Center");
+			ImGui::SetNextItemWidth(120.0f);
+			if (ImGui::DragFloat("X##WorldCenter", &editedX, 0.1f, -FLT_MAX, FLT_MAX, "%.3f"))
+			{
+				object->Translate(glm::vec3(editedX - worldCenterPosition.x, 0.0f, 0.0f));
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Reset X"))
+			{
+				object->Translate(glm::vec3(defaultWorldCenterPosition.x - worldCenterPosition.x, 0.0f, 0.0f));
+				editedX = defaultWorldCenterPosition.x;
+			}
+
+			ImGui::SetNextItemWidth(120.0f);
+			if (ImGui::DragFloat("Y##WorldCenter", &editedY, 0.1f, -FLT_MAX, FLT_MAX, "%.3f"))
+			{
+				object->Translate(glm::vec3(0.0f, editedY - worldCenterPosition.y, 0.0f));
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Reset Y"))
+			{
+				object->Translate(glm::vec3(0.0f, defaultWorldCenterPosition.y - worldCenterPosition.y, 0.0f));
+				editedY = defaultWorldCenterPosition.y;
+			}
+
+			ImGui::SetNextItemWidth(120.0f);
+			if (ImGui::DragFloat("Z##WorldCenter", &editedZ, 0.1f, -FLT_MAX, FLT_MAX, "%.3f"))
+			{
+				object->Translate(glm::vec3(0.0f, 0.0f, editedZ - worldCenterPosition.z));
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Reset Z"))
+			{
+				object->Translate(glm::vec3(0.0f, 0.0f, defaultWorldCenterPosition.z - worldCenterPosition.z));
+				editedZ = defaultWorldCenterPosition.z;
+			}
+		}
 	}
 	ImGui::End();
 }

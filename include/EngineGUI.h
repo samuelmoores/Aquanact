@@ -23,4 +23,5 @@ private:
 	bool m_showAxis = true;
 	bool m_showGrid = true;
 	bool m_initialized = false;
+	int m_selectedSceneObjectIndex = -1;
 };

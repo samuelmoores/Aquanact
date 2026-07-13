@@ -26,6 +26,9 @@ public:
 	std::string Name();
 	std::string SourcePath();
 	glm::vec3 Position();
+	glm::vec3 WorldPosition();
+	glm::vec3 WorldCenterPosition();
+	glm::vec3 InitialWorldCenterPosition() const;
 	glm::vec3 Rotation();
 	glm::vec3 Scale();
 	void SetRotation(glm::vec3 newRotation);
@@ -107,6 +110,7 @@ private:
 	glm::vec3 m_position;
 	glm::vec3 m_rotation;
 	glm::vec3 m_scale;
+	glm::vec3 m_initialWorldCenter;
 	bool m_skinned;
 	bool m_ignoreCameraCollision = false;
 	std::string m_name;
