@@ -41,6 +41,7 @@ set(SOURCES
     "include/MathUtils.h" "src/MathUtils.cpp"
     "include/Audio.h" "src/Audio.cpp"
     "include/RenderCommand.h"
+    "include/FrameAllocator.h"
     "include/GLHeaders.h"
 )
 

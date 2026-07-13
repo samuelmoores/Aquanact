@@ -4,6 +4,10 @@
 #include "EngineGUI.h"
 #include "Grid.h"
 #include "Camera.h"
+#include "Globals.h"
+#include "SceneManager.h"
+#include "RenderManager.h"
+#include "FrameAllocator.h"
 
 #include <imgui.h>
 #include <chrono>
@@ -75,6 +79,16 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 
 	ImGui::Begin("Debug Stats");
 	ImGui::Text("FPS: %.1f", m_lastFps);
+	ImGui::Text("Scene objects: %zu", gSceneManager.Objects().size());
+	ImGui::Separator();
+	ImGui::Text("Render commands: %zu", gRenderManager.LastFrameCommandCount());
+	ImGui::Text("Skipped objects: %zu", gRenderManager.LastFrameSkippedObjects());
+	ImGui::Text("Build time: %.4f ms", gRenderManager.LastFrameBuildMs());
+	ImGui::Text("Flush time: %.4f ms", gRenderManager.LastFrameFlushMs());
+	ImGui::Separator();
+	ImGui::Text("Frame allocator capacity: %.2f KB", static_cast<double>(gRenderManager.FrameAllocatorCapacityBytes()) / 1024.0);
+	ImGui::Text("Frame allocator used: %.2f KB", static_cast<double>(gRenderManager.FrameAllocatorUsedBytes()) / 1024.0);
+	ImGui::Text("Frame allocator peak: %.2f KB", static_cast<double>(gRenderManager.FrameAllocatorPeakBytes()) / 1024.0);
 	ImGui::End();
 }
 
