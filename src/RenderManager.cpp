@@ -72,32 +72,6 @@ void RenderManager::Submit(const RenderCommand& command)
 	m_commands[m_commandCount++] = command;
 }
 
-void printMatrixRender(const aiMatrix4x4& m)
-{
-	std::cout << std::fixed << std::setprecision(3);
-	std::cout << "[ "
-		<< std::setw(9) << m.a1 << " "
-		<< std::setw(9) << m.a2 << " "
-		<< std::setw(9) << m.a3 << " "
-		<< std::setw(9) << m.a4 << " ]\n";
-	std::cout << "[ "
-		<< std::setw(9) << m.b1 << " "
-		<< std::setw(9) << m.b2 << " "
-		<< std::setw(9) << m.b3 << " "
-		<< std::setw(9) << m.b4 << " ]\n";
-	std::cout << "[ "
-		<< std::setw(9) << m.c1 << " "
-		<< std::setw(9) << m.c2 << " "
-		<< std::setw(9) << m.c3 << " "
-		<< std::setw(9) << m.c4 << " ]\n";
-	std::cout << "[ "
-		<< std::setw(9) << m.d1 << " "
-		<< std::setw(9) << m.d2 << " "
-		<< std::setw(9) << m.d3 << " "
-		<< std::setw(9) << m.d4 << " ]\n";
-	std::cout << "----------------------------------------------\n";
-}
-
 void RenderManager::Flush(const Camera& camera)
 {
 	const auto flushStart = std::chrono::high_resolution_clock::now();
