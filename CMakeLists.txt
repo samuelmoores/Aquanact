@@ -48,6 +48,15 @@ set(SOURCES
 
 add_executable (AquanactEngine ${SOURCES})
 
+if (MSVC)
+    target_link_options(AquanactEngine PRIVATE
+        "/LIBPATH:C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/lib/x64"
+        "/LIBPATH:C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/ATLMFC/lib/x64"
+        "/LIBPATH:C:/Program Files (x86)/Windows Kits/10/Lib/10.0.26100.0/ucrt/x64"
+        "/LIBPATH:C:/Program Files (x86)/Windows Kits/10/Lib/10.0.26100.0/um/x64"
+    )
+endif()
+
 find_package(SFML COMPONENTS system window graphics audio CONFIG REQUIRED)
 target_link_libraries(AquanactEngine PRIVATE sfml-system sfml-network sfml-graphics sfml-window sfml-audio)
 target_link_libraries(AquanactEngine PRIVATE Psapi)
