@@ -88,12 +88,14 @@ void RenderManager::Flush(const Camera& camera)
 
 void RenderManager::Loop()
 {
+	// Reset per-frame counters and rebuild the command buffer from scratch.
 	m_lastFrameCommandCount = 0;
 	m_lastFrameSkippedObjects = 0;
 	m_frameAllocator.Reset();
 	m_commands = nullptr;
 	if (m_commandCapacity > 0)
 	{
+		// Reuse the existing command capacity so we avoid reallocating every frame.
 		m_commands = static_cast<RenderCommand*>(m_frameAllocator.Allocate(sizeof(RenderCommand) * m_commandCapacity, alignof(RenderCommand)));
 	}
 	if (!m_commands && m_commandCapacity != 0)
@@ -101,8 +103,12 @@ void RenderManager::Loop()
 		m_commandCapacity = 0;
 	}
 	const auto buildStart = std::chrono::high_resolution_clock::now();
+
+	// Start a new editor frame on the active graphics device.
 	m_device->Clear(0.0f, 0.0f, 0.0f, 0.0f);
 	m_device->BeginFrame();
+
+	// Build render commands from the current scene.
 	for (const auto& object : gSceneManager.Objects())
 	{
 		if (!object || !object->GetMesh() || !object->GetShader())
@@ -111,6 +117,7 @@ void RenderManager::Loop()
 			continue;
 		}
 
+		// Components update before rendering so animation and other state are current.
 		object->UpdateComponents(gInput.DeltaTime());
 
 		Submit(RenderCommand{
@@ -122,11 +129,17 @@ void RenderManager::Loop()
 	}
 	const auto buildEnd = std::chrono::high_resolution_clock::now();
 	m_lastFrameBuildTime = buildEnd - buildStart;
+
+	// Submit the built commands using the chosen camera.
 	Flush(gEngineCamera);
+
+	// Draw ImGui overlays after the 3D pass.
 	gEngineGUI.BeginFrame();
 	gDebug.draw(gEngineCamera, gEngineGUI);
 	gEngineGUI.Draw(gEngineCamera, gFileManager, gSceneManager, gProjectManager);
 	gEngineGUI.EndFrame();
+
+	// Present the frame and process window events.
 	m_device->EndFrame();
 	gWindow.PollEvents();
 }

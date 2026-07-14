@@ -11,7 +11,6 @@ public:
 
 	void Clear();
 	Object3D* AddObject(std::unique_ptr<Object3D> object);
-
 	const std::vector<std::unique_ptr<Object3D>>& Objects() const;
 
 private:

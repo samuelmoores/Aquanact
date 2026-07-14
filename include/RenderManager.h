@@ -8,6 +8,7 @@
 #include "RenderCommand.h"
 
 class GraphicsDevice;
+class SceneManager;
 
 class RenderManager {
 public:
