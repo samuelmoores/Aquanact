@@ -1,13 +1,13 @@
-#include "LevelManager.h"
+#include "SceneManager.h"
 
 #include "Object3D.h"
 
-void LevelManager::Clear()
+void SceneManager::Clear()
 {
 	m_objects.clear();
 }
 
-Object3D* LevelManager::AddObject(std::unique_ptr<Object3D> object)
+Object3D* SceneManager::AddObject(std::unique_ptr<Object3D> object)
 {
 	if (!object)
 	{
@@ -19,7 +19,7 @@ Object3D* LevelManager::AddObject(std::unique_ptr<Object3D> object)
 	return rawObject;
 }
 
-const std::vector<std::unique_ptr<Object3D>>& LevelManager::Objects() const
+const std::vector<std::unique_ptr<Object3D>>& SceneManager::Objects() const
 {
 	return m_objects;
 }
