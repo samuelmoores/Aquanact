@@ -31,11 +31,14 @@ void Animator::AddClip(Animation* clip)
 	m_clips.emplace_back(clip);
 }
 
-void Animator::Play(int clipIndex)
+void Animator::Play(int clipIndex, float blendSeconds)
 {
 	if (clipIndex == m_currentClip && m_blendFactor >= 1.0f) return;
 	m_nextClip    = clipIndex;
 	m_blendFactor = 0.0f;
+	m_blendSpeed = blendSeconds > 0.0f ? (1.0f / blendSeconds) : 9999.0f;
+	m_currentTime = 0.0f;
+	m_prevTicks = 0.0f;
 }
 
 void Animator::AddEvent(int clipIndex, float tickTime, std::function<void()> callback)
@@ -66,7 +69,7 @@ void Animator::Update(float dt)
 
 	if (m_blendFactor < 1.0f)
 	{
-		m_blendFactor += dt * 3.0f;
+		m_blendFactor += dt * m_blendSpeed;
 		if (m_blendFactor >= 1.0f)
 		{
 			m_blendFactor  = 1.0f;
@@ -88,6 +91,11 @@ void Animator::Update(float dt)
 		FireEvents(m_currentClip, m_prevTicks, ticks, a->Duration());
 		m_prevTicks = ticks;
 	}
+}
+
+int Animator::ClipCount() const
+{
+	return static_cast<int>(m_clips.size());
 }
 
 void Animator::Traverse(float timeTicks, const aiNode* node, const aiMatrix4x4& parent, Animation* anim)

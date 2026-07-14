@@ -1,5 +1,6 @@
 #include "Animation.h"
 #include <cassert>
+#include <algorithm>
 
 Animation::Animation(aiAnimation* anim)
 	: m_anim(anim)
@@ -51,8 +52,9 @@ void Animation::CalcPosition(aiVector3D& out, float timeTicks, const aiNodeAnim*
 	int i = FindPositionKey(timeTicks, ch);
 	float t1 = (float)ch->mPositionKeys[i].mTime;
 	float t2 = (float)ch->mPositionKeys[i + 1].mTime;
-	float f = (timeTicks - t1) / (t2 - t1);
-	assert(f >= 0.0f && f <= 1.0f);
+	float denom = t2 - t1;
+	float f = denom != 0.0f ? (timeTicks - t1) / denom : 0.0f;
+	f = std::clamp(f, 0.0f, 1.0f);
 	out = ch->mPositionKeys[i].mValue + f * (ch->mPositionKeys[i + 1].mValue - ch->mPositionKeys[i].mValue);
 }
 
@@ -62,8 +64,9 @@ void Animation::CalcRotation(aiQuaternion& out, float timeTicks, const aiNodeAni
 	int i = FindRotationKey(timeTicks, ch);
 	float t1 = (float)ch->mRotationKeys[i].mTime;
 	float t2 = (float)ch->mRotationKeys[i + 1].mTime;
-	float f = (timeTicks - t1) / (t2 - t1);
-	assert(f >= 0.0f && f <= 1.0f);
+	float denom = t2 - t1;
+	float f = denom != 0.0f ? (timeTicks - t1) / denom : 0.0f;
+	f = std::clamp(f, 0.0f, 1.0f);
 	aiQuaternion::Interpolate(out, ch->mRotationKeys[i].mValue, ch->mRotationKeys[i + 1].mValue, f);
 	out.Normalize();
 }
@@ -74,7 +77,8 @@ void Animation::CalcScaling(aiVector3D& out, float timeTicks, const aiNodeAnim* 
 	int i = FindScalingKey(timeTicks, ch);
 	float t1 = (float)ch->mScalingKeys[i].mTime;
 	float t2 = (float)ch->mScalingKeys[i + 1].mTime;
-	float f = (timeTicks - t1) / (t2 - t1);
-	assert(f >= 0.0f && f <= 1.0f);
+	float denom = t2 - t1;
+	float f = denom != 0.0f ? (timeTicks - t1) / denom : 0.0f;
+	f = std::clamp(f, 0.0f, 1.0f);
 	out = ch->mScalingKeys[i].mValue + f * (ch->mScalingKeys[i + 1].mValue - ch->mScalingKeys[i].mValue);
 }

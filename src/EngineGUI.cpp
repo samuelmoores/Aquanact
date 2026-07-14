@@ -16,6 +16,7 @@
 #include <imgui_impl_opengl3.h>
 #include <filesystem>
 #include <algorithm>
+#include <cstring>
 
 void EngineGUI::startUp(Window& window)
 {
@@ -204,15 +205,13 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& scen
 			const glm::vec3 worldCenterPosition = object->WorldCenterPosition();
 			const glm::vec3 defaultWorldCenterPosition = object->InitialWorldCenterPosition();
 			ImGui::Text("Name: %s", object->Name().empty() ? "<unnamed>" : object->Name().c_str());
-			ImGui::Text("Components");
-			const bool hasAnimator = object->HasAnimatorComponent();
-			ImGui::BulletText("Animator: %s", hasAnimator ? "present" : "missing");
+			AnimatorComponent* animatorComponent = object->GetAnimatorComponent();
 
+			ImGui::Separator();
+			ImGui::TextUnformatted("Position");
 			float editedX = worldCenterPosition.x;
 			float editedY = worldCenterPosition.y;
 			float editedZ = worldCenterPosition.z;
-
-			ImGui::TextUnformatted("World Center");
 			ImGui::SetNextItemWidth(120.0f);
 			if (ImGui::DragFloat("X##WorldCenter", &editedX, 0.1f, -FLT_MAX, FLT_MAX, "%.3f"))
 			{
@@ -247,6 +246,42 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& scen
 			{
 				object->Translate(glm::vec3(0.0f, 0.0f, defaultWorldCenterPosition.z - worldCenterPosition.z));
 				editedZ = defaultWorldCenterPosition.z;
+			}
+
+			if (animatorComponent)
+			{
+				static char selectedStateName[64] = "";
+				static bool selectedStateInitialized = false;
+				if (!selectedStateInitialized || animatorComponent->States().empty())
+				{
+					if (!animatorComponent->States().empty())
+					{
+						std::strncpy(selectedStateName, animatorComponent->States().front().name.c_str(), sizeof(selectedStateName) - 1);
+						selectedStateName[sizeof(selectedStateName) - 1] = '\0';
+					}
+					selectedStateInitialized = true;
+				}
+
+				ImGui::Separator();
+				ImGui::TextUnformatted("Initial Animation");
+				if (ImGui::BeginCombo("##InitialAnimation", selectedStateName[0] != '\0' ? selectedStateName : "<select animation>"))
+				{
+					for (const auto& state : animatorComponent->States())
+					{
+						const bool selected = std::strcmp(selectedStateName, state.name.c_str()) == 0;
+						if (ImGui::Selectable(state.name.c_str(), selected))
+						{
+							std::strncpy(selectedStateName, state.name.c_str(), sizeof(selectedStateName) - 1);
+							selectedStateName[sizeof(selectedStateName) - 1] = '\0';
+							animatorComponent->SetDesiredState(selectedStateName);
+						}
+						if (selected)
+						{
+							ImGui::SetItemDefaultFocus();
+						}
+					}
+					ImGui::EndCombo();
+				}
 			}
 		}
 	}

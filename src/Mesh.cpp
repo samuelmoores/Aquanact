@@ -104,7 +104,10 @@ Mesh::Mesh(const char* modelFile)
 			if (animScene)
 			{
 				for (unsigned int i = 0; i < animScene->mNumAnimations; i++)
+				{
 					m_animations.push_back(animScene->mAnimations[i]);
+					m_animationSources.push_back(animPath);
+				}
 			}
 		}
 	}
@@ -174,7 +177,7 @@ void Mesh::assimpLoad(const std::string& path, bool flipUvs)
 
 		for (int i = 0; i < m_scene->mNumMeshes; i++)
 		{
-			fromAssimpMesh(m_scene->mMeshes[i], vertices, faces);
+			fromAssimpMesh(m_scene->mMeshes[i], vertices, faces, path);
 			aiMaterial* mat = m_scene->mMaterials[m_scene->mMeshes[i]->mMaterialIndex];
 			aiString matName;
 			mat->Get(AI_MATKEY_NAME, matName);
@@ -226,7 +229,7 @@ void Mesh::assimpLoad(const std::string& path, bool flipUvs)
 		
 	}
 }
-void Mesh::fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, std::vector<uint32_t>& faces)
+void Mesh::fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, std::vector<uint32_t>& faces, const std::string& sourcePath)
 {
 	int numVertices = mesh->mNumVertices;
 	int numIndices = mesh->mNumFaces * 3;
@@ -313,6 +316,7 @@ void Mesh::fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, s
 	for (int i = 0; i < m_scene->mNumAnimations; i++)
 	{
 		m_animations.push_back(m_scene->mAnimations[i]);
+		m_animationSources.push_back(sourcePath);
 	}
 
 	m_totalVertices += numVertices;
@@ -505,6 +509,7 @@ bool Mesh::RayHit(const glm::vec3& ro, const glm::vec3& rd, float& tHit)
 //animation data access
 int Mesh::NumAnimations() const { return (int)m_animations.size(); }
 aiAnimation* Mesh::GetAnimation(int i) const { return m_animations[i]; }
+const std::string& Mesh::GetAnimationSource(int i) const { return m_animationSources[i]; }
 const aiNode* Mesh::GetRootNode() const { return m_scene->mRootNode; }
 
 

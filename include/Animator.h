@@ -18,8 +18,9 @@ class Animator {
 public:
 	Animator(const aiNode* rootNode, Skeleton* skeleton);
 	void AddClip(Animation* clip);
-	void Play(int clipIndex);
+	void Play(int clipIndex, float blendSeconds = 0.33f);
 	void Update(float dt);
+	int ClipCount() const;
 
 	// Register a callback to fire each time the animation cursor crosses tickTime in the given clip.
 	// tickTime is in animation ticks (same units as Animation::Duration()).
@@ -37,6 +38,7 @@ private:
 	int m_currentClip = 0;
 	int m_nextClip    = 0;
 	float m_blendFactor = 1.0f;
+	float m_blendSpeed = 3.0f;
 	float m_currentTime = 0.0f;
 	float m_prevTicks   = 0.0f;
 };

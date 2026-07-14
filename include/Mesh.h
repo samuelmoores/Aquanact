@@ -41,7 +41,7 @@ class Mesh {
 
 		//loading
 		void assimpLoad(const std::string& path, bool flipUvs);
-		void fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, std::vector<uint32_t>& faces);
+		void fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, std::vector<uint32_t>& faces, const std::string& sourcePath);
 		void ReadNodeHeirarchy(const aiNode* node, const aiMatrix4x4& ParentTransform);
 		void LoadTexture(aiMaterial* mat, aiTextureType textureType, std::string path);
 
@@ -76,6 +76,7 @@ class Mesh {
 		//animation data access (for Animator setup)
 		int NumAnimations() const;
 		aiAnimation* GetAnimation(int i) const;
+		const std::string& GetAnimationSource(int i) const;
 		const aiNode* GetRootNode() const;
 
 
@@ -102,6 +103,7 @@ class Mesh {
 		std::vector<Mesh> m_subMeshes;
 		std::vector<int> m_facesSize;
 		std::vector<aiAnimation*> m_animations;
+		std::vector<std::string> m_animationSources;
 		std::vector<SubMeshMaterial> m_materials;
 		static SubMeshMaterial s_defaultMaterial;
 
