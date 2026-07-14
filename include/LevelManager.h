@@ -5,9 +5,9 @@
 
 class Object3D;
 
-class SceneManager {
+class LevelManager {
 public:
-	SceneManager() = default;
+	LevelManager() = default;
 
 	void Clear();
 	Object3D* AddObject(std::unique_ptr<Object3D> object);
