@@ -1,7 +1,7 @@
 #include "RenderManager.h"
+#include "FrontEndManager.h"
 #include "Globals.h"
 #include "Debug.h"
-#include "EngineGUI.h"
 #include "EngineCamera.h"
 #include "Window.h"
 #include "Object3D.h"
@@ -149,10 +149,13 @@ void RenderManager::Loop()
 	Flush(*m_camera);
 
 	// Draw ImGui overlays after the 3D pass.
-	gEngineGUI.BeginFrame();
-	gDebug.draw(*m_camera, gEngineGUI);
-	gEngineGUI.Draw(*m_camera, gFileManager, gSceneManager, gProjectManager);
-	gEngineGUI.EndFrame();
+	if (gFrontEndManager.IsEditorMode())
+	{
+		gFrontEndManager.BeginFrame();
+		gDebug.draw(*m_camera, gFrontEndManager.EditorGUI());
+		gFrontEndManager.Draw(*m_camera, gFileManager, gSceneManager, gProjectManager);
+		gFrontEndManager.EndFrame();
+	}
 
 	// Present the frame and process window events.
 	m_device.EndFrame();

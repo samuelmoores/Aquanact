@@ -4,8 +4,8 @@
 
 class Window;
 class RenderManager;
+class FrontEndManager;
 class Debug;
-class EngineGUI;
 class FileManager;
 class FileSystem;
 class SceneManager;
@@ -14,8 +14,8 @@ class Input;
 
 extern Window gWindow;
 extern RenderManager gRenderManager;
+extern FrontEndManager gFrontEndManager;
 extern Debug gDebug;
-extern EngineGUI gEngineGUI;
 extern FileManager gFileManager;
 extern FileSystem gFileSystem;
 extern SceneManager gSceneManager;

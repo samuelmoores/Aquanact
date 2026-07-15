@@ -28,6 +28,7 @@ set(SOURCES
     "include/Line.h" "src/Line.cpp"
     "include/Debug.h" "src/Debug.cpp"
     "include/EngineGUI.h" "src/EngineGUI.cpp"
+    "include/FrontEndManager.h" "src/FrontEndManager.cpp"
     "include/FileManager.h" "src/FileManager.cpp"
     "include/FileSystem.h" "src/FileSystem.cpp"
     "include/SceneManager.h" "src/SceneManager.cpp"

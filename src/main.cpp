@@ -1,19 +1,19 @@
 #include <Globals.h>
 #include <RenderManager.h>
+#include <FrontEndManager.h>
 #include <Object3D.h>
 #include <SceneManager.h>
 #include <ProjectManager.h>
 #include <Window.h>
 #include <Debug.h>
-#include <EngineGUI.h>
 #include <FileManager.h>
 #include <FileSystem.h>
 #include <Input.h>
 
 Window gWindow;
 RenderManager gRenderManager;
+FrontEndManager gFrontEndManager;
 Debug gDebug;
-EngineGUI gEngineGUI;
 FileSystem gFileSystem;
 FileManager gFileManager(gFileSystem);
 SceneManager gSceneManager;
@@ -31,10 +31,10 @@ int main()
 {
     gWindow.startUp();
     gRenderManager.startUp(gWindow);
+    gFrontEndManager.startUp(gWindow);
     gInput.startUp(gWindow);
     gInput.AttachCamera(gRenderManager.GetCamera());
     gDebug.startUp();
-    gEngineGUI.startUp(gWindow);
     gFileManager.startUp();
     gProjectManager.LoadProject("C:/dev/Aquanact/assets/projects/project.aqua", gSceneManager);
 
@@ -42,7 +42,7 @@ int main()
         mainLoop();
 
     gDebug.shutDown();
-    gEngineGUI.shutDown();
+    gFrontEndManager.shutDown();
     gFileManager.shutDown();
     gSceneManager.Clear();
     gInput.shutDown();
