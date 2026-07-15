@@ -1,6 +1,9 @@
 #pragma once
 
 #include "GraphicsDevice.h"
+#include "OpenGLGraphics.h"
+
+#include <memory>
 
 class Window;
 
@@ -19,6 +22,7 @@ public:
 
 private:
 	void startUp() override;
+	std::unique_ptr<OpenGLGraphics> m_platform;
 	Window* m_window = nullptr;
 	bool m_initialized = false;
 };

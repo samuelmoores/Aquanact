@@ -10,6 +10,7 @@ public:
 	void startUp();
 	void shutDown();
 	GLFWwindow* GLFW() { return m_glfwWindow; }
+	void GetFramebufferSize(int& width, int& height) const;
 	bool ShouldClose() const;
 	void SwapBuffers();
 	void PollEvents();

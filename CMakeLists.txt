@@ -40,6 +40,7 @@ set(SOURCES
     "include/RenderManager.h" "src/RenderManager.cpp"
     "include/GraphicsDevice.h"
     "include/OpenGLGraphicsDevice.h" "src/OpenGLGraphicsDevice.cpp"
+    "include/OpenGLGraphics.h" "src/OpenGLGraphics.cpp"
     "include/Physics.h" "src/Physics.cpp"
     "include/MathUtils.h" "src/MathUtils.cpp"
     "include/Audio.h" "src/Audio.cpp"

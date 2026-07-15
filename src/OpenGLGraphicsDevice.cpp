@@ -1,5 +1,6 @@
 #include "OpenGLGraphicsDevice.h"
 
+#include "OpenGLGraphics.h"
 #include "Window.h"
 #include "RenderCommand.h"
 #include "Camera.h"
@@ -7,7 +8,7 @@
 #include "ShaderProgram.h"
 #include "GLHeaders.h"
 
-#include <stdexcept>
+#include <memory>
 #include <vector>
 
 namespace {
@@ -24,29 +25,37 @@ namespace {
 
 void OpenGLGraphicsDevice::startUp(Window& window)
 {
+	if (m_initialized) {
+		return;
+	}
+
 	m_window = &window;
 	startUp();
 }
 
 void OpenGLGraphicsDevice::startUp()
 {
-	if (m_initialized) {
+	if (m_initialized || !m_window) {
 		return;
 	}
 
-	glfwMakeContextCurrent(m_window->GLFW());
-	if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress))) {
-		throw std::runtime_error("Failed to initialize GLAD");
+	if (!m_platform)
+	{
+		m_platform = std::make_unique<OpenGLGraphics>();
 	}
-
-	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_MULTISAMPLE);
-	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+	m_platform->startUp(*m_window);
 	m_initialized = true;
 }
 
 void OpenGLGraphicsDevice::shutDown()
 {
+	if (m_platform)
+	{
+		m_platform->shutDown();
+		m_platform.reset();
+	}
+
+	m_window = nullptr;
 	m_initialized = false;
 }
 
@@ -57,6 +66,11 @@ OpenGLGraphicsDevice::~OpenGLGraphicsDevice()
 
 void OpenGLGraphicsDevice::BeginFrame()
 {
+	if (m_platform)
+	{
+		m_platform->MakeCurrent();
+		m_platform->UpdateViewport();
+	}
 }
 
 void OpenGLGraphicsDevice::Clear(float r, float g, float b, float a)
@@ -67,7 +81,10 @@ void OpenGLGraphicsDevice::Clear(float r, float g, float b, float a)
 
 void OpenGLGraphicsDevice::EndFrame()
 {
-	glfwSwapBuffers(m_window->GLFW());
+	if (m_platform && m_platform->IsInitialized())
+	{
+		m_platform->SwapBuffers();
+	}
 }
 
 void OpenGLGraphicsDevice::Draw(const RenderCommand& command, const Camera& camera)

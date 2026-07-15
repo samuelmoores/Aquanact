@@ -39,6 +39,18 @@ void Window::shutDown()
     glfwTerminate();
 }
 
+void Window::GetFramebufferSize(int& width, int& height) const
+{
+    width = 0;
+    height = 0;
+    if (!m_glfwWindow)
+    {
+        return;
+    }
+
+    glfwGetFramebufferSize(m_glfwWindow, &width, &height);
+}
+
 bool Window::ShouldClose() const
 {
     return glfwWindowShouldClose(m_glfwWindow);
