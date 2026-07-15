@@ -3,6 +3,7 @@
 #include "Debug.h"
 #include "Globals.h"
 #include "Object3D.h"
+#include "FileSystem.h"
 #include "SceneManager.h"
 
 #include <glm/glm.hpp>
@@ -117,21 +118,21 @@ namespace {
 
 	std::filesystem::path MakePortableSourcePath(const std::filesystem::path& projectPath, const std::filesystem::path& sourcePath)
 	{
-		if (!std::filesystem::exists(sourcePath))
+		if (!gFileSystem.Exists(sourcePath))
 		{
 			return sourcePath;
 		}
 
 		const std::filesystem::path projectDir = projectPath.parent_path();
 		std::error_code ec;
-		const std::filesystem::path projectRelative = std::filesystem::relative(sourcePath, projectDir, ec);
+		const std::filesystem::path projectRelative = gFileSystem.Relative(sourcePath, projectDir, ec);
 		if (!ec && !projectRelative.empty() && !IsRelativeToParent(projectRelative))
 		{
 			return projectRelative;
 		}
 
 		const std::filesystem::path assetsRoot = AssetsRoot();
-		const std::filesystem::path assetsRelative = std::filesystem::relative(sourcePath, assetsRoot, ec);
+		const std::filesystem::path assetsRelative = gFileSystem.Relative(sourcePath, assetsRoot, ec);
 		if (!ec && !assetsRelative.empty() && !IsRelativeToParent(assetsRelative))
 		{
 			return assetsRelative;
@@ -142,20 +143,20 @@ namespace {
 
 	std::filesystem::path ResolveSourcePath(const std::filesystem::path& projectPath, const std::filesystem::path& sourcePath)
 	{
-		if (std::filesystem::exists(sourcePath))
+		if (gFileSystem.Exists(sourcePath))
 		{
 			return sourcePath;
 		}
 
 		const std::filesystem::path projectDir = projectPath.parent_path();
 		const std::filesystem::path projectRelative = projectDir / sourcePath;
-		if (std::filesystem::exists(projectRelative))
+		if (gFileSystem.Exists(projectRelative))
 		{
 			return projectRelative;
 		}
 
 		const std::filesystem::path assetsRelative = AssetsRoot() / sourcePath;
-		if (std::filesystem::exists(assetsRelative))
+		if (gFileSystem.Exists(assetsRelative))
 		{
 			return assetsRelative;
 		}
@@ -163,12 +164,12 @@ namespace {
 		const std::filesystem::path searchRoots[] = { ModelsRoot(), TexturesRoot(), ProjectsRoot() };
 		for (const auto& searchRoot : searchRoots)
 		{
-			if (!std::filesystem::exists(searchRoot) || !std::filesystem::is_directory(searchRoot))
+			if (!gFileSystem.Exists(searchRoot) || !gFileSystem.IsDirectory(searchRoot))
 			{
 				continue;
 			}
 
-			for (const auto& entry : std::filesystem::recursive_directory_iterator(searchRoot))
+			for (const auto& entry : gFileSystem.ReadDirectoryRecursive(searchRoot))
 			{
 				if (!entry.is_regular_file())
 				{
@@ -186,15 +187,19 @@ namespace {
 	}
 }
 
+ProjectManager::ProjectManager(FileSystem& fileSystem)
+	: m_fileSystem(&fileSystem)
+{
+}
+
 bool ProjectManager::SaveProject(const std::filesystem::path& path, const SceneManager& sceneManager) const
 {
-	std::ofstream file(path);
-	if (!file.is_open())
+	if (!m_fileSystem)
 	{
 		return false;
 	}
 
-	file << "AquanactProject 1\n";
+	std::string contents = "AquanactProject 1\n";
 	for (const auto& object : sceneManager.Objects())
 	{
 		if (!object)
@@ -207,25 +212,31 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const SceneM
 		const glm::vec3 scale = object->Scale();
 
 		const std::filesystem::path portableSourcePath = MakePortableSourcePath(path, object->SourcePath());
-		file
-			<< "object;"
-			<< EscapeField(portableSourcePath.string()) << ";"
-			<< position.x << ";" << position.y << ";" << position.z << ";"
-			<< rotation.x << ";" << rotation.y << ";" << rotation.z << ";"
-			<< scale.x << ";" << scale.y << ";" << scale.z << "\n";
+		contents += "object;";
+		contents += EscapeField(portableSourcePath.string());
+		contents += ";";
+		contents += std::to_string(position.x) + ";" + std::to_string(position.y) + ";" + std::to_string(position.z) + ";";
+		contents += std::to_string(rotation.x) + ";" + std::to_string(rotation.y) + ";" + std::to_string(rotation.z) + ";";
+		contents += std::to_string(scale.x) + ";" + std::to_string(scale.y) + ";" + std::to_string(scale.z) + "\n";
 	}
 
-	return true;
+	return m_fileSystem->WriteTextFile(path, contents);
 }
 
 bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager& sceneManager) const
 {
-	std::ifstream file(path);
-	if (!file.is_open())
+	if (!m_fileSystem)
 	{
 		return false;
 	}
 
+	const std::string fileContents = m_fileSystem->ReadTextFile(path);
+	if (fileContents.empty())
+	{
+		return false;
+	}
+
+	std::istringstream file(fileContents);
 	std::string header;
 	std::getline(file, header);
 	if (header != "AquanactProject 1")

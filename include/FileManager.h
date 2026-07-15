@@ -4,9 +4,14 @@
 #include <string>
 #include <vector>
 
+class FileSystem;
+
 class FileManager {
 public:
-	FileManager() = default;
+	// FileManager depends on the shared FileSystem service for path and directory access,
+	// and the constructor is explicit so the dependency wiring stays intentional and
+	// the compiler does not create a FileManager implicitly from a FileSystem.
+	explicit FileManager(FileSystem& fileSystem);
 
 	void startUp();
 	void shutDown();
@@ -30,6 +35,7 @@ public:
 private:
 	void ClearEntries();
 
+	FileSystem* m_fileSystem = nullptr;
 	std::filesystem::path m_rootDirectory;
 	std::filesystem::path m_currentDirectory;
 	std::filesystem::path m_selectedPath;

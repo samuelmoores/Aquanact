@@ -2,11 +2,17 @@
 #include "Debug.h"
 #include "Globals.h"
 #include "Object3D.h"
+#include "FileSystem.h"
 #include "SceneManager.h"
+
+FileManager::FileManager(FileSystem& fileSystem)
+	: m_fileSystem(&fileSystem)
+{
+}
 
 void FileManager::startUp()
 {
-	m_rootDirectory = std::filesystem::path("C:/dev/Aquanact/assets/models");
+	m_rootDirectory = m_fileSystem ? m_fileSystem->Path("C:/dev/Aquanact/assets/models") : std::filesystem::path("C:/dev/Aquanact/assets/models");
 	m_currentDirectory = m_rootDirectory;
 	m_selectedPath.clear();
 	Refresh();
@@ -29,7 +35,7 @@ void FileManager::SetRootDirectory(const std::filesystem::path& rootDirectory)
 
 void FileManager::SetCurrentDirectory(const std::filesystem::path& currentDirectory)
 {
-	if (currentDirectory.empty() || !std::filesystem::exists(currentDirectory) || !std::filesystem::is_directory(currentDirectory))
+	if (!m_fileSystem || currentDirectory.empty() || !m_fileSystem->Exists(currentDirectory) || !m_fileSystem->IsDirectory(currentDirectory))
 	{
 		return;
 	}
@@ -61,15 +67,12 @@ void FileManager::Refresh()
 {
 	ClearEntries();
 
-	if (m_currentDirectory.empty() || !std::filesystem::exists(m_currentDirectory) || !std::filesystem::is_directory(m_currentDirectory))
+	if (!m_fileSystem || m_currentDirectory.empty() || !m_fileSystem->Exists(m_currentDirectory) || !m_fileSystem->IsDirectory(m_currentDirectory))
 	{
 		return;
 	}
 
-	for (const auto& entry : std::filesystem::directory_iterator(m_currentDirectory))
-	{
-		m_entries.push_back(entry);
-	}
+	m_entries = m_fileSystem->ReadDirectory(m_currentDirectory);
 }
 
 const std::filesystem::path& FileManager::RootDirectory() const
@@ -104,9 +107,7 @@ bool FileManager::ImportSelected()
 		return false;
 	}
 
-	const std::filesystem::path absolutePath = m_selectedPath.is_absolute()
-		? m_selectedPath
-		: std::filesystem::absolute(m_selectedPath);
+	const std::filesystem::path absolutePath = m_fileSystem->Absolute(m_selectedPath);
 
 	try
 	{

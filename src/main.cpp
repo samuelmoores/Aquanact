@@ -9,6 +9,7 @@
 #include <Debug.h>
 #include <EngineGUI.h>
 #include <FileManager.h>
+#include <FileSystem.h>
 #include <Input.h>
 
 Window gWindow;
@@ -17,9 +18,10 @@ RenderManager gRenderManager;
 OpenGLGraphicsDevice gGraphicsDevice;
 Debug gDebug;
 EngineGUI gEngineGUI;
-FileManager gFileManager;
+FileSystem gFileSystem;
+FileManager gFileManager(gFileSystem);
 SceneManager gSceneManager;
-ProjectManager gProjectManager;
+ProjectManager gProjectManager(gFileSystem);
 Input gInput;
 
 static void mainLoop()

@@ -180,8 +180,10 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& scen
 	{
 		const auto& object = objects[i];
 		const std::string label = object ? object->Name() : std::string("<null>");
+		const std::string visibleLabel = label.empty() ? "<unnamed>" : label;
+		const std::string selectableId = visibleLabel + "##SceneObject" + std::to_string(i);
 		const bool selected = m_selectedSceneObjectIndex == static_cast<int>(i);
-		if (ImGui::Selectable(label.empty() ? "<unnamed>" : label.c_str(), selected))
+		if (ImGui::Selectable(selectableId.c_str(), selected))
 		{
 			m_selectedSceneObjectIndex = static_cast<int>(i);
 		}
