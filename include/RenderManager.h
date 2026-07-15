@@ -1,20 +1,28 @@
 #pragma once
 #include <cstddef>
 #include <chrono>
+#include <memory>
 #include <GLHeaders.h>
 
 #include "FrameAllocator.h"
 #include "Camera.h"
+#include "EngineCamera.h"
 #include "RenderCommand.h"
+#include "OpenGLGraphicsDevice.h"
 
-class GraphicsDevice;
+class Window;
 class SceneManager;
 
 class RenderManager {
 public:
 	RenderManager() = default;
-	void startUp(GraphicsDevice& device);
+	~RenderManager();
+	void startUp(Window& window);
 	void shutDown();
+	// Const and non-const accessors let callers read the camera from const code
+	// while still allowing mutable access where the renderer owns the state.
+	EngineCamera& GetCamera() { return *m_camera; }
+	const EngineCamera& GetCamera() const { return *m_camera; }
 	void Submit(const RenderCommand& command);
 	void Flush(const Camera& camera);
 	void Loop();
@@ -28,7 +36,8 @@ public:
 	std::size_t FrameAllocatorPeakBytes() const;
 
 private:
-	GraphicsDevice* m_device = nullptr;
+	std::unique_ptr<EngineCamera> m_camera;
+	OpenGLGraphicsDevice m_device;
 	FrameAllocator m_frameAllocator;
 	RenderCommand* m_commands = nullptr;
 	std::size_t m_commandCapacity = 0;

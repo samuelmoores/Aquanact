@@ -4,8 +4,6 @@
 #include <SceneManager.h>
 #include <ProjectManager.h>
 #include <Window.h>
-#include <EngineCamera.h>
-#include <OpenGLGraphicsDevice.h>
 #include <Debug.h>
 #include <EngineGUI.h>
 #include <FileManager.h>
@@ -13,9 +11,7 @@
 #include <Input.h>
 
 Window gWindow;
-EngineCamera gEngineCamera;
 RenderManager gRenderManager;
-OpenGLGraphicsDevice gGraphicsDevice;
 Debug gDebug;
 EngineGUI gEngineGUI;
 FileSystem gFileSystem;
@@ -34,11 +30,9 @@ static void mainLoop()
 int main()
 {
     gWindow.startUp();
-    gGraphicsDevice.startUp(gWindow);
-    gEngineCamera.startUp();
-    gRenderManager.startUp(gGraphicsDevice);
+    gRenderManager.startUp(gWindow);
     gInput.startUp(gWindow);
-    gInput.AttachCamera(gEngineCamera);
+    gInput.AttachCamera(gRenderManager.GetCamera());
     gDebug.startUp();
     gEngineGUI.startUp(gWindow);
     gFileManager.startUp();
@@ -53,8 +47,6 @@ int main()
     gSceneManager.Clear();
     gInput.shutDown();
     gRenderManager.shutDown();
-    gEngineCamera.shutDown();
-    gGraphicsDevice.shutDown();
     gWindow.shutDown();
     return 0;
 }

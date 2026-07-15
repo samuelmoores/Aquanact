@@ -2,10 +2,10 @@
 
 #include "FileManager.h"
 #include "Debug.h"
+#include "RenderManager.h"
 #include "Globals.h"
 #include "SceneManager.h"
 #include "ProjectManager.h"
-#include "EngineCamera.h"
 #include "Window.h"
 #include "Camera.h"
 #include "Object3D.h"
@@ -84,11 +84,11 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& scen
 			ImGui::MenuItem("Axis", nullptr, &m_showAxis);
 			if (ImGui::BeginMenu("EngineCamera"))
 			{
-				float moveSpeed = gEngineCamera.MoveSpeed();
+				float moveSpeed = gRenderManager.GetCamera().MoveSpeed();
 				ImGui::SetNextItemWidth(140.0f);
 				if (ImGui::InputFloat("Move Speed", &moveSpeed, 0.0f, 0.0f, "%.1f"))
 				{
-					gEngineCamera.SetMoveSpeed(moveSpeed);
+					gRenderManager.GetCamera().SetMoveSpeed(moveSpeed);
 				}
 				ImGui::EndMenu();
 			}

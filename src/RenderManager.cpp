@@ -1,9 +1,8 @@
 #include "RenderManager.h"
 #include "Globals.h"
-#include "GraphicsDevice.h"
-#include "EngineCamera.h"
 #include "Debug.h"
 #include "EngineGUI.h"
+#include "EngineCamera.h"
 #include "Window.h"
 #include "Object3D.h"
 #include "SceneManager.h"
@@ -13,9 +12,8 @@
 #include <iostream>
 #include <algorithm>
 
-void RenderManager::startUp(GraphicsDevice& device)
+void RenderManager::startUp(Window& window)
 {
-	m_device = &device;
 	m_frameAllocator.ResetCapacity(1024 * 1024);
 	m_commands = nullptr;
 	m_commandCapacity = 0;
@@ -24,10 +22,27 @@ void RenderManager::startUp(GraphicsDevice& device)
 	m_lastFrameSkippedObjects = 0;
 	m_lastFrameBuildTime = std::chrono::duration<double, std::milli>{ 0.0 };
 	m_lastFrameFlushTime = std::chrono::duration<double, std::milli>{ 0.0 };
+	if (!m_camera)
+	{
+		m_camera = std::make_unique<EngineCamera>();
+	}
+	m_camera->startUp();
+	m_device.startUp(window);
+}
+
+RenderManager::~RenderManager()
+{
+	shutDown();
 }
 
 void RenderManager::shutDown()
 {
+	m_device.shutDown();
+	if (m_camera)
+	{
+		m_camera->shutDown();
+		m_camera.reset();
+	}
 	m_commands = nullptr;
 	m_commandCapacity = 0;
 	m_commandCount = 0;
@@ -78,7 +93,7 @@ void RenderManager::Flush(const Camera& camera)
 	m_lastFrameCommandCount = m_commandCount;
 	for (std::size_t i = 0; i < m_commandCount; ++i) {
 		const RenderCommand& command = m_commands[i];
-		m_device->Draw(command, camera);
+		m_device.Draw(command, camera);
 	}
 
 	m_commandCount = 0;
@@ -105,8 +120,8 @@ void RenderManager::Loop()
 	const auto buildStart = std::chrono::high_resolution_clock::now();
 
 	// Start a new editor frame on the active graphics device.
-	m_device->Clear(0.0f, 0.0f, 0.0f, 0.0f);
-	m_device->BeginFrame();
+	m_device.Clear(0.0f, 0.0f, 0.0f, 0.0f);
+	m_device.BeginFrame();
 
 	// Build render commands from the current scene.
 	for (const auto& object : gSceneManager.Objects())
@@ -131,16 +146,16 @@ void RenderManager::Loop()
 	m_lastFrameBuildTime = buildEnd - buildStart;
 
 	// Submit the built commands using the chosen camera.
-	Flush(gEngineCamera);
+	Flush(*m_camera);
 
 	// Draw ImGui overlays after the 3D pass.
 	gEngineGUI.BeginFrame();
-	gDebug.draw(gEngineCamera, gEngineGUI);
-	gEngineGUI.Draw(gEngineCamera, gFileManager, gSceneManager, gProjectManager);
+	gDebug.draw(*m_camera, gEngineGUI);
+	gEngineGUI.Draw(*m_camera, gFileManager, gSceneManager, gProjectManager);
 	gEngineGUI.EndFrame();
 
 	// Present the frame and process window events.
-	m_device->EndFrame();
+	m_device.EndFrame();
 	gWindow.PollEvents();
 }
 

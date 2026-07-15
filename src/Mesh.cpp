@@ -6,7 +6,7 @@
 #include <filesystem>
 
 #include <GLHeaders.h>
-#include <EngineCamera.h>
+#include <RenderManager.h>
 #include <Globals.h>
 #include <Line.h>
 #include "ModelImporter.h"
@@ -112,8 +112,8 @@ glm::vec3 Mesh::maxBounds()
 void Mesh::DrawBoundingBox()
 {
 	Line line(m_meshMinBounds, m_meshMaxBounds);
-	line.UpdateProjection(gEngineCamera.GetProjectionMatrix());
-	line.draw(gEngineCamera.GetViewMatrix());
+	line.UpdateProjection(gRenderManager.GetCamera().GetProjectionMatrix());
+	line.draw(gRenderManager.GetCamera().GetViewMatrix());
 }
 
 void Mesh::updateAABB(glm::vec3 position, glm::vec3 scale)
