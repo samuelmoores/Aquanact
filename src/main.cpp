@@ -33,7 +33,7 @@ int main()
     gRenderManager.startUp(gWindow);
     gFrontEndManager.startUp(gWindow);
     gInput.startUp(gWindow);
-    gInput.AttachCamera(gRenderManager.GetCamera());
+    gInput.AttachCamera(gRenderManager.GetEngineCamera());
     gDebug.startUp();
     gFileManager.startUp();
     gProjectManager.LoadProject("C:/dev/Aquanact/assets/projects/project.aqua", gSceneManager);

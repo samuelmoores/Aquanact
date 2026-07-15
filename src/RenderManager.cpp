@@ -3,6 +3,7 @@
 #include "Globals.h"
 #include "Debug.h"
 #include "EngineCamera.h"
+#include "GameCamera.h"
 #include "Window.h"
 #include "Object3D.h"
 #include "SceneManager.h"
@@ -22,11 +23,16 @@ void RenderManager::startUp(Window& window)
 	m_lastFrameSkippedObjects = 0;
 	m_lastFrameBuildTime = std::chrono::duration<double, std::milli>{ 0.0 };
 	m_lastFrameFlushTime = std::chrono::duration<double, std::milli>{ 0.0 };
-	if (!m_camera)
+	if (!m_engineCamera)
 	{
-		m_camera = std::make_unique<EngineCamera>();
+		m_engineCamera = std::make_unique<EngineCamera>();
 	}
-	m_camera->startUp();
+	if (!m_gameCamera)
+	{
+		m_gameCamera = std::make_unique<GameCamera>();
+	}
+	m_engineCamera->startUp();
+	m_gameCamera->startUp();
 	m_device.startUp(window);
 }
 
@@ -38,10 +44,15 @@ RenderManager::~RenderManager()
 void RenderManager::shutDown()
 {
 	m_device.shutDown();
-	if (m_camera)
+	if (m_engineCamera)
 	{
-		m_camera->shutDown();
-		m_camera.reset();
+		m_engineCamera->shutDown();
+		m_engineCamera.reset();
+	}
+	if (m_gameCamera)
+	{
+		m_gameCamera->shutDown();
+		m_gameCamera.reset();
 	}
 	m_commands = nullptr;
 	m_commandCapacity = 0;
@@ -146,14 +157,15 @@ void RenderManager::Loop()
 	m_lastFrameBuildTime = buildEnd - buildStart;
 
 	// Submit the built commands using the chosen camera.
-	Flush(*m_camera);
+	const Camera& activeCamera = gFrontEndManager.IsGameMode() ? static_cast<const Camera&>(*m_gameCamera) : static_cast<const Camera&>(*m_engineCamera);
+	Flush(activeCamera);
 
 	// Draw ImGui overlays after the 3D pass.
 	if (gFrontEndManager.IsEditorMode())
 	{
 		gFrontEndManager.BeginFrame();
-		gDebug.draw(*m_camera, gFrontEndManager.EditorGUI());
-		gFrontEndManager.Draw(*m_camera, gFileManager, gSceneManager, gProjectManager);
+		gDebug.draw(*m_engineCamera, gFrontEndManager.EditorGUI());
+		gFrontEndManager.Draw(*m_engineCamera, gFileManager, gSceneManager, gProjectManager);
 		gFrontEndManager.EndFrame();
 	}
 

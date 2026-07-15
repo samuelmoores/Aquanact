@@ -5,6 +5,7 @@
 #include "Object3D.h"
 #include "FileSystem.h"
 #include "SceneManager.h"
+#include "RenderManager.h"
 
 #include <glm/glm.hpp>
 #include <fstream>
@@ -199,7 +200,7 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const SceneM
 		return false;
 	}
 
-	std::string contents = "AquanactProject 1\n";
+	std::string contents = "AquanactProject 2\n";
 	for (const auto& object : sceneManager.Objects())
 	{
 		if (!object)
@@ -220,6 +221,12 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const SceneM
 		contents += std::to_string(scale.x) + ";" + std::to_string(scale.y) + ";" + std::to_string(scale.z) + "\n";
 	}
 
+	const glm::vec3 gameCameraPosition = gRenderManager.GetGameCamera().GetPosition();
+	const glm::vec3 gameCameraFacing = gRenderManager.GetGameCamera().GetFacing();
+	contents += "gamecamera;";
+	contents += std::to_string(gameCameraPosition.x) + ";" + std::to_string(gameCameraPosition.y) + ";" + std::to_string(gameCameraPosition.z) + ";";
+	contents += std::to_string(gameCameraFacing.x) + ";" + std::to_string(gameCameraFacing.y) + ";" + std::to_string(gameCameraFacing.z) + "\n";
+
 	return m_fileSystem->WriteTextFile(path, contents);
 }
 
@@ -239,7 +246,7 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 	std::istringstream file(fileContents);
 	std::string header;
 	std::getline(file, header);
-	if (header != "AquanactProject 1")
+	if (header != "AquanactProject 1" && header != "AquanactProject 2")
 	{
 		return false;
 	}
@@ -254,6 +261,29 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 		}
 
 		const std::vector<std::string> fields = SplitFields(line);
+		if (fields.size() == 7 && fields[0] == "gamecamera")
+		{
+			try
+			{
+				gRenderManager.GetGameCamera().SetPose(
+					glm::vec3(
+						std::stof(fields[1]),
+						std::stof(fields[2]),
+						std::stof(fields[3])),
+					glm::vec3(
+						std::stof(fields[4]),
+						std::stof(fields[5]),
+						std::stof(fields[6])));
+			}
+			catch (const std::exception& ex)
+			{
+				gDebug.LogMessage("Failed to load game camera from line: " + line);
+				gDebug.LogMessage("Reason: " + std::string(ex.what()));
+				return false;
+			}
+			continue;
+		}
+
 		if (fields.size() != 11 || fields[0] != "object")
 		{
 			continue;

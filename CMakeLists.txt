@@ -20,6 +20,7 @@ set(SOURCES
     "include/ModelImporter.h" "src/ModelImporter.cpp"
     "include/Camera.h"
     "include/EngineCamera.h" "src/EngineCamera.cpp"
+    "include/GameCamera.h" "src/GameCamera.cpp"
     "include/Renderer.h"
     "include/Object3D.h" "src/Object3D.cpp"
     "include/Axis.h" "src/Axis.cpp"

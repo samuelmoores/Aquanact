@@ -3,6 +3,7 @@
 #include "FileManager.h"
 #include "Debug.h"
 #include "RenderManager.h"
+#include "FrontEndManager.h"
 #include "Globals.h"
 #include "SceneManager.h"
 #include "ProjectManager.h"
@@ -79,16 +80,32 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& scen
 			}
 			ImGui::EndMenu();
 		}
+		if (ImGui::BeginMenu("Game"))
+		{
+			if (ImGui::MenuItem("Play"))
+			{
+				gFrontEndManager.SetMode(FrontEndMode::Game);
+			}
+			if (ImGui::MenuItem("Stop"))
+			{
+				gFrontEndManager.SetMode(FrontEndMode::Editor);
+			}
+			if (ImGui::MenuItem("Set Game Camera"))
+			{
+				gRenderManager.GetGameCamera().CopyFrom(gRenderManager.GetEngineCamera());
+			}
+			ImGui::EndMenu();
+		}
 		if (ImGui::BeginMenu("View"))
 		{
 			ImGui::MenuItem("Axis", nullptr, &m_showAxis);
 			if (ImGui::BeginMenu("EngineCamera"))
 			{
-				float moveSpeed = gRenderManager.GetCamera().MoveSpeed();
+				float moveSpeed = gRenderManager.GetEngineCamera().MoveSpeed();
 				ImGui::SetNextItemWidth(140.0f);
 				if (ImGui::InputFloat("Move Speed", &moveSpeed, 0.0f, 0.0f, "%.1f"))
 				{
-					gRenderManager.GetCamera().SetMoveSpeed(moveSpeed);
+					gRenderManager.GetEngineCamera().SetMoveSpeed(moveSpeed);
 				}
 				ImGui::EndMenu();
 			}

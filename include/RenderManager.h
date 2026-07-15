@@ -7,6 +7,7 @@
 #include "FrameAllocator.h"
 #include "Camera.h"
 #include "EngineCamera.h"
+#include "GameCamera.h"
 #include "RenderCommand.h"
 #include "OpenGLGraphicsDevice.h"
 
@@ -21,8 +22,10 @@ public:
 	void shutDown();
 	// Const and non-const accessors let callers read the camera from const code
 	// while still allowing mutable access where the renderer owns the state.
-	EngineCamera& GetCamera() { return *m_camera; }
-	const EngineCamera& GetCamera() const { return *m_camera; }
+	EngineCamera& GetEngineCamera() { return *m_engineCamera; }
+	const EngineCamera& GetEngineCamera() const { return *m_engineCamera; }
+	GameCamera& GetGameCamera() { return *m_gameCamera; }
+	const GameCamera& GetGameCamera() const { return *m_gameCamera; }
 	void Submit(const RenderCommand& command);
 	void Flush(const Camera& camera);
 	void Loop();
@@ -36,7 +39,8 @@ public:
 	std::size_t FrameAllocatorPeakBytes() const;
 
 private:
-	std::unique_ptr<EngineCamera> m_camera;
+	std::unique_ptr<EngineCamera> m_engineCamera;
+	std::unique_ptr<GameCamera> m_gameCamera;
 	OpenGLGraphicsDevice m_device;
 	FrameAllocator m_frameAllocator;
 	RenderCommand* m_commands = nullptr;
