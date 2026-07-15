@@ -1,5 +1,6 @@
 #include <EngineCamera.h>
 #include "Globals.h"
+#include "ModelImporter.h"
 #include "Object3D.h"
 #include "AnimatorComponent.h"
 #include <iomanip>
@@ -48,7 +49,8 @@ Object3D::Object3D(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 
 Object3D::Object3D(const char* modelFile)
 {
-	m_mesh = new Mesh(modelFile);
+	auto model = ModelImporter().Import(modelFile, true);
+	m_mesh = new Mesh(std::move(model));
 	m_skinned = m_mesh->Skinned();
 
 	if (m_skinned)

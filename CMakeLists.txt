@@ -17,6 +17,7 @@ set(SOURCES
     "include/ShaderProgram.h" "src/ShaderProgram.cpp"
     "include/StbImage.h" "src/StbImage.cpp"
     "include/Mesh.h" "src/Mesh.cpp"
+    "include/ModelImporter.h" "src/ModelImporter.cpp"
     "include/Camera.h"
     "include/EngineCamera.h" "src/EngineCamera.cpp"
     "include/Renderer.h"

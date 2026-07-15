@@ -7,8 +7,9 @@
 #include <ShaderProgram.h>
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
-#include <assimp/postprocess.h>
 #include <glm/gtc/matrix_transform.hpp>
+
+struct ImportedModel;
 
 struct Vertex3D {
 	glm::vec3 position;   // offset 0  (3 floats)
@@ -37,18 +38,12 @@ class Mesh {
 	public:
 		Mesh();
 		Mesh(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces);
-		Mesh(const char* modelFile);
-
-		//loading
-		void assimpLoad(const std::string& path, bool flipUvs);
-		void fromAssimpMesh(const aiMesh* mesh, std::vector<Vertex3D>& vertices, std::vector<uint32_t>& faces, const std::string& sourcePath);
-		void ReadNodeHeirarchy(const aiNode* node, const aiMatrix4x4& ParentTransform);
-		void LoadTexture(aiMaterial* mat, aiTextureType textureType, std::string path);
+		Mesh(ImportedModel&& importedModel);
 
 		//open gl
-		void Bind();
+		void Bind(int index = 0);
 		void UnBind();
-		uint32_t FacesSize() const;
+		uint32_t FacesSize(int index) const;
 
 		//bounding box
 		void updateAABB(glm::vec3 position, glm::vec3 scale);
@@ -65,13 +60,14 @@ class Mesh {
 		void SetBuffers(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces);
 		void SetTexture(const char* colorFile);
 		void SetDiffuseTextureMemory(aiTexture* text);
+		void LoadTexture(aiMaterial* mat, aiTextureType textureType, const std::string& path);
 		const Skeleton& GetSkeleton() const;
 		Skeleton* GetSkeletonPtr();
 		const SubMeshMaterial& GetMaterial(int index) const;
+		uint32_t FacesOffset(int index) const;
 		void SetAmbientColor(int index, glm::vec3 color);
 		bool Skinned();
-		int NumBuffers();
-		void ClearBufferIndex();
+		int NumBuffers() const;
 
 		//animation data access (for Animator setup)
 		int NumAnimations() const;
@@ -82,6 +78,7 @@ class Mesh {
 
 
 	private:
+		void AdoptImportedModel(ImportedModel&& importedModel);
 		std::vector<Vertex3D> m_vertices;
 		std::vector<uint32_t> m_faces;
 		std::vector<uint32_t> m_vao;
@@ -93,18 +90,16 @@ class Mesh {
 		glm::vec3 m_meshMinBounds;
 		glm::vec3 m_meshMaxBounds;
 		Skeleton m_skeleton;
-		Assimp::Importer m_importer;
+		std::unique_ptr<Assimp::Importer> m_importer;
 		std::vector<std::unique_ptr<Assimp::Importer>> m_animImporters;
 		const aiScene* m_scene;
-		aiMatrix4x4 m_GlobalInverseTransform;
 		bool m_skinned;
-		int m_totalVertices;
-		std::string m_texturesFolder;
-		std::vector<Mesh> m_subMeshes;
 		std::vector<int> m_facesSize;
+		std::vector<int> m_faceOffsets;
 		std::vector<aiAnimation*> m_animations;
 		std::vector<std::string> m_animationSources;
 		std::vector<SubMeshMaterial> m_materials;
+		std::string m_sourcePath;
 		static SubMeshMaterial s_defaultMaterial;
 
 };
