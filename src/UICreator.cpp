@@ -42,24 +42,16 @@ void UICreator::Draw(const Camera&)
 	{
 		if (ImGui::BeginMenu("UI"))
 		{
-			if (ImGui::MenuItem("Create Main Menu"))
+			if (ImGui::MenuItem("Create Button"))
 			{
-				gDebug.LogMessage("Create Main Menu requested");
-			}
-			if (ImGui::MenuItem("Create Pause Menu"))
-			{
-				gDebug.LogMessage("Create Pause Menu requested");
-			}
-			if (ImGui::MenuItem("Create HUD"))
-			{
-				gDebug.LogMessage("Create HUD requested");
+				gDebug.LogMessage("Create Button requested");
 			}
 			ImGui::Separator();
-			if (ImGui::MenuItem("Exit UI Creation"))
+			if (ImGui::MenuItem("Leave UI Creation"))
 			{
 				gFrontEndManager.ReturnToEngineEditor();
 				gRenderManager.SetActiveCamera(gRenderManager.GetEngineCamera());
-				gDebug.LogMessage("Exit UI Creation requested");
+				gDebug.LogMessage("Leave UI Creation requested");
 			}
 			ImGui::EndMenu();
 		}
