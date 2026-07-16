@@ -27,11 +27,15 @@ SceneManager gSceneManager;
 ProjectManager gProjectManager(gFileSystem);
 GameplayManager gGameplayManager;
 Input gInput;
+EngineState gEngineState;
 
 static void mainLoop()
 {
     gInput.Update();
-    gGameplayManager.Update(gInput.DeltaTime());
+    if (gEngineState.IsGameMode())
+    {
+        gGameplayManager.Update(gInput.DeltaTime());
+    }
 
     gRenderManager.Loop();
 }
@@ -103,17 +107,17 @@ static int RunApplication(int argc, char** argv)
 #ifdef AQUANACT_EDITOR
     if (launchConfig.mode == LaunchMode::Editor)
     {
-        gFrontEndManager.SetMode(FrontEndMode::Editor);
+        gEngineState.SetMode(EngineMode::Editor);
         gInput.AttachCamera(gRenderManager.GetEngineCamera());
         gDebug.startUp();
         gFileManager.startUp();
     }
     else
     {
-        gFrontEndManager.SetMode(FrontEndMode::Game);
+        gEngineState.SetMode(EngineMode::Game);
     }
 #else
-    gFrontEndManager.SetMode(launchConfig.mode == LaunchMode::Editor ? FrontEndMode::Editor : FrontEndMode::Game);
+    gEngineState.SetMode(launchConfig.mode == LaunchMode::Editor ? EngineMode::Editor : EngineMode::Game);
 #endif
     gProjectManager.LoadProject(launchConfig.projectPath, gSceneManager);
 

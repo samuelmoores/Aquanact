@@ -157,11 +157,11 @@ void RenderManager::Loop()
 	m_lastFrameBuildTime = buildEnd - buildStart;
 
 	// Submit the built commands using the chosen camera.
-	const Camera& activeCamera = gFrontEndManager.IsGameMode() ? static_cast<const Camera&>(*m_gameCamera) : static_cast<const Camera&>(*m_engineCamera);
+	const Camera& activeCamera = gEngineState.IsGameMode() ? static_cast<const Camera&>(*m_gameCamera) : static_cast<const Camera&>(*m_engineCamera);
 	Flush(activeCamera);
 
 	// Draw ImGui overlays after the 3D pass.
-	if (gFrontEndManager.IsEditorMode())
+	if (gEngineState.IsEditorMode())
 	{
 		gFrontEndManager.BeginFrame();
 		gDebug.draw(*m_engineCamera, gFrontEndManager.EditorGUI());

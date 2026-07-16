@@ -99,11 +99,11 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& scen
 		{
 			if (ImGui::MenuItem("Play"))
 			{
-				gFrontEndManager.SetMode(FrontEndMode::Game);
+				gEngineState.SetMode(EngineMode::Game);
 			}
 			if (ImGui::MenuItem("Stop"))
 			{
-				gFrontEndManager.SetMode(FrontEndMode::Editor);
+				gEngineState.SetMode(EngineMode::Editor);
 			}
 			if (ImGui::MenuItem("Set Game Camera"))
 			{

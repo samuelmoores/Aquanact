@@ -6,6 +6,7 @@
 #include "FileManager.h"
 #include "SceneManager.h"
 #include "ProjectManager.h"
+#include "Globals.h"
 
 FrontEndManager::~FrontEndManager()
 {
@@ -41,7 +42,7 @@ void FrontEndManager::BeginFrame()
 
 void FrontEndManager::Draw(const Camera& camera, FileManager& fileManager, SceneManager& sceneManager, ProjectManager& projectManager)
 {
-	if (m_mode == FrontEndMode::Editor && m_engineGUI)
+	if (IsEditorMode() && m_engineGUI)
 	{
 		m_engineGUI->Draw(camera, fileManager, sceneManager, projectManager);
 	}
@@ -55,24 +56,19 @@ void FrontEndManager::EndFrame()
 	}
 }
 
-void FrontEndManager::SetMode(FrontEndMode mode)
+EngineMode FrontEndManager::Mode() const
 {
-	m_mode = mode;
-}
-
-FrontEndMode FrontEndManager::Mode() const
-{
-	return m_mode;
+	return gEngineState.Mode();
 }
 
 bool FrontEndManager::IsEditorMode() const
 {
-	return m_mode == FrontEndMode::Editor;
+	return gEngineState.IsEditorMode();
 }
 
 bool FrontEndManager::IsGameMode() const
 {
-	return m_mode == FrontEndMode::Game;
+	return gEngineState.IsGameMode();
 }
 
 EngineGUI& FrontEndManager::EditorGUI()
