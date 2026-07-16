@@ -9,6 +9,7 @@
 #include "Component.h"
 
 class AnimatorComponent;
+class Controller;
 
 
 
@@ -20,6 +21,7 @@ public:
 	Mesh* GetMesh();
 	ShaderProgram* GetShader();
 	AnimatorComponent* GetAnimatorComponent();
+	Controller* GetController();
 	template<typename T>
 	T* GetComponent();
 	template<typename T, typename... Args>

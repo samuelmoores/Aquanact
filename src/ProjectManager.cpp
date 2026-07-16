@@ -1,11 +1,14 @@
 #include "ProjectManager.h"
 
 #include "Debug.h"
+#include "Controller.h"
+#include "AnimatorComponent.h"
 #include "Globals.h"
 #include "Object3D.h"
 #include "FileSystem.h"
 #include "SceneManager.h"
 #include "RenderManager.h"
+#include "GameplayManager.h"
 
 #include <glm/glm.hpp>
 #include <fstream>
@@ -200,7 +203,7 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const SceneM
 		return false;
 	}
 
-	std::string contents = "AquanactProject 2\n";
+	std::string contents = "AquanactProject 3\n";
 	for (const auto& object : sceneManager.Objects())
 	{
 		if (!object)
@@ -219,6 +222,23 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const SceneM
 		contents += std::to_string(position.x) + ";" + std::to_string(position.y) + ";" + std::to_string(position.z) + ";";
 		contents += std::to_string(rotation.x) + ";" + std::to_string(rotation.y) + ";" + std::to_string(rotation.z) + ";";
 		contents += std::to_string(scale.x) + ";" + std::to_string(scale.y) + ";" + std::to_string(scale.z) + "\n";
+	}
+
+	for (const auto& object : sceneManager.Objects())
+	{
+		if (!object)
+		{
+			continue;
+		}
+
+		if (Controller* controller = object->GetController())
+		{
+			contents += "component;";
+			contents += EscapeField(MakePortableSourcePath(path, object->SourcePath()).string());
+			contents += ";controller;";
+			contents += std::to_string(controller->MoveSpeed());
+			contents += "\n";
+		}
 	}
 
 	const glm::vec3 gameCameraPosition = gRenderManager.GetGameCamera().GetPosition();
@@ -246,12 +266,17 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 	std::istringstream file(fileContents);
 	std::string header;
 	std::getline(file, header);
-	if (header != "AquanactProject 1" && header != "AquanactProject 2")
+	if (header != "AquanactProject 1" && header != "AquanactProject 2" && header != "AquanactProject 3")
 	{
 		return false;
 	}
 
 	std::vector<std::unique_ptr<Object3D>> loadedObjects;
+	struct PendingController {
+		std::filesystem::path sourcePath;
+		float moveSpeed = 50.0f;
+	};
+	std::vector<PendingController> pendingControllers;
 	std::string line;
 	while (std::getline(file, line))
 	{
@@ -278,6 +303,24 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 			catch (const std::exception& ex)
 			{
 				gDebug.LogMessage("Failed to load game camera from line: " + line);
+				gDebug.LogMessage("Reason: " + std::string(ex.what()));
+				return false;
+			}
+			continue;
+		}
+
+		if (fields.size() == 4 && fields[0] == "component" && fields[2] == "controller")
+		{
+			try
+			{
+				pendingControllers.push_back(PendingController{
+					ResolveSourcePath(path, fields[1]),
+					std::stof(fields[3])
+				});
+			}
+			catch (const std::exception& ex)
+			{
+				gDebug.LogMessage("Failed to load controller component from line: " + line);
 				gDebug.LogMessage("Reason: " + std::string(ex.what()));
 				return false;
 			}
@@ -319,9 +362,39 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 	}
 
 	sceneManager.Clear();
+	gGameplayManager.shutDown();
 	for (auto& object : loadedObjects)
 	{
-		sceneManager.AddObject(std::move(object));
+		Object3D* loadedObject = sceneManager.AddObject(std::move(object));
+		if (loadedObject)
+		{
+			if (Controller* controller = loadedObject->GetController())
+			{
+				gGameplayManager.RegisterController(controller);
+			}
+		}
+	}
+
+	for (const auto& pendingController : pendingControllers)
+	{
+		for (const auto& object : sceneManager.Objects())
+		{
+			if (!object || object->SourcePath() != pendingController.sourcePath.string())
+			{
+				continue;
+			}
+
+			if (object->GetController())
+			{
+				continue;
+			}
+
+			Controller* controller = object->AddComponent<Controller>();
+			controller->SetOwner(object.get());
+			controller->SetMoveSpeed(pendingController.moveSpeed);
+			gGameplayManager.RegisterController(controller);
+			break;
+		}
 	}
 
 	return true;

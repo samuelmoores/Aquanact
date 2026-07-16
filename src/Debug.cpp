@@ -4,6 +4,7 @@
 #include "EngineGUI.h"
 #include "Grid.h"
 #include "Camera.h"
+#include "Input.h"
 #include "Globals.h"
 #include "SceneManager.h"
 #include "RenderManager.h"
@@ -90,6 +91,43 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 	ImGui::Text("Frame allocator used: %.2f KB", static_cast<double>(gRenderManager.FrameAllocatorUsedBytes()) / 1024.0);
 	ImGui::Text("Frame allocator peak: %.2f KB", static_cast<double>(gRenderManager.FrameAllocatorPeakBytes()) / 1024.0);
 	ImGui::End();
+}
+
+void Debug::drawGameModeInput(const Input& input)
+{
+	ImGui::Begin("Game Input");
+	ImGui::Text("Window focused: %s", input.WindowFocused() ? "yes" : "no");
+	ImGui::Text("Look active: %s", input.LookActive() ? "yes" : "no");
+	ImGui::Text("Look became active: %s", input.LookBecameActive() ? "yes" : "no");
+	const glm::vec3 move = input.MoveInput();
+	const glm::vec2 mouse = input.MouseDelta();
+	ImGui::Separator();
+	ImGui::Text("Move input: %.2f, %.2f, %.2f", move.x, move.y, move.z);
+	ImGui::Text("Mouse delta: %.2f, %.2f", mouse.x, mouse.y);
+	ImGui::Text("Delta time: %.4f", input.DeltaTime());
+	ImGui::End();
+
+	ImGui::Begin("Gameplay Diagnostics");
+	ImGui::Text("Controller registered: %s", m_controllerRegistered ? "yes" : "no");
+	ImGui::Text("Object: %s", m_gameplayObjectName.empty() ? "<none>" : m_gameplayObjectName.c_str());
+	ImGui::Separator();
+	ImGui::Text("Move input: %.2f, %.2f, %.2f", m_gameplayMoveInput.x, m_gameplayMoveInput.y, m_gameplayMoveInput.z);
+	ImGui::Text("Move speed: %.2f", m_gameplayMoveSpeed);
+	ImGui::Text("Delta time: %.4f", m_gameplayDt);
+	ImGui::Text("Applied delta: %.3f, %.3f, %.3f", m_gameplayDelta.x, m_gameplayDelta.y, m_gameplayDelta.z);
+	ImGui::Text("Position: %.3f, %.3f, %.3f", m_gameplayPosition.x, m_gameplayPosition.y, m_gameplayPosition.z);
+	ImGui::End();
+}
+
+void Debug::SetGameplayDiagnostics(bool controllerRegistered, const std::string& objectName, const glm::vec3& moveInput, float moveSpeed, float dt, const glm::vec3& delta, const glm::vec3& position)
+{
+	m_controllerRegistered = controllerRegistered;
+	m_gameplayObjectName = objectName;
+	m_gameplayMoveInput = moveInput;
+	m_gameplayMoveSpeed = moveSpeed;
+	m_gameplayDt = dt;
+	m_gameplayDelta = delta;
+	m_gameplayPosition = position;
 }
 
 void Debug::LogMessage(const std::string& message)

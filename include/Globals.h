@@ -10,6 +10,7 @@ class FileManager;
 class FileSystem;
 class SceneManager;
 class ProjectManager;
+class GameplayManager;
 class Input;
 
 extern Window gWindow;
@@ -20,4 +21,5 @@ extern FileManager gFileManager;
 extern FileSystem gFileSystem;
 extern SceneManager gSceneManager;
 extern ProjectManager gProjectManager;
+extern GameplayManager gGameplayManager;
 extern Input gInput;

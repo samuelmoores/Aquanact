@@ -33,7 +33,7 @@ void FrontEndManager::shutDown()
 
 void FrontEndManager::BeginFrame()
 {
-	if (m_mode == FrontEndMode::Editor && m_engineGUI)
+	if (m_engineGUI)
 	{
 		m_engineGUI->BeginFrame();
 	}
@@ -49,7 +49,7 @@ void FrontEndManager::Draw(const Camera& camera, FileManager& fileManager, Scene
 
 void FrontEndManager::EndFrame()
 {
-	if (m_mode == FrontEndMode::Editor && m_engineGUI)
+	if (m_engineGUI)
 	{
 		m_engineGUI->EndFrame();
 	}

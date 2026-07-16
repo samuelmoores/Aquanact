@@ -3,6 +3,9 @@
 #include "ModelImporter.h"
 #include "Object3D.h"
 #include "AnimatorComponent.h"
+#include "Controller.h"
+#include "Debug.h"
+#include "Globals.h"
 #include <iomanip>
 
 void printMatrix(const glm::mat4& m) {
@@ -86,6 +89,11 @@ AnimatorComponent* Object3D::GetAnimatorComponent()
 	return GetComponent<AnimatorComponent>();
 }
 
+Controller* Object3D::GetController()
+{
+	return GetComponent<Controller>();
+}
+
 ShaderProgram* Object3D::GetShader()
 {
 	return &m_shader;
@@ -124,6 +132,7 @@ void Object3D::Move(glm::vec3 delta)
 {
 	m_position += delta;
 	updateMeshAABB(delta);
+	gDebug.LogMessage("Move " + m_name + ": " + std::to_string(delta.x) + ", " + std::to_string(delta.y) + ", " + std::to_string(delta.z));
 }
 
 void Object3D::Translate(glm::vec3 delta)

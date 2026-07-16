@@ -3,6 +3,7 @@
 #include "FileManager.h"
 #include "Debug.h"
 #include "RenderManager.h"
+#include "GameplayManager.h"
 #include "FrontEndManager.h"
 #include "AquanactBuildSystem.h"
 #include "Globals.h"
@@ -11,6 +12,7 @@
 #include "Window.h"
 #include "Camera.h"
 #include "Object3D.h"
+#include "Controller.h"
 #include "AnimatorComponent.h"
 
 #include <imgui.h>
@@ -233,7 +235,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& scen
 	}
 	else
 	{
-		const auto& object = objects[static_cast<std::size_t>(m_selectedSceneObjectIndex)];
+		auto& object = objects[static_cast<std::size_t>(m_selectedSceneObjectIndex)];
 		if (!object)
 		{
 			ImGui::TextUnformatted("Selected object is null.");
@@ -244,6 +246,25 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& scen
 			const glm::vec3 defaultWorldCenterPosition = object->InitialWorldCenterPosition();
 			ImGui::Text("Name: %s", object->Name().empty() ? "<unnamed>" : object->Name().c_str());
 			AnimatorComponent* animatorComponent = object->GetAnimatorComponent();
+			Controller* controller = object->GetController();
+
+			ImGui::Separator();
+			ImGui::TextUnformatted("Gameplay");
+			if (controller)
+			{
+				float moveSpeed = controller->MoveSpeed();
+				ImGui::SetNextItemWidth(140.0f);
+				if (ImGui::InputFloat("Move Speed", &moveSpeed, 0.0f, 0.0f, "%.1f"))
+				{
+					controller->SetMoveSpeed(moveSpeed);
+				}
+			}
+			else if (ImGui::Button("Add Controller"))
+			{
+				controller = object->AddComponent<Controller>();
+				controller->SetOwner(object.get());
+				gGameplayManager.RegisterController(controller);
+			}
 
 			ImGui::Separator();
 			ImGui::TextUnformatted("Position");

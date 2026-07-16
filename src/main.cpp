@@ -3,6 +3,7 @@
 #include <Object3D.h>
 #include <SceneManager.h>
 #include <ProjectManager.h>
+#include <GameplayManager.h>
 #include <Window.h>
 #include <Debug.h>
 #include <FileManager.h>
@@ -24,16 +25,33 @@ FileSystem gFileSystem;
 FileManager gFileManager(gFileSystem);
 SceneManager gSceneManager;
 ProjectManager gProjectManager(gFileSystem);
+GameplayManager gGameplayManager;
 Input gInput;
 
 static void mainLoop()
 {
     gInput.Update();
+    gGameplayManager.Update(gInput.DeltaTime());
 
     gRenderManager.Loop();
 }
 
 namespace {
+	std::filesystem::path DefaultProjectPath()
+	{
+		const std::filesystem::path packagedProject = std::filesystem::current_path() / "project.aqua";
+		if (std::filesystem::exists(packagedProject))
+		{
+			return packagedProject;
+		}
+
+#ifdef AQUANACT_SOURCE_ROOT
+		return std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets" / "projects" / "project.aqua";
+#else
+		return packagedProject;
+#endif
+	}
+
 	enum class LaunchMode {
 		Editor,
 		Game
@@ -41,7 +59,7 @@ namespace {
 
 	struct LaunchConfig {
 		LaunchMode mode = LaunchMode::Editor;
-		std::filesystem::path projectPath = std::filesystem::current_path() / "project.aqua";
+		std::filesystem::path projectPath = DefaultProjectPath();
 	};
 
 	LaunchConfig ParseLaunchConfig(int argc, char** argv)
@@ -77,9 +95,10 @@ static int RunApplication(int argc, char** argv)
 {
     const LaunchConfig launchConfig = ParseLaunchConfig(argc, argv);
 
-	gWindow.startUp();
+    gWindow.startUp();
     gRenderManager.startUp(gWindow);
     gFrontEndManager.startUp(gWindow);
+    gGameplayManager.startUp();
     gInput.startUp(gWindow);
 #ifdef AQUANACT_EDITOR
     if (launchConfig.mode == LaunchMode::Editor)
@@ -109,6 +128,7 @@ static int RunApplication(int argc, char** argv)
     }
 #endif
     gFrontEndManager.shutDown();
+    gGameplayManager.shutDown();
     gSceneManager.Clear();
     gInput.shutDown();
     gRenderManager.shutDown();

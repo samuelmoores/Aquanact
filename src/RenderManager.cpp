@@ -168,6 +168,12 @@ void RenderManager::Loop()
 		gFrontEndManager.Draw(*m_engineCamera, gFileManager, gSceneManager, gProjectManager);
 		gFrontEndManager.EndFrame();
 	}
+	else
+	{
+		gFrontEndManager.BeginFrame();
+		gDebug.drawGameModeInput(gInput);
+		gFrontEndManager.EndFrame();
+	}
 
 	// Present the frame and process window events.
 	m_device.EndFrame();
