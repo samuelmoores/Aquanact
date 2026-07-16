@@ -102,7 +102,7 @@ void Debug::drawGameModeInput(const Input& input)
 	const glm::vec3 move = input.MoveInput();
 	const glm::vec2 mouse = input.MouseDelta();
 	ImGui::Separator();
-	ImGui::Text("Move input: %.2f, %.2f, %.2f", move.x, move.y, move.z);
+	ImGui::Text("Move input: %.2f, %.2f", move.x, move.z);
 	ImGui::Text("Mouse delta: %.2f, %.2f", mouse.x, mouse.y);
 	ImGui::Text("Delta time: %.4f", input.DeltaTime());
 	ImGui::End();
