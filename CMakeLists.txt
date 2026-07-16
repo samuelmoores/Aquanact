@@ -106,6 +106,25 @@ find_package(imgui CONFIG REQUIRED)
 target_link_libraries(AquanactEngine PRIVATE imgui::imgui)
 target_link_libraries(AquanactGame PRIVATE imgui::imgui)
 
+find_path(MYGUI_INCLUDE_DIR
+    NAMES MyGUI.h
+    PATH_SUFFIXES MYGUI
+    REQUIRED
+)
+find_library(MYGUI_ENGINE_LIBRARY
+    NAMES MyGUIEngineStatic
+    REQUIRED
+)
+find_library(MYGUI_OPENGL_LIBRARY
+    NAMES MyGUI.OpenGLPlatform
+    REQUIRED
+)
+
+target_include_directories(AquanactEngine PRIVATE ${MYGUI_INCLUDE_DIR})
+target_include_directories(AquanactGame PRIVATE ${MYGUI_INCLUDE_DIR})
+target_link_libraries(AquanactEngine PRIVATE ${MYGUI_ENGINE_LIBRARY} ${MYGUI_OPENGL_LIBRARY})
+target_link_libraries(AquanactGame PRIVATE ${MYGUI_ENGINE_LIBRARY} ${MYGUI_OPENGL_LIBRARY})
+
 target_include_directories(AquanactEngine PUBLIC "./include")
 target_include_directories(AquanactGame PUBLIC "./include")
 target_include_directories(AquanactBuildTool PUBLIC "./include")

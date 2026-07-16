@@ -10,6 +10,12 @@
     "glfw3",
     "glad",
     {
+      "name": "mygui",
+      "features": [
+        "opengl"
+      ]
+    },
+    {
       "name": "imgui",
       "features": [
         "glfw-binding",
