@@ -33,6 +33,7 @@ void RenderManager::startUp(Window& window)
 	}
 	m_engineCamera->startUp();
 	m_gameCamera->startUp();
+	m_activeCamera = m_engineCamera.get();
 	m_device.startUp(window);
 }
 
@@ -156,15 +157,16 @@ void RenderManager::Loop()
 	const auto buildEnd = std::chrono::high_resolution_clock::now();
 	m_lastFrameBuildTime = buildEnd - buildStart;
 
-	// Submit the built commands using the chosen camera.
-	const Camera& activeCamera = gEngineState.IsGameMode() ? static_cast<const Camera&>(*m_gameCamera) : static_cast<const Camera&>(*m_engineCamera);
-	Flush(activeCamera);
+	// Submit the built commands using the currently selected camera.
+	Flush(ActiveCamera());
 
 	// Draw ImGui overlays after the 3D pass.
 	if (gEngineState.IsEditorMode())
 	{
 		gFrontEndManager.BeginFrame();
-		gDebug.draw(*m_engineCamera, gFrontEndManager.EditorGUI());
+		// Draw editor overlays from the same camera as the scene so preview modes stay consistent.
+		// Use active camera since the game camera can be used as a preview in editor mode
+		gDebug.draw(ActiveCamera(), gFrontEndManager.EditorGUI());
 		gFrontEndManager.Draw(*m_engineCamera, gFileManager, gSceneManager, gProjectManager);
 		gFrontEndManager.EndFrame();
 	}

@@ -115,6 +115,16 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& scen
 			}
 			ImGui::EndMenu();
 		}
+		if (ImGui::BeginMenu("UI"))
+		{
+			if (ImGui::MenuItem("Create UI"))
+			{
+				gFrontEndManager.OpenUICreator();
+				gRenderManager.SetActiveCamera(gRenderManager.GetGameCamera());
+				gDebug.LogMessage("UI Creator opened.");
+			}
+			ImGui::EndMenu();
+		}
 		if (ImGui::BeginMenu("View"))
 		{
 			ImGui::MenuItem("Axis", nullptr, &m_showAxis);
@@ -410,4 +420,14 @@ bool EngineGUI::ShowAxis() const
 bool EngineGUI::ShowGrid() const
 {
 	return m_showGrid;
+}
+
+void EngineGUI::SetShowAxis(bool showAxis)
+{
+	m_showAxis = showAxis;
+}
+
+void EngineGUI::SetShowGrid(bool showGrid)
+{
+	m_showGrid = showGrid;
 }

@@ -17,6 +17,8 @@ public:
 
 	bool ShowAxis() const;
 	bool ShowGrid() const;
+	void SetShowAxis(bool showAxis);
+	void SetShowGrid(bool showGrid);
 
 private:
 	void DrawBuildGamePopup();

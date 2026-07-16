@@ -26,6 +26,9 @@ public:
 	const EngineCamera& GetEngineCamera() const { return *m_engineCamera; }
 	GameCamera& GetGameCamera() { return *m_gameCamera; }
 	const GameCamera& GetGameCamera() const { return *m_gameCamera; }
+	void SetActiveCamera(Camera& camera) { m_activeCamera = &camera; }
+	Camera& ActiveCamera() { return *m_activeCamera; }
+	const Camera& ActiveCamera() const { return *m_activeCamera; }
 	void Submit(const RenderCommand& command);
 	void Flush(const Camera& camera);
 	void Loop();
@@ -41,6 +44,7 @@ public:
 private:
 	std::unique_ptr<EngineCamera> m_engineCamera;
 	std::unique_ptr<GameCamera> m_gameCamera;
+	Camera* m_activeCamera = nullptr;
 	OpenGLGraphicsDevice m_device;
 	FrameAllocator m_frameAllocator;
 	RenderCommand* m_commands = nullptr;

@@ -19,8 +19,13 @@ void FrontEndManager::startUp(Window& window)
 	{
 		m_engineGUI = std::make_unique<EngineGUI>();
 	}
+	if (!m_uiCreator)
+	{
+		m_uiCreator = std::make_unique<UICreator>();
+	}
 
 	m_engineGUI->startUp(window);
+	m_uiCreator->startUp(window);
 }
 
 void FrontEndManager::shutDown()
@@ -30,6 +35,11 @@ void FrontEndManager::shutDown()
 		m_engineGUI->shutDown();
 		m_engineGUI.reset();
 	}
+	if (m_uiCreator)
+	{
+		m_uiCreator->shutDown();
+		m_uiCreator.reset();
+	}
 }
 
 void FrontEndManager::BeginFrame()
@@ -38,13 +48,26 @@ void FrontEndManager::BeginFrame()
 	{
 		m_engineGUI->BeginFrame();
 	}
+	if (m_uiCreator)
+	{
+		m_uiCreator->BeginFrame();
+	}
 }
 
 void FrontEndManager::Draw(const Camera& camera, FileManager& fileManager, SceneManager& sceneManager, ProjectManager& projectManager)
 {
-	if (IsEditorMode() && m_engineGUI)
+	if (!IsEditorMode())
+	{
+		return;
+	}
+
+	if (m_mode == FrontEndMode::EngineEditor && m_engineGUI)
 	{
 		m_engineGUI->Draw(camera, fileManager, sceneManager, projectManager);
+	}
+	else if (m_mode == FrontEndMode::UICreator && m_uiCreator)
+	{
+		m_uiCreator->Draw(camera);
 	}
 }
 
@@ -54,9 +77,33 @@ void FrontEndManager::EndFrame()
 	{
 		m_engineGUI->EndFrame();
 	}
+	if (m_uiCreator)
+	{
+		m_uiCreator->EndFrame();
+	}
 }
 
-EngineMode FrontEndManager::Mode() const
+void FrontEndManager::SetMode(FrontEndMode mode)
+{
+	m_mode = mode;
+}
+
+FrontEndMode FrontEndManager::FrontEndModeValue() const
+{
+	return m_mode;
+}
+
+void FrontEndManager::OpenUICreator()
+{
+	m_mode = FrontEndMode::UICreator;
+}
+
+void FrontEndManager::ReturnToEngineEditor()
+{
+	m_mode = FrontEndMode::EngineEditor;
+}
+
+EngineMode FrontEndManager::AppMode() const
 {
 	return gEngineState.Mode();
 }
@@ -79,4 +126,14 @@ EngineGUI& FrontEndManager::EditorGUI()
 const EngineGUI& FrontEndManager::EditorGUI() const
 {
 	return *m_engineGUI;
+}
+
+UICreator& FrontEndManager::Creator()
+{
+	return *m_uiCreator;
+}
+
+const UICreator& FrontEndManager::Creator() const
+{
+	return *m_uiCreator;
 }

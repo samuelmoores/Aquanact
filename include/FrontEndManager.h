@@ -9,6 +9,12 @@ class FileManager;
 class SceneManager;
 class ProjectManager;
 #include "EngineGUI.h"
+#include "UICreator.h"
+
+enum class FrontEndMode {
+	EngineEditor,
+	UICreator
+};
 
 class FrontEndManager {
 public:
@@ -22,13 +28,22 @@ public:
 	void Draw(const Camera& camera, FileManager& fileManager, SceneManager& sceneManager, ProjectManager& projectManager);
 	void EndFrame();
 
-	EngineMode Mode() const;
+	void SetMode(FrontEndMode mode);
+	FrontEndMode FrontEndModeValue() const;
+	void OpenUICreator();
+	void ReturnToEngineEditor();
+
+	EngineMode AppMode() const;
 
 	bool IsEditorMode() const;
 	bool IsGameMode() const;
 	EngineGUI& EditorGUI();
 	const EngineGUI& EditorGUI() const;
+	UICreator& Creator();
+	const UICreator& Creator() const;
 
 private:
 	std::unique_ptr<EngineGUI> m_engineGUI;
+	std::unique_ptr<UICreator> m_uiCreator;
+	FrontEndMode m_mode = FrontEndMode::EngineEditor;
 };
