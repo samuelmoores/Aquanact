@@ -12,6 +12,10 @@ endif()
 
 project ("AquanactEngine")
 
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 set(SOURCES
     "src/main.cpp"
     "include/ShaderProgram.h" "src/ShaderProgram.cpp"
@@ -49,9 +53,24 @@ set(SOURCES
     "include/RenderCommand.h"
     "include/FrameAllocator.h"
     "include/GLHeaders.h"
+    "include/AquanactBuildSystem.h" "src/AquanactBuildSystem.cpp"
 )
 
 add_executable (AquanactEngine ${SOURCES})
+target_compile_definitions(AquanactEngine PRIVATE AQUANACT_EDITOR)
+target_compile_definitions(AquanactEngine PRIVATE AQUANACT_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
+target_compile_features(AquanactEngine PRIVATE cxx_std_20)
+
+add_executable (AquanactGame WIN32 ${SOURCES})
+target_compile_definitions(AquanactGame PRIVATE AQUANACT_GAME)
+target_compile_definitions(AquanactGame PRIVATE AQUANACT_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
+target_compile_features(AquanactGame PRIVATE cxx_std_20)
+
+add_executable (AquanactBuildTool
+    "src/BuildToolMain.cpp"
+    "include/AquanactBuildSystem.h" "src/AquanactBuildSystem.cpp"
+)
+target_compile_definitions(AquanactBuildTool PRIVATE AQUANACT_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
 
 if (MSVC)
     target_link_options(AquanactEngine PRIVATE
@@ -65,22 +84,34 @@ endif()
 find_package(SFML COMPONENTS system window graphics audio CONFIG REQUIRED)
 target_link_libraries(AquanactEngine PRIVATE sfml-system sfml-network sfml-graphics sfml-window sfml-audio)
 target_link_libraries(AquanactEngine PRIVATE Psapi)
+target_link_libraries(AquanactGame PRIVATE sfml-system sfml-network sfml-graphics sfml-window sfml-audio)
+target_link_libraries(AquanactGame PRIVATE Psapi)
 
 find_package(glfw3 CONFIG REQUIRED)
 target_link_libraries(AquanactEngine PRIVATE glfw)
+target_link_libraries(AquanactGame PRIVATE glfw)
 
 find_package(assimp CONFIG REQUIRED)
 target_link_libraries(AquanactEngine PRIVATE assimp::assimp)
+target_link_libraries(AquanactGame PRIVATE assimp::assimp)
 
 find_package(glad CONFIG REQUIRED)
 target_link_libraries(AquanactEngine PRIVATE glad::glad)
+target_link_libraries(AquanactGame PRIVATE glad::glad)
 
 find_package(imgui CONFIG REQUIRED)
 target_link_libraries(AquanactEngine PRIVATE imgui::imgui)
+target_link_libraries(AquanactGame PRIVATE imgui::imgui)
 
 target_include_directories(AquanactEngine PUBLIC "./include")
+target_include_directories(AquanactGame PUBLIC "./include")
+target_include_directories(AquanactBuildTool PUBLIC "./include")
+target_compile_features(AquanactBuildTool PRIVATE cxx_std_20)
 
 set_target_properties(AquanactEngine
+        PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR})
+set_target_properties(AquanactGame
         PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR})
 
@@ -100,6 +131,3 @@ add_custom_target(copymodels
 add_dependencies(AquanactEngine copyshaders copymodels)
 
 
-if (CMAKE_VERSION VERSION_GREATER 3.12)
-  set_property(TARGET AquanactEngine PROPERTY CXX_STANDARD 20)
-endif()

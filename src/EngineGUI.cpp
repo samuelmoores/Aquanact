@@ -4,6 +4,7 @@
 #include "Debug.h"
 #include "RenderManager.h"
 #include "FrontEndManager.h"
+#include "AquanactBuildSystem.h"
 #include "Globals.h"
 #include "SceneManager.h"
 #include "ProjectManager.h"
@@ -18,6 +19,18 @@
 #include <filesystem>
 #include <algorithm>
 #include <cstring>
+#include <string>
+
+namespace {
+	std::filesystem::path SourceRoot()
+	{
+#ifdef AQUANACT_SOURCE_ROOT
+		return std::filesystem::path(AQUANACT_SOURCE_ROOT);
+#else
+		return std::filesystem::current_path();
+#endif
+	}
+}
 
 void EngineGUI::startUp(Window& window)
 {
@@ -94,6 +107,10 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& scen
 			{
 				gRenderManager.GetGameCamera().CopyFrom(gRenderManager.GetEngineCamera());
 			}
+			if (ImGui::MenuItem("Build Game"))
+			{
+				m_buildGamePopupRequested = true;
+			}
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("View"))
@@ -148,6 +165,8 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& scen
 		}
 		ImGui::EndMainMenuBar();
 	}
+
+	DrawBuildGamePopup();
 
 	ImGui::Begin("File Explorer");
 	if (ImGui::Button("Models"))
@@ -305,6 +324,55 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& scen
 		}
 	}
 	ImGui::End();
+}
+
+void EngineGUI::DrawBuildGamePopup()
+{
+	static char buildPath[512] = "C:\\dev\\Aquanact\\out\\package";
+	static std::string statusMessage;
+	static bool requestedBuild = false;
+
+	if (m_buildGamePopupRequested)
+	{
+		ImGui::OpenPopup("Build Game##AquanactBuildGame");
+		m_buildGamePopupRequested = false;
+	}
+
+	if (ImGui::BeginPopupModal("Build Game##AquanactBuildGame", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		ImGui::TextUnformatted("Build the packaged game to this folder:");
+		ImGui::InputText("Output", buildPath, sizeof(buildPath));
+
+		if (ImGui::Button("Build"))
+		{
+			requestedBuild = true;
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Close"))
+		{
+			ImGui::CloseCurrentPopup();
+		}
+
+		if (requestedBuild)
+		{
+			requestedBuild = false;
+			AquanactBuildSystem buildSystem;
+			const std::filesystem::path sourceRoot = SourceRoot();
+			const std::filesystem::path outputRoot = std::filesystem::path(buildPath);
+			const std::filesystem::path projectFile = sourceRoot / "assets" / "projects" / "project.aqua";
+			const std::filesystem::path executablePath = std::filesystem::current_path() / "AquanactGame.exe";
+			const bool ok = buildSystem.Build(sourceRoot, outputRoot, projectFile, executablePath);
+			statusMessage = ok ? "Build succeeded." : "Build failed.";
+		}
+
+		if (!statusMessage.empty())
+		{
+			ImGui::Separator();
+			ImGui::TextUnformatted(statusMessage.c_str());
+		}
+
+		ImGui::EndPopup();
+	}
 }
 
 void EngineGUI::EndFrame()

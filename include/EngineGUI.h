@@ -19,9 +19,12 @@ public:
 	bool ShowGrid() const;
 
 private:
+	void DrawBuildGamePopup();
+
 	Window* m_window = nullptr;
 	bool m_showAxis = true;
 	bool m_showGrid = true;
 	bool m_initialized = false;
 	int m_selectedSceneObjectIndex = -1;
+	bool m_buildGamePopupRequested = false;
 };
