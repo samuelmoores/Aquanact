@@ -59,6 +59,7 @@ public:
 	void SetGridSettings(float size);
 	float GridSize() const;
 	float GridSpacing() const;
+	double StartupToFirstDrawMs() const;
 
 private:
 	// Rebuilds the axis/grid helpers when the grid configuration changes.
@@ -73,6 +74,7 @@ private:
 	float m_gridSize = 1200.0f;
 	float m_gridSpacing = 50.0f;
 	float m_lastFps = 0.0f;
+	double m_startupToFirstDrawMs = -1.0;
 	bool m_controllerRegistered = false;
 	std::string m_gameplayObjectName;
 	glm::vec3 m_gameplayMoveInput{ 0.0f };

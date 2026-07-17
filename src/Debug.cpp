@@ -19,6 +19,10 @@
 #include <Windows.h>
 #endif
 
+namespace {
+	const auto g_programStartTime = std::chrono::high_resolution_clock::now();
+}
+
 void Debug::startUp()
 {
 	// The debug subsystem owns the editor overlay primitives and records
@@ -64,6 +68,11 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 	{
 		firstFrame = false;
 		m_lastFps = 0.0f;
+		if (m_startupToFirstDrawMs < 0.0)
+		{
+			const auto elapsed = std::chrono::high_resolution_clock::now() - g_programStartTime;
+			m_startupToFirstDrawMs = std::chrono::duration<double>(elapsed).count();
+		}
 	}
 	else
 	{
@@ -112,6 +121,7 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 	ImGui::Text("Editor GUI/MyGUI: %.4f ms", gRenderManager.LastFrameEditorGuiMs());
 	ImGui::Text("UI creator: %.4f ms", gRenderManager.LastFrameUiCreatorMs());
 	ImGui::Text("Runtime GUI: %.4f ms", gRenderManager.LastFrameRuntimeGuiMs());
+	ImGui::Text("Startup to first draw: %.2f s", m_startupToFirstDrawMs);
 	ImGui::Separator();
 	ImGui::Text("Frame allocator capacity: %.2f KB", static_cast<double>(gRenderManager.FrameAllocatorCapacityBytes()) / 1024.0);
 	ImGui::Text("Frame allocator used: %.2f KB", static_cast<double>(gRenderManager.FrameAllocatorUsedBytes()) / 1024.0);
@@ -343,4 +353,9 @@ float Debug::GridSize() const
 float Debug::GridSpacing() const
 {
 	return m_gridSpacing;
+}
+
+double Debug::StartupToFirstDrawMs() const
+{
+	return m_startupToFirstDrawMs;
 }
