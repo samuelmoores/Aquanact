@@ -17,6 +17,74 @@ namespace {
 	{
 		return std::filesystem::current_path() / "UI";
 	}
+
+	GameGUIAsset LoadAssetFile(const std::filesystem::path& assetPath)
+	{
+		GameGUIAsset asset;
+		asset.name = assetPath.stem().string();
+		asset.savedOnDisk = true;
+
+		std::ifstream file(assetPath);
+		if (!file.is_open())
+		{
+			asset.savedOnDisk = false;
+			return asset;
+		}
+
+		std::string contents((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+		const std::size_t namePos = contents.find("\"name\":");
+		if (namePos != std::string::npos)
+		{
+			const std::size_t firstQuote = contents.find('"', namePos + 7);
+			const std::size_t secondQuote = firstQuote == std::string::npos ? std::string::npos : contents.find('"', firstQuote + 1);
+			if (firstQuote != std::string::npos && secondQuote != std::string::npos)
+			{
+				asset.name = contents.substr(firstQuote + 1, secondQuote - firstQuote - 1);
+			}
+		}
+
+		std::size_t widgetPos = contents.find("\"type\": \"");
+		while (widgetPos != std::string::npos)
+		{
+			GameGUIWidgetDef widget;
+			const auto readField = [&contents](const std::string& key, std::size_t start) -> std::string
+			{
+				const std::size_t keyPos = contents.find(key, start);
+				if (keyPos == std::string::npos)
+				{
+					return {};
+				}
+				const std::size_t valueStart = contents.find_first_not_of(" \t", keyPos + key.size());
+				if (valueStart == std::string::npos)
+				{
+					return {};
+				}
+				if (contents[valueStart] == '"')
+				{
+					const std::size_t valueEnd = contents.find('"', valueStart + 1);
+					return valueEnd == std::string::npos ? std::string{} : contents.substr(valueStart + 1, valueEnd - valueStart - 1);
+				}
+				const std::size_t valueEnd = contents.find_first_of(",\n}", valueStart);
+				return contents.substr(valueStart, valueEnd - valueStart);
+			};
+
+			widget.type = readField("\"type\":", widgetPos);
+			widget.name = readField("\"name\":", widgetPos);
+			widget.skin = readField("\"skin\":", widgetPos);
+			widget.text = readField("\"text\":", widgetPos);
+			widget.layer = readField("\"layer\":", widgetPos);
+			widget.x = std::stoi(readField("\"x\":", widgetPos));
+			widget.y = std::stoi(readField("\"y\":", widgetPos));
+			widget.width = std::stoi(readField("\"width\":", widgetPos));
+			widget.height = std::stoi(readField("\"height\":", widgetPos));
+			widget.visible = readField("\"visible\":", widgetPos).find("true") != std::string::npos;
+			widget.alpha = std::stof(readField("\"alpha\":", widgetPos));
+			asset.widgets.push_back(widget);
+			widgetPos = contents.find("\"type\": \"", widgetPos + 1);
+		}
+
+		return asset;
+	}
 }
 
 void GameGUICreator::startUp(Window& window)
@@ -28,10 +96,32 @@ void GameGUICreator::startUp(Window& window)
 
 	m_window = &window;
 	m_assets.clear();
+	const std::filesystem::path assetDirectory = AssetDirectory();
+	std::error_code ec;
+	if (std::filesystem::exists(assetDirectory, ec) && !ec)
+	{
+		for (const auto& entry : std::filesystem::directory_iterator(assetDirectory, ec))
+		{
+			if (ec)
+			{
+				break;
+			}
+			if (!entry.is_regular_file() || entry.path().extension() != ".json")
+			{
+				continue;
+			}
+			m_assets.push_back(LoadAssetFile(entry.path()));
+		}
+	}
 	m_selectedAssetIndex = -1;
 	m_selectedWidgetIndex = -1;
 	m_newAssetName[0] = '\0';
 	m_initialized = true;
+	if (!m_assets.empty())
+	{
+		m_selectedAssetIndex = 0;
+		m_selectedWidgetIndex = m_assets.front().widgets.empty() ? -1 : 0;
+	}
 	SyncRuntimePreview();
 }
 
@@ -104,6 +194,7 @@ void GameGUICreator::Draw(const Camera&)
 			}
 			if (ImGui::MenuItem("Load UI", nullptr, false, m_selectedAssetIndex >= 0))
 			{
+				// Load now means "reload the selected asset from disk" after startup scan.
 				LoadCurrentAsset();
 				SyncRuntimePreview();
 				gDebug.LogMessage("Load UI requested");
@@ -161,6 +252,10 @@ void GameGUICreator::Draw(const Camera&)
 		ImGui::Separator();
 		ImGui::Text("Asset: %s", asset.name.c_str());
 		ImGui::Text("Saved on disk: %s", asset.savedOnDisk ? "yes" : "no");
+		if (ImGui::Button("Delete Asset"))
+		{
+			DeleteSelectedAsset();
+		}
 	}
 	ImGui::End();
 
@@ -361,59 +456,8 @@ void GameGUICreator::LoadCurrentAsset()
 		return;
 	}
 
-	std::string contents((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-	const std::size_t namePos = contents.find("\"name\":");
-	if (namePos != std::string::npos)
-	{
-		const std::size_t firstQuote = contents.find('"', namePos + 7);
-		const std::size_t secondQuote = firstQuote == std::string::npos ? std::string::npos : contents.find('"', firstQuote + 1);
-		if (firstQuote != std::string::npos && secondQuote != std::string::npos)
-		{
-			asset.name = contents.substr(firstQuote + 1, secondQuote - firstQuote - 1);
-		}
-	}
-
-	std::size_t widgetPos = contents.find("\"type\": \"");
-	while (widgetPos != std::string::npos)
-	{
-		GameGUIWidgetDef widget;
-		const auto readField = [&contents](const std::string& key, std::size_t start) -> std::string
-		{
-			const std::size_t keyPos = contents.find(key, start);
-			if (keyPos == std::string::npos)
-			{
-				return {};
-			}
-			const std::size_t valueStart = contents.find_first_not_of(" \t", keyPos + key.size());
-			if (valueStart == std::string::npos)
-			{
-				return {};
-			}
-			if (contents[valueStart] == '"')
-			{
-				const std::size_t valueEnd = contents.find('"', valueStart + 1);
-				return valueEnd == std::string::npos ? std::string{} : contents.substr(valueStart + 1, valueEnd - valueStart - 1);
-			}
-			const std::size_t valueEnd = contents.find_first_of(",\n}", valueStart);
-			return contents.substr(valueStart, valueEnd - valueStart);
-		};
-
-		widget.type = readField("\"type\":", widgetPos);
-		widget.name = readField("\"name\":", widgetPos);
-		widget.skin = readField("\"skin\":", widgetPos);
-		widget.text = readField("\"text\":", widgetPos);
-		widget.layer = readField("\"layer\":", widgetPos);
-		widget.x = std::stoi(readField("\"x\":", widgetPos));
-		widget.y = std::stoi(readField("\"y\":", widgetPos));
-		widget.width = std::stoi(readField("\"width\":", widgetPos));
-		widget.height = std::stoi(readField("\"height\":", widgetPos));
-		widget.visible = readField("\"visible\":", widgetPos).find("true") != std::string::npos;
-		widget.alpha = std::stof(readField("\"alpha\":", widgetPos));
-		asset.widgets.push_back(widget);
-		widgetPos = contents.find("\"type\": \"", widgetPos + 1);
-	}
-
-	asset.savedOnDisk = true;
+	GameGUIAsset loadedAsset = LoadAssetFile(assetPath);
+	asset = std::move(loadedAsset);
 	m_selectedWidgetIndex = asset.widgets.empty() ? -1 : 0;
 }
 

@@ -209,21 +209,6 @@ void GameGUI::CreateTestButton()
 		MyGUI::LayerManager::getInstance().upLayerItem(m_testButton);
 	}
 
-	m_loadedAsset = GameGUIAsset{};
-	m_loadedAsset.name = "TestUI";
-	m_loadedAsset.widgets.push_back(GameGUIWidgetDef{
-		"Button",
-		"TestButton",
-		"ButtonSkin",
-		"Test Button",
-		"Main",
-		buttonLeft,
-		buttonTop,
-		buttonWidth,
-		buttonHeight,
-		true,
-		1.0f
-	});
 }
 
 void GameGUI::DestroyTestButton()
