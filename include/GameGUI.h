@@ -15,7 +15,12 @@ class GameGUIImageLoader final : public MyGUI::OpenGLImageLoader
 public:
 	~GameGUIImageLoader() override = default;
 
+	// MyGUI asks the engine to decode images into raw pixels here. This became a
+	// custom loader because the default MyGUI image path was not aware of our stb_image
+	// wrapper and the engine's asset layout.
 	void* loadImage(int& _width, int& _height, MyGUI::PixelFormat& _format, const std::string& _filename) override;
+	// The runtime UI only needs loading, not saving. We keep the method because the
+	// MyGUI interface requires it, but the engine does not use it yet.
 	void saveImage(int _width, int _height, MyGUI::PixelFormat _format, void* _texture, const std::string& _filename) override;
 
 private:
@@ -28,10 +33,16 @@ class GameGUI {
 public:
 	GameGUI() = default;
 
+	// Startup had to be done in a specific order:
+	// platform first, then resources, then Gui, then widgets.
+	// Earlier runtime crashes came from initializing these pieces out of sequence.
 	void startUp(Window& window);
+	// Shutdown mirrors startup in reverse order so widgets die before the GUI platform.
 	void shutDown();
 
 	void BeginFrame();
+	// Draw is where the MyGUI overlay is actually submitted to OpenGL.
+	// The final fix was to restore a GUI-safe GL state before this call.
 	void Draw();
 	void EndFrame();
 
@@ -42,6 +53,4 @@ private:
 	GameGUIImageLoader m_imageLoader;
 	MyGUI::Button* m_testButton = nullptr;
 	bool m_initialized = false;
-	bool m_loggedRenderSubmission = false;
-	bool m_loggedStartupState = false;
 };

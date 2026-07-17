@@ -13,12 +13,15 @@ void OpenGLGraphics::startUp(Window& window)
 	}
 
 	m_window = &window;
+	// GLAD must be loaded before any OpenGL calls. Earlier startup crashes would
+	// show up here if the context was not current yet.
 	MakeCurrent();
 	if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress)))
 	{
 		throw std::runtime_error("Failed to initialize GLAD");
 	}
 
+	// The scene renderer starts from a known baseline so the 3D pass is consistent.
 	ConfigureDefaultState();
 	SetVSync(true);
 	UpdateViewport();
@@ -89,6 +92,7 @@ void OpenGLGraphics::UpdateViewport()
 
 void OpenGLGraphics::ConfigureDefaultState()
 {
+	// 3D rendering wants depth testing enabled and multisampling active.
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_MULTISAMPLE);
 	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
@@ -96,6 +100,8 @@ void OpenGLGraphics::ConfigureDefaultState()
 
 void OpenGLGraphics::ConfigureGuiState()
 {
+	// The GUI pass previously failed because it inherited scene state.
+	// This state block gives MyGUI a simple overlay environment instead.
 	glDisable(GL_DEPTH_TEST);
 	glDisable(GL_CULL_FACE);
 	glDisable(GL_STENCIL_TEST);

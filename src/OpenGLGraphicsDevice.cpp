@@ -68,6 +68,7 @@ void OpenGLGraphicsDevice::BeginFrame()
 {
 	if (m_platform)
 	{
+		// Make the window's context current and update the viewport before any draw calls.
 		m_platform->MakeCurrent();
 		m_platform->UpdateViewport();
 	}
@@ -91,6 +92,7 @@ void OpenGLGraphicsDevice::ConfigureDefaultState()
 {
 	if (m_platform)
 	{
+		// Used by the scene renderer and 3D content.
 		m_platform->ConfigureDefaultState();
 	}
 }
@@ -99,6 +101,7 @@ void OpenGLGraphicsDevice::ConfigureGuiState()
 {
 	if (m_platform)
 	{
+		// Used by the GUI overlay after the scene pass has finished.
 		m_platform->ConfigureGuiState();
 	}
 }

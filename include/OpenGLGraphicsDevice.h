@@ -18,6 +18,7 @@ public:
 	void Clear(float r, float g, float b, float a) override;
 	void EndFrame() override;
 	void ConfigureDefaultState();
+	// Called immediately before GUI submission so overlays do not inherit scene GL state.
 	void ConfigureGuiState();
 
 	void Draw(const RenderCommand& command, const Camera& camera) override;

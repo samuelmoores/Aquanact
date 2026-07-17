@@ -17,8 +17,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 if (MSVC)
+    # Match the MSVC runtime used by the vcpkg binaries so debug/release and iterator
+    # settings line up with the external libraries we link against.
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
 endif()
+
+# Record the vcpkg triplet so the build can log which package target it was compiled against.
+set(AQUANACT_VCPKG_TARGET_TRIPLET "${VCPKG_TARGET_TRIPLET}")
 
 set(SOURCES
     "src/main.cpp"
@@ -68,12 +73,20 @@ add_executable (AquanactEngine ${SOURCES})
 target_compile_definitions(AquanactEngine PRIVATE AQUANACT_EDITOR)
 target_compile_definitions(AquanactEngine PRIVATE AQUANACT_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
 target_compile_definitions(AquanactEngine PRIVATE MYGUI_STATIC)
+target_compile_definitions(AquanactEngine PRIVATE AQUANACT_VCPKG_TARGET_TRIPLET="${AQUANACT_VCPKG_TARGET_TRIPLET}")
+target_compile_definitions(AquanactEngine PRIVATE AQUANACT_MYGUI_ENGINE_LIBRARY="${MYGUI_ENGINE_LIBRARY_DEBUG}")
+target_compile_definitions(AquanactEngine PRIVATE AQUANACT_MYGUI_OPENGL_LIBRARY="${MYGUI_OPENGL_LIBRARY_DEBUG}")
+target_compile_definitions(AquanactEngine PRIVATE AQUANACT_FREETYPE_LIBRARY="freetype")
 target_compile_features(AquanactEngine PRIVATE cxx_std_20)
 
 add_executable (AquanactGame WIN32 ${SOURCES})
 target_compile_definitions(AquanactGame PRIVATE AQUANACT_GAME)
 target_compile_definitions(AquanactGame PRIVATE AQUANACT_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
 target_compile_definitions(AquanactGame PRIVATE MYGUI_STATIC)
+target_compile_definitions(AquanactGame PRIVATE AQUANACT_VCPKG_TARGET_TRIPLET="${AQUANACT_VCPKG_TARGET_TRIPLET}")
+target_compile_definitions(AquanactGame PRIVATE AQUANACT_MYGUI_ENGINE_LIBRARY="${MYGUI_ENGINE_LIBRARY_DEBUG}")
+target_compile_definitions(AquanactGame PRIVATE AQUANACT_MYGUI_OPENGL_LIBRARY="${MYGUI_OPENGL_LIBRARY_DEBUG}")
+target_compile_definitions(AquanactGame PRIVATE AQUANACT_FREETYPE_LIBRARY="freetype")
 target_compile_features(AquanactGame PRIVATE cxx_std_20)
 
 add_executable (AquanactBuildTool
@@ -123,6 +136,9 @@ find_package(imgui CONFIG REQUIRED)
 target_link_libraries(AquanactEngine PRIVATE imgui::imgui)
 target_link_libraries(AquanactGame PRIVATE imgui::imgui)
 
+# MyGUI's vcpkg package did not provide a simple CONFIG target in this setup, so we
+# locate the headers and libraries explicitly and choose the debug or release variant
+# ourselves.
 find_path(MYGUI_INCLUDE_DIR
     NAMES MyGUI.h
     PATH_SUFFIXES MYGUI
@@ -188,6 +204,8 @@ add_custom_target(copymodels
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 add_custom_target(copymygui
+        # MyGUI's skins, layouts, fonts, and XML descriptors must be present next to
+        # the executable, otherwise startup succeeds but widget/resource loading fails.
         COMMAND ${CMAKE_COMMAND} -E rm -rf ${CMAKE_BINARY_DIR}/MyGUI_Media
         COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/external/mygui-upstream/Media/MyGUI_Media ${CMAKE_BINARY_DIR}
         COMMENT "syncing MyGUI media to ${CMAKE_BINARY_DIR}"

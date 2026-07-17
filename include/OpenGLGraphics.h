@@ -15,6 +15,8 @@ public:
 	void SetVSync(bool enabled);
 	void UpdateViewport();
 	void ConfigureDefaultState();
+	// GUI rendering needs a different state than the 3D scene pass. This helper
+	// exists so overlays like MyGUI can draw without inheriting depth or shader state.
 	void ConfigureGuiState();
 
 	bool IsInitialized() const { return m_initialized; }
