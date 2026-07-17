@@ -95,35 +95,21 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& scen
 			}
 			ImGui::EndMenu();
 		}
-		if (ImGui::BeginMenu("Game"))
+		if (ImGui::BeginMenu("File"))
 		{
-			if (ImGui::MenuItem("Play"))
+			if (ImGui::MenuItem("Save Project"))
 			{
-				gEngineState.SetMode(EngineMode::Game);
-				gRenderManager.SetActiveCamera(gRenderManager.GetGameCamera());
+				projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", sceneManager);
 			}
-			if (ImGui::MenuItem("Stop"))
+			if (ImGui::MenuItem("Load Project"))
 			{
-				gEngineState.SetMode(EngineMode::Editor);
-				gRenderManager.SetActiveCamera(gRenderManager.GetEngineCamera());
+				projectManager.LoadProject("C:/dev/Aquanact/assets/projects/project.aqua", sceneManager);
 			}
-			if (ImGui::MenuItem("Set Game Camera"))
+			ImGui::Separator();
+			const bool canImport = fileManager.CanImportSelection();
+			if (ImGui::MenuItem("Import Selected", nullptr, false, canImport))
 			{
-				gRenderManager.GetGameCamera().CopyFrom(gRenderManager.GetEngineCamera());
-			}
-			if (ImGui::MenuItem("Build Game"))
-			{
-				m_buildGamePopupRequested = true;
-			}
-			ImGui::EndMenu();
-		}
-		if (ImGui::BeginMenu("UI"))
-		{
-			if (ImGui::MenuItem("Create UI"))
-			{
-				gFrontEndManager.OpenGameGUICreator();
-				gRenderManager.SetActiveCamera(gRenderManager.GetGameCamera());
-				gDebug.LogMessage("GameGUI Creator opened.");
+				fileManager.ImportSelected();
 			}
 			ImGui::EndMenu();
 		}
@@ -144,36 +130,41 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& scen
 			{
 				ImGui::MenuItem("Show Grid", nullptr, &m_showGrid);
 				float gridSize = gDebug.GridSize();
-				float gridSpacing = gDebug.GridSpacing();
 				ImGui::SetNextItemWidth(140.0f);
-				bool sizeChanged = ImGui::InputFloat("Size", &gridSize, 0.0f, 0.0f, "%.1f");
-				ImGui::SetNextItemWidth(140.0f);
-				bool spacingChanged = ImGui::InputFloat("Spacing", &gridSpacing, 0.0f, 0.0f, "%.1f");
+				bool sizeChanged = ImGui::DragFloat("Size", &gridSize, 1.0f, 1.0f, 10000.0f, "%.1f");
 				gridSize = std::max(gridSize, 1.0f);
-				gridSpacing = std::max(gridSpacing, 1.0f);
-				if (sizeChanged || spacingChanged)
+				if (sizeChanged)
 				{
-					gDebug.SetGridSettings(gridSize, gridSpacing);
+					gDebug.SetGridSettings(gridSize);
 				}
 				ImGui::EndMenu();
 			}
 			ImGui::EndMenu();
 		}
-		if (ImGui::BeginMenu("File"))
+		if (ImGui::BeginMenu("Game"))
 		{
-			if (ImGui::MenuItem("Save Project"))
+			if (ImGui::MenuItem("Play"))
 			{
-				projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", sceneManager);
+				gEngineState.SetMode(EngineMode::Game);
+				gRenderManager.SetActiveCamera(gRenderManager.GetGameCamera());
 			}
-			if (ImGui::MenuItem("Load Project"))
+			if (ImGui::MenuItem("Set Game Camera"))
 			{
-				projectManager.LoadProject("C:/dev/Aquanact/assets/projects/project.aqua", sceneManager);
+				gRenderManager.GetGameCamera().CopyFrom(gRenderManager.GetEngineCamera());
 			}
-			ImGui::Separator();
-			const bool canImport = fileManager.CanImportSelection();
-			if (ImGui::MenuItem("Import Selected", nullptr, false, canImport))
+			if (ImGui::MenuItem("Build Game"))
 			{
-				fileManager.ImportSelected();
+				m_buildGamePopupRequested = true;
+			}
+			ImGui::EndMenu();
+		}
+		if (ImGui::BeginMenu("UI"))
+		{
+			if (ImGui::MenuItem("GameGUI Creator"))
+			{
+				gFrontEndManager.OpenGameGUICreator();
+				gRenderManager.SetActiveCamera(gRenderManager.GetGameCamera());
+				gDebug.LogMessage("GameGUI Creator opened.");
 			}
 			ImGui::EndMenu();
 		}

@@ -1,6 +1,7 @@
 #include "Grid.h"
 
 #include "Line.h"
+#include <GLHeaders.h>
 #include <cmath>
 
 Grid::Grid(float w, float spacing)
@@ -77,11 +78,13 @@ void Grid::draw(glm::mat4 viewMatrix, bool drawCenterLines)
 {
 	for (Line* line : m_lines)
 	{
+		glLineWidth(1.0f);
 		line->draw(viewMatrix);
 	}
 
 	if (drawCenterLines)
 	{
+		glLineWidth(4.0f);
 		for (Line* line : m_centerLines)
 		{
 			line->draw(viewMatrix);

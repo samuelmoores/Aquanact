@@ -23,7 +23,7 @@ void Debug::startUp()
 {
 	// The debug subsystem owns the editor overlay primitives and records
 	// early build/dependency diagnostics before the rest of the app starts running.
-	m_axis = new Axis(1200.0f);
+	RebuildAxis();
 	RebuildGrid();
 	LogBuildInfo();
 	VerifyDependencies();
@@ -45,6 +45,12 @@ void Debug::RebuildGrid()
 	// Grid settings are mutable in the editor, so rebuild the helper when size or spacing changes.
 	delete m_grid;
 	m_grid = new Grid(m_gridSize, m_gridSpacing);
+}
+
+void Debug::RebuildAxis()
+{
+	delete m_axis;
+	m_axis = new Axis(m_axisLength);
 }
 
 void Debug::draw(const Camera& camera, const EngineGUI& gui)
@@ -315,20 +321,17 @@ void Debug::LogDependencyHint(const std::string& dependency, const std::string& 
 	LogTagged(Severity::Warning, "Dependency", dependency + ": " + details);
 }
 
-void Debug::SetGridSettings(float size, float spacing)
+void Debug::SetGridSettings(float size)
 {
 	if (size <= 0.0f)
 	{
 		size = 1.0f;
 	}
 
-	if (spacing <= 0.0f)
-	{
-		spacing = 1.0f;
-	}
-
 	m_gridSize = size;
-	m_gridSpacing = spacing;
+	m_gridSpacing = (size / 24.0f > 1.0f) ? (size / 24.0f) : 1.0f;
+	m_axisLength = m_gridSize;
+	RebuildAxis();
 	RebuildGrid();
 }
 

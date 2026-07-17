@@ -220,18 +220,13 @@ void GameGUICreator::Draw(const Camera&)
 
 	if (ImGui::BeginMainMenuBar())
 	{
-		if (ImGui::BeginMenu("Create"))
+		if (ImGui::BeginMenu("UI"))
 		{
-			if (ImGui::MenuItem("Create Asset"))
+			if (ImGui::MenuItem("Leave GameGUI Creator"))
 			{
-				m_showCreateAssetPopup = true;
-				m_newAssetName[0] = '\0';
-			}
-			ImGui::Separator();
-			if (ImGui::MenuItem("Create Button", nullptr, false, m_selectedAssetIndex >= 0))
-			{
-				m_showCreateWidgetPopup = true;
-				m_newWidgetName[0] = '\0';
+				gFrontEndManager.ReturnToEngineGUIEditor();
+				gRenderManager.SetActiveCamera(gRenderManager.GetEngineCamera());
+				gDebug.LogMessage("Leave GameGUI Creator requested");
 			}
 			ImGui::EndMenu();
 		}
@@ -248,16 +243,6 @@ void GameGUICreator::Draw(const Camera&)
 				LoadCurrentAsset();
 				SyncRuntimePreview();
 				gDebug.LogMessage("Load UI requested");
-			}
-			ImGui::EndMenu();
-		}
-		if (ImGui::BeginMenu("UI"))
-		{
-			if (ImGui::MenuItem("Leave UI Creation"))
-			{
-				gFrontEndManager.ReturnToEngineGUIEditor();
-				gRenderManager.SetActiveCamera(gRenderManager.GetEngineCamera());
-				gDebug.LogMessage("Leave UI Creation requested");
 			}
 			ImGui::EndMenu();
 		}
@@ -279,13 +264,28 @@ void GameGUICreator::Draw(const Camera&)
 			}
 			ImGui::EndMenu();
 		}
+		if (ImGui::BeginMenu("Create"))
+		{
+			if (ImGui::MenuItem("Create GameGUI Asset"))
+			{
+				m_showCreateAssetPopup = true;
+				m_newAssetName[0] = '\0';
+			}
+			ImGui::Separator();
+			if (ImGui::MenuItem("Create Button", nullptr, false, m_selectedAssetIndex >= 0))
+			{
+				m_showCreateWidgetPopup = true;
+				m_newWidgetName[0] = '\0';
+			}
+			ImGui::EndMenu();
+		}
 		ImGui::EndMainMenuBar();
 	}
 
 	DrawCreateAssetPopup();
 	DrawCreateWidgetPopup();
 
-		ImGui::Begin("UIAssets");
+		ImGui::Begin("GameGUI Assets");
 	for (std::size_t i = 0; i < m_assets.size(); ++i)
 	{
 		const GameGUIAsset& asset = m_assets[i];
@@ -355,11 +355,11 @@ void GameGUICreator::DrawCreateAssetPopup()
 {
 	if (m_showCreateAssetPopup)
 	{
-		ImGui::OpenPopup("Create Asset");
+		ImGui::OpenPopup("Create GameGUI Asset");
 		m_showCreateAssetPopup = false;
 	}
 
-	if (ImGui::BeginPopupModal("Create Asset", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+	if (ImGui::BeginPopupModal("Create GameGUI Asset", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 	{
 		ImGui::TextUnformatted("Enter a UI asset name:");
 		ImGui::InputText("Name", m_newAssetName, sizeof(m_newAssetName));
@@ -370,7 +370,7 @@ void GameGUICreator::DrawCreateAssetPopup()
 			{
 				// Empty names used to auto-fill a default asset, but that created
 				// unwanted files. Now we treat it as a cancel operation instead.
-				gDebug.LogMessage("Create Asset cancelled: name is empty");
+				gDebug.LogMessage("Create GameGUI Asset cancelled: name is empty");
 				ImGui::CloseCurrentPopup();
 				return;
 			}

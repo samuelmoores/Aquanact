@@ -56,18 +56,20 @@ public:
 	void VerifyDependencies();
 	// Emits a dependency-specific warning that explains what is missing or misconfigured.
 	void LogDependencyHint(const std::string& dependency, const std::string& details);
-	void SetGridSettings(float size, float spacing);
+	void SetGridSettings(float size);
 	float GridSize() const;
 	float GridSpacing() const;
 
 private:
 	// Rebuilds the axis/grid helpers when the grid configuration changes.
 	void RebuildGrid();
+	void RebuildAxis();
 	// Small formatting helper used by the log window.
 	std::string SeverityPrefix(Severity severity) const;
 
 	class Axis* m_axis = nullptr;
 	class Grid* m_grid = nullptr;
+	float m_axisLength = 1200.0f;
 	float m_gridSize = 1200.0f;
 	float m_gridSpacing = 50.0f;
 	float m_lastFps = 0.0f;

@@ -1,0 +1,174 @@
+MyGUI to GameGUI Action Flow Report
+
+This report traces the flow from the lowest-level MyGUI click event through the Aquanact GameGUI wrapper and into the final gameplay action handling.
+
+1. Lowest-level MyGUI input flow
+
+The MyGUI event chain starts inside the upstream MyGUI engine, not inside Aquanact.
+
+- The core event definition lives in `external/mygui-upstream/MyGUIEngine/include/MyGUI_WidgetInput.h`.
+- The widget click event is exposed as `eventMouseButtonClick` on `MyGUI::WidgetInput`.
+- MyGUI declares the internal trigger method `_riseMouseButtonClick()` in the same header.
+- The implementation in `external/mygui-upstream/MyGUIEngine/src/MyGUI_WidgetInput.cpp` shows the exact handoff:
+  - `WidgetInput::_riseMouseButtonClick()` calls `onMouseButtonClick()`
+  - then fires `eventMouseButtonClick(static_cast<Widget*>(this))`
+
+That is the lowest-level transition relevant to the GameGUI click path. At this point, MyGUI has already translated mouse state into a widget-level click event.
+
+2. MyGUI button widget layer
+
+Our runtime GameGUI creates `MyGUI::Button` widgets, which inherit the click event from the WidgetInput system.
+
+- The button type is declared in `external/mygui-upstream/MyGUIEngine/include/MyGUI_Button.h`.
+- It does not define a custom click event of its own; it relies on the inherited `eventMouseButtonClick`.
+- In practice, button-specific behavior is still driven by the same widget input pipeline, which is why a button click can be handled by attaching a delegate to `eventMouseButtonClick`.
+
+3. Aquanact runtime wrapper: `GameGUI`
+
+The runtime wrapper is implemented in `src/GameGUI.cpp` and declared in `include/GameGUI.h`.
+
+Startup:
+
+- `GameGUI::startUp(Window& window)` creates the MyGUI OpenGL platform.
+- It initializes the platform with the custom `GameGUIImageLoader`.
+- It sets the render view size from the window framebuffer.
+- It registers the resource root with `MyGUI::OpenGLDataManager::getInstance().addResourceLocation(".", true)`.
+- It creates and initializes `MyGUI::Gui`.
+- It hides the MyGUI pointer via `MyGUI::PointerManager::getInstance().setVisible(false)`.
+
+Frame submission:
+
+- `GameGUI::Draw()` calls `m_gui->frameEvent(0.0f)` each frame.
+- It then resets OpenGL state so MyGUI renders over a clean overlay pipeline.
+- Finally, it calls `m_platform->getRenderManagerPtr()->drawOneFrame()`.
+
+Widget creation:
+
+- `GameGUI::LoadUIAsset(const GameGUIAsset& asset)` clears any previous widgets and rebuilds runtime widgets from the asset description.
+- `GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def)` creates the actual MyGUI widget.
+- For button widgets, the code uses `m_gui->createWidget<MyGUI::Button>(...)`.
+- After creation, the button caption, visibility, and alpha are applied.
+
+Click binding:
+
+- The runtime binds `button->eventMouseButtonClick += MyGUI::newDelegate(this, &GameGUI::OnWidgetClicked);`
+- That means MyGUI click events are routed into `GameGUI::OnWidgetClicked(MyGUI::Widget* sender)`.
+
+4. Asset-level action data
+
+The action system is carried in the asset schema defined in `include/GameGUIAsset.h`.
+
+- `GameGUIActionType` currently supports:
+  - `None`
+  - `QuitGame`
+  - `PauseGame`
+- `GameGUIWidgetDef` includes an `action` field of type `GameGUIActionType`.
+
+This is the key addition that turns a plain button into a behavior-driven UI element.
+
+5. Editor-side authoring flow: `GameGUICreator`
+
+The editor UI for authoring GameGUI assets lives in `src/GameGUICreator.cpp`.
+
+Asset loading:
+
+- `GameGUICreator::startUp(Window& window)` scans the asset directory and loads `.json` UI assets.
+- `LoadAssetFile(...)` reads the widget records from disk.
+- The loader converts the serialized `action` string into `GameGUIActionType` with `StringToAction(...)`.
+
+Widget authoring:
+
+- `DrawCreateWidgetPopup()` shows an action combo box.
+- The chosen action is stored in `m_newWidgetAction`.
+- `AddButtonWidget()` copies that selection into `button.action`.
+
+Asset persistence:
+
+- `SaveCurrentAsset()` serializes the widget action back to JSON using `ActionToString(widget.action)`.
+- That keeps the authored action round-trippable between editor and runtime.
+
+Preview sync:
+
+- `SyncRuntimePreview()` pushes the current asset into the runtime GameGUI preview through `gFrontEndManager.RuntimeGUI().LoadUIAsset(CurrentAsset())`.
+- This means the runtime preview is always reading the same action metadata the editor just authored.
+
+6. Front-end routing
+
+The app-level front-end switch is controlled by `FrontEndManager`.
+
+- `src/FrontEndManager.cpp` owns:
+  - `EngineGUI`
+  - `GameGUIManager`
+  - `GameGUICreator`
+- `OpenGameGUICreator()` switches the frontend mode to `GameGUICreator`.
+- `ReturnToEngineGUIEditor()` switches back to the main engine editor.
+
+In `src/EngineGUI.cpp`, the UI menu entry `Create UI` calls:
+
+- `gFrontEndManager.OpenGameGUICreator()`
+- `gRenderManager.SetActiveCamera(gRenderManager.GetGameCamera())`
+
+So the GameGUI authoring and preview path is entered from the editor UI.
+
+7. Runtime asset management: `GameGUIManager`
+
+`src/GameGUIManager.cpp` sits between the editor/frontend and the runtime `GameGUI` instance.
+
+Responsibilities:
+
+- It owns the live `GameGUI` runtime wrapper.
+- It loads `.json` assets from `assets/gameGUI`.
+- It tracks which assets are placed in the scene.
+- It exposes a runtime action log and last-click message.
+
+Important flow:
+
+- `GameGUIManager::LoadUIAsset(...)` stores or replaces the asset in the manager.
+- `ApplyActiveAsset()` forwards the active asset to `m_runtime->LoadUIAsset(...)`.
+- `RecordClick(...)` updates the last click message and appends it to the action log.
+
+The diagnostics window in `DrawDiagnosticsWindow()` makes the action flow visible during runtime testing.
+
+8. Final action event handling in `GameGUI`
+
+The final click handler is `GameGUI::OnWidgetClicked(MyGUI::Widget* sender)` in `src/GameGUI.cpp`.
+
+The runtime flow is:
+
+- MyGUI raises `eventMouseButtonClick`
+- `GameGUI` receives the callback through `MyGUI::newDelegate(...)`
+- `OnWidgetClicked(...)` reads the widget name
+- `FindWidgetDef(m_loadedAsset, name)` looks up the corresponding asset definition
+- The widget’s `action` field is extracted
+- The action is routed through a `switch`
+
+Action outcomes:
+
+- `GameGUIActionType::QuitGame`
+  - records click messages
+  - logs the request
+  - calls `glfwSetWindowShouldClose(...)` when a window exists
+- `GameGUIActionType::PauseGame`
+  - records click messages
+  - logs the request
+  - calls `gGameplayManager.TogglePaused()`
+  - records whether gameplay is now paused or resumed
+- `GameGUIActionType::None`
+  - no gameplay action is triggered
+
+This is the final application-level action event added to the GameGUI functionality.
+
+9. End-to-end chain summary
+
+The full path is:
+
+`MyGUI WidgetInput::_riseMouseButtonClick()`
+-> `MyGUI::WidgetInput::eventMouseButtonClick`
+-> `GameGUI` delegate binding in `CreateWidgetFromDef()`
+-> `GameGUI::OnWidgetClicked()`
+-> asset lookup by widget name
+-> `GameGUIActionType` dispatch
+-> final action such as quit or pause
+
+In short, the lowest-level MyGUI click event is now converted into a data-driven GameGUI action that is authored in the UI creator, persisted in asset JSON, previewed through the runtime wrapper, and executed in the click handler.
+
