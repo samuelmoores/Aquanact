@@ -100,10 +100,12 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& scen
 			if (ImGui::MenuItem("Play"))
 			{
 				gEngineState.SetMode(EngineMode::Game);
+				gRenderManager.SetActiveCamera(gRenderManager.GetGameCamera());
 			}
 			if (ImGui::MenuItem("Stop"))
 			{
 				gEngineState.SetMode(EngineMode::Editor);
+				gRenderManager.SetActiveCamera(gRenderManager.GetEngineCamera());
 			}
 			if (ImGui::MenuItem("Set Game Camera"))
 			{

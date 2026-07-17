@@ -44,6 +44,9 @@ void UICreator::Draw(const Camera&)
 		{
 			if (ImGui::MenuItem("Create Button"))
 			{
+				// The button is now created on demand instead of during GameGUI startup.
+				// That keeps the runtime UI lifecycle owned by the UI creator.
+				gFrontEndManager.RuntimeGUI().CreateTestButton();
 				gDebug.LogMessage("Create Button requested");
 			}
 			ImGui::Separator();

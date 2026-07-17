@@ -84,9 +84,9 @@ void FrontEndManager::Draw(const Camera& camera, FileManager& fileManager, Scene
 		m_uiCreator->Draw(camera);
 	}
 
-	// The runtime GUI is available in editor mode as a preview layer, so draw it
-	// alongside the editor UI instead of hiding it behind a mutually exclusive branch.
-	if (m_mode == FrontEndMode::EngineEditor && m_gameGUI)
+	// The runtime MyGUI test widget should only be visible while the UI creator is active.
+	// Drawing it here keeps it out of the normal engine editor view.
+	if (m_mode == FrontEndMode::UICreator && m_gameGUI)
 	{
 		m_gameGUI->Draw();
 	}

@@ -88,32 +88,6 @@ void GameGUI::startUp(Window& window)
 		// ordering fixed the runtime exceptions we saw during the first integration pass.
 		m_gui = new MyGUI::Gui();
 		m_gui->initialise();
-
-		// Create one visible widget as a smoke test. We used a known skin from the
-		// bundled MyGUI media so the test was about rendering, not asset authoring.
-		const int buttonWidth = 640;
-		const int buttonHeight = 180;
-		const int buttonLeft = 24;
-		const int buttonTop = 24;
-		m_testButton = m_gui->createWidget<MyGUI::Button>(
-			// Use a real bundled MyGUI skin name from MyGUI_BlueWhiteSkins.xml.
-			"ButtonSkin",
-			buttonLeft,
-			buttonTop,
-			buttonWidth,
-			buttonHeight,
-			MyGUI::Align::Default,
-			"Main",
-			"TestButton");
-		if (m_testButton)
-		{
-			m_testButton->setCaption("Test Button");
-			m_testButton->setVisible(true);
-			m_testButton->setAlpha(1.0f);
-			// The button originally existed but still did not show up; pushing it onto the
-			// correct layer made the widget participate in the render submission path.
-			MyGUI::LayerManager::getInstance().upLayerItem(m_testButton);
-		}
 		m_initialized = true;
 	}
 	catch (const std::exception& e)
@@ -140,12 +114,7 @@ void GameGUI::shutDown()
 {
 	if (m_initialized)
 	{
-		if (m_testButton)
-		{
-			// Widgets are owned by Gui; destroy them before tearing down the backend.
-			m_gui->destroyWidget(m_testButton);
-			m_testButton = nullptr;
-		}
+		DestroyTestButton();
 
 		// Reverse startup order to avoid dangling MyGUI objects during shutdown.
 		m_gui->shutdown();
@@ -195,4 +164,52 @@ void GameGUI::Draw()
 
 void GameGUI::EndFrame()
 {
+}
+
+void GameGUI::CreateTestButton()
+{
+	if (!m_initialized || !m_gui)
+	{
+		return;
+	}
+
+	// The button is now created by the UI creator instead of at startup, so the
+	// editor controls when the runtime UI is actually spawned.
+	if (m_testButton)
+	{
+		DestroyTestButton();
+	}
+
+	const int buttonWidth = 640;
+	const int buttonHeight = 180;
+	const int buttonLeft = 24;
+	const int buttonTop = 24;
+	m_testButton = m_gui->createWidget<MyGUI::Button>(
+		"ButtonSkin",
+		buttonLeft,
+		buttonTop,
+		buttonWidth,
+		buttonHeight,
+		MyGUI::Align::Default,
+		"Main",
+		"TestButton");
+	if (m_testButton)
+	{
+		m_testButton->setCaption("Test Button");
+		m_testButton->setVisible(true);
+		m_testButton->setAlpha(1.0f);
+		MyGUI::LayerManager::getInstance().upLayerItem(m_testButton);
+	}
+}
+
+void GameGUI::DestroyTestButton()
+{
+	if (!m_gui || !m_testButton)
+	{
+		return;
+	}
+
+	// Keep destruction centralized so the widget lifetime is always paired with Gui.
+	m_gui->destroyWidget(m_testButton);
+	m_testButton = nullptr;
 }

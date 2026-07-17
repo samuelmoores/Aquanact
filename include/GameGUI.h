@@ -46,7 +46,13 @@ public:
 	void Draw();
 	void EndFrame();
 
+	// Creates the current smoke-test widget on demand instead of at startup.
+	// This lets the UI creator own the moment the first runtime widget appears.
+	void CreateTestButton();
+
 private:
+	void DestroyTestButton();
+
 	Window* m_window = nullptr;
 	MyGUI::OpenGLPlatform* m_platform = nullptr;
 	MyGUI::Gui* m_gui = nullptr;
