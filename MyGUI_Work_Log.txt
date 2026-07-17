@@ -1,0 +1,153 @@
+MyGUI Integration Work Log
+
+Scope
+- Set up MyGUI through vcpkg.
+- Wired MyGUI into the engine build.
+- Added a basic GameGUI wrapper and a test button.
+- Debugged build, linker, runtime, and render issues.
+- Confirmed the final failure cause using an OpenGL state dump.
+
+1. Dependency setup
+- Tried adding MyGUI as a vcpkg dependency.
+- vcpkg successfully downloaded and built MyGUI 3.4.3.
+- The package was static and required matching debug/release library names.
+- Several linker issues were resolved by using the correct debug libraries and adding missing dependencies such as FreeType and OpenGL support.
+
+2. Build integration
+- Added MyGUI to the CMake build.
+- Reconfigured CMake so the generator could find the package.
+- Confirmed the project generated successfully after the package install completed.
+
+3. GameGUI wrapper
+- Added a `GameGUI` class as the engine-side wrapper around MyGUI.
+- Added a custom `GameGUIImageLoader` so MyGUI could load image data through stb_image.
+- Implemented startup and shutdown for:
+  - `MyGUI::OpenGLPlatform`
+  - `MyGUI::Gui`
+  - widget creation and destruction
+
+4. Initial widget test
+- Created a single test button to verify the runtime UI path.
+- Used a built-in MyGUI skin/resource instead of a blank custom asset.
+- Moved the button toward the center and increased its size for visibility during testing.
+
+5. Runtime issues and fixes
+- Hit runtime exceptions during MyGUI startup and widget creation.
+- Added logs to identify which part of initialization was failing.
+- Fixed the image loader memory handling so returned buffers matched MyGUI/OpenGL expectations.
+- Added MyGUI media/resource paths to the build output so skins and XML assets could be found.
+
+6. Linker and dependency issues
+- Resolved multiple linker errors by adding missing MyGUI dependencies.
+- Matched debug and release variants of MyGUI libraries.
+- Added FreeType to satisfy MyGUI font support.
+- Added OpenGL-related linkage so the MyGUI OpenGL backend could resolve symbols like `glBindTexture`.
+
+7. Render path debugging
+- Confirmed the button was created successfully.
+- Confirmed MyGUI submission reached `frameEvent()` and `drawOneFrame()`.
+- Added one-time logs only, to avoid per-frame spam.
+- Moved MyGUI submission logs from the in-app debug overlay to `std::cout` when needed.
+
+8. OpenGL state investigation
+- Dumped the GL state immediately before MyGUI rendered.
+- The dump showed:
+  - depth testing enabled
+  - an active scene shader program still bound
+  - 3D render state still present
+- That explained why the UI was not drawing correctly.
+
+9. Final fix
+- Forced a GUI-safe OpenGL state before MyGUI submission:
+  - disabled depth test
+  - disabled culling
+  - disabled stencil and scissor tests
+  - enabled alpha blending
+  - unbound the shader program
+  - unbound VAO and buffers
+- After that, the MyGUI button rendered successfully.
+
+Final takeaway
+- MyGUI itself was working.
+- The button was not visible because the GUI pass inherited scene rendering state.
+- Resetting OpenGL state before `drawOneFrame()` exposed and fixed the problem.
+
+Detailed error breakdown
+
+A. Build and package resolution errors
+- Cause:
+  - The first issue was not really MyGUI code, but package availability and CMake integration.
+  - `find_package(MyGUI ...)` failed until vcpkg had a real install of MyGUI and CMake was pointed at the generated package config.
+  - The first attempts also exposed that MyGUI depended on additional libraries beyond the top-level package.
+- Fix:
+  - Added MyGUI to vcpkg and reconfigured the project so CMake could see the installed package.
+  - Let vcpkg resolve and build the missing dependencies.
+  - Kept the project on the vcpkg toolchain so the include paths and libraries stayed consistent.
+
+B. Library name and configuration mismatches
+- Cause:
+  - The MyGUI build produced both debug and release variants, and the wrong one was linked at first.
+  - That caused MSVC runtime mismatches such as `_ITERATOR_DEBUG_LEVEL` and `RuntimeLibrary` conflicts.
+  - In practice, this means the engine was built with the debug runtime, but one or more MyGUI libraries were compiled with release settings.
+- Fix:
+  - Switched the link references to the debug MyGUI libraries.
+  - Matched the project runtime to the same MSVC debug model as the dependencies.
+  - After the library set matched, the iterator and runtime mismatch errors disappeared.
+
+C. Missing FreeType symbols
+- Cause:
+  - MyGUI’s TrueType font support uses FreeType internally.
+  - The linker error for `FT_Init_FreeType` and `FT_Done_FreeType` meant the MyGUI engine library was present, but the FreeType implementation it expected was not linked.
+- Fix:
+  - Added FreeType to the link set.
+  - Once that library was present, MyGUI’s font code could resolve its FreeType references correctly.
+
+D. Missing OpenGL symbols
+- Cause:
+  - MyGUI’s OpenGL backend depends on OpenGL entry points such as `glBindTexture`.
+  - Those were unresolved because the engine was not yet linking the OpenGL library set in the way MyGUI expected.
+- Fix:
+  - Added the OpenGL dependency to the build.
+  - After that, the MyGUI OpenGL platform library could resolve the graphics API functions it uses for texture and widget rendering.
+
+E. Runtime crash in GameGUI initialization
+- Cause:
+  - The early runtime failures were caused by MyGUI being partially initialized or initialized in the wrong order.
+  - The platform, GUI singleton, resource paths, and widget creation all depend on each other being set up in sequence.
+  - If a required layer, skin, or resource path is missing, MyGUI can initialize some systems and then fail when the first widget or resource is requested.
+- Fix:
+  - Established a strict startup order:
+    1. Create and initialize the MyGUI OpenGL platform.
+    2. Set the view size.
+    3. Register the resource location for bundled MyGUI media.
+    4. Construct and initialize `MyGUI::Gui`.
+    5. Create the test widget.
+  - That made the startup path stable enough to move on to rendering.
+
+F. Widget not visible even though it was created
+- Cause:
+  - The button existed, but it still did not appear on screen.
+  - That meant the problem was no longer widget creation; it was the render path.
+  - The debug GL state dump showed the MyGUI draw pass was inheriting 3D engine state:
+    - depth testing was still enabled
+    - a scene shader program was still active
+    - the UI pass was not starting from a clean overlay state
+  - MyGUI’s widget rendering expects a GUI-friendly state, not the scene renderer’s state.
+- Fix:
+  - Captured the GL state right before `drawOneFrame()` to confirm the exact condition.
+  - Reset the state before MyGUI drew:
+    - disabled depth testing so UI quads would not be rejected by the depth buffer
+    - disabled culling and stencil/scissor tests
+    - enabled blending for alpha UI textures
+    - cleared the active shader program
+    - unbound VAOs and buffers that the scene pass might have left behind
+  - Once the render state was reset, the MyGUI button became visible.
+
+G. Why the logs were changed several times
+- Cause:
+  - Early logs were too noisy and appeared every frame, which made it hard to read the important signal.
+  - Some useful messages were hidden in the in-app debug overlay, which itself was affected by the render problem.
+- Fix:
+  - Moved key diagnostics to `std::cout` when copy/paste was needed.
+  - Kept render diagnostics one-time only so they only printed on the first frame.
+  - That let us isolate the exact stage that was failing without log spam.

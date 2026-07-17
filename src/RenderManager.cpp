@@ -132,6 +132,10 @@ void RenderManager::Loop()
 	const auto buildStart = std::chrono::high_resolution_clock::now();
 
 	// Start a new editor frame on the active graphics device.
+	// MyGUI uses fixed-function GL state for its overlay pass, so re-apply the
+	// engine's baseline state here to prevent GUI rendering from leaking depth or
+	// blend state into the next 3D frame.
+	m_device.ConfigureDefaultState();
 	m_device.Clear(0.0f, 0.0f, 0.0f, 0.0f);
 	m_device.BeginFrame();
 

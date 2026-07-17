@@ -15,6 +15,7 @@ public:
 	void SetVSync(bool enabled);
 	void UpdateViewport();
 	void ConfigureDefaultState();
+	void ConfigureGuiState();
 
 	bool IsInitialized() const { return m_initialized; }
 

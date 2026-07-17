@@ -19,12 +19,17 @@ void FrontEndManager::startUp(Window& window)
 	{
 		m_engineGUI = std::make_unique<EngineGUI>();
 	}
+	if (!m_gameGUI)
+	{
+		m_gameGUI = std::make_unique<GameGUI>();
+	}
 	if (!m_uiCreator)
 	{
 		m_uiCreator = std::make_unique<UICreator>();
 	}
 
 	m_engineGUI->startUp(window);
+	m_gameGUI->startUp(window);
 	m_uiCreator->startUp(window);
 }
 
@@ -34,6 +39,11 @@ void FrontEndManager::shutDown()
 	{
 		m_engineGUI->shutDown();
 		m_engineGUI.reset();
+	}
+	if (m_gameGUI)
+	{
+		m_gameGUI->shutDown();
+		m_gameGUI.reset();
 	}
 	if (m_uiCreator)
 	{
@@ -47,6 +57,10 @@ void FrontEndManager::BeginFrame()
 	if (m_engineGUI)
 	{
 		m_engineGUI->BeginFrame();
+	}
+	if (m_gameGUI)
+	{
+		m_gameGUI->BeginFrame();
 	}
 	if (m_uiCreator)
 	{
@@ -69,6 +83,13 @@ void FrontEndManager::Draw(const Camera& camera, FileManager& fileManager, Scene
 	{
 		m_uiCreator->Draw(camera);
 	}
+
+	// The runtime GUI is available in editor mode as a preview layer, so draw it
+	// alongside the editor UI instead of hiding it behind a mutually exclusive branch.
+	if (m_mode == FrontEndMode::EngineEditor && m_gameGUI)
+	{
+		m_gameGUI->Draw();
+	}
 }
 
 void FrontEndManager::EndFrame()
@@ -76,6 +97,10 @@ void FrontEndManager::EndFrame()
 	if (m_engineGUI)
 	{
 		m_engineGUI->EndFrame();
+	}
+	if (m_gameGUI)
+	{
+		m_gameGUI->EndFrame();
 	}
 	if (m_uiCreator)
 	{
@@ -126,6 +151,16 @@ EngineGUI& FrontEndManager::EditorGUI()
 const EngineGUI& FrontEndManager::EditorGUI() const
 {
 	return *m_engineGUI;
+}
+
+GameGUI& FrontEndManager::RuntimeGUI()
+{
+	return *m_gameGUI;
+}
+
+const GameGUI& FrontEndManager::RuntimeGUI() const
+{
+	return *m_gameGUI;
 }
 
 UICreator& FrontEndManager::Creator()

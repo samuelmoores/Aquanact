@@ -87,6 +87,22 @@ void OpenGLGraphicsDevice::EndFrame()
 	}
 }
 
+void OpenGLGraphicsDevice::ConfigureDefaultState()
+{
+	if (m_platform)
+	{
+		m_platform->ConfigureDefaultState();
+	}
+}
+
+void OpenGLGraphicsDevice::ConfigureGuiState()
+{
+	if (m_platform)
+	{
+		m_platform->ConfigureGuiState();
+	}
+}
+
 void OpenGLGraphicsDevice::Draw(const RenderCommand& command, const Camera& camera)
 {
 	command.shader->activate();

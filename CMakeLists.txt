@@ -16,6 +16,10 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+if (MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+endif()
+
 set(SOURCES
     "src/main.cpp"
     "include/ShaderProgram.h" "src/ShaderProgram.cpp"
@@ -33,6 +37,7 @@ set(SOURCES
     "include/Line.h" "src/Line.cpp"
     "include/Debug.h" "src/Debug.cpp"
     "include/EngineGUI.h" "src/EngineGUI.cpp"
+    "include/GameGUI.h" "src/GameGUI.cpp"
     "include/UICreator.h" "src/UICreator.cpp"
     "include/FrontEndManager.h" "src/FrontEndManager.cpp"
     "include/FileManager.h" "src/FileManager.cpp"
@@ -62,11 +67,13 @@ set(SOURCES
 add_executable (AquanactEngine ${SOURCES})
 target_compile_definitions(AquanactEngine PRIVATE AQUANACT_EDITOR)
 target_compile_definitions(AquanactEngine PRIVATE AQUANACT_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
+target_compile_definitions(AquanactEngine PRIVATE MYGUI_STATIC)
 target_compile_features(AquanactEngine PRIVATE cxx_std_20)
 
 add_executable (AquanactGame WIN32 ${SOURCES})
 target_compile_definitions(AquanactGame PRIVATE AQUANACT_GAME)
 target_compile_definitions(AquanactGame PRIVATE AQUANACT_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
+target_compile_definitions(AquanactGame PRIVATE MYGUI_STATIC)
 target_compile_features(AquanactGame PRIVATE cxx_std_20)
 
 add_executable (AquanactBuildTool
@@ -77,6 +84,12 @@ target_compile_definitions(AquanactBuildTool PRIVATE AQUANACT_SOURCE_ROOT="${CMA
 
 if (MSVC)
     target_link_options(AquanactEngine PRIVATE
+        "/LIBPATH:C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/lib/x64"
+        "/LIBPATH:C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/ATLMFC/lib/x64"
+        "/LIBPATH:C:/Program Files (x86)/Windows Kits/10/Lib/10.0.26100.0/ucrt/x64"
+        "/LIBPATH:C:/Program Files (x86)/Windows Kits/10/Lib/10.0.26100.0/um/x64"
+    )
+    target_link_options(AquanactGame PRIVATE
         "/LIBPATH:C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/lib/x64"
         "/LIBPATH:C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/ATLMFC/lib/x64"
         "/LIBPATH:C:/Program Files (x86)/Windows Kits/10/Lib/10.0.26100.0/ucrt/x64"
@@ -102,6 +115,10 @@ find_package(glad CONFIG REQUIRED)
 target_link_libraries(AquanactEngine PRIVATE glad::glad)
 target_link_libraries(AquanactGame PRIVATE glad::glad)
 
+find_package(OpenGL REQUIRED)
+target_link_libraries(AquanactEngine PRIVATE OpenGL::GL)
+target_link_libraries(AquanactGame PRIVATE OpenGL::GL)
+
 find_package(imgui CONFIG REQUIRED)
 target_link_libraries(AquanactEngine PRIVATE imgui::imgui)
 target_link_libraries(AquanactGame PRIVATE imgui::imgui)
@@ -111,19 +128,39 @@ find_path(MYGUI_INCLUDE_DIR
     PATH_SUFFIXES MYGUI
     REQUIRED
 )
-find_library(MYGUI_ENGINE_LIBRARY
+
+find_library(MYGUI_ENGINE_LIBRARY_DEBUG
+    NAMES MyGUIEngineStatic_d
+    REQUIRED
+)
+find_library(MYGUI_ENGINE_LIBRARY_RELEASE
     NAMES MyGUIEngineStatic
     REQUIRED
 )
-find_library(MYGUI_OPENGL_LIBRARY
+
+find_library(MYGUI_OPENGL_LIBRARY_DEBUG
+    NAMES MyGUI.OpenGLPlatform_d
+    REQUIRED
+)
+find_library(MYGUI_OPENGL_LIBRARY_RELEASE
     NAMES MyGUI.OpenGLPlatform
     REQUIRED
 )
 
+find_package(freetype CONFIG REQUIRED)
+
 target_include_directories(AquanactEngine PRIVATE ${MYGUI_INCLUDE_DIR})
 target_include_directories(AquanactGame PRIVATE ${MYGUI_INCLUDE_DIR})
-target_link_libraries(AquanactEngine PRIVATE ${MYGUI_ENGINE_LIBRARY} ${MYGUI_OPENGL_LIBRARY})
-target_link_libraries(AquanactGame PRIVATE ${MYGUI_ENGINE_LIBRARY} ${MYGUI_OPENGL_LIBRARY})
+target_link_libraries(AquanactEngine PRIVATE
+    debug ${MYGUI_ENGINE_LIBRARY_DEBUG} optimized ${MYGUI_ENGINE_LIBRARY_RELEASE}
+    debug ${MYGUI_OPENGL_LIBRARY_DEBUG} optimized ${MYGUI_OPENGL_LIBRARY_RELEASE}
+    freetype
+)
+target_link_libraries(AquanactGame PRIVATE
+    debug ${MYGUI_ENGINE_LIBRARY_DEBUG} optimized ${MYGUI_ENGINE_LIBRARY_RELEASE}
+    debug ${MYGUI_OPENGL_LIBRARY_DEBUG} optimized ${MYGUI_OPENGL_LIBRARY_RELEASE}
+    freetype
+)
 
 target_include_directories(AquanactEngine PUBLIC "./include")
 target_include_directories(AquanactGame PUBLIC "./include")
@@ -150,6 +187,13 @@ add_custom_target(copymodels
         COMMENT "syncing ${CMAKE_SOURCE_DIR}/assets to ${CMAKE_BINARY_DIR}/assets"
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
+add_custom_target(copymygui
+        COMMAND ${CMAKE_COMMAND} -E rm -rf ${CMAKE_BINARY_DIR}/MyGUI_Media
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/external/mygui-upstream/Media/MyGUI_Media ${CMAKE_BINARY_DIR}
+        COMMENT "syncing MyGUI media to ${CMAKE_BINARY_DIR}"
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
 add_dependencies(AquanactEngine copyshaders copymodels)
+add_dependencies(AquanactEngine copymygui)
 
 
