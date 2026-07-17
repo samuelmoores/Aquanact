@@ -102,6 +102,11 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 	ImGui::Text("Build time: %.4f ms", gRenderManager.LastFrameBuildMs());
 	ImGui::Text("Flush time: %.4f ms", gRenderManager.LastFrameFlushMs());
 	ImGui::Separator();
+	ImGui::Text("Debug overlay: %.4f ms", gRenderManager.LastFrameDebugOverlayMs());
+	ImGui::Text("Editor GUI/MyGUI: %.4f ms", gRenderManager.LastFrameEditorGuiMs());
+	ImGui::Text("UI creator: %.4f ms", gRenderManager.LastFrameUiCreatorMs());
+	ImGui::Text("Runtime GUI: %.4f ms", gRenderManager.LastFrameRuntimeGuiMs());
+	ImGui::Separator();
 	ImGui::Text("Frame allocator capacity: %.2f KB", static_cast<double>(gRenderManager.FrameAllocatorCapacityBytes()) / 1024.0);
 	ImGui::Text("Frame allocator used: %.2f KB", static_cast<double>(gRenderManager.FrameAllocatorUsedBytes()) / 1024.0);
 	ImGui::Text("Frame allocator peak: %.2f KB", static_cast<double>(gRenderManager.FrameAllocatorPeakBytes()) / 1024.0);

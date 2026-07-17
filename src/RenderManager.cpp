@@ -23,6 +23,10 @@ void RenderManager::startUp(Window& window)
 	m_lastFrameSkippedObjects = 0;
 	m_lastFrameBuildTime = std::chrono::duration<double, std::milli>{ 0.0 };
 	m_lastFrameFlushTime = std::chrono::duration<double, std::milli>{ 0.0 };
+	m_lastFrameDebugOverlayTime = std::chrono::duration<double, std::milli>{ 0.0 };
+	m_lastFrameEditorGuiTime = std::chrono::duration<double, std::milli>{ 0.0 };
+	m_lastFrameUiCreatorTime = std::chrono::duration<double, std::milli>{ 0.0 };
+	m_lastFrameRuntimeGuiTime = std::chrono::duration<double, std::milli>{ 0.0 };
 	if (!m_engineCamera)
 	{
 		m_engineCamera = std::make_unique<EngineCamera>();
@@ -167,17 +171,41 @@ void RenderManager::Loop()
 	// Draw ImGui overlays after the 3D pass.
 	if (gEngineState.IsEditorMode())
 	{
+		const auto debugStart = std::chrono::high_resolution_clock::now();
 		gFrontEndManager.BeginFrame();
 		// Draw editor overlays from the same camera as the scene so preview modes stay consistent.
 		// Use active camera since the game camera can be used as a preview in editor mode
 		gDebug.draw(ActiveCamera(), gFrontEndManager.EditorGUI());
+		const auto debugEnd = std::chrono::high_resolution_clock::now();
+		m_lastFrameDebugOverlayTime = debugEnd - debugStart;
+
+		const auto editorGuiStart = std::chrono::high_resolution_clock::now();
 		gFrontEndManager.Draw(*m_engineCamera, gFileManager, gSceneManager, gProjectManager);
+		const auto editorGuiEnd = std::chrono::high_resolution_clock::now();
+		m_lastFrameEditorGuiTime = editorGuiEnd - editorGuiStart;
+
+		if (gFrontEndManager.FrontEndModeValue() == FrontEndMode::UICreator)
+		{
+			m_lastFrameUiCreatorTime = m_lastFrameEditorGuiTime;
+			m_lastFrameRuntimeGuiTime = std::chrono::duration<double, std::milli>{ 0.0 };
+		}
+		else
+		{
+			m_lastFrameUiCreatorTime = std::chrono::duration<double, std::milli>{ 0.0 };
+			m_lastFrameRuntimeGuiTime = std::chrono::duration<double, std::milli>{ 0.0 };
+		}
 		gFrontEndManager.EndFrame();
 	}
 	else
 	{
+		const auto debugStart = std::chrono::high_resolution_clock::now();
 		gFrontEndManager.BeginFrame();
 		gDebug.drawGameModeInput(gInput);
+		const auto debugEnd = std::chrono::high_resolution_clock::now();
+		m_lastFrameDebugOverlayTime = debugEnd - debugStart;
+		m_lastFrameEditorGuiTime = std::chrono::duration<double, std::milli>{ 0.0 };
+		m_lastFrameUiCreatorTime = std::chrono::duration<double, std::milli>{ 0.0 };
+		m_lastFrameRuntimeGuiTime = std::chrono::duration<double, std::milli>{ 0.0 };
 		gFrontEndManager.EndFrame();
 	}
 
@@ -204,6 +232,26 @@ double RenderManager::LastFrameBuildMs() const
 double RenderManager::LastFrameFlushMs() const
 {
 	return m_lastFrameFlushTime.count();
+}
+
+double RenderManager::LastFrameDebugOverlayMs() const
+{
+	return m_lastFrameDebugOverlayTime.count();
+}
+
+double RenderManager::LastFrameEditorGuiMs() const
+{
+	return m_lastFrameEditorGuiTime.count();
+}
+
+double RenderManager::LastFrameUiCreatorMs() const
+{
+	return m_lastFrameUiCreatorTime.count();
+}
+
+double RenderManager::LastFrameRuntimeGuiMs() const
+{
+	return m_lastFrameRuntimeGuiTime.count();
 }
 
 std::size_t RenderManager::FrameAllocatorCapacityBytes() const

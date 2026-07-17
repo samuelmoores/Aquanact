@@ -37,6 +37,10 @@ public:
 	std::size_t LastFrameSkippedObjects() const;
 	double LastFrameBuildMs() const;
 	double LastFrameFlushMs() const;
+	double LastFrameDebugOverlayMs() const;
+	double LastFrameEditorGuiMs() const;
+	double LastFrameUiCreatorMs() const;
+	double LastFrameRuntimeGuiMs() const;
 	std::size_t FrameAllocatorCapacityBytes() const;
 	std::size_t FrameAllocatorUsedBytes() const;
 	std::size_t FrameAllocatorPeakBytes() const;
@@ -54,4 +58,8 @@ private:
 	std::size_t m_lastFrameSkippedObjects = 0;
 	std::chrono::duration<double, std::milli> m_lastFrameBuildTime{ 0.0 };
 	std::chrono::duration<double, std::milli> m_lastFrameFlushTime{ 0.0 };
+	std::chrono::duration<double, std::milli> m_lastFrameDebugOverlayTime{ 0.0 };
+	std::chrono::duration<double, std::milli> m_lastFrameEditorGuiTime{ 0.0 };
+	std::chrono::duration<double, std::milli> m_lastFrameUiCreatorTime{ 0.0 };
+	std::chrono::duration<double, std::milli> m_lastFrameRuntimeGuiTime{ 0.0 };
 };

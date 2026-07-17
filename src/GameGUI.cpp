@@ -5,6 +5,7 @@
 #include "Window.h"
 #include "StbImage.h"
 #include "GLHeaders.h"
+#include "UIAsset.h"
 
 #include <MYGUI/MyGUI_Button.h>
 #include <MYGUI/MyGUI_Gui.h>
@@ -13,6 +14,7 @@
 #include <MYGUI/MyGUI_LayerManager.h>
 #include <MYGUI/MyGUI_OpenGLImageLoader.h>
 #include <algorithm>
+#include <fstream>
 #include <Texture.h>
 
 void* GameGUIImageLoader::loadImage(int& _width, int& _height, MyGUI::PixelFormat& _format, const std::string& _filename)
@@ -114,6 +116,7 @@ void GameGUI::shutDown()
 {
 	if (m_initialized)
 	{
+		ClearUI();
 		DestroyTestButton();
 
 		// Reverse startup order to avoid dangling MyGUI objects during shutdown.
@@ -180,10 +183,15 @@ void GameGUI::CreateTestButton()
 		DestroyTestButton();
 	}
 
-	const int buttonWidth = 640;
-	const int buttonHeight = 180;
-	const int buttonLeft = 24;
-	const int buttonTop = 24;
+	int framebufferWidth = 0;
+	int framebufferHeight = 0;
+	m_window->GetFramebufferSize(framebufferWidth, framebufferHeight);
+
+	const int buttonWidth = 320;
+	const int buttonHeight = 90;
+	const int buttonLeft = (framebufferWidth - buttonWidth) / 2;
+	const int buttonTop = (framebufferHeight - buttonHeight) / 2;
+
 	m_testButton = m_gui->createWidget<MyGUI::Button>(
 		"ButtonSkin",
 		buttonLeft,
@@ -200,6 +208,22 @@ void GameGUI::CreateTestButton()
 		m_testButton->setAlpha(1.0f);
 		MyGUI::LayerManager::getInstance().upLayerItem(m_testButton);
 	}
+
+	m_loadedAsset = UIAsset{};
+	m_loadedAsset.name = "TestUI";
+	m_loadedAsset.widgets.push_back(UIWidgetDef{
+		"Button",
+		"TestButton",
+		"ButtonSkin",
+		"Test Button",
+		"Main",
+		buttonLeft,
+		buttonTop,
+		buttonWidth,
+		buttonHeight,
+		true,
+		1.0f
+	});
 }
 
 void GameGUI::DestroyTestButton()
@@ -212,4 +236,66 @@ void GameGUI::DestroyTestButton()
 	// Keep destruction centralized so the widget lifetime is always paired with Gui.
 	m_gui->destroyWidget(m_testButton);
 	m_testButton = nullptr;
+}
+
+void GameGUI::LoadUIAsset(const UIAsset& asset)
+{
+	if (!m_initialized || !m_gui)
+	{
+		return;
+	}
+
+	ClearUI();
+	m_loadedAsset = asset;
+	for (const UIWidgetDef& widget : m_loadedAsset.widgets)
+	{
+		CreateWidgetFromDef(widget);
+	}
+}
+
+void GameGUI::ClearUI()
+{
+	if (!m_gui)
+	{
+		m_runtimeWidgets.clear();
+		return;
+	}
+
+	for (MyGUI::Widget* widget : m_runtimeWidgets)
+	{
+		if (widget)
+		{
+			m_gui->destroyWidget(widget);
+		}
+	}
+	m_runtimeWidgets.clear();
+	m_testButton = nullptr;
+}
+
+void GameGUI::CreateWidgetFromDef(const UIWidgetDef& def)
+{
+	if (def.type == "Button")
+	{
+		MyGUI::Button* button = m_gui->createWidget<MyGUI::Button>(
+			def.skin,
+			def.x,
+			def.y,
+			def.width,
+			def.height,
+			MyGUI::Align::Default,
+			def.layer,
+			def.name);
+		if (button)
+		{
+			button->setCaption(def.text);
+			button->setVisible(def.visible);
+			button->setAlpha(def.alpha);
+			MyGUI::LayerManager::getInstance().upLayerItem(button);
+			m_runtimeWidgets.push_back(button);
+			if (def.name == "TestButton")
+			{
+				m_testButton = button;
+			}
+		}
+	}
 }

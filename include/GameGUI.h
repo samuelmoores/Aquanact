@@ -1,6 +1,9 @@
 #pragma once
 
+#include "UIAsset.h"
+
 #include <string>
+#include <vector>
 #include <MYGUI/MyGUI_OpenGLImageLoader.h>
 
 class Window;
@@ -49,8 +52,12 @@ public:
 	// Creates the current smoke-test widget on demand instead of at startup.
 	// This lets the UI creator own the moment the first runtime widget appears.
 	void CreateTestButton();
+	// Loads a whole UI asset and rebuilds the live MyGUI widgets from its definitions.
+	void LoadUIAsset(const UIAsset& asset);
+	void ClearUI();
 
 private:
+	void CreateWidgetFromDef(const UIWidgetDef& def);
 	void DestroyTestButton();
 
 	Window* m_window = nullptr;
@@ -58,5 +65,7 @@ private:
 	MyGUI::Gui* m_gui = nullptr;
 	GameGUIImageLoader m_imageLoader;
 	MyGUI::Button* m_testButton = nullptr;
+	std::vector<MyGUI::Widget*> m_runtimeWidgets;
+	UIAsset m_loadedAsset;
 	bool m_initialized = false;
 };

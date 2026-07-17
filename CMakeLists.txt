@@ -41,6 +41,7 @@ set(SOURCES
     "include/Texture.h"
     "include/Line.h" "src/Line.cpp"
     "include/Debug.h" "src/Debug.cpp"
+    "include/UIAsset.h"
     "include/EngineGUI.h" "src/EngineGUI.cpp"
     "include/GameGUI.h" "src/GameGUI.cpp"
     "include/UICreator.h" "src/UICreator.cpp"
