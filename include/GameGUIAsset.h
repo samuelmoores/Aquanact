@@ -4,6 +4,13 @@
 #include <string>
 #include <vector>
 
+enum class GameGUIActionType
+{
+	None,
+	QuitGame,
+	PauseGame,
+};
+
 struct GameGUIWidgetDef
 {
 	std::string type;
@@ -17,6 +24,7 @@ struct GameGUIWidgetDef
 	int height = 30;
 	bool visible = true;
 	float alpha = 1.0f;
+	GameGUIActionType action = GameGUIActionType::None;
 };
 
 struct GameGUIAsset

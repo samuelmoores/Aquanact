@@ -3,6 +3,7 @@
 #include "Debug.h"
 #include "FrontEndManager.h"
 #include "Globals.h"
+#include "GameplayManager.h"
 #include "Window.h"
 #include "StbImage.h"
 #include "GLHeaders.h"
@@ -18,6 +19,20 @@
 #include <algorithm>
 #include <fstream>
 #include <Texture.h>
+
+namespace {
+	const GameGUIWidgetDef* FindWidgetDef(const GameGUIAsset& asset, const std::string& name)
+	{
+		for (const auto& widget : asset.widgets)
+		{
+			if (widget.name == name)
+			{
+				return &widget;
+			}
+		}
+		return nullptr;
+	}
+}
 
 void* GameGUIImageLoader::loadImage(int& _width, int& _height, MyGUI::PixelFormat& _format, const std::string& _filename)
 {
@@ -245,20 +260,30 @@ void GameGUI::OnWidgetClicked(MyGUI::Widget* sender)
 	}
 
 	const std::string name = sender->getName();
+	const GameGUIWidgetDef* def = FindWidgetDef(m_loadedAsset, name);
+	const GameGUIActionType action = def ? def->action : GameGUIActionType::None;
 	gDebug.LogMessage(std::string("GameGUI click received for widget: ") + (name.empty() ? "<unnamed>" : name));
 	gFrontEndManager.RuntimeGUI().RecordClick("Clicked widget: " + (name.empty() ? std::string("<unnamed>") : name));
-	if (name == "quit")
+	switch (action)
 	{
+	case GameGUIActionType::QuitGame:
 		gFrontEndManager.RuntimeGUI().RecordClick("Quit action requested");
 		gDebug.LogMessage("GameGUI Quit action requested");
-	}
-
-	// Keep shutdown path normal so the main loop exits cleanly and the window
-	// teardown stays centralized in the engine.
-	if (name == "quit" && m_window && m_window->GLFW())
-	{
-		gDebug.LogMessage("GameGUI requested window close via Quit button");
-		gFrontEndManager.RuntimeGUI().RecordClick("Window close requested");
-		glfwSetWindowShouldClose(m_window->GLFW(), GLFW_TRUE);
+		if (m_window && m_window->GLFW())
+		{
+			gDebug.LogMessage("GameGUI requested window close via Quit button");
+			gFrontEndManager.RuntimeGUI().RecordClick("Window close requested");
+			glfwSetWindowShouldClose(m_window->GLFW(), GLFW_TRUE);
+		}
+		break;
+	case GameGUIActionType::PauseGame:
+		gFrontEndManager.RuntimeGUI().RecordClick("Pause Game action requested");
+		gDebug.LogMessage("GameGUI PauseGame action requested");
+		gGameplayManager.TogglePaused();
+		gFrontEndManager.RuntimeGUI().RecordClick(gGameplayManager.IsPaused() ? "Gameplay paused" : "Gameplay resumed");
+		break;
+	case GameGUIActionType::None:
+	default:
+		break;
 	}
 }

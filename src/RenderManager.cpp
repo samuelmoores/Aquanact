@@ -152,9 +152,6 @@ void RenderManager::Loop()
 			continue;
 		}
 
-		// Components update before rendering so animation and other state are current.
-		object->UpdateComponents(gInput.DeltaTime());
-
 		Submit(RenderCommand{
 			object->GetMesh(),
 			object->GetShader(),

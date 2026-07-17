@@ -14,6 +14,45 @@
 #include <cstdio>
 
 namespace {
+	const char* ActionLabel(GameGUIActionType action)
+	{
+		switch (action)
+		{
+		case GameGUIActionType::QuitGame:
+			return "Quit Game";
+		case GameGUIActionType::PauseGame:
+			return "Pause Game";
+		default:
+			return "None";
+		}
+	}
+
+	std::string ActionToString(GameGUIActionType action)
+	{
+		switch (action)
+		{
+		case GameGUIActionType::QuitGame:
+			return "QuitGame";
+		case GameGUIActionType::PauseGame:
+			return "PauseGame";
+		default:
+			return "None";
+		}
+	}
+
+	GameGUIActionType StringToAction(const std::string& value)
+	{
+		if (value == "QuitGame")
+		{
+			return GameGUIActionType::QuitGame;
+		}
+		if (value == "PauseGame")
+		{
+			return GameGUIActionType::PauseGame;
+		}
+		return GameGUIActionType::None;
+	}
+
 	std::filesystem::path AssetDirectory()
 	{
 #ifdef AQUANACT_SOURCE_ROOT
@@ -86,6 +125,7 @@ namespace {
 			widget.height = std::stoi(readField("\"height\":", widgetPos));
 			widget.visible = readField("\"visible\":", widgetPos).find("true") != std::string::npos;
 			widget.alpha = std::stof(readField("\"alpha\":", widgetPos));
+			widget.action = StringToAction(readField("\"action\":", widgetPos));
 			asset.widgets.push_back(widget);
 			widgetPos = contents.find("\"type\": \"", widgetPos + 1);
 		}
@@ -123,6 +163,8 @@ void GameGUICreator::startUp(Window& window)
 	m_selectedAssetIndex = -1;
 	m_selectedWidgetIndex = -1;
 	m_newAssetName[0] = '\0';
+	m_newWidgetName[0] = '\0';
+	m_newWidgetAction = GameGUIActionType::None;
 	m_initialized = true;
 	if (!m_assets.empty())
 	{
@@ -138,6 +180,8 @@ void GameGUICreator::shutDown()
 	m_initialized = false;
 	m_showCreateAssetPopup = false;
 	m_newAssetName[0] = '\0';
+	m_newWidgetName[0] = '\0';
+	m_newWidgetAction = GameGUIActionType::None;
 	m_assets.clear();
 	m_selectedAssetIndex = -1;
 	m_selectedWidgetIndex = -1;
@@ -356,6 +400,25 @@ void GameGUICreator::DrawCreateWidgetPopup()
 	{
 		ImGui::TextUnformatted("Enter a widget name:");
 		ImGui::InputText("Name", m_newWidgetName, sizeof(m_newWidgetName));
+		GameGUIActionType action = m_newWidgetAction;
+		if (ImGui::BeginCombo("Action", ActionLabel(action)))
+		{
+			const GameGUIActionType options[] = { GameGUIActionType::None, GameGUIActionType::QuitGame, GameGUIActionType::PauseGame };
+			for (GameGUIActionType option : options)
+			{
+				const bool selected = option == action;
+				if (ImGui::Selectable(ActionLabel(option), selected))
+				{
+					action = option;
+				}
+				if (selected)
+				{
+					ImGui::SetItemDefaultFocus();
+				}
+			}
+			ImGui::EndCombo();
+		}
+		m_newWidgetAction = action;
 		if (ImGui::Button("Create"))
 		{
 			AddButtonWidget();
@@ -406,6 +469,7 @@ void GameGUICreator::AddButtonWidget()
 	button.layer = "Main";
 	button.width = 320;
 	button.height = 90;
+	button.action = m_newWidgetAction;
 
 	int framebufferWidth = 0;
 	int framebufferHeight = 0;
@@ -429,6 +493,7 @@ void GameGUICreator::AddButtonWidget()
 	asset.widgets.push_back(button);
 	m_selectedWidgetIndex = static_cast<int>(asset.widgets.size() - 1);
 	m_newWidgetName[0] = '\0';
+	m_newWidgetAction = GameGUIActionType::None;
 	gDebug.LogMessage(
 		std::string("Created GameGUI button widget: name='") + button.name +
 		"', asset='" + asset.name +
@@ -467,7 +532,8 @@ void GameGUICreator::SaveCurrentAsset()
 		json << "      \"width\": " << widget.width << ",\n";
 		json << "      \"height\": " << widget.height << ",\n";
 		json << "      \"visible\": " << (widget.visible ? "true" : "false") << ",\n";
-		json << "      \"alpha\": " << widget.alpha << "\n";
+		json << "      \"alpha\": " << widget.alpha << ",\n";
+		json << "      \"action\": \"" << ActionToString(widget.action) << "\"\n";
 		json << "    }" << (i + 1 < asset.widgets.size() ? "," : "") << "\n";
 	}
 	json << "  ]\n";

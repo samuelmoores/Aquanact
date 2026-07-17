@@ -39,6 +39,7 @@ private:
 	bool m_showCreateWidgetPopup = false;
 	char m_newAssetName[64] = { 0 };
 	char m_newWidgetName[64] = { 0 };
+	GameGUIActionType m_newWidgetAction = GameGUIActionType::None;
 	std::vector<GameGUIAsset> m_assets;
 	int m_selectedAssetIndex = -1;
 	int m_selectedWidgetIndex = -1;

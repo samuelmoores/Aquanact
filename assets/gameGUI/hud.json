@@ -3,16 +3,31 @@
   "widgets": [
     {
       "type": "Button",
+      "name": "pause",
+      "skin": "ButtonSkin",
+      "text": "Test Button",
+      "layer": "Main",
+      "x": 373,
+      "y": 53,
+      "width": 320,
+      "height": 90,
+      "visible": true,
+      "alpha": 1,
+      "action": "PauseGame"
+    },
+    {
+      "type": "Button",
       "name": "quit",
       "skin": "ButtonSkin",
       "text": "Test Button",
       "layer": "Main",
-      "x": 480,
-      "y": 315,
+      "x": 907,
+      "y": 561,
       "width": 320,
       "height": 90,
       "visible": true,
-      "alpha": 1
+      "alpha": 1,
+      "action": "QuitGame"
     }
   ]
 }
