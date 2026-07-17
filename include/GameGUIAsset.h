@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-struct UIWidgetDef
+struct GameGUIWidgetDef
 {
 	std::string type;
 	std::string name;
@@ -19,9 +19,9 @@ struct UIWidgetDef
 	float alpha = 1.0f;
 };
 
-struct UIAsset
+struct GameGUIAsset
 {
-	std::string name = "UntitledUI";
-	std::vector<UIWidgetDef> widgets;
+	std::string name = "UntitledGameGUI";
+	std::vector<GameGUIWidgetDef> widgets;
 	bool savedOnDisk = false;
 };

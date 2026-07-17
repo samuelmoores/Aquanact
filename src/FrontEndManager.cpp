@@ -25,7 +25,7 @@ void FrontEndManager::startUp(Window& window)
 	}
 	if (!m_uiCreator)
 	{
-		m_uiCreator = std::make_unique<UICreator>();
+		m_uiCreator = std::make_unique<GameGUICreator>();
 	}
 
 	m_engineGUI->startUp(window);
@@ -79,14 +79,14 @@ void FrontEndManager::Draw(const Camera& camera, FileManager& fileManager, Scene
 	{
 		m_engineGUI->Draw(camera, fileManager, sceneManager, projectManager);
 	}
-	else if (m_mode == FrontEndMode::UICreator && m_uiCreator)
+	else if (m_mode == FrontEndMode::GameGUICreator && m_uiCreator)
 	{
 		m_uiCreator->Draw(camera);
 	}
 
 	// The runtime MyGUI test widget should only be visible while the UI creator is active.
 	// Drawing it here keeps it out of the normal engine editor view.
-	if (m_mode == FrontEndMode::UICreator && m_gameGUI)
+	if (m_mode == FrontEndMode::GameGUICreator && m_gameGUI)
 	{
 		m_gameGUI->Draw();
 	}
@@ -118,12 +118,12 @@ FrontEndMode FrontEndManager::FrontEndModeValue() const
 	return m_mode;
 }
 
-void FrontEndManager::OpenUICreator()
+void FrontEndManager::OpenGameGUICreator()
 {
-	m_mode = FrontEndMode::UICreator;
+	m_mode = FrontEndMode::GameGUICreator;
 }
 
-void FrontEndManager::ReturnToEngineEditor()
+void FrontEndManager::ReturnToEngineGUIEditor()
 {
 	m_mode = FrontEndMode::EngineEditor;
 }
@@ -163,12 +163,12 @@ const GameGUI& FrontEndManager::RuntimeGUI() const
 	return *m_gameGUI;
 }
 
-UICreator& FrontEndManager::Creator()
+GameGUICreator& FrontEndManager::Creator()
 {
 	return *m_uiCreator;
 }
 
-const UICreator& FrontEndManager::Creator() const
+const GameGUICreator& FrontEndManager::Creator() const
 {
 	return *m_uiCreator;
 }

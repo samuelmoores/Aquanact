@@ -4,14 +4,14 @@
 #include <string>
 #include <vector>
 
-#include "UIAsset.h"
+#include "GameGUIAsset.h"
 
 class Window;
 class Camera;
 
-class UICreator {
+class GameGUICreator {
 public:
-	UICreator() = default;
+	GameGUICreator() = default;
 	void startUp(Window& window);
 	void shutDown();
 	void BeginFrame();
@@ -20,11 +20,11 @@ public:
 
 private:
 	void DrawCreateAssetPopup();
-	std::filesystem::path AssetPathFor(const UIAsset& asset) const;
-	UIAsset& CurrentAsset();
-	const UIAsset& CurrentAsset() const;
+	std::filesystem::path AssetPathFor(const GameGUIAsset& asset) const;
+	GameGUIAsset& CurrentAsset();
+	const GameGUIAsset& CurrentAsset() const;
 	void AddButtonWidget();
-	void AddUIAsset(const std::string& name);
+	void AddGameGUIAsset(const std::string& name);
 	void SaveCurrentAsset();
 	void LoadCurrentAsset();
 	void DeleteSelectedWidget();
@@ -36,7 +36,7 @@ private:
 	bool m_initialized = false;
 	bool m_showCreateAssetPopup = false;
 	char m_newAssetName[64] = { 0 };
-	std::vector<UIAsset> m_assets;
+	std::vector<GameGUIAsset> m_assets;
 	int m_selectedAssetIndex = -1;
 	int m_selectedWidgetIndex = -1;
 };

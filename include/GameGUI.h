@@ -1,6 +1,6 @@
 #pragma once
 
-#include "UIAsset.h"
+#include "GameGUIAsset.h"
 
 #include <string>
 #include <vector>
@@ -53,11 +53,11 @@ public:
 	// This lets the UI creator own the moment the first runtime widget appears.
 	void CreateTestButton();
 	// Loads a whole UI asset and rebuilds the live MyGUI widgets from its definitions.
-	void LoadUIAsset(const UIAsset& asset);
+	void LoadUIAsset(const GameGUIAsset& asset);
 	void ClearUI();
 
 private:
-	void CreateWidgetFromDef(const UIWidgetDef& def);
+	void CreateWidgetFromDef(const GameGUIWidgetDef& def);
 	void DestroyTestButton();
 
 	Window* m_window = nullptr;
@@ -66,6 +66,6 @@ private:
 	GameGUIImageLoader m_imageLoader;
 	MyGUI::Button* m_testButton = nullptr;
 	std::vector<MyGUI::Widget*> m_runtimeWidgets;
-	UIAsset m_loadedAsset;
+	GameGUIAsset m_loadedAsset;
 	bool m_initialized = false;
 };

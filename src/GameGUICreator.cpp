@@ -1,4 +1,4 @@
-#include "UICreator.h"
+#include "GameGUICreator.h"
 
 #include "FrontEndManager.h"
 #include "RenderManager.h"
@@ -19,7 +19,7 @@ namespace {
 	}
 }
 
-void UICreator::startUp(Window& window)
+void GameGUICreator::startUp(Window& window)
 {
 	if (m_initialized)
 	{
@@ -35,7 +35,7 @@ void UICreator::startUp(Window& window)
 	SyncRuntimePreview();
 }
 
-void UICreator::shutDown()
+void GameGUICreator::shutDown()
 {
 	m_window = nullptr;
 	m_initialized = false;
@@ -46,26 +46,26 @@ void UICreator::shutDown()
 	m_selectedWidgetIndex = -1;
 }
 
-void UICreator::BeginFrame()
+void GameGUICreator::BeginFrame()
 {
 }
 
-UIAsset& UICreator::CurrentAsset()
-{
-	return m_assets[static_cast<std::size_t>(m_selectedAssetIndex)];
-}
-
-const UIAsset& UICreator::CurrentAsset() const
+GameGUIAsset& GameGUICreator::CurrentAsset()
 {
 	return m_assets[static_cast<std::size_t>(m_selectedAssetIndex)];
 }
 
-std::filesystem::path UICreator::AssetPathFor(const UIAsset& asset) const
+const GameGUIAsset& GameGUICreator::CurrentAsset() const
+{
+	return m_assets[static_cast<std::size_t>(m_selectedAssetIndex)];
+}
+
+std::filesystem::path GameGUICreator::AssetPathFor(const GameGUIAsset& asset) const
 {
 	return AssetDirectory() / (asset.name + ".json");
 }
 
-void UICreator::Draw(const Camera&)
+void GameGUICreator::Draw(const Camera&)
 {
 	if (!m_initialized)
 	{
@@ -114,7 +114,7 @@ void UICreator::Draw(const Camera&)
 		{
 			if (ImGui::MenuItem("Leave UI Creation"))
 			{
-				gFrontEndManager.ReturnToEngineEditor();
+				gFrontEndManager.ReturnToEngineGUIEditor();
 				gRenderManager.SetActiveCamera(gRenderManager.GetEngineCamera());
 				gDebug.LogMessage("Leave UI Creation requested");
 			}
@@ -146,7 +146,7 @@ void UICreator::Draw(const Camera&)
 		ImGui::Begin("UIAssets");
 	for (std::size_t i = 0; i < m_assets.size(); ++i)
 	{
-		const UIAsset& asset = m_assets[i];
+		const GameGUIAsset& asset = m_assets[i];
 		const bool selected = m_selectedAssetIndex == static_cast<int>(i);
 		if (ImGui::Selectable(asset.name.c_str(), selected))
 		{
@@ -157,7 +157,7 @@ void UICreator::Draw(const Camera&)
 	}
 	if (m_selectedAssetIndex >= 0 && m_selectedAssetIndex < static_cast<int>(m_assets.size()))
 	{
-		const UIAsset& asset = CurrentAsset();
+		const GameGUIAsset& asset = CurrentAsset();
 		ImGui::Separator();
 		ImGui::Text("Asset: %s", asset.name.c_str());
 		ImGui::Text("Saved on disk: %s", asset.savedOnDisk ? "yes" : "no");
@@ -167,10 +167,10 @@ void UICreator::Draw(const Camera&)
 	ImGui::Begin("Widgets");
 	if (m_selectedAssetIndex >= 0 && m_selectedAssetIndex < static_cast<int>(m_assets.size()))
 	{
-		UIAsset& asset = CurrentAsset();
+		GameGUIAsset& asset = CurrentAsset();
 		for (std::size_t i = 0; i < asset.widgets.size(); ++i)
 		{
-			const UIWidgetDef& widget = asset.widgets[i];
+			const GameGUIWidgetDef& widget = asset.widgets[i];
 			const bool selected = m_selectedWidgetIndex == static_cast<int>(i);
 			if (ImGui::Selectable(widget.name.c_str(), selected))
 			{
@@ -179,7 +179,7 @@ void UICreator::Draw(const Camera&)
 		}
 		if (m_selectedWidgetIndex >= 0 && m_selectedWidgetIndex < static_cast<int>(asset.widgets.size()))
 		{
-			UIWidgetDef& widget = asset.widgets[static_cast<std::size_t>(m_selectedWidgetIndex)];
+			GameGUIWidgetDef& widget = asset.widgets[static_cast<std::size_t>(m_selectedWidgetIndex)];
 			ImGui::Separator();
 			ImGui::Text("Name: %s", widget.name.c_str());
 			ImGui::Text("Type: %s", widget.type.c_str());
@@ -201,11 +201,11 @@ void UICreator::Draw(const Camera&)
 	ImGui::End();
 }
 
-void UICreator::EndFrame()
+void GameGUICreator::EndFrame()
 {
 }
 
-void UICreator::DrawCreateAssetPopup()
+void GameGUICreator::DrawCreateAssetPopup()
 {
 	if (m_showCreateAssetPopup)
 	{
@@ -224,7 +224,7 @@ void UICreator::DrawCreateAssetPopup()
 			{
 				name = "HUD";
 			}
-			AddUIAsset(name);
+			AddGameGUIAsset(name);
 			SaveCurrentAsset();
 			SyncRuntimePreview();
 			ImGui::CloseCurrentPopup();
@@ -238,12 +238,12 @@ void UICreator::DrawCreateAssetPopup()
 	}
 }
 
-void UICreator::AddUIAsset(const std::string& name)
+void GameGUICreator::AddGameGUIAsset(const std::string& name)
 {
-	UIAsset asset;
+	GameGUIAsset asset;
 	asset.name = name;
 	int suffix = 1;
-	while (std::any_of(m_assets.begin(), m_assets.end(), [&asset](const UIAsset& existing)
+	while (std::any_of(m_assets.begin(), m_assets.end(), [&asset](const GameGUIAsset& existing)
 	{
 		return existing.name == asset.name;
 	}))
@@ -256,14 +256,14 @@ void UICreator::AddUIAsset(const std::string& name)
 	m_selectedWidgetIndex = -1;
 }
 
-void UICreator::AddButtonWidget()
+void GameGUICreator::AddButtonWidget()
 {
 	if (m_selectedAssetIndex < 0 || m_selectedAssetIndex >= static_cast<int>(m_assets.size()))
 	{
 		return;
 	}
 
-	UIWidgetDef button;
+	GameGUIWidgetDef button;
 	button.type = "Button";
 	button.name = "button";
 	button.skin = "ButtonSkin";
@@ -281,9 +281,9 @@ void UICreator::AddButtonWidget()
 	button.x = std::max(0, (framebufferWidth - button.width) / 2);
 	button.y = std::max(0, (framebufferHeight - button.height) / 2);
 
-	UIAsset& asset = CurrentAsset();
+	GameGUIAsset& asset = CurrentAsset();
 	int suffix = 1;
-	while (std::any_of(asset.widgets.begin(), asset.widgets.end(), [&button](const UIWidgetDef& widget)
+	while (std::any_of(asset.widgets.begin(), asset.widgets.end(), [&button](const GameGUIWidgetDef& widget)
 	{
 		return widget.name == button.name;
 	}))
@@ -295,14 +295,14 @@ void UICreator::AddButtonWidget()
 	m_selectedWidgetIndex = static_cast<int>(asset.widgets.size() - 1);
 }
 
-void UICreator::SaveCurrentAsset()
+void GameGUICreator::SaveCurrentAsset()
 {
 	if (m_selectedAssetIndex < 0 || m_selectedAssetIndex >= static_cast<int>(m_assets.size()))
 	{
 		return;
 	}
 
-	UIAsset& asset = CurrentAsset();
+	GameGUIAsset& asset = CurrentAsset();
 	const std::filesystem::path assetPath = AssetPathFor(asset);
 	const std::filesystem::path directory = assetPath.parent_path();
 	std::error_code ec;
@@ -314,7 +314,7 @@ void UICreator::SaveCurrentAsset()
 	json << "  \"widgets\": [\n";
 	for (std::size_t i = 0; i < asset.widgets.size(); ++i)
 	{
-		const UIWidgetDef& widget = asset.widgets[i];
+		const GameGUIWidgetDef& widget = asset.widgets[i];
 		json << "    {\n";
 		json << "      \"type\": \"" << widget.type << "\",\n";
 		json << "      \"name\": \"" << widget.name << "\",\n";
@@ -344,14 +344,14 @@ void UICreator::SaveCurrentAsset()
 	gDebug.LogMessage("Saved UI asset: " + assetPath.string());
 }
 
-void UICreator::LoadCurrentAsset()
+void GameGUICreator::LoadCurrentAsset()
 {
 	if (m_selectedAssetIndex < 0 || m_selectedAssetIndex >= static_cast<int>(m_assets.size()))
 	{
 		return;
 	}
 
-	UIAsset& asset = CurrentAsset();
+	GameGUIAsset& asset = CurrentAsset();
 	asset.widgets.clear();
 	const std::filesystem::path assetPath = AssetPathFor(asset);
 	std::ifstream file(assetPath);
@@ -376,7 +376,7 @@ void UICreator::LoadCurrentAsset()
 	std::size_t widgetPos = contents.find("\"type\": \"");
 	while (widgetPos != std::string::npos)
 	{
-		UIWidgetDef widget;
+		GameGUIWidgetDef widget;
 		const auto readField = [&contents](const std::string& key, std::size_t start) -> std::string
 		{
 			const std::size_t keyPos = contents.find(key, start);
@@ -417,14 +417,14 @@ void UICreator::LoadCurrentAsset()
 	m_selectedWidgetIndex = asset.widgets.empty() ? -1 : 0;
 }
 
-void UICreator::DeleteSelectedWidget()
+void GameGUICreator::DeleteSelectedWidget()
 {
 	if (m_selectedAssetIndex < 0 || m_selectedAssetIndex >= static_cast<int>(m_assets.size()))
 	{
 		return;
 	}
 
-	UIAsset& asset = CurrentAsset();
+	GameGUIAsset& asset = CurrentAsset();
 	if (m_selectedWidgetIndex < 0 || m_selectedWidgetIndex >= static_cast<int>(asset.widgets.size()))
 	{
 		return;
@@ -443,14 +443,14 @@ void UICreator::DeleteSelectedWidget()
 	SyncRuntimePreview();
 }
 
-void UICreator::DeleteSelectedAsset()
+void GameGUICreator::DeleteSelectedAsset()
 {
 	if (m_selectedAssetIndex < 0 || m_selectedAssetIndex >= static_cast<int>(m_assets.size()))
 	{
 		return;
 	}
 
-	const UIAsset asset = CurrentAsset();
+	const GameGUIAsset asset = CurrentAsset();
 	const std::filesystem::path assetPath = AssetPathFor(asset);
 	if (std::filesystem::exists(assetPath))
 	{
@@ -480,7 +480,7 @@ void UICreator::DeleteSelectedAsset()
 	SyncRuntimePreview();
 }
 
-void UICreator::SyncRuntimePreview()
+void GameGUICreator::SyncRuntimePreview()
 {
 	if (m_selectedAssetIndex < 0 || m_selectedAssetIndex >= static_cast<int>(m_assets.size()))
 	{
@@ -491,7 +491,7 @@ void UICreator::SyncRuntimePreview()
 	gFrontEndManager.RuntimeGUI().LoadUIAsset(CurrentAsset());
 }
 
-bool UICreator::IsCurrentAssetStoredOnDisk() const
+bool GameGUICreator::IsCurrentAssetStoredOnDisk() const
 {
 	if (m_selectedAssetIndex < 0 || m_selectedAssetIndex >= static_cast<int>(m_assets.size()))
 	{

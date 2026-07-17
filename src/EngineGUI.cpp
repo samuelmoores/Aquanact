@@ -121,9 +121,9 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& scen
 		{
 			if (ImGui::MenuItem("Create UI"))
 			{
-				gFrontEndManager.OpenUICreator();
+				gFrontEndManager.OpenGameGUICreator();
 				gRenderManager.SetActiveCamera(gRenderManager.GetGameCamera());
-				gDebug.LogMessage("UI Creator opened.");
+				gDebug.LogMessage("GameGUI Creator opened.");
 			}
 			ImGui::EndMenu();
 		}

@@ -184,7 +184,7 @@ void RenderManager::Loop()
 		const auto editorGuiEnd = std::chrono::high_resolution_clock::now();
 		m_lastFrameEditorGuiTime = editorGuiEnd - editorGuiStart;
 
-		if (gFrontEndManager.FrontEndModeValue() == FrontEndMode::UICreator)
+		if (gFrontEndManager.FrontEndModeValue() == FrontEndMode::GameGUICreator)
 		{
 			m_lastFrameUiCreatorTime = m_lastFrameEditorGuiTime;
 			m_lastFrameRuntimeGuiTime = std::chrono::duration<double, std::milli>{ 0.0 };

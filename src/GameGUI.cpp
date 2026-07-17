@@ -5,7 +5,7 @@
 #include "Window.h"
 #include "StbImage.h"
 #include "GLHeaders.h"
-#include "UIAsset.h"
+#include "GameGUIAsset.h"
 
 #include <MYGUI/MyGUI_Button.h>
 #include <MYGUI/MyGUI_Gui.h>
@@ -209,9 +209,9 @@ void GameGUI::CreateTestButton()
 		MyGUI::LayerManager::getInstance().upLayerItem(m_testButton);
 	}
 
-	m_loadedAsset = UIAsset{};
+	m_loadedAsset = GameGUIAsset{};
 	m_loadedAsset.name = "TestUI";
-	m_loadedAsset.widgets.push_back(UIWidgetDef{
+	m_loadedAsset.widgets.push_back(GameGUIWidgetDef{
 		"Button",
 		"TestButton",
 		"ButtonSkin",
@@ -238,7 +238,7 @@ void GameGUI::DestroyTestButton()
 	m_testButton = nullptr;
 }
 
-void GameGUI::LoadUIAsset(const UIAsset& asset)
+void GameGUI::LoadUIAsset(const GameGUIAsset& asset)
 {
 	if (!m_initialized || !m_gui)
 	{
@@ -247,7 +247,7 @@ void GameGUI::LoadUIAsset(const UIAsset& asset)
 
 	ClearUI();
 	m_loadedAsset = asset;
-	for (const UIWidgetDef& widget : m_loadedAsset.widgets)
+	for (const GameGUIWidgetDef& widget : m_loadedAsset.widgets)
 	{
 		CreateWidgetFromDef(widget);
 	}
@@ -272,7 +272,7 @@ void GameGUI::ClearUI()
 	m_testButton = nullptr;
 }
 
-void GameGUI::CreateWidgetFromDef(const UIWidgetDef& def)
+void GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def)
 {
 	if (def.type == "Button")
 	{

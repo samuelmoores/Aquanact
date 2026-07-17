@@ -10,11 +10,11 @@ class SceneManager;
 class ProjectManager;
 #include "EngineGUI.h"
 #include "GameGUI.h"
-#include "UICreator.h"
+#include "GameGUICreator.h"
 
 enum class FrontEndMode {
 	EngineEditor,
-	UICreator
+	GameGUICreator
 };
 
 class FrontEndManager {
@@ -31,8 +31,8 @@ public:
 
 	void SetMode(FrontEndMode mode);
 	FrontEndMode FrontEndModeValue() const;
-	void OpenUICreator();
-	void ReturnToEngineEditor();
+	void OpenGameGUICreator();
+	void ReturnToEngineGUIEditor();
 
 	EngineMode AppMode() const;
 
@@ -42,12 +42,12 @@ public:
 	const EngineGUI& EditorGUI() const;
 	GameGUI& RuntimeGUI();
 	const GameGUI& RuntimeGUI() const;
-	UICreator& Creator();
-	const UICreator& Creator() const;
+	GameGUICreator& Creator();
+	const GameGUICreator& Creator() const;
 
 private:
 	std::unique_ptr<EngineGUI> m_engineGUI;
 	std::unique_ptr<GameGUI> m_gameGUI;
-	std::unique_ptr<UICreator> m_uiCreator;
+	std::unique_ptr<GameGUICreator> m_uiCreator;
 	FrontEndMode m_mode = FrontEndMode::EngineEditor;
 };
