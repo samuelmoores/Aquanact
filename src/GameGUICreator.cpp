@@ -11,6 +11,7 @@
 #include <fstream>
 #include <sstream>
 #include <algorithm>
+#include <cstdio>
 
 namespace {
 	std::filesystem::path AssetDirectory()
@@ -185,9 +186,8 @@ void GameGUICreator::Draw(const Camera&)
 			ImGui::Separator();
 			if (ImGui::MenuItem("Create Button", nullptr, false, m_selectedAssetIndex >= 0))
 			{
-				AddButtonWidget();
-				SyncRuntimePreview();
-				gDebug.LogMessage("Create Button requested");
+				m_showCreateWidgetPopup = true;
+				m_newWidgetName[0] = '\0';
 			}
 			ImGui::EndMenu();
 		}
@@ -239,6 +239,7 @@ void GameGUICreator::Draw(const Camera&)
 	}
 
 	DrawCreateAssetPopup();
+	DrawCreateWidgetPopup();
 
 		ImGui::Begin("UIAssets");
 	for (std::size_t i = 0; i < m_assets.size(); ++i)
@@ -343,6 +344,34 @@ void GameGUICreator::DrawCreateAssetPopup()
 	}
 }
 
+void GameGUICreator::DrawCreateWidgetPopup()
+{
+	if (m_showCreateWidgetPopup)
+	{
+		ImGui::OpenPopup("Create Widget");
+		m_showCreateWidgetPopup = false;
+	}
+
+	if (ImGui::BeginPopupModal("Create Widget", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		ImGui::TextUnformatted("Enter a widget name:");
+		ImGui::InputText("Name", m_newWidgetName, sizeof(m_newWidgetName));
+		if (ImGui::Button("Create"))
+		{
+			AddButtonWidget();
+			SyncRuntimePreview();
+			gDebug.LogMessage("Create Button requested");
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Cancel"))
+		{
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
+}
+
 void GameGUICreator::AddGameGUIAsset(const std::string& name)
 {
 	GameGUIAsset asset;
@@ -365,12 +394,13 @@ void GameGUICreator::AddButtonWidget()
 {
 	if (m_selectedAssetIndex < 0 || m_selectedAssetIndex >= static_cast<int>(m_assets.size()))
 	{
+		gDebug.LogMessage("AddButtonWidget skipped: no active GameGUI asset");
 		return;
 	}
 
 	GameGUIWidgetDef button;
 	button.type = "Button";
-	button.name = "button";
+	button.name = m_newWidgetName[0] != '\0' ? m_newWidgetName : "button";
 	button.skin = "ButtonSkin";
 	button.text = "Test Button";
 	button.layer = "Main";
@@ -398,6 +428,12 @@ void GameGUICreator::AddButtonWidget()
 
 	asset.widgets.push_back(button);
 	m_selectedWidgetIndex = static_cast<int>(asset.widgets.size() - 1);
+	m_newWidgetName[0] = '\0';
+	gDebug.LogMessage(
+		std::string("Created GameGUI button widget: name='") + button.name +
+		"', asset='" + asset.name +
+		"', pos=(" + std::to_string(button.x) + "," + std::to_string(button.y) + ")" +
+		", size=(" + std::to_string(button.width) + "x" + std::to_string(button.height) + ")");
 }
 
 void GameGUICreator::SaveCurrentAsset()

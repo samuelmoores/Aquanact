@@ -42,6 +42,8 @@ public:
 private:
 	// Converts the asset-level widget description into an actual MyGUI widget.
 	void CreateWidgetFromDef(const GameGUIWidgetDef& def);
+	// Handles runtime widget clicks for simple built-in actions like quitting.
+	void OnWidgetClicked(MyGUI::Widget* sender);
 
 	Window* m_window = nullptr;
 	MyGUI::OpenGLPlatform* m_platform = nullptr;

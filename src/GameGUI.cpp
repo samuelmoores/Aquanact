@@ -1,6 +1,7 @@
 #include "GameGUI.h"
 
 #include "Debug.h"
+#include "FrontEndManager.h"
 #include "Globals.h"
 #include "Window.h"
 #include "StbImage.h"
@@ -221,8 +222,43 @@ void GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def)
 			button->setCaption(def.text);
 			button->setVisible(def.visible);
 			button->setAlpha(def.alpha);
+			// Button clicks are routed back into GameGUI so we can attach small
+			// built-in behaviors without hardcoding them into the widget assets.
+			button->eventMouseButtonClick += MyGUI::newDelegate(this, &GameGUI::OnWidgetClicked);
+			gDebug.LogMessage(std::string("GameGUI click handler bound for widget: ") + def.name);
 			MyGUI::LayerManager::getInstance().upLayerItem(button);
 			m_runtimeWidgets.push_back(button);
+			gDebug.LogMessage(
+				std::string("GameGUI widget created: name='") + def.name +
+				"', type='" + def.type +
+				"', skin='" + def.skin +
+				"', layer='" + def.layer + "'");
 		}
+	}
+}
+
+void GameGUI::OnWidgetClicked(MyGUI::Widget* sender)
+{
+	if (!sender)
+	{
+		return;
+	}
+
+	const std::string name = sender->getName();
+	gDebug.LogMessage(std::string("GameGUI click received for widget: ") + (name.empty() ? "<unnamed>" : name));
+	gFrontEndManager.RuntimeGUI().RecordClick("Clicked widget: " + (name.empty() ? std::string("<unnamed>") : name));
+	if (name == "quit")
+	{
+		gFrontEndManager.RuntimeGUI().RecordClick("Quit action requested");
+		gDebug.LogMessage("GameGUI Quit action requested");
+	}
+
+	// Keep shutdown path normal so the main loop exits cleanly and the window
+	// teardown stays centralized in the engine.
+	if (name == "quit" && m_window && m_window->GLFW())
+	{
+		gDebug.LogMessage("GameGUI requested window close via Quit button");
+		gFrontEndManager.RuntimeGUI().RecordClick("Window close requested");
+		glfwSetWindowShouldClose(m_window->GLFW(), GLFW_TRUE);
 	}
 }

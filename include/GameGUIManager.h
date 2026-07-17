@@ -31,6 +31,8 @@ public:
 	const std::vector<std::string>& SceneAssets() const;
 	void DrawEditorWindow();
 	void DrawDiagnosticsWindow();
+	void LogAction(const std::string& message);
+	void RecordClick(const std::string& message);
 	void ClearUI();
 	std::size_t LoadedAssetCount() const;
 	std::size_t PlacedAssetCount() const;
@@ -43,5 +45,7 @@ private:
 	std::unique_ptr<GameGUI> m_runtime;
 	std::vector<GameGUIAsset> m_assets;
 	std::vector<std::string> m_sceneAssets;
+	std::vector<std::string> m_actionLog;
+	std::string m_lastClickMessage;
 	int m_activeAssetIndex = -1;
 };

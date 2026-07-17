@@ -20,6 +20,7 @@ public:
 
 private:
 	void DrawCreateAssetPopup();
+	void DrawCreateWidgetPopup();
 	std::filesystem::path AssetPathFor(const GameGUIAsset& asset) const;
 	GameGUIAsset& CurrentAsset();
 	const GameGUIAsset& CurrentAsset() const;
@@ -35,7 +36,9 @@ private:
 	Window* m_window = nullptr;
 	bool m_initialized = false;
 	bool m_showCreateAssetPopup = false;
+	bool m_showCreateWidgetPopup = false;
 	char m_newAssetName[64] = { 0 };
+	char m_newWidgetName[64] = { 0 };
 	std::vector<GameGUIAsset> m_assets;
 	int m_selectedAssetIndex = -1;
 	int m_selectedWidgetIndex = -1;

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "glm/glm.hpp"
+#define GLFW_INCLUDE_NONE
+#include "GLFW/glfw3.h"
 
 class Window;
 class EngineCamera;
@@ -22,7 +24,15 @@ public:
 	float DeltaTime() const;
 
 private:
+	static void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
+	static void CursorPosCallback(GLFWwindow* window, double xpos, double ypos);
+
+	void HandleMouseButton(int button, int action);
+	void HandleCursorPos(double xpos, double ypos);
+
 	Window* m_window = nullptr;
+	GLFWmousebuttonfun m_previousMouseButtonCallback = nullptr;
+	GLFWcursorposfun m_previousCursorPosCallback = nullptr;
 	bool m_lookActive = false;
 	glm::vec2 m_lastCursorPos = glm::vec2(0.0f);
 	glm::vec2 m_mouseDelta = glm::vec2(0.0f);

@@ -124,6 +124,8 @@ static int RunApplication(int argc, char** argv)
     while (!gWindow.ShouldClose())
         mainLoop();
 
+    gDebug.LogMessage("Main loop exiting because the window close flag was set.");
+
 #ifdef AQUANACT_EDITOR
     if (launchConfig.mode == LaunchMode::Editor)
     {

@@ -1,6 +1,8 @@
 #include "GameGUIManager.h"
 
 #include "GameGUI.h"
+#include "Globals.h"
+#include "RenderManager.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -318,6 +320,29 @@ void GameGUIManager::DrawDiagnosticsWindow()
 	ImGui::Text("Placed assets: %zu", m_sceneAssets.size());
 	ImGui::Text("Active asset index: %d", m_activeAssetIndex);
 	ImGui::Text("Active asset name: %s", ActiveAssetName().empty() ? "<none>" : ActiveAssetName().c_str());
+	ImGui::Text("Last click: %s", m_lastClickMessage.empty() ? "<none>" : m_lastClickMessage.c_str());
+	if (gEngineState.IsGameMode())
+	{
+		ImGui::Separator();
+		// The editor menu bar disappears in game mode, so we expose a minimal
+		// in-game stop control here to return to the editor without restarting.
+		if (ImGui::Button("Stop Game"))
+		{
+			gEngineState.SetMode(EngineMode::Editor);
+			gRenderManager.SetActiveCamera(gRenderManager.GetEngineCamera());
+			LogAction("Stop Game requested");
+		}
+	}
+	ImGui::Separator();
+	ImGui::TextUnformatted("Action log:");
+	if (m_actionLog.empty())
+	{
+		ImGui::BulletText("<empty>");
+	}
+	for (const auto& entry : m_actionLog)
+	{
+		ImGui::BulletText("%s", entry.c_str());
+	}
 	ImGui::Separator();
 	ImGui::TextUnformatted("Loaded asset names:");
 	for (const auto& asset : m_assets)
@@ -331,6 +356,31 @@ void GameGUIManager::DrawDiagnosticsWindow()
 		ImGui::BulletText("%s", name.c_str());
 	}
 	ImGui::End();
+}
+
+void GameGUIManager::LogAction(const std::string& message)
+{
+	if (message.empty())
+	{
+		return;
+	}
+
+	m_actionLog.push_back(message);
+	if (m_actionLog.size() > 12)
+	{
+		m_actionLog.erase(m_actionLog.begin());
+	}
+}
+
+void GameGUIManager::RecordClick(const std::string& message)
+{
+	if (message.empty())
+	{
+		return;
+	}
+
+	m_lastClickMessage = message;
+	LogAction(message);
 }
 
 void GameGUIManager::UnloadUIAsset(const std::string& name)
@@ -369,6 +419,8 @@ void GameGUIManager::ClearUI()
 {
 	m_assets.clear();
 	m_sceneAssets.clear();
+	m_actionLog.clear();
+	m_lastClickMessage.clear();
 	m_activeAssetIndex = -1;
 	if (m_runtime)
 	{

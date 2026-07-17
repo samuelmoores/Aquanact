@@ -2,7 +2,11 @@
 
 #include "Window.h"
 #include "EngineCamera.h"
+#include "Globals.h"
 #include "GLFW/glfw3.h"
+
+#include <MYGUI/MyGUI_InputManager.h>
+#include <MYGUI/MyGUI_MouseButton.h>
 
 void Input::startUp(Window& window)
 {
@@ -14,6 +18,12 @@ void Input::startUp(Window& window)
 	glfwGetCursorPos(m_window->GLFW(), &x, &y);
 	m_lastCursorPos = glm::vec2(static_cast<float>(x), static_cast<float>(y));
 	m_mouseDelta = glm::vec2(0.0f);
+
+	glfwSetWindowUserPointer(m_window->GLFW(), this);
+	// Chain GLFW callbacks so ImGui keeps receiving input while MyGUI gets the
+	// same raw mouse events in game mode.
+	m_previousMouseButtonCallback = glfwSetMouseButtonCallback(m_window->GLFW(), &Input::MouseButtonCallback);
+	m_previousCursorPosCallback = glfwSetCursorPosCallback(m_window->GLFW(), &Input::CursorPosCallback);
 }
 
 void Input::shutDown()
@@ -21,7 +31,14 @@ void Input::shutDown()
 	if (m_window && m_lookActive) {
 		glfwSetInputMode(m_window->GLFW(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 	}
+	if (m_window)
+	{
+		glfwSetMouseButtonCallback(m_window->GLFW(), m_previousMouseButtonCallback);
+		glfwSetCursorPosCallback(m_window->GLFW(), m_previousCursorPosCallback);
+	}
 	m_window = nullptr;
+	m_previousMouseButtonCallback = nullptr;
+	m_previousCursorPosCallback = nullptr;
 	m_lookActive = false;
 	m_lookBecameActive = false;
 	m_mouseDelta = glm::vec2(0.0f);
@@ -117,4 +134,71 @@ float Input::DeltaTime() const
 bool Input::WindowFocused() const
 {
 	return m_windowFocused;
+}
+
+void Input::MouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
+{
+	auto* input = static_cast<Input*>(glfwGetWindowUserPointer(window));
+	if (input)
+	{
+		input->HandleMouseButton(button, action);
+	}
+
+	GLFWmousebuttonfun previous = input ? input->m_previousMouseButtonCallback : nullptr;
+	if (previous)
+	{
+		previous(window, button, action, mods);
+	}
+}
+
+void Input::CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
+{
+	auto* input = static_cast<Input*>(glfwGetWindowUserPointer(window));
+	if (input)
+	{
+		input->HandleCursorPos(xpos, ypos);
+	}
+
+	GLFWcursorposfun previous = input ? input->m_previousCursorPosCallback : nullptr;
+	if (previous)
+	{
+		previous(window, xpos, ypos);
+	}
+}
+
+void Input::HandleMouseButton(int button, int action)
+{
+	if (!m_window || !gEngineState.IsGameMode())
+	{
+		return;
+	}
+
+	double x = 0.0;
+	double y = 0.0;
+	glfwGetCursorPos(m_window->GLFW(), &x, &y);
+
+	if (button == GLFW_MOUSE_BUTTON_LEFT)
+	{
+		if (action == GLFW_PRESS)
+		{
+			MyGUI::InputManager::getInstance().injectMousePress(static_cast<int>(x), static_cast<int>(y), MyGUI::MouseButton::Left);
+		}
+		else if (action == GLFW_RELEASE)
+		{
+			MyGUI::InputManager::getInstance().injectMouseRelease(static_cast<int>(x), static_cast<int>(y), MyGUI::MouseButton::Left);
+		}
+	}
+}
+
+void Input::HandleCursorPos(double xpos, double ypos)
+{
+	if (!m_window || !gEngineState.IsGameMode())
+	{
+		return;
+	}
+
+	MyGUI::InputManager::getInstance().injectMouseMove(
+		static_cast<int>(xpos),
+		static_cast<int>(ypos),
+		0);
 }
