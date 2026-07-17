@@ -1,0 +1,31 @@
+{
+  "name": "hud",
+  "widgets": [
+    {
+      "type": "Button",
+      "name": "button",
+      "skin": "ButtonSkin",
+      "text": "Test Button",
+      "layer": "Main",
+      "x": 411,
+      "y": 111,
+      "width": 320,
+      "height": 90,
+      "visible": true,
+      "alpha": 1
+    },
+    {
+      "type": "Button",
+      "name": "button_2",
+      "skin": "ButtonSkin",
+      "text": "Test Button",
+      "layer": "Main",
+      "x": 480,
+      "y": 315,
+      "width": 320,
+      "height": 90,
+      "visible": true,
+      "alpha": 1
+    }
+  ]
+}

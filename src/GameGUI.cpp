@@ -12,6 +12,7 @@
 #include <MYGUI/MyGUI_OpenGLDataManager.h>
 #include <MYGUI/MyGUI_OpenGLPlatform.h>
 #include <MYGUI/MyGUI_LayerManager.h>
+#include <MYGUI/MyGUI_PointerManager.h>
 #include <MYGUI/MyGUI_OpenGLImageLoader.h>
 #include <algorithm>
 #include <fstream>
@@ -83,13 +84,14 @@ void GameGUI::startUp(Window& window)
 		m_platform->getRenderManagerPtr()->setViewSize(framebufferWidth, framebufferHeight);
 		// MyGUI resolves XML resources through its data manager. Registering the build
 		// output root lets it find the copied MyGUI media folder and the XML skin files
-		// referenced by the test button.
+		// referenced by the runtime widgets.
 		MyGUI::OpenGLDataManager::getInstance().addResourceLocation(".", true);
 
 		// Gui has to exist only after the platform and resources are available. That
 		// ordering fixed the runtime exceptions we saw during the first integration pass.
 		m_gui = new MyGUI::Gui();
 		m_gui->initialise();
+		MyGUI::PointerManager::getInstance().setVisible(false);
 		m_initialized = true;
 	}
 	catch (const std::exception& e)
@@ -117,7 +119,6 @@ void GameGUI::shutDown()
 	if (m_initialized)
 	{
 		ClearUI();
-		DestroyTestButton();
 
 		// Reverse startup order to avoid dangling MyGUI objects during shutdown.
 		m_gui->shutdown();
@@ -169,60 +170,6 @@ void GameGUI::EndFrame()
 {
 }
 
-void GameGUI::CreateTestButton()
-{
-	if (!m_initialized || !m_gui)
-	{
-		return;
-	}
-
-	// The button is now created by the UI creator instead of at startup, so the
-	// editor controls when the runtime UI is actually spawned.
-	if (m_testButton)
-	{
-		DestroyTestButton();
-	}
-
-	int framebufferWidth = 0;
-	int framebufferHeight = 0;
-	m_window->GetFramebufferSize(framebufferWidth, framebufferHeight);
-
-	const int buttonWidth = 320;
-	const int buttonHeight = 90;
-	const int buttonLeft = (framebufferWidth - buttonWidth) / 2;
-	const int buttonTop = (framebufferHeight - buttonHeight) / 2;
-
-	m_testButton = m_gui->createWidget<MyGUI::Button>(
-		"ButtonSkin",
-		buttonLeft,
-		buttonTop,
-		buttonWidth,
-		buttonHeight,
-		MyGUI::Align::Default,
-		"Main",
-		"TestButton");
-	if (m_testButton)
-	{
-		m_testButton->setCaption("Test Button");
-		m_testButton->setVisible(true);
-		m_testButton->setAlpha(1.0f);
-		MyGUI::LayerManager::getInstance().upLayerItem(m_testButton);
-	}
-
-}
-
-void GameGUI::DestroyTestButton()
-{
-	if (!m_gui || !m_testButton)
-	{
-		return;
-	}
-
-	// Keep destruction centralized so the widget lifetime is always paired with Gui.
-	m_gui->destroyWidget(m_testButton);
-	m_testButton = nullptr;
-}
-
 void GameGUI::LoadUIAsset(const GameGUIAsset& asset)
 {
 	if (!m_initialized || !m_gui)
@@ -254,7 +201,6 @@ void GameGUI::ClearUI()
 		}
 	}
 	m_runtimeWidgets.clear();
-	m_testButton = nullptr;
 }
 
 void GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def)
@@ -277,10 +223,6 @@ void GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def)
 			button->setAlpha(def.alpha);
 			MyGUI::LayerManager::getInstance().upLayerItem(button);
 			m_runtimeWidgets.push_back(button);
-			if (def.name == "TestButton")
-			{
-				m_testButton = button;
-			}
 		}
 	}
 }

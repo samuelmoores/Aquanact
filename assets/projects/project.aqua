@@ -3,3 +3,5 @@ object;models\\character.fbx;8.787702;4.579291;-18.289900;0.000000;0.000000;0.00
 object;models\\griff.fbx;-160.000000;0.000000;-107.199997;0.000000;0.000000;0.000000;1.000000;1.000000;1.000000
 component;models\\character.fbx;controller;50.000000
 gamecamera;661.902649;909.326172;-769.507751;-0.529017;-0.603350;0.596749
+gameguiasset;hud
+gameguiactive;hud

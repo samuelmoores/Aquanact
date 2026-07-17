@@ -44,6 +44,7 @@ set(SOURCES
     "include/GameGUIAsset.h"
     "include/EngineGUI.h" "src/EngineGUI.cpp"
     "include/GameGUI.h" "src/GameGUI.cpp"
+    "include/GameGUIManager.h" "src/GameGUIManager.cpp"
     "include/GameGUICreator.h" "src/GameGUICreator.cpp"
     "include/FrontEndManager.h" "src/FrontEndManager.cpp"
     "include/FileManager.h" "src/FileManager.cpp"

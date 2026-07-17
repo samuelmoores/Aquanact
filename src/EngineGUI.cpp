@@ -357,6 +357,8 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& scen
 		}
 	}
 	ImGui::End();
+
+	gFrontEndManager.RuntimeGUI().DrawEditorWindow();
 }
 
 void EngineGUI::DrawBuildGamePopup()

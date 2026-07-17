@@ -17,48 +17,31 @@ class GameGUIImageLoader final : public MyGUI::OpenGLImageLoader
 {
 public:
 	~GameGUIImageLoader() override = default;
-
-	// MyGUI asks the engine to decode images into raw pixels here. This became a
-	// custom loader because the default MyGUI image path was not aware of our stb_image
-	// wrapper and the engine's asset layout.
+	// MyGUI requests decoded pixels through this callback, so the loader bridges
+	// the engine's file/image handling into MyGUI's OpenGL texture pipeline.
 	void* loadImage(int& _width, int& _height, MyGUI::PixelFormat& _format, const std::string& _filename) override;
-	// The runtime UI only needs loading, not saving. We keep the method because the
-	// MyGUI interface requires it, but the engine does not use it yet.
+	// The runtime path does not export textures yet, so saving remains a stub.
 	void saveImage(int _width, int _height, MyGUI::PixelFormat _format, void* _texture, const std::string& _filename) override;
-
-private:
-	// MyGUI asks for raw CPU pixel memory here. The memory has to stay valid long enough
-	// for the backend to upload it into an OpenGL texture. MyGUI/OpenGLTexture takes
-	// ownership and deletes the buffer with delete[], so we must return heap memory.
 };
 
 class GameGUI {
 public:
 	GameGUI() = default;
-
-	// Startup had to be done in a specific order:
-	// platform first, then resources, then Gui, then widgets.
-	// Earlier runtime crashes came from initializing these pieces out of sequence.
+	// Startup and shutdown bracket the lifetime of the MyGUI platform, renderer,
+	// and widget objects owned by the runtime wrapper.
 	void startUp(Window& window);
-	// Shutdown mirrors startup in reverse order so widgets die before the GUI platform.
 	void shutDown();
-
 	void BeginFrame();
-	// Draw is where the MyGUI overlay is actually submitted to OpenGL.
-	// The final fix was to restore a GUI-safe GL state before this call.
+	// Draw submits the MyGUI overlay after the engine has finished its scene pass.
 	void Draw();
 	void EndFrame();
-
-	// Creates the current smoke-test widget on demand instead of at startup.
-	// This lets the UI creator own the moment the first runtime widget appears.
-	void CreateTestButton();
-	// Loads a whole UI asset and rebuilds the live MyGUI widgets from its definitions.
+	// UI assets are deserialized into live MyGUI widgets through this entry point.
 	void LoadUIAsset(const GameGUIAsset& asset);
 	void ClearUI();
 
 private:
+	// Converts the asset-level widget description into an actual MyGUI widget.
 	void CreateWidgetFromDef(const GameGUIWidgetDef& def);
-	void DestroyTestButton();
 
 	Window* m_window = nullptr;
 	MyGUI::OpenGLPlatform* m_platform = nullptr;

@@ -5,6 +5,7 @@
 #include "AnimatorComponent.h"
 #include "Globals.h"
 #include "Object3D.h"
+#include "FrontEndManager.h"
 #include "FileSystem.h"
 #include "SceneManager.h"
 #include "RenderManager.h"
@@ -247,6 +248,24 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const SceneM
 	contents += std::to_string(gameCameraPosition.x) + ";" + std::to_string(gameCameraPosition.y) + ";" + std::to_string(gameCameraPosition.z) + ";";
 	contents += std::to_string(gameCameraFacing.x) + ";" + std::to_string(gameCameraFacing.y) + ";" + std::to_string(gameCameraFacing.z) + "\n";
 
+	// Persist the runtime GameGUI placement list with the project so the same
+	// UI assets are restored when the scene is reopened.
+	for (const auto& assetName : gFrontEndManager.RuntimeGUI().SceneAssets())
+	{
+		contents += "gameguiasset;";
+		contents += EscapeField(assetName);
+		contents += "\n";
+	}
+
+	// Keep track of which GameGUI asset was active when the project was saved.
+	const std::string activeGameGUIAsset = gFrontEndManager.RuntimeGUI().ActiveAssetName();
+	if (!activeGameGUIAsset.empty())
+	{
+		contents += "gameguiactive;";
+		contents += EscapeField(activeGameGUIAsset);
+		contents += "\n";
+	}
+
 	return m_fileSystem->WriteTextFile(path, contents);
 }
 
@@ -277,6 +296,10 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 		float moveSpeed = 50.0f;
 	};
 	std::vector<PendingController> pendingControllers;
+	// GameGUI state is loaded in two phases: we collect the saved asset names
+	// here, then hand them back to the runtime GUI after the scene finishes loading.
+	std::vector<std::string> pendingGameGUIAssets;
+	std::string pendingActiveGameGUIAsset;
 	std::string line;
 	while (std::getline(file, line))
 	{
@@ -306,6 +329,18 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 				gDebug.LogMessage("Reason: " + std::string(ex.what()));
 				return false;
 			}
+			continue;
+		}
+
+		if (fields.size() == 2 && fields[0] == "gameguiasset")
+		{
+			pendingGameGUIAssets.push_back(UnescapeField(fields[1]));
+			continue;
+		}
+
+		if (fields.size() == 2 && fields[0] == "gameguiactive")
+		{
+			pendingActiveGameGUIAsset = UnescapeField(fields[1]);
 			continue;
 		}
 
@@ -395,6 +430,14 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 			gGameplayManager.RegisterController(controller);
 			break;
 		}
+	}
+
+	// Rebuild the runtime GameGUI placement list after the scene and controllers
+	// are restored so the UI matches the saved project state.
+	gFrontEndManager.RuntimeGUI().SetSceneAssets(pendingGameGUIAssets);
+	if (!pendingActiveGameGUIAsset.empty())
+	{
+		gFrontEndManager.RuntimeGUI().ActivateAsset(pendingActiveGameGUIAsset);
 	}
 
 	return true;

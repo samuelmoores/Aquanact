@@ -21,7 +21,7 @@ void FrontEndManager::startUp(Window& window)
 	}
 	if (!m_gameGUI)
 	{
-		m_gameGUI = std::make_unique<GameGUI>();
+		m_gameGUI = std::make_unique<GameGUIManager>();
 	}
 	if (!m_uiCreator)
 	{
@@ -90,6 +90,11 @@ void FrontEndManager::Draw(const Camera& camera, FileManager& fileManager, Scene
 	{
 		m_gameGUI->Draw();
 	}
+
+	if (m_gameGUI && IsGameMode())
+	{
+		m_gameGUI->DrawDiagnosticsWindow();
+	}
 }
 
 void FrontEndManager::EndFrame()
@@ -153,12 +158,12 @@ const EngineGUI& FrontEndManager::EditorGUI() const
 	return *m_engineGUI;
 }
 
-GameGUI& FrontEndManager::RuntimeGUI()
+GameGUIManager& FrontEndManager::RuntimeGUI()
 {
 	return *m_gameGUI;
 }
 
-const GameGUI& FrontEndManager::RuntimeGUI() const
+const GameGUIManager& FrontEndManager::RuntimeGUI() const
 {
 	return *m_gameGUI;
 }

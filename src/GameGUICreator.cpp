@@ -15,7 +15,13 @@
 namespace {
 	std::filesystem::path AssetDirectory()
 	{
-		return std::filesystem::current_path() / "UI";
+#ifdef AQUANACT_SOURCE_ROOT
+		// UI assets are authored in the source tree, not the build tree, so the
+		// editor can save and reload them without depending on build output.
+		return std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets" / "gameGUI";
+#else
+		return std::filesystem::current_path() / "assets" / "gameGUI";
+#endif
 	}
 
 	GameGUIAsset LoadAssetFile(const std::filesystem::path& assetPath)
@@ -317,7 +323,11 @@ void GameGUICreator::DrawCreateAssetPopup()
 			std::string name = m_newAssetName;
 			if (name.empty())
 			{
-				name = "HUD";
+				// Empty names used to auto-fill a default asset, but that created
+				// unwanted files. Now we treat it as a cancel operation instead.
+				gDebug.LogMessage("Create Asset cancelled: name is empty");
+				ImGui::CloseCurrentPopup();
+				return;
 			}
 			AddGameGUIAsset(name);
 			SaveCurrentAsset();

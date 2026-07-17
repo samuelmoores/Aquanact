@@ -201,6 +201,10 @@ void RenderManager::Loop()
 		const auto debugStart = std::chrono::high_resolution_clock::now();
 		gFrontEndManager.BeginFrame();
 		gDebug.drawGameModeInput(gInput);
+		// The runtime manager keeps the first placed asset active, so the render
+		// loop only needs to draw the already-selected GameGUI instance.
+		gFrontEndManager.RuntimeGUI().Draw();
+		gFrontEndManager.RuntimeGUI().DrawDiagnosticsWindow();
 		const auto debugEnd = std::chrono::high_resolution_clock::now();
 		m_lastFrameDebugOverlayTime = debugEnd - debugStart;
 		m_lastFrameEditorGuiTime = std::chrono::duration<double, std::milli>{ 0.0 };
