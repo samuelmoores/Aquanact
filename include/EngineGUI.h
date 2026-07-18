@@ -27,6 +27,9 @@ private:
 	bool m_showAxis = true;
 	bool m_showGrid = true;
 	bool m_initialized = false;
+	unsigned int m_bootTexture = 0;
+	int m_bootTextureWidth = 0;
+	int m_bootTextureHeight = 0;
 	int m_selectedSceneObjectIndex = -1;
 	bool m_buildGamePopupRequested = false;
 };

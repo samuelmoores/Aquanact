@@ -14,6 +14,8 @@
 #include "Object3D.h"
 #include "Controller.h"
 #include "AnimatorComponent.h"
+#include "GLHeaders.h"
+#include "StbImage.h"
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -21,6 +23,7 @@
 #include <filesystem>
 #include <algorithm>
 #include <cstring>
+#include <cstdint>
 #include <string>
 
 namespace {
@@ -51,6 +54,86 @@ void EngineGUI::startUp(Window& window)
 	ImGui_ImplGlfw_InitForOpenGL(window.GLFW(), true);
 	ImGui_ImplOpenGL3_Init("#version 330");
 	m_initialized = true;
+
+	try
+	{
+		StbImage bootImage;
+		const std::filesystem::path bootImagePath = SourceRoot() / "assets" / "bootImage" / "aquanact_transparent.png";
+		bootImage.loadFromFile(bootImagePath.string());
+		m_bootTextureWidth = bootImage.getWidth();
+		m_bootTextureHeight = bootImage.getHeight();
+
+		glGenTextures(1, &m_bootTexture);
+		glBindTexture(GL_TEXTURE_2D, m_bootTexture);
+		GLint previousUnpackAlignment = 4;
+		glGetIntegerv(GL_UNPACK_ALIGNMENT, &previousUnpackAlignment);
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexImage2D(
+			GL_TEXTURE_2D,
+			0,
+			GL_RGBA8,
+			bootImage.getWidth(),
+			bootImage.getHeight(),
+			0,
+			GL_RGBA,
+			GL_UNSIGNED_BYTE,
+			bootImage.getData());
+		glPixelStorei(GL_UNPACK_ALIGNMENT, previousUnpackAlignment);
+		glBindTexture(GL_TEXTURE_2D, 0);
+	}
+	catch (const std::exception& ex)
+	{
+		gDebug.LogMessage("Boot image failed to load: " + std::string(ex.what()));
+		if (m_bootTexture != 0)
+		{
+			glDeleteTextures(1, &m_bootTexture);
+			m_bootTexture = 0;
+		}
+		m_bootTextureWidth = 0;
+		m_bootTextureHeight = 0;
+	}
+
+	// Present a first ImGui frame immediately so the window has visible content
+	// while the remaining frontend systems and project assets finish starting up.
+	BeginFrame();
+	ImDrawList* drawList = ImGui::GetBackgroundDrawList();
+	const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+	const ImVec2 center(displaySize.x * 0.5f, displaySize.y * 0.5f);
+	float titleY = center.y + 100.0f;
+	if (m_bootTexture != 0)
+	{
+		const float imageAspect = static_cast<float>(m_bootTextureWidth) / static_cast<float>(m_bootTextureHeight);
+		const float maxImageWidth = displaySize.x * 0.195f;
+		const float maxImageHeight = displaySize.y * 0.175f;
+		float imageWidth = maxImageWidth;
+		float imageHeight = imageWidth / imageAspect;
+		if (imageHeight > maxImageHeight)
+		{
+			imageHeight = maxImageHeight;
+			imageWidth = imageHeight * imageAspect;
+		}
+
+		const ImVec2 imageMin(center.x - imageWidth * 0.5f, center.y - imageHeight * 0.5f - 24.0f);
+		const ImVec2 imageMax(imageMin.x + imageWidth, imageMin.y + imageHeight);
+			drawList->AddImage(
+			reinterpret_cast<ImTextureID>(static_cast<intptr_t>(m_bootTexture)),
+			imageMin,
+			imageMax,
+			ImVec2(0.0f, 0.0f),
+			ImVec2(1.0f, 1.0f));
+		titleY = imageMax.y + 24.0f;
+	}
+
+	glClearColor(0.02f, 0.02f, 0.025f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	ImGui::Render();
+	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+	window.SwapBuffers();
+	window.PollEvents();
 }
 
 void EngineGUI::shutDown()
@@ -60,6 +143,13 @@ void EngineGUI::shutDown()
 		return;
 	}
 
+	if (m_bootTexture != 0)
+	{
+		glDeleteTextures(1, &m_bootTexture);
+		m_bootTexture = 0;
+	}
+	m_bootTextureWidth = 0;
+	m_bootTextureHeight = 0;
 	ImGui_ImplOpenGL3_Shutdown();
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
