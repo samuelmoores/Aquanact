@@ -52,6 +52,7 @@ bool AquanactBuildSystem::Build(const std::filesystem::path& sourceRoot,
 
 		CopyDirectoryIfExists(sourceRoot / "shaders", buildRoot / "shaders");
 		CopyDirectoryIfExists(sourceRoot / "assets", buildRoot / "assets");
+		CopyDirectoryIfExists(sourceRoot / "external" / "mygui-upstream" / "Media" / "MyGUI_Media", buildRoot);
 
 		if (std::filesystem::exists(projectFile))
 		{

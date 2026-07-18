@@ -215,5 +215,6 @@ add_custom_target(copymygui
 )
 add_dependencies(AquanactEngine copyshaders copymodels)
 add_dependencies(AquanactEngine copymygui)
+add_dependencies(AquanactGame copyshaders copymodels copymygui)
 
 

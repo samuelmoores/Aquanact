@@ -8,6 +8,7 @@
 #include "StbImage.h"
 #include "GLHeaders.h"
 #include "GameGUIAsset.h"
+#include "FileSystem.h"
 
 #include <MYGUI/MyGUI_Button.h>
 #include <MYGUI/MyGUI_Gui.h>
@@ -101,7 +102,8 @@ void GameGUI::startUp(Window& window)
 		// MyGUI resolves XML resources through its data manager. Registering the build
 		// output root lets it find the copied MyGUI media folder and the XML skin files
 		// referenced by the runtime widgets.
-		MyGUI::OpenGLDataManager::getInstance().addResourceLocation(".", true);
+		const std::filesystem::path resourceRoot = gFileSystem.ExecutableDirectory();
+		MyGUI::OpenGLDataManager::getInstance().addResourceLocation(resourceRoot.string(), true);
 
 		// Gui has to exist only after the platform and resources are available. That
 		// ordering fixed the runtime exceptions we saw during the first integration pass.

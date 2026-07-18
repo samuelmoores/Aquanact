@@ -16,6 +16,7 @@
 #include "AnimatorComponent.h"
 #include "GLHeaders.h"
 #include "StbImage.h"
+#include "FileSystem.h"
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -58,7 +59,13 @@ void EngineGUI::startUp(Window& window)
 	try
 	{
 		StbImage bootImage;
-		const std::filesystem::path bootImagePath = SourceRoot() / "assets" / "bootImage" / "aquanact_transparent.png";
+		const std::filesystem::path bootImageRoot =
+#ifdef AQUANACT_GAME
+			gFileSystem.ExecutableDirectory() / "assets" / "bootImage";
+#else
+			SourceRoot() / "assets" / "bootImage";
+#endif
+		const std::filesystem::path bootImagePath = bootImageRoot / "aquanact_transparent.png";
 		bootImage.loadFromFile(bootImagePath.string());
 		m_bootTextureWidth = bootImage.getWidth();
 		m_bootTextureHeight = bootImage.getHeight();

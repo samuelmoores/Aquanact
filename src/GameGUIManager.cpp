@@ -3,6 +3,7 @@
 #include "GameGUI.h"
 #include "Globals.h"
 #include "RenderManager.h"
+#include "FileSystem.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -13,12 +14,16 @@
 namespace {
 	std::filesystem::path AssetDirectory()
 	{
+#ifdef AQUANACT_GAME
+		return gFileSystem.ExecutableDirectory() / "assets" / "gameGUI";
+#else
 #ifdef AQUANACT_SOURCE_ROOT
 		// Keep authored GameGUI assets under the source tree so they survive
 		// rebuilds and remain editable outside the build output directory.
 		return std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets" / "gameGUI";
 #else
 		return std::filesystem::current_path() / "assets" / "gameGUI";
+#endif
 #endif
 	}
 

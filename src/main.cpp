@@ -43,6 +43,12 @@ static void mainLoop()
 namespace {
 	std::filesystem::path DefaultProjectPath()
 	{
+		const std::filesystem::path executableProject = gFileSystem.ExecutableDirectory() / "project.aqua";
+		if (std::filesystem::exists(executableProject))
+		{
+			return executableProject;
+		}
+
 		const std::filesystem::path packagedProject = std::filesystem::current_path() / "project.aqua";
 		if (std::filesystem::exists(packagedProject))
 		{

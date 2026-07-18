@@ -3,6 +3,34 @@
 #include <fstream>
 #include <iterator>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
+std::filesystem::path FileSystem::ExecutableDirectory() const
+{
+#ifdef _WIN32
+	std::wstring buffer;
+	buffer.resize(MAX_PATH);
+
+	for (;;)
+	{
+		const DWORD length = GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
+		if (length == 0)
+		{
+			break;
+		}
+		if (length < buffer.size() - 1)
+		{
+			buffer.resize(length);
+			return std::filesystem::path(buffer).parent_path();
+		}
+		buffer.resize(buffer.size() * 2);
+	}
+#endif
+	return std::filesystem::current_path();
+}
+
 bool FileSystem::Exists(const std::filesystem::path& path) const
 {
 	return std::filesystem::exists(path);

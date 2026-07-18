@@ -27,17 +27,26 @@ void RenderManager::startUp(Window& window)
 	m_lastFrameEditorGuiTime = std::chrono::duration<double, std::milli>{ 0.0 };
 	m_lastFrameUiCreatorTime = std::chrono::duration<double, std::milli>{ 0.0 };
 	m_lastFrameRuntimeGuiTime = std::chrono::duration<double, std::milli>{ 0.0 };
-	if (!m_engineCamera)
-	{
-		m_engineCamera = std::make_unique<EngineCamera>();
-	}
 	if (!m_gameCamera)
 	{
 		m_gameCamera = std::make_unique<GameCamera>();
+		m_gameCamera->startUp();
 	}
-	m_engineCamera->startUp();
-	m_gameCamera->startUp();
-	m_activeCamera = m_engineCamera.get();
+
+	if (gEngineState.IsEditorMode())
+	{
+		if (!m_engineCamera)
+		{
+			m_engineCamera = std::make_unique<EngineCamera>();
+		}
+		m_engineCamera->startUp();
+		m_activeCamera = m_engineCamera.get();
+	}
+	else
+	{
+		m_activeCamera = m_gameCamera.get();
+	}
+
 	m_device.startUp(window);
 }
 
