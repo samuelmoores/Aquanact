@@ -1,0 +1,117 @@
+Aquanact boot report: editor mode through the first draw call
+==============================================================
+
+Scope
+-----
+This report follows the source-defined startup path for the AquanactEngine target
+(CMake target definition: CMakeLists.txt, target_compile_definitions(...
+AQUANACT_EDITOR)) until the first OpenGL draw operation. The trace is based on
+src/main.cpp, src/Window.cpp, src/RenderManager.cpp, and the graphics/UI startup
+code. The checked-in project is assets/projects/project.aqua.
+
+Mode selection
+--------------
+RunApplication parses the command line before any subsystem starts. Editor is the
+default LaunchMode. The executable name game.exe selects game mode, --game forces
+game mode, and --editor forces editor mode. For the normal AquanactEngine target,
+editor mode is therefore the default unless --game is supplied.
+
+Startup sequence
+----------------
+1. Global singleton-like objects are constructed before main: Window,
+   RenderManager, FrontEndManager, Debug, FileSystem/FileManager, SceneManager,
+   ProjectManager, GameplayManager, Input, and EngineState.
+
+2. RunApplication calls Window::startUp (src/Window.cpp). GLFW is initialized;
+   a resizable 1280x720 window is created with an OpenGL 3.3 compatibility
+   context, 8-bit stencil, and 4x multisampling. The context is made current and
+   vsync is enabled.
+
+3. RenderManager::startUp resets the frame allocator and command-buffer state,
+   creates EngineCamera and GameCamera, starts both cameras, and starts the
+   OpenGLGraphicsDevice. OpenGLGraphics makes the GLFW context current, loads
+   GLAD, enables depth testing and multisampling, sets the clear color, updates
+   the viewport, and enables vsync.
+
+4. FrontEndManager::startUp creates and starts EngineGUI, GameGUIManager, and
+   GameGUICreator. EngineGUI creates the ImGui context and initializes the GLFW
+   and OpenGL3 ImGui backends. GameGUIManager starts the MyGUI OpenGL platform,
+   registers the image loader and resource root, creates/initializes MyGUI, and
+   scans assets/gameGUI for JSON assets. GameGUICreator also scans the same
+   directory and prepares its editor-side asset list. Its initial preview asset,
+   if any, is passed to the runtime GUI.
+
+5. GameplayManager::startUp clears controllers and unpauses the gameplay system.
+
+6. Input::startUp attaches to the GLFW window, records the initial cursor
+   position, installs mouse callbacks, and stores the previous callbacks so they
+   can be restored at shutdown.
+
+7. Because this is an editor build and the selected mode is editor,
+   EngineState is set to Editor. Input attaches the EngineCamera. Debug::startUp
+   builds the axis and grid helpers, logs build/dependency diagnostics, and
+   verifies runtime dependencies. FileManager::startUp sets the model directory
+   to C:/dev/Aquanact/assets/models and enumerates it.
+
+8. ProjectManager::LoadProject loads the selected project path. With the default
+   source-tree project it reads assets/projects/project.aqua, restores the game
+   camera, collects GameGUI placement information, imports each object model
+   (character.fbx and griff.fbx), creates meshes/shaders, restores transforms,
+   creates the saved controller component, registers controllers, and activates
+   the saved HUD asset. Scene objects are now available to the renderer.
+
+First main-loop iteration
+-------------------------
+The loop starts after startup and continues until GLFW reports the window should
+close.
+
+1. Input::Update samples focus, keyboard, mouse buttons, cursor movement, and
+   delta time. In editor mode it also updates the EngineCamera when a camera is
+   attached.
+
+2. GameplayManager::Update is skipped because EngineState is Editor.
+
+3. RenderManager::Loop resets the per-frame allocator and command list, restores
+   the default 3D state, clears color and depth buffers, makes the context
+   current, and updates the viewport.
+
+4. It walks SceneManager::Objects(). For every object with a mesh and shader it
+   submits a RenderCommand containing the mesh, shader, model matrix, and skinning
+   flag. The checked-in project supplies drawable objects, so commands are built.
+
+5. Flush(ActiveCamera()) calls OpenGLGraphicsDevice::Draw for each command.
+   Draw activates the shader, uploads model/view/projection/camera/skinning
+   uniforms, binds each submesh, and issues the first actual scene draw at:
+
+       glDrawElements(GL_TRIANGLES, ...)
+
+   in src/OpenGLGraphicsDevice.cpp, OpenGLGraphicsDevice::Draw. For the checked-in
+   project this is the first draw call reached after boot, assuming model import
+   succeeds. glClear earlier in the frame is a buffer clear, not a draw call.
+
+Editor overlay after the first draw
+-----------------------------------
+After the scene pass, RenderManager starts a new ImGui frame, draws the Debug
+axis/grid and diagnostic windows, then draws the EngineGUI editor windows. On
+EndFrame, EngineGUI calls ImGui::Render and
+ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData()), which submits the editor
+overlay draw calls. The frame is then presented with glfwSwapBuffers and GLFW
+events are polled.
+
+Conditional first-draw note
+---------------------------
+If the project contains no object with both a valid mesh and shader, Flush issues
+no glDrawElements call. In that case the first draw operation is produced later
+by the ImGui OpenGL3 backend from EngineGUI::EndFrame. If axis/grid visibility
+is enabled, Debug::draw can also issue line draws before the ImGui backend.
+
+Primary source references
+-------------------------
+- src/main.cpp: RunApplication, mainLoop, ParseLaunchConfig
+- src/Window.cpp: Window::startUp
+- src/RenderManager.cpp: RenderManager::startUp and RenderManager::Loop
+- src/OpenGLGraphics.cpp: OpenGLGraphics::startUp and GL state setup
+- src/OpenGLGraphicsDevice.cpp: BeginFrame, Clear, Draw, EndFrame
+- src/ProjectManager.cpp: ProjectManager::LoadProject
+- src/EngineGUI.cpp: EngineGUI::startUp and EngineGUI::EndFrame
+- src/Debug.cpp: Debug::startUp and Debug::draw

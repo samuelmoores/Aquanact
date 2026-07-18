@@ -25,6 +25,11 @@ namespace {
 
 void Debug::startUp()
 {
+	if (!gEngineState.IsEditorMode())
+	{
+		return;
+	}
+
 	// The debug subsystem owns the editor overlay primitives and records
 	// early build/dependency diagnostics before the rest of the app starts running.
 	RebuildAxis();

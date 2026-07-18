@@ -2,6 +2,7 @@
 
 #include "Window.h"
 #include "EngineCamera.h"
+#include "RenderManager.h"
 #include "Globals.h"
 #include "GLFW/glfw3.h"
 
@@ -24,6 +25,11 @@ void Input::startUp(Window& window)
 	// same raw mouse events in game mode.
 	m_previousMouseButtonCallback = glfwSetMouseButtonCallback(m_window->GLFW(), &Input::MouseButtonCallback);
 	m_previousCursorPosCallback = glfwSetCursorPosCallback(m_window->GLFW(), &Input::CursorPosCallback);
+
+	if (gEngineState.IsEditorMode())
+	{
+		AttachCamera(gRenderManager.GetEngineCamera());
+	}
 }
 
 void Input::shutDown()

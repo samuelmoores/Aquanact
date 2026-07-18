@@ -4,6 +4,7 @@
 #include "Object3D.h"
 #include "FileSystem.h"
 #include "SceneManager.h"
+#include "Globals.h"
 
 FileManager::FileManager(FileSystem& fileSystem)
 	: m_fileSystem(&fileSystem)
@@ -12,6 +13,11 @@ FileManager::FileManager(FileSystem& fileSystem)
 
 void FileManager::startUp()
 {
+	if (!gEngineState.IsEditorMode())
+	{
+		return;
+	}
+
 	m_rootDirectory = m_fileSystem ? m_fileSystem->Path("C:/dev/Aquanact/assets/models") : std::filesystem::path("C:/dev/Aquanact/assets/models");
 	m_currentDirectory = m_rootDirectory;
 	m_selectedPath.clear();

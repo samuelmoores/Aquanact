@@ -1,0 +1,118 @@
+Aquanact boot report: game mode through the first draw call
+============================================================
+
+Scope
+-----
+This report follows the packaged-game path represented by the AquanactGame CMake
+target (WIN32, AQUANACT_GAME) until the first OpenGL draw operation. The game and
+editor targets share src/main.cpp and the same renderer; the important difference
+is the mode selected before the project is loaded and before the first frame.
+
+Mode selection
+--------------
+RunApplication parses the command line before startup. A process named game.exe
+defaults to game mode, --game forces game mode, and --editor forces editor mode.
+For the normal packaged game launch, the mode is Game. The game target uses
+WinMain, which forwards __argc and __argv to RunApplication.
+
+Startup sequence
+----------------
+1. Global objects are constructed: Window, RenderManager, FrontEndManager,
+   Debug, FileSystem/FileManager, SceneManager, ProjectManager, GameplayManager,
+   Input, and EngineState.
+
+2. Window::startUp initializes GLFW, creates a resizable 1280x720 OpenGL 3.3
+   compatibility-context window with stencil and multisampling, makes the
+   context current, and enables vsync.
+
+3. RenderManager::startUp resets frame-rendering state, creates/starts the engine
+   and game cameras, and starts OpenGLGraphicsDevice. The graphics platform makes
+   the context current, loads GLAD, enables depth testing and multisampling,
+   establishes the clear color, sets the viewport, and enables vsync.
+
+4. FrontEndManager::startUp starts all three front-end subsystems even though the
+   application is going to run in game mode. EngineGUI initializes ImGui and its
+   GLFW/OpenGL3 backends. GameGUIManager initializes MyGUI's OpenGL platform and
+   Gui, registers the image loader/resource location, and scans the gameGUI JSON
+   assets. GameGUICreator scans the same authoring directory and prepares its
+   editor asset list. The runtime GUI is ready before the project is loaded.
+
+5. GameplayManager::startUp clears its controller list and sets the game to an
+   unpaused state.
+
+6. Input::startUp attaches to the window, records the initial cursor position,
+   installs GLFW mouse callbacks, and preserves any previous callbacks.
+
+7. RunApplication sets EngineState to Game. The editor-only branch is not taken:
+   the EngineCamera is not attached to Input, Debug::startUp is not called, and
+   FileManager::startUp is not called. This means game startup does not build the
+   editor axis/grid or enumerate the editor model browser.
+
+8. ProjectManager::LoadProject loads the packaged project path. It first checks
+   the current working directory for project.aqua; otherwise the compiled
+   AQUANACT_SOURCE_ROOT fallback points to assets/projects/project.aqua. The
+   loader restores the game camera pose, reads GUI placement/active-asset data,
+   imports the saved models, creates meshes and shaders, restores transforms,
+   creates/registers controllers, and activates the saved runtime HUD. The
+   checked-in project contains character.fbx and griff.fbx plus the hud asset.
+
+First main-loop iteration
+-------------------------
+1. mainLoop calls Input::Update. It samples focus, keyboard, mouse state, cursor
+   movement, and delta time. No EngineCamera update occurs because no camera was
+   attached in game mode.
+
+2. Because EngineState is Game, GameplayManager::Update runs before rendering.
+   It updates object components (including animation components) and then updates
+   registered controllers using the current input delta time.
+
+3. RenderManager::Loop resets the per-frame allocator and command buffer,
+   restores the default 3D state, clears color and depth buffers, makes the GL
+   context current, and updates the viewport.
+
+4. The renderer walks the loaded SceneManager objects and submits one
+   RenderCommand for every object with a mesh and shader. It then flushes those
+   commands using ActiveCamera(), which is the GameCamera because that is the
+   default active camera and the project loaded its saved game-camera pose.
+
+5. OpenGLGraphicsDevice::Draw activates the object shader, uploads the model,
+   view, projection, camera-position, and skinning uniforms, binds the first
+   submesh, and issues the first actual scene draw at:
+
+       glDrawElements(GL_TRIANGLES, ...)
+
+   in src/OpenGLGraphicsDevice.cpp, OpenGLGraphicsDevice::Draw. With the
+   checked-in project, this is the first draw call after boot if model import and
+   shader setup succeed. The preceding glClear is not a draw call.
+
+Runtime UI after the first draw
+-------------------------------
+After the 3D scene pass, RenderManager starts the ImGui frame, creates the game
+input and gameplay diagnostic windows, and calls GameGUI::Draw for the active
+runtime asset. GameGUI advances MyGUI, establishes an overlay-friendly GL state,
+and calls MyGUI's RenderManager::drawOneFrame to submit runtime widget geometry.
+RenderManager then ends the front-end frame. EngineGUI::EndFrame still renders
+the ImGui draw data, so the game diagnostics are submitted through the ImGui
+OpenGL3 backend. Finally, OpenGLGraphicsDevice presents the back buffer with
+glfwSwapBuffers and GLFW events are polled.
+
+Conditional first-draw note
+---------------------------
+If no valid scene render command is loaded, the scene Flush produces no
+glDrawElements call. The first GPU draw then comes from a later overlay backend:
+normally MyGUI if an active runtime asset has drawable widgets, or the ImGui
+OpenGL3 backend during EngineGUI::EndFrame. The exact first overlay draw depends
+on the loaded GUI content and backend batching.
+
+Primary source references
+-------------------------
+- src/main.cpp: WinMain, RunApplication, mainLoop, ParseLaunchConfig
+- CMakeLists.txt: AquanactGame target and AQUANACT_GAME definition
+- src/Window.cpp: Window::startUp
+- src/RenderManager.cpp: RenderManager::startUp and RenderManager::Loop
+- src/OpenGLGraphics.cpp: OpenGLGraphics::startUp and GL state setup
+- src/OpenGLGraphicsDevice.cpp: BeginFrame, Clear, Draw, EndFrame
+- src/ProjectManager.cpp: ProjectManager::LoadProject
+- src/GameplayManager.cpp: GameplayManager::Update
+- src/GameGUI.cpp: GameGUI::startUp and GameGUI::Draw
+- src/EngineGUI.cpp: EngineGUI::startUp and EngineGUI::EndFrame

@@ -98,27 +98,15 @@ namespace {
 static int RunApplication(int argc, char** argv)
 {
     const LaunchConfig launchConfig = ParseLaunchConfig(argc, argv);
+    gEngineState.SetMode(launchConfig.mode == LaunchMode::Editor ? EngineMode::Editor : EngineMode::Game);
 
     gWindow.startUp();
     gRenderManager.startUp(gWindow);
     gFrontEndManager.startUp(gWindow);
     gGameplayManager.startUp();
     gInput.startUp(gWindow);
-#ifdef AQUANACT_EDITOR
-    if (launchConfig.mode == LaunchMode::Editor)
-    {
-        gEngineState.SetMode(EngineMode::Editor);
-        gInput.AttachCamera(gRenderManager.GetEngineCamera());
-        gDebug.startUp();
-        gFileManager.startUp();
-    }
-    else
-    {
-        gEngineState.SetMode(EngineMode::Game);
-    }
-#else
-    gEngineState.SetMode(launchConfig.mode == LaunchMode::Editor ? EngineMode::Editor : EngineMode::Game);
-#endif
+    gDebug.startUp();
+    gFileManager.startUp();
     gProjectManager.LoadProject(launchConfig.projectPath, gSceneManager);
 
     while (!gWindow.ShouldClose())
@@ -126,13 +114,8 @@ static int RunApplication(int argc, char** argv)
 
     gDebug.LogMessage("Main loop exiting because the window close flag was set.");
 
-#ifdef AQUANACT_EDITOR
-    if (launchConfig.mode == LaunchMode::Editor)
-    {
-        gDebug.shutDown();
-        gFileManager.shutDown();
-    }
-#endif
+    gDebug.shutDown();
+    gFileManager.shutDown();
     gFrontEndManager.shutDown();
     gGameplayManager.shutDown();
     gSceneManager.Clear();
