@@ -18,6 +18,10 @@ enum class EngineMode {
 	Game
 };
 
+// Set to true to show the ImGui Game Input and GameGUI diagnostics windows
+// while the application is running in GameMode.
+inline bool GameModeDebug = true;
+
 class EngineState {
 public:
 	void SetMode(EngineMode mode) { m_mode = mode; }

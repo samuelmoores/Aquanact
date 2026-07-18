@@ -1,0 +1,73 @@
+Aquanact GameMode Debugging
+===========================
+
+Enabling GameMode
+-----------------
+GameMode can be enabled in either of these ways:
+
+1. Launch the packaged executable as game.exe. The executable name selects
+   GameMode automatically.
+
+2. Launch the editor executable with the command-line option:
+
+       AquanactEngine.exe --game
+
+The mode is selected in src/main.cpp immediately after launch arguments are
+parsed. The engine then loads the project, starts gameplay updates, and enters
+the normal render loop.
+
+Enabling GameMode debugging
+----------------------------
+GameMode debugging is controlled by the flag in include/Globals.h:
+
+       inline constexpr bool GameModeDebug = false;
+
+Change the value to true and rebuild the application:
+
+       inline constexpr bool GameModeDebug = true;
+
+When enabled, the ImGui Game Input and GameGUIDiagnostics windows are drawn in
+GameMode. When disabled, the normal runtime GameGUI still renders, but the
+diagnostic windows are omitted. The diagnostics are conditionally handled in
+src/RenderManager.cpp.
+
+GameMode diagnostics
+--------------------
+During each frame, RenderManager::Loop() checks gEngineState. In GameMode it:
+
+- Starts the ImGui frame.
+- Optionally draws the Game Input window through Debug::drawGameModeInput() when
+  GameModeDebug is true.
+- Draws the active runtime GameGUI/MyGUI asset.
+- Optionally draws the GameGUIDiagnostics window through
+  GameGUIManager::DrawDiagnosticsWindow() when GameModeDebug is true.
+- Renders the ImGui draw data through EngineGUI::EndFrame().
+
+The Game Input window displays window focus, mouse-look state, movement input,
+mouse delta, and delta time.
+
+When enabled, the GameGUIDiagnostics window displays runtime GUI status, loaded
+and placed asset counts, the active asset, and the GUI action log. A separate
+Game Controls window provides the Return button, which switches back to
+EditorMode.
+
+Gameplay diagnostics
+--------------------
+Gameplay input is sampled by Input::Update(). GameplayManager::Update() then
+updates object components and registered controllers before the scene is
+rendered. Controller and object state can therefore be inspected while the
+game is running through the runtime diagnostics panels.
+
+Returning to EditorMode
+-----------------------
+Press Return in the standalone Game Controls window. This changes EngineState
+back to EditorMode and selects the EngineCamera. The editor rendering path
+resumes on the following frame.
+
+Relevant source files
+---------------------
+- src/main.cpp: launch mode parsing and per-frame gameplay update
+- src/RenderManager.cpp: editor/game render branches and GameModeDebug checks
+- src/Debug.cpp: Game Input diagnostic window
+- src/GameGUIManager.cpp: GameGUI diagnostics window and Stop Game action
+- src/EngineGUI.cpp: ImGui frame creation and rendering

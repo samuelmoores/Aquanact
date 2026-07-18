@@ -15,22 +15,34 @@ FrontEndManager::~FrontEndManager()
 
 void FrontEndManager::startUp(Window& window)
 {
-	if (!m_engineGUI)
-	{
-		m_engineGUI = std::make_unique<EngineGUI>();
-	}
+	// both engine and game need the game ui
 	if (!m_gameGUI)
 	{
 		m_gameGUI = std::make_unique<GameGUIManager>();
 	}
-	if (!m_uiCreator)
+
+	// only the engine needs the engine and ui creator ui
+	if (gEngineState.IsEditorMode())
 	{
-		m_uiCreator = std::make_unique<GameGUICreator>();
+		if (!m_engineGUI)
+		{
+			m_engineGUI = std::make_unique<EngineGUI>();
+		}
+		if (!m_uiCreator)
+		{
+			m_uiCreator = std::make_unique<GameGUICreator>();
+		}
+		m_engineGUI->startUp(window);
+		m_uiCreator->startUp(window);
+	}
+	else
+	{
+		// only the built game needs to turn off game debugging
+		GameModeDebug = false;
 	}
 
-	m_engineGUI->startUp(window);
+	// both need the game ui
 	m_gameGUI->startUp(window);
-	m_uiCreator->startUp(window);
 }
 
 void FrontEndManager::shutDown()

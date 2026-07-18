@@ -31,6 +31,7 @@ public:
 	const std::vector<std::string>& SceneAssets() const;
 	void DrawEditorWindow();
 	void DrawDiagnosticsWindow();
+	void DrawReturnButton();
 	void LogAction(const std::string& message);
 	void RecordClick(const std::string& message);
 	void ClearUI();

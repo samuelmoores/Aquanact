@@ -326,18 +326,6 @@ void GameGUIManager::DrawDiagnosticsWindow()
 	ImGui::Text("Active asset index: %d", m_activeAssetIndex);
 	ImGui::Text("Active asset name: %s", ActiveAssetName().empty() ? "<none>" : ActiveAssetName().c_str());
 	ImGui::Text("Last click: %s", m_lastClickMessage.empty() ? "<none>" : m_lastClickMessage.c_str());
-	if (gEngineState.IsGameMode())
-	{
-		ImGui::Separator();
-		// The editor menu bar disappears in game mode, so we expose a minimal
-		// in-game stop control here to return to the editor without restarting.
-		if (ImGui::Button("Stop Game"))
-		{
-			gEngineState.SetMode(EngineMode::Editor);
-			gRenderManager.SetActiveCamera(gRenderManager.GetEngineCamera());
-			LogAction("Stop Game requested");
-		}
-	}
 	ImGui::Separator();
 	ImGui::TextUnformatted("Action log:");
 	if (m_actionLog.empty())
@@ -359,6 +347,23 @@ void GameGUIManager::DrawDiagnosticsWindow()
 	for (const auto& name : m_sceneAssets)
 	{
 		ImGui::BulletText("%s", name.c_str());
+	}
+	ImGui::End();
+}
+
+void GameGUIManager::DrawReturnButton()
+{
+	if (!gEngineState.IsGameMode())
+	{
+		return;
+	}
+
+	ImGui::Begin("Engine");
+	if (ImGui::Button("Return"))
+	{
+		gEngineState.SetMode(EngineMode::Editor);
+		gRenderManager.SetActiveCamera(gRenderManager.GetEngineCamera());
+		LogAction("Return to editor requested");
 	}
 	ImGui::End();
 }
