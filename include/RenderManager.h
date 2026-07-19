@@ -10,6 +10,7 @@
 #include "GameCamera.h"
 #include "RenderCommand.h"
 #include "OpenGLGraphicsDevice.h"
+#include "LightingManager.h"
 
 class Window;
 class SceneManager;
@@ -52,6 +53,9 @@ private:
 	OpenGLGraphicsDevice m_device;
 	FrameAllocator m_frameAllocator;
 	RenderCommand* m_commands = nullptr;
+	std::unique_ptr<LightingManager> m_lightingManager = nullptr;
+
+	//debug
 	std::size_t m_commandCapacity = 0;
 	std::size_t m_commandCount = 0;
 	std::size_t m_lastFrameCommandCount = 0;

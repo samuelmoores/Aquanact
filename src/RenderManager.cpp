@@ -17,6 +17,8 @@ void RenderManager::startUp(Window& window)
 {
 	m_frameAllocator.ResetCapacity(1024 * 1024);
 	m_commands = nullptr;
+
+	//Debug
 	m_commandCapacity = 0;
 	m_commandCount = 0;
 	m_lastFrameCommandCount = 0;
@@ -27,6 +29,8 @@ void RenderManager::startUp(Window& window)
 	m_lastFrameEditorGuiTime = std::chrono::duration<double, std::milli>{ 0.0 };
 	m_lastFrameUiCreatorTime = std::chrono::duration<double, std::milli>{ 0.0 };
 	m_lastFrameRuntimeGuiTime = std::chrono::duration<double, std::milli>{ 0.0 };
+
+	//Cameras
 	if (!m_gameCamera)
 	{
 		m_gameCamera = std::make_unique<GameCamera>();
@@ -47,7 +51,15 @@ void RenderManager::startUp(Window& window)
 		m_activeCamera = m_gameCamera.get();
 	}
 
+	//Graphics Device
 	m_device.startUp(window);
+
+	//Lighting
+	if (!m_lightingManager)
+	{
+		m_lightingManager = std::make_unique<LightingManager>();
+	}
+	m_lightingManager->startUp();
 }
 
 RenderManager::~RenderManager()
@@ -57,7 +69,19 @@ RenderManager::~RenderManager()
 
 void RenderManager::shutDown()
 {
+	//-----Reverse order from startUp------
+
+	//Lighting
+	if (m_lightingManager)
+	{
+		m_lightingManager->shutDown();
+		m_lightingManager.reset();
+	}
+
+	//Graphics
 	m_device.shutDown();
+
+	//Camera
 	if (m_engineCamera)
 	{
 		m_engineCamera->shutDown();
@@ -118,7 +142,7 @@ void RenderManager::Flush(const Camera& camera)
 	m_lastFrameCommandCount = m_commandCount;
 	for (std::size_t i = 0; i < m_commandCount; ++i) {
 		const RenderCommand& command = m_commands[i];
-		m_device.Draw(command, camera);
+		m_device.Draw(command, camera, *m_lightingManager);
 	}
 
 	m_commandCount = 0;

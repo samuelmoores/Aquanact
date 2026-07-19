@@ -71,7 +71,7 @@ set(SOURCES
     "include/AquanactBuildSystem.h" "src/AquanactBuildSystem.cpp"
 )
 
-add_executable (AquanactEngine ${SOURCES})
+add_executable (AquanactEngine ${SOURCES} "include/LightingManager.h" "src/LightingManager.cpp")
 target_compile_definitions(AquanactEngine PRIVATE AQUANACT_EDITOR)
 target_compile_definitions(AquanactEngine PRIVATE AQUANACT_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
 target_compile_definitions(AquanactEngine PRIVATE MYGUI_STATIC)
@@ -81,7 +81,7 @@ target_compile_definitions(AquanactEngine PRIVATE AQUANACT_MYGUI_OPENGL_LIBRARY=
 target_compile_definitions(AquanactEngine PRIVATE AQUANACT_FREETYPE_LIBRARY="freetype")
 target_compile_features(AquanactEngine PRIVATE cxx_std_20)
 
-add_executable (AquanactGame WIN32 ${SOURCES})
+add_executable (AquanactGame WIN32 ${SOURCES} "include/LightingManager.h" "src/LightingManager.cpp")
 target_compile_definitions(AquanactGame PRIVATE AQUANACT_GAME)
 target_compile_definitions(AquanactGame PRIVATE AQUANACT_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
 target_compile_definitions(AquanactGame PRIVATE MYGUI_STATIC)
@@ -93,8 +93,7 @@ target_compile_features(AquanactGame PRIVATE cxx_std_20)
 
 add_executable (AquanactBuildTool
     "src/BuildToolMain.cpp"
-    "include/AquanactBuildSystem.h" "src/AquanactBuildSystem.cpp"
-)
+    "include/AquanactBuildSystem.h" "src/AquanactBuildSystem.cpp")
 target_compile_definitions(AquanactBuildTool PRIVATE AQUANACT_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
 
 if (MSVC)

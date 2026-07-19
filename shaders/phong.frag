@@ -1,6 +1,12 @@
 #version 330 core
 layout (location=0) out vec4 FragColor;
 
+struct DirectionalLight {
+	vec3 direction;
+	vec3 color;
+	float intensity;
+};
+
 in vec3 FragWorldPos;
 in vec3 Normal;
 in vec2 TexCoord;
@@ -12,6 +18,7 @@ uniform sampler2D baseTexture;
 uniform sampler2D normalMap;
 uniform bool useNormalMap;
 
+uniform DirectionalLight sunLight;
 uniform vec4 material;
 uniform vec3 ambientColor;
 uniform vec3 viewPos;
@@ -32,6 +39,12 @@ void main()
 	    norm = normalize(Normal);
 	}
 
+	vec3 lightDir = normalize(-sunLight.direction);
+
+	float diff = max(dot(norm, lightDir), 0.0);
+
+	vec3 result = (ambientColor) * texture(baseTexture, TexCoord).rgb * diff;
+
 	vec3 ambientIntensity = material.x * ambientColor + 0.02;
-	FragColor = vec4(ambientIntensity, 1.0) * texture(baseTexture, TexCoord);
+	FragColor = vec4(ambientIntensity, 1.0) * vec4(result, 1.0);
 }

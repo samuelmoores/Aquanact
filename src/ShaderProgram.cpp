@@ -205,5 +205,3 @@ void ShaderProgram::setUniform(const std::string& uniformName, const std::vector
     GLint boneUniformLocation = glGetUniformLocation(m_programId, uniformName.c_str());
     glUniformMatrix4fv(boneUniformLocation, values.size(), GL_FALSE, glm::value_ptr(values[0]));
 }
-
-

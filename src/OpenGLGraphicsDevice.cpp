@@ -106,7 +106,7 @@ void OpenGLGraphicsDevice::ConfigureGuiState()
 	}
 }
 
-void OpenGLGraphicsDevice::Draw(const RenderCommand& command, const Camera& camera)
+void OpenGLGraphicsDevice::Draw(const RenderCommand& command, const Camera& camera, const LightingManager& lightingManager)
 {
 	command.shader->activate();
 	command.shader->setUniform("model", command.modelMatrix);
@@ -114,6 +114,8 @@ void OpenGLGraphicsDevice::Draw(const RenderCommand& command, const Camera& came
 	command.shader->setUniform("projection", camera.GetProjectionMatrix());
 	command.shader->setUniform("skinned", command.isSkinned);
 	command.shader->setUniform("viewPos", camera.GetPosition());
+
+	lightingManager.ApplyToShader(command.shader);
 
 	if (command.isSkinned) {
 		const auto& assimpTransforms = command.mesh->GetSkeleton().finalTransformations;

@@ -2,10 +2,12 @@
 
 #include "GraphicsDevice.h"
 #include "OpenGLGraphics.h"
+#include "LightingManager.h"
 
 #include <memory>
 
 class Window;
+class LightingManager;
 
 class OpenGLGraphicsDevice final : public GraphicsDevice {
 public:
@@ -21,7 +23,7 @@ public:
 	// Called immediately before GUI submission so overlays do not inherit scene GL state.
 	void ConfigureGuiState();
 
-	void Draw(const RenderCommand& command, const Camera& camera) override;
+	void Draw(const RenderCommand& command, const Camera& camera, const LightingManager& lightingManager) override;
 
 private:
 	void startUp() override;
