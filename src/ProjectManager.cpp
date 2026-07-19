@@ -190,6 +190,16 @@ namespace {
 
 		return projectRelative;
 	}
+
+	std::string BoolField(bool value)
+	{
+		return value ? "1" : "0";
+	}
+
+	bool ParseBoolField(const std::string& value)
+	{
+		return value == "1" || value == "true" || value == "True";
+	}
 }
 
 ProjectManager::ProjectManager(FileSystem& fileSystem)
@@ -204,7 +214,7 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const SceneM
 		return false;
 	}
 
-	std::string contents = "AquanactProject 3\n";
+	std::string contents = "AquanactProject 4\n";
 	for (const auto& object : sceneManager.Objects())
 	{
 		if (!object)
@@ -248,6 +258,16 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const SceneM
 	contents += std::to_string(gameCameraPosition.x) + ";" + std::to_string(gameCameraPosition.y) + ";" + std::to_string(gameCameraPosition.z) + ";";
 	contents += std::to_string(gameCameraFacing.x) + ";" + std::to_string(gameCameraFacing.y) + ";" + std::to_string(gameCameraFacing.z) + "\n";
 
+	contents += "editorview;";
+	contents += BoolField(gFrontEndManager.EditorGUI().ShowAxis()) + ";";
+	contents += BoolField(gFrontEndManager.EditorGUI().ShowGrid()) + "\n";
+
+	const DirectionalLight& sunLight = gRenderManager.Lights().SunLight();
+	contents += "sunlight;";
+	contents += std::to_string(sunLight.direction.x) + ";" + std::to_string(sunLight.direction.y) + ";" + std::to_string(sunLight.direction.z) + ";";
+	contents += std::to_string(sunLight.color.x) + ";" + std::to_string(sunLight.color.y) + ";" + std::to_string(sunLight.color.z) + ";";
+	contents += std::to_string(sunLight.intensity) + "\n";
+
 	// Persist the runtime GameGUI placement list with the project so the same
 	// UI assets are restored when the scene is reopened.
 	for (const auto& assetName : gFrontEndManager.RuntimeGUI().SceneAssets())
@@ -285,7 +305,7 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 	std::istringstream file(fileContents);
 	std::string header;
 	std::getline(file, header);
-	if (header != "AquanactProject 1" && header != "AquanactProject 2" && header != "AquanactProject 3")
+	if (header != "AquanactProject 1" && header != "AquanactProject 2" && header != "AquanactProject 3" && header != "AquanactProject 4")
 	{
 		return false;
 	}
@@ -326,6 +346,37 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 			catch (const std::exception& ex)
 			{
 				gDebug.LogMessage("Failed to load game camera from line: " + line);
+				gDebug.LogMessage("Reason: " + std::string(ex.what()));
+				return false;
+			}
+			continue;
+		}
+
+		if (fields.size() == 3 && fields[0] == "editorview")
+		{
+			gFrontEndManager.EditorGUI().SetShowAxis(ParseBoolField(fields[1]));
+			gFrontEndManager.EditorGUI().SetShowGrid(ParseBoolField(fields[2]));
+			continue;
+		}
+
+		if (fields.size() == 8 && fields[0] == "sunlight")
+		{
+			try
+			{
+				DirectionalLight& sunLight = gRenderManager.Lights().SunLight();
+				sunLight.direction = glm::vec3(
+					std::stof(fields[1]),
+					std::stof(fields[2]),
+					std::stof(fields[3]));
+				sunLight.color = glm::vec3(
+					std::stof(fields[4]),
+					std::stof(fields[5]),
+					std::stof(fields[6]));
+				sunLight.intensity = std::stof(fields[7]);
+			}
+			catch (const std::exception& ex)
+			{
+				gDebug.LogMessage("Failed to load sun light from line: " + line);
 				gDebug.LogMessage("Reason: " + std::string(ex.what()));
 				return false;
 			}

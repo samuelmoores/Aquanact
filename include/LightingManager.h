@@ -15,6 +15,8 @@ public:
 	void startUp();
 	void shutDown();
 	void ApplyToShader(const ShaderProgram* shader) const;
+	DirectionalLight& SunLight();
+	const DirectionalLight& SunLight() const;
 
 private:
 	DirectionalLight m_sun;

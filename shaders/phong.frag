@@ -29,7 +29,7 @@ void main()
 {
 	vec3 norm;
 
-	if (useNormalMap)
+	if (useNormalMap && false)
 	{
 	    vec3 tangentNormal = texture(normalMap, TexCoord).rgb * 2.0 - 1.0;
 	    norm = normalize(TBN * tangentNormal);
@@ -45,6 +45,12 @@ void main()
 
 	vec3 result = (ambientColor) * texture(baseTexture, TexCoord).rgb * diff;
 
-	vec3 ambientIntensity = material.x * ambientColor + 0.02;
-	FragColor = vec4(ambientIntensity, 1.0) * vec4(result, 1.0);
+	vec3 finalColor = ambientColor + sunLight.color;
+
+	vec3 ambientIntensity = material.x * finalColor + 0.02;
+	//vec3 ambientIntensity = finalColor + 0.02;
+	vec3 finalIntensity = ambientIntensity + sunLight.intensity;
+
+	FragColor = vec4(finalIntensity, 1.0) * vec4(result, 1.0);
+	//FragColor = vec4(texture(baseTexture, TexCoord).rgb, 1.0);
 }

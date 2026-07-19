@@ -30,6 +30,8 @@ public:
 	void SetActiveCamera(Camera& camera) { m_activeCamera = &camera; }
 	Camera& ActiveCamera() { return *m_activeCamera; }
 	const Camera& ActiveCamera() const { return *m_activeCamera; }
+	LightingManager& Lights() { return *m_lightingManager; }
+	const LightingManager& Lights() const { return *m_lightingManager; }
 	void Submit(const RenderCommand& command);
 	void Flush(const Camera& camera);
 	void Loop();

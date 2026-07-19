@@ -446,6 +446,20 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& scen
 	}
 	ImGui::End();
 
+	ImGui::Begin("Lighting");
+	DirectionalLight& sunLight = gRenderManager.Lights().SunLight();
+	ImGui::TextUnformatted("Sun Light");
+	ImGui::DragFloat3("Direction", &sunLight.direction.x, 0.01f, -1.0f, 1.0f, "%.2f");
+	ImGui::ColorEdit3("Color", &sunLight.color.x);
+	ImGui::DragFloat("Intensity", &sunLight.intensity, 0.05f, 0.0f, 10.0f, "%.2f");
+	if (ImGui::Button("Reset Sun"))
+	{
+		sunLight.direction = glm::vec3(-0.3f, -1.0f, 0.2f);
+		sunLight.color = glm::vec3(1.0f);
+		sunLight.intensity = 1.0f;
+	}
+	ImGui::End();
+
 	gFrontEndManager.RuntimeGUI().DrawEditorWindow();
 }
 
