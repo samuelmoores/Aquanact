@@ -4,6 +4,10 @@
 #include <GLHeaders.h>
 #include <cmath>
 
+namespace {
+	constexpr float GroundPlaneVisualOffset = 1.0f;
+}
+
 Grid::Grid(float w, float spacing)
 {
 	if (spacing <= 0.0f)
@@ -11,7 +15,7 @@ Grid::Grid(float w, float spacing)
 
 	const glm::vec3 color(0.45f, 0.45f, 0.45f);
 	const glm::vec3 centerColor(0.75f, 0.75f, 0.75f);
-	const float y = 0.0f;
+	const float y = GroundPlaneVisualOffset;
 
 	for (float x = -w; x <= w; x += spacing)
 	{
