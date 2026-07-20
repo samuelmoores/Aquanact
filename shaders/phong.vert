@@ -12,12 +12,14 @@ uniform mat4 view;
 uniform mat4 model;
 uniform bool skinned;
 uniform mat4 finalBones[200];
+uniform vec3 viewPos;
 
 out vec2 TexCoord;
 out vec3 FragWorldPos;
 out vec3 Normal;
 flat out ivec4 BoneIDs;
 out vec4 Weights;
+out vec3 ViewPos;
 
 out mat3 TBN;
 
@@ -46,7 +48,8 @@ void main()
     FragWorldPos = vec3(model * PosL);
 
     // Transform normal to world space
-    // For skinned meshes, apply bone transform first so normals follow the skeleton
+    // For skinned meshes, apply bone transform first 
+    // so normals follow the skeleton
     vec3 localNormal  = vNormal;
     vec3 localTangent = vTangent;
     if (skinned)
@@ -66,5 +69,8 @@ void main()
 
     // Pass texture coordinates
     TexCoord = vTexCoord;
+
+    // camera position for spec
+    ViewPos = viewPos;
 
 }

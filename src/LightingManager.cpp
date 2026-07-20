@@ -17,6 +17,7 @@ void LightingManager::ApplyToShader(const ShaderProgram* shader) const
 	shader->setUniform("sunLight.direction", m_sun.direction);
 	shader->setUniform("sunLight.color", m_sun.color);
 	shader->setUniform("sunLight.intensity", m_sun.intensity);
+	shader->setUniform("sunLight.ambient", m_sun.ambient);
 }
 
 DirectionalLight& LightingManager::SunLight()

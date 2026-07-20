@@ -1,56 +1,43 @@
 #version 330 core
-layout (location=0) out vec4 FragColor;
 
 struct DirectionalLight {
 	vec3 direction;
 	vec3 color;
 	float intensity;
+	float ambient;
+
 };
 
+layout (location=0) out vec4 FragColor;
+
+//vertex shader
 in vec3 FragWorldPos;
 in vec3 Normal;
 in vec2 TexCoord;
-in mat3 TBN;
-flat in ivec4 BoneIDs;
-in vec4 Weights;
+in vec3 ViewPos;
 
+//uniforms
 uniform sampler2D baseTexture;
-uniform sampler2D normalMap;
-uniform bool useNormalMap;
-
 uniform DirectionalLight sunLight;
-uniform vec4 material;
-uniform vec3 ambientColor;
-uniform vec3 viewPos;
-uniform int bone;
-
 
 void main()
 {
-	vec3 norm;
+	//ambient
 
-	if (useNormalMap && false)
-	{
-	    vec3 tangentNormal = texture(normalMap, TexCoord).rgb * 2.0 - 1.0;
-	    norm = normalize(TBN * tangentNormal);
-	}
-	else
-	{
-	    norm = normalize(Normal);
-	}
-
+	//diffuse
+	vec3 vertexNormal = normalize(Normal);
 	vec3 lightDir = normalize(-sunLight.direction);
+	float dotProduct = max(dot(vertexNormal, lightDir), sunLight.ambient);
 
-	float diff = max(dot(norm, lightDir), 0.0);
+	//specular
+	float specularStrength = 0.5f;
+	vec3 viewDirection = normalize(ViewPos - FragWorldPos);
+	vec3 reflectDirection = reflect(-lightDir, vertexNormal);
+	float spec = pow(max(dot(viewDirection, reflectDirection), 0.0), 32);
+	vec3 specular = specularStrength * spec * sunLight.color;
 
-	vec3 result = (ambientColor) * texture(baseTexture, TexCoord).rgb * diff;
-
-	vec3 finalColor = ambientColor + sunLight.color;
-
-	vec3 ambientIntensity = material.x * finalColor + 0.02;
-	//vec3 ambientIntensity = finalColor + 0.02;
-	vec3 finalIntensity = ambientIntensity + sunLight.intensity;
-
-	FragColor = vec4(finalIntensity, 1.0) * vec4(result, 1.0);
-	//FragColor = vec4(texture(baseTexture, TexCoord).rgb, 1.0);
+	vec3 finalTextureFrag = texture(baseTexture, TexCoord).rgb * dotProduct;
+	
+	FragColor = vec4(finalTextureFrag + specular, 1.0) * sunLight.intensity;
+	return;
 }
