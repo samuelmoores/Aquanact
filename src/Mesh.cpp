@@ -235,6 +235,13 @@ const SubMeshMaterial& Mesh::GetMaterial(int index) const
 	return m_materials[index];
 }
 
+bool Mesh::HasNormalTexture(int index) const
+{
+	return index >= 0 &&
+		index < static_cast<int>(m_textureNormal.size()) &&
+		m_textureNormal[index] != 0;
+}
+
 uint32_t Mesh::FacesOffset(int index) const
 {
 	if (index < 0 || index >= static_cast<int>(m_faceOffsets.size()))

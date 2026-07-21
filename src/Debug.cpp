@@ -3,17 +3,20 @@
 #include "Axis.h"
 #include "EngineGUI.h"
 #include "Grid.h"
+#include "Line.h"
 #include "Camera.h"
 #include "Input.h"
 #include "Globals.h"
 #include "SceneManager.h"
 #include "RenderManager.h"
+#include "LightingManager.h"
 #include "FrameAllocator.h"
 #include "GLHeaders.h"
 
 #include <imgui.h>
 #include <chrono>
 #include <algorithm>
+#include <cmath>
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -21,6 +24,35 @@
 
 namespace {
 	const auto g_programStartTime = std::chrono::high_resolution_clock::now();
+
+	std::vector<LineVertex3D> MakeWireSphereVertices(const glm::vec3& color)
+	{
+		constexpr int segments = 48;
+		constexpr float pi = 3.14159265358979323846f;
+		std::vector<LineVertex3D> vertices;
+		vertices.reserve(segments * 2 * 3);
+
+		auto addVertex = [&](const glm::vec3& position) {
+			vertices.push_back({ position.x, position.y, position.z, color.r, color.g, color.b });
+		};
+
+		for (int i = 0; i < segments; ++i)
+		{
+			const float a0 = (static_cast<float>(i) / static_cast<float>(segments)) * 2.0f * pi;
+			const float a1 = (static_cast<float>(i + 1) / static_cast<float>(segments)) * 2.0f * pi;
+
+			addVertex(glm::vec3(std::cos(a0), std::sin(a0), 0.0f));
+			addVertex(glm::vec3(std::cos(a1), std::sin(a1), 0.0f));
+
+			addVertex(glm::vec3(std::cos(a0), 0.0f, std::sin(a0)));
+			addVertex(glm::vec3(std::cos(a1), 0.0f, std::sin(a1)));
+
+			addVertex(glm::vec3(0.0f, std::cos(a0), std::sin(a0)));
+			addVertex(glm::vec3(0.0f, std::cos(a1), std::sin(a1)));
+		}
+
+		return vertices;
+	}
 }
 
 void Debug::startUp()
@@ -45,6 +77,12 @@ void Debug::shutDown()
 	m_axis = nullptr;
 	delete m_grid;
 	m_grid = nullptr;
+	for (Line* sphere : m_pointLightDebugSpheres)
+	{
+		delete sphere;
+	}
+	m_pointLightDebugSpheres.clear();
+	m_pointLightDebugColors.clear();
 	m_logMessages.clear();
 	m_logOnceKeys.clear();
 }
@@ -60,6 +98,23 @@ void Debug::RebuildAxis()
 {
 	delete m_axis;
 	m_axis = new Axis(m_axisLength);
+}
+
+void Debug::RebuildPointLightDebugSpheres()
+{
+	for (Line* sphere : m_pointLightDebugSpheres)
+	{
+		delete sphere;
+	}
+	m_pointLightDebugSpheres.clear();
+	m_pointLightDebugColors.clear();
+
+	for (const PointLight& pointLight : gRenderManager.Lights().PointLights())
+	{
+		const glm::vec3 color = glm::clamp(pointLight.color, glm::vec3(0.0f), glm::vec3(1.0f));
+		m_pointLightDebugSpheres.push_back(new Line(MakeWireSphereVertices(color)));
+		m_pointLightDebugColors.push_back(color);
+	}
 }
 
 void Debug::draw(const Camera& camera, const EngineGUI& gui)
@@ -99,6 +154,45 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 	{
 		m_grid->UpdateProjection(projection);
 		m_grid->draw(view, !gui.ShowAxis());
+	}
+
+	const std::vector<PointLight>& pointLights = gRenderManager.Lights().PointLights();
+	bool rebuildLightSpheres = m_pointLightDebugSpheres.size() != pointLights.size();
+	if (!rebuildLightSpheres)
+	{
+		for (std::size_t i = 0; i < pointLights.size(); ++i)
+		{
+			const glm::vec3 color = glm::clamp(pointLights[i].color, glm::vec3(0.0f), glm::vec3(1.0f));
+			if (m_pointLightDebugColors[i] != color)
+			{
+				rebuildLightSpheres = true;
+				break;
+			}
+		}
+	}
+
+	if (rebuildLightSpheres)
+	{
+		RebuildPointLightDebugSpheres();
+	}
+
+	for (std::size_t i = 0; i < pointLights.size() && i < m_pointLightDebugSpheres.size(); ++i)
+	{
+		Line* sphere = m_pointLightDebugSpheres[i];
+		if (!sphere)
+		{
+			continue;
+		}
+
+		const PointLight& pointLight = pointLights[i];
+		const float markerRadius = std::clamp(pointLight.radius * 0.03f, 15.0f, 80.0f);
+		const glm::mat4 model =
+			glm::translate(glm::mat4(1.0f), pointLight.position) *
+			glm::scale(glm::mat4(1.0f), glm::vec3(markerRadius));
+
+		sphere->UpdateProjection(projection);
+		glLineWidth(2.0f);
+		sphere->draw(view, model);
 	}
 
 	ImGui::Begin("Debug Log");

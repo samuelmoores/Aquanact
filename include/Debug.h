@@ -65,11 +65,14 @@ private:
 	// Rebuilds the axis/grid helpers when the grid configuration changes.
 	void RebuildGrid();
 	void RebuildAxis();
+	void RebuildPointLightDebugSpheres();
 	// Small formatting helper used by the log window.
 	std::string SeverityPrefix(Severity severity) const;
 
 	class Axis* m_axis = nullptr;
 	class Grid* m_grid = nullptr;
+	std::vector<class Line*> m_pointLightDebugSpheres;
+	std::vector<glm::vec3> m_pointLightDebugColors;
 	float m_axisLength = 1200.0f;
 	float m_gridSize = 1200.0f;
 	float m_gridSpacing = 50.0f;

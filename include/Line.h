@@ -15,6 +15,7 @@ public:
 	~Line();
 	void UpdateProjection(glm::mat4 projectionMatrix);
 	void draw(glm::mat4 viewMatrix);
+	void draw(glm::mat4 viewMatrix, glm::mat4 modelMatrix);
 private:
 	std::vector<LineVertex3D> m_vertices;
 	uint32_t m_vao;

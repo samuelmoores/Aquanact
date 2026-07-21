@@ -139,6 +139,7 @@ void OpenGLGraphicsDevice::Draw(const RenderCommand& command, const Camera& came
 		const SubMeshMaterial& mat = command.mesh->GetMaterial(j);
 		command.shader->setUniform("material", mat.phong);
 		command.shader->setUniform("ambientColor", mat.ambientColor);
+		command.shader->setUniform("hasNormalTexture", command.mesh->HasNormalTexture(j));
 		command.mesh->Bind(j);
 		glDrawElements(GL_TRIANGLES, command.mesh->FacesSize(j), GL_UNSIGNED_INT, reinterpret_cast<void*>(static_cast<uintptr_t>(command.mesh->FacesOffset(j) * sizeof(uint32_t))));
 		command.mesh->UnBind();

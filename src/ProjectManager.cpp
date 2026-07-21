@@ -214,7 +214,7 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const SceneM
 		return false;
 	}
 
-	std::string contents = "AquanactProject 4\n";
+	std::string contents = "AquanactProject 7\n";
 	for (const auto& object : sceneManager.Objects())
 	{
 		if (!object)
@@ -266,7 +266,22 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const SceneM
 	contents += "sunlight;";
 	contents += std::to_string(sunLight.direction.x) + ";" + std::to_string(sunLight.direction.y) + ";" + std::to_string(sunLight.direction.z) + ";";
 	contents += std::to_string(sunLight.color.x) + ";" + std::to_string(sunLight.color.y) + ";" + std::to_string(sunLight.color.z) + ";";
-	contents += std::to_string(sunLight.intensity) + "\n";
+	contents += std::to_string(sunLight.intensity) + ";";
+	contents += std::to_string(sunLight.ambient) + "\n";
+
+	for (const PointLight& pointLight : gRenderManager.Lights().PointLights())
+	{
+		contents += "pointlight;";
+		contents += std::to_string(pointLight.position.x) + ";" + std::to_string(pointLight.position.y) + ";" + std::to_string(pointLight.position.z) + ";";
+		contents += std::to_string(pointLight.color.x) + ";" + std::to_string(pointLight.color.y) + ";" + std::to_string(pointLight.color.z) + ";";
+		contents += std::to_string(pointLight.intensity) + ";";
+		contents += std::to_string(pointLight.ambient) + ";";
+		contents += std::to_string(pointLight.radius) + ";";
+		contents += std::to_string(pointLight.radiusFade) + ";";
+		contents += std::to_string(pointLight.constant) + ";";
+		contents += std::to_string(pointLight.linear) + ";";
+		contents += std::to_string(pointLight.quadratic) + "\n";
+	}
 
 	// Persist the runtime GameGUI placement list with the project so the same
 	// UI assets are restored when the scene is reopened.
@@ -305,7 +320,7 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 	std::istringstream file(fileContents);
 	std::string header;
 	std::getline(file, header);
-	if (header != "AquanactProject 1" && header != "AquanactProject 2" && header != "AquanactProject 3" && header != "AquanactProject 4")
+	if (header != "AquanactProject 1" && header != "AquanactProject 2" && header != "AquanactProject 3" && header != "AquanactProject 4" && header != "AquanactProject 5" && header != "AquanactProject 6" && header != "AquanactProject 7")
 	{
 		return false;
 	}
@@ -320,6 +335,7 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 	// here, then hand them back to the runtime GUI after the scene finishes loading.
 	std::vector<std::string> pendingGameGUIAssets;
 	std::string pendingActiveGameGUIAsset;
+	gRenderManager.Lights().PointLights().clear();
 	std::string line;
 	while (std::getline(file, line))
 	{
@@ -359,7 +375,7 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 			continue;
 		}
 
-		if (fields.size() == 8 && fields[0] == "sunlight")
+		if ((fields.size() == 8 || fields.size() == 9) && fields[0] == "sunlight")
 		{
 			try
 			{
@@ -373,10 +389,52 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 					std::stof(fields[5]),
 					std::stof(fields[6]));
 				sunLight.intensity = std::stof(fields[7]);
+				if (fields.size() == 9)
+				{
+					sunLight.ambient = std::stof(fields[8]);
+				}
 			}
 			catch (const std::exception& ex)
 			{
 				gDebug.LogMessage("Failed to load sun light from line: " + line);
+				gDebug.LogMessage("Reason: " + std::string(ex.what()));
+				return false;
+			}
+			continue;
+		}
+
+		if ((fields.size() == 12 || fields.size() == 13 || fields.size() == 14) && fields[0] == "pointlight")
+		{
+			try
+			{
+				PointLight& pointLight = gRenderManager.Lights().AddPointLight();
+				pointLight.position = glm::vec3(
+					std::stof(fields[1]),
+					std::stof(fields[2]),
+					std::stof(fields[3]));
+				pointLight.color = glm::vec3(
+					std::stof(fields[4]),
+					std::stof(fields[5]),
+					std::stof(fields[6]));
+				pointLight.intensity = std::stof(fields[7]);
+				if (fields.size() == 14)
+				{
+					pointLight.ambient = std::stof(fields[8]);
+					pointLight.SetRadius(std::stof(fields[9]));
+					pointLight.radiusFade = std::stof(fields[10]);
+				}
+				else
+				{
+					pointLight.SetRadius(std::stof(fields[8]));
+					if (fields.size() == 13)
+					{
+						pointLight.radiusFade = std::stof(fields[9]);
+					}
+				}
+			}
+			catch (const std::exception& ex)
+			{
+				gDebug.LogMessage("Failed to load point light from line: " + line);
 				gDebug.LogMessage("Reason: " + std::string(ex.what()));
 				return false;
 			}

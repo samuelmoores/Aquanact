@@ -98,9 +98,14 @@ void Line::UpdateProjection(glm::mat4 projectionMatrix)
 
 void Line::draw(glm::mat4 viewMatrix)
 {
+	draw(viewMatrix, glm::mat4(1));
+}
+
+void Line::draw(glm::mat4 viewMatrix, glm::mat4 modelMatrix)
+{
 	m_shader.activate();
 	m_shader.setUniform("view", viewMatrix);
-	m_shader.setUniform("model", glm::mat4(1));
+	m_shader.setUniform("model", modelMatrix);
 	glBindVertexArray(m_vao);
 	glDrawArrays(GL_LINES, 0, m_vertices.size());
 	glBindVertexArray(0);
