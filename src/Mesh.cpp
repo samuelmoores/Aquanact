@@ -18,6 +18,20 @@
 
 namespace {
 	const int VERTICES_PER_FACE = 3;
+
+	uint32_t CreateFlatNormalTexture()
+	{
+		const unsigned char flatNormal[] = { 128, 128, 255, 255 };
+		uint32_t textureId = 0;
+		glGenTextures(1, &textureId);
+		glBindTexture(GL_TEXTURE_2D, textureId);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, flatNormal);
+		return textureId;
+	}
 }
 
 Mesh::Mesh()
@@ -90,6 +104,9 @@ void Mesh::AdoptImportedModel(ImportedModel&& importedModel)
 		{
 			aiMaterial* mat = m_scene->mMaterials[m_scene->mMeshes[i]->mMaterialIndex];
 			LoadTexture(mat, aiTextureType_DIFFUSE, m_sourcePath); // Fallback to BASE_COLOR or embedded texture when available.
+
+			LoadTexture(mat, aiTextureType_SPECULAR, m_sourcePath); // Fallback to BASE_COLOR or embedded texture when available.
+			LoadTexture(mat, aiTextureType_NORMALS, m_sourcePath); // Fallback to HEIGHT/bump maps when available.
 		}
 	}
 
@@ -347,6 +364,84 @@ void Mesh::SetDiffuseTextureMemory(aiTexture* text)
 	glGenerateMipmap(GL_TEXTURE_2D);
 }
 
+void Mesh::SetSpecularTextureMemory(aiTexture* text)
+{
+	m_textureSpecular.push_back(0);
+	StbImage stb_image_color;
+	stb_image_color.loadFromMemory(text);
+
+	glGenTextures(1, &m_textureSpecular.back());
+	glBindTexture(GL_TEXTURE_2D, m_textureSpecular.back());
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexImage2D(
+		GL_TEXTURE_2D,
+		0,
+		GL_RGBA,
+		stb_image_color.getWidth(),
+		stb_image_color.getHeight(),
+		0,
+		GL_RGBA,
+		GL_UNSIGNED_BYTE,
+		stb_image_color.getData()
+	);
+	glGenerateMipmap(GL_TEXTURE_2D);
+}
+
+void Mesh::SetNormalTextureMemory(aiTexture* text)
+{
+	m_textureNormal.push_back(0);
+	StbImage stb_image_normal;
+	stb_image_normal.loadFromMemory(text);
+
+	glGenTextures(1, &m_textureNormal.back());
+	glBindTexture(GL_TEXTURE_2D, m_textureNormal.back());
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexImage2D(
+		GL_TEXTURE_2D,
+		0,
+		GL_RGBA,
+		stb_image_normal.getWidth(),
+		stb_image_normal.getHeight(),
+		0,
+		GL_RGBA,
+		GL_UNSIGNED_BYTE,
+		stb_image_normal.getData()
+	);
+	glGenerateMipmap(GL_TEXTURE_2D);
+}
+
+void Mesh::SetNormalTexture(const char* normalFile)
+{
+	m_textureNormal.push_back(0);
+	StbImage stb_image_normal;
+	stb_image_normal.loadFromFile(normalFile);
+
+	glGenTextures(1, &m_textureNormal.back());
+	glBindTexture(GL_TEXTURE_2D, m_textureNormal.back());
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexImage2D(
+		GL_TEXTURE_2D,
+		0,
+		GL_RGBA,
+		stb_image_normal.getWidth(),
+		stb_image_normal.getHeight(),
+		0,
+		GL_RGBA,
+		GL_UNSIGNED_BYTE,
+		stb_image_normal.getData()
+	);
+	glGenerateMipmap(GL_TEXTURE_2D);
+}
+
 void Mesh::LoadTexture(aiMaterial* mat, aiTextureType textureType, const std::string& path)
 {
 	aiString texturePath;
@@ -356,10 +451,19 @@ void Mesh::LoadTexture(aiMaterial* mat, aiTextureType textureType, const std::st
 	{
 		result = mat->GetTexture(aiTextureType_BASE_COLOR, 0, &texturePath);
 	}
+	if (result != AI_SUCCESS && textureType == aiTextureType_NORMALS)
+	{
+		result = mat->GetTexture(aiTextureType_HEIGHT, 0, &texturePath);
+	}
 
 	if (result != AI_SUCCESS || texturePath.length == 0)
 	{
-		m_textureColor.push_back(0);
+		if (textureType == aiTextureType_SPECULAR)
+			m_textureSpecular.push_back(0);
+		else if (textureType == aiTextureType_NORMALS)
+			m_textureNormal.push_back(CreateFlatNormalTexture());
+		else
+			m_textureColor.push_back(0);
 		return;
 	}
 
@@ -371,8 +475,23 @@ void Mesh::LoadTexture(aiMaterial* mat, aiTextureType textureType, const std::st
 			SetDiffuseTextureMemory(const_cast<aiTexture*>(embeddedTexture));
 			return;
 		}
+		if (embeddedTexture->mHeight == 0 && textureType == aiTextureType_SPECULAR)
+		{
+			SetSpecularTextureMemory(const_cast<aiTexture*>(embeddedTexture));
+			return;
+		}
+		if (embeddedTexture->mHeight == 0 && textureType == aiTextureType_NORMALS)
+		{
+			SetNormalTextureMemory(const_cast<aiTexture*>(embeddedTexture));
+			return;
+		}
 
-		m_textureColor.push_back(0);
+		if (textureType == aiTextureType_SPECULAR)
+			m_textureSpecular.push_back(0);
+		else if (textureType == aiTextureType_NORMALS)
+			m_textureNormal.push_back(CreateFlatNormalTexture());
+		else
+			m_textureColor.push_back(0);
 		return;
 	}
 
@@ -387,7 +506,39 @@ void Mesh::LoadTexture(aiMaterial* mat, aiTextureType textureType, const std::st
 		? std::filesystem::path(".")
 		: std::filesystem::path(path).parent_path();
 	std::filesystem::path texPath = texDir / textureFileName;
-	SetTexture(texPath.string().c_str());
+	if (textureType == aiTextureType_SPECULAR)
+	{
+		m_textureSpecular.push_back(0);
+		StbImage stb_image_color;
+		stb_image_color.loadFromFile(texPath.string().c_str());
+
+		glGenTextures(1, &m_textureSpecular.back());
+		glBindTexture(GL_TEXTURE_2D, m_textureSpecular.back());
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexImage2D(
+			GL_TEXTURE_2D,
+			0,
+			GL_RGBA,
+			stb_image_color.getWidth(),
+			stb_image_color.getHeight(),
+			0,
+			GL_RGBA,
+			GL_UNSIGNED_BYTE,
+			stb_image_color.getData()
+		);
+		glGenerateMipmap(GL_TEXTURE_2D);
+	}
+	else if (textureType == aiTextureType_NORMALS)
+	{
+		SetNormalTexture(texPath.string().c_str());
+	}
+	else
+	{
+		SetTexture(texPath.string().c_str());
+	}
 }
 
 SubMeshMaterial Mesh::s_defaultMaterial = {
@@ -403,11 +554,24 @@ void Mesh::Bind(int index)
 	glActiveTexture(GL_TEXTURE0);
 	if (index < static_cast<int>(m_textureColor.size()) && m_textureColor[index] != 0)
 		glBindTexture(GL_TEXTURE_2D, m_textureColor[index]);
+
+	glActiveTexture(GL_TEXTURE1);
+	if (index < static_cast<int>(m_textureSpecular.size()) && m_textureSpecular[index] != 0)
+		glBindTexture(GL_TEXTURE_2D, m_textureSpecular[index]);
+
+	glActiveTexture(GL_TEXTURE2);
+	if (index < static_cast<int>(m_textureNormal.size()) && m_textureNormal[index] != 0)
+		glBindTexture(GL_TEXTURE_2D, m_textureNormal[index]);
 }
 
 void Mesh::UnBind()
 {
 	glBindVertexArray(0);
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
 

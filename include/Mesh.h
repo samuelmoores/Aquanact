@@ -60,6 +60,9 @@ class Mesh {
 		void SetBuffers(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces);
 		void SetTexture(const char* colorFile);
 		void SetDiffuseTextureMemory(aiTexture* text);
+		void SetSpecularTextureMemory(aiTexture* text);
+		void SetNormalTextureMemory(aiTexture* text);
+		void SetNormalTexture(const char* normalFile);
 		void LoadTexture(aiMaterial* mat, aiTextureType textureType, const std::string& path);
 		const Skeleton& GetSkeleton() const;
 		Skeleton* GetSkeletonPtr();
@@ -83,6 +86,8 @@ class Mesh {
 		std::vector<uint32_t> m_faces;
 		std::vector<uint32_t> m_vao;
 		std::vector<uint32_t> m_textureColor;
+		std::vector<uint32_t> m_textureSpecular;
+		std::vector<uint32_t> m_textureNormal;
 		int m_currVao;
 		int m_currTextureColor;
 		glm::vec3 m_minBounds;

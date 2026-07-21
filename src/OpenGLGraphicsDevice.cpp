@@ -109,6 +109,11 @@ void OpenGLGraphicsDevice::ConfigureGuiState()
 void OpenGLGraphicsDevice::Draw(const RenderCommand& command, const Camera& camera, const LightingManager& lightingManager)
 {
 	command.shader->activate();
+
+	command.shader->setUniform("baseTexture", 0);
+	command.shader->setUniform("specularTexture", 1);
+	command.shader->setUniform("normalTexture", 2);
+
 	command.shader->setUniform("model", command.modelMatrix);
 	command.shader->setUniform("view", camera.GetViewMatrix());
 	command.shader->setUniform("projection", camera.GetProjectionMatrix());
