@@ -12,6 +12,7 @@
 
 #include <MYGUI/MyGUI_Button.h>
 #include <MYGUI/MyGUI_Gui.h>
+#include <MYGUI/MyGUI_TextBox.h>
 #include <MYGUI/MyGUI_OpenGLDataManager.h>
 #include <MYGUI/MyGUI_OpenGLPlatform.h>
 #include <MYGUI/MyGUI_LayerManager.h>
@@ -245,6 +246,31 @@ void GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def)
 			gDebug.LogMessage(std::string("GameGUI click handler bound for widget: ") + def.name);
 			MyGUI::LayerManager::getInstance().upLayerItem(button);
 			m_runtimeWidgets.push_back(button);
+			gDebug.LogMessage(
+				std::string("GameGUI widget created: name='") + def.name +
+				"', type='" + def.type +
+				"', skin='" + def.skin +
+				"', layer='" + def.layer + "'");
+		}
+	}
+	else if (def.type == "TextBox" || def.type == "Text")
+	{
+		MyGUI::TextBox* text = m_gui->createWidget<MyGUI::TextBox>(
+			def.skin.empty() ? "TextBox" : def.skin,
+			def.x,
+			def.y,
+			def.width,
+			def.height,
+			MyGUI::Align::Default,
+			def.layer,
+			def.name);
+		if (text)
+		{
+			text->setCaption(def.text);
+			text->setVisible(def.visible);
+			text->setAlpha(def.alpha);
+			MyGUI::LayerManager::getInstance().upLayerItem(text);
+			m_runtimeWidgets.push_back(text);
 			gDebug.LogMessage(
 				std::string("GameGUI widget created: name='") + def.name +
 				"', type='" + def.type +

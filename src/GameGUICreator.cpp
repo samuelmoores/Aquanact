@@ -164,6 +164,8 @@ void GameGUICreator::startUp(Window& window)
 	m_selectedWidgetIndex = -1;
 	m_newAssetName[0] = '\0';
 	m_newWidgetName[0] = '\0';
+	m_newWidgetText[0] = '\0';
+	m_newWidgetIsText = false;
 	m_newWidgetAction = GameGUIActionType::None;
 	m_initialized = true;
 	if (!m_assets.empty())
@@ -181,6 +183,8 @@ void GameGUICreator::shutDown()
 	m_showCreateAssetPopup = false;
 	m_newAssetName[0] = '\0';
 	m_newWidgetName[0] = '\0';
+	m_newWidgetText[0] = '\0';
+	m_newWidgetIsText = false;
 	m_newWidgetAction = GameGUIActionType::None;
 	m_assets.clear();
 	m_selectedAssetIndex = -1;
@@ -275,7 +279,16 @@ void GameGUICreator::Draw(const Camera&)
 			if (ImGui::MenuItem("Create Button", nullptr, false, m_selectedAssetIndex >= 0))
 			{
 				m_showCreateWidgetPopup = true;
+				m_newWidgetIsText = false;
 				m_newWidgetName[0] = '\0';
+				m_newWidgetText[0] = '\0';
+			}
+			if (ImGui::MenuItem("Create Text", nullptr, false, m_selectedAssetIndex >= 0))
+			{
+				m_showCreateWidgetPopup = true;
+				m_newWidgetIsText = true;
+				m_newWidgetName[0] = '\0';
+				std::snprintf(m_newWidgetText, sizeof(m_newWidgetText), "New Text");
 			}
 			ImGui::EndMenu();
 		}
@@ -331,6 +344,13 @@ void GameGUICreator::Draw(const Camera&)
 			ImGui::Text("Type: %s", widget.type.c_str());
 			ImGui::Text("Position: %d, %d", widget.x, widget.y);
 			ImGui::Text("Size: %d x %d", widget.width, widget.height);
+			char textBuffer[128] = { 0 };
+			std::snprintf(textBuffer, sizeof(textBuffer), "%s", widget.text.c_str());
+			if (ImGui::InputText("Text", textBuffer, sizeof(textBuffer)))
+			{
+				widget.text = textBuffer;
+				SyncRuntimePreview();
+			}
 			float position[2] = { static_cast<float>(widget.x), static_cast<float>(widget.y) };
 			if (ImGui::DragFloat2("Move", position, 1.0f))
 			{
@@ -398,32 +418,46 @@ void GameGUICreator::DrawCreateWidgetPopup()
 
 	if (ImGui::BeginPopupModal("Create Widget", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 	{
-		ImGui::TextUnformatted("Enter a widget name:");
+		ImGui::TextUnformatted(m_newWidgetIsText ? "Create a text widget:" : "Create a button widget:");
 		ImGui::InputText("Name", m_newWidgetName, sizeof(m_newWidgetName));
-		GameGUIActionType action = m_newWidgetAction;
-		if (ImGui::BeginCombo("Action", ActionLabel(action)))
+		if (m_newWidgetIsText)
 		{
-			const GameGUIActionType options[] = { GameGUIActionType::None, GameGUIActionType::QuitGame, GameGUIActionType::PauseGame };
-			for (GameGUIActionType option : options)
-			{
-				const bool selected = option == action;
-				if (ImGui::Selectable(ActionLabel(option), selected))
-				{
-					action = option;
-				}
-				if (selected)
-				{
-					ImGui::SetItemDefaultFocus();
-				}
-			}
-			ImGui::EndCombo();
+			ImGui::InputText("Text", m_newWidgetText, sizeof(m_newWidgetText));
 		}
-		m_newWidgetAction = action;
+		else
+		{
+			GameGUIActionType action = m_newWidgetAction;
+			if (ImGui::BeginCombo("Action", ActionLabel(action)))
+			{
+				const GameGUIActionType options[] = { GameGUIActionType::None, GameGUIActionType::QuitGame, GameGUIActionType::PauseGame };
+				for (GameGUIActionType option : options)
+				{
+					const bool selected = option == action;
+					if (ImGui::Selectable(ActionLabel(option), selected))
+					{
+						action = option;
+					}
+					if (selected)
+					{
+						ImGui::SetItemDefaultFocus();
+					}
+				}
+				ImGui::EndCombo();
+			}
+			m_newWidgetAction = action;
+		}
 		if (ImGui::Button("Create"))
 		{
-			AddButtonWidget();
+			if (m_newWidgetIsText)
+			{
+				AddTextWidget();
+			}
+			else
+			{
+				AddButtonWidget();
+			}
 			SyncRuntimePreview();
-			gDebug.LogMessage("Create Button requested");
+			gDebug.LogMessage(m_newWidgetIsText ? "Create Text requested" : "Create Button requested");
 			ImGui::CloseCurrentPopup();
 		}
 		ImGui::SameLine();
@@ -499,6 +533,54 @@ void GameGUICreator::AddButtonWidget()
 		"', asset='" + asset.name +
 		"', pos=(" + std::to_string(button.x) + "," + std::to_string(button.y) + ")" +
 		", size=(" + std::to_string(button.width) + "x" + std::to_string(button.height) + ")");
+}
+
+void GameGUICreator::AddTextWidget()
+{
+	if (m_selectedAssetIndex < 0 || m_selectedAssetIndex >= static_cast<int>(m_assets.size()))
+	{
+		gDebug.LogMessage("AddTextWidget skipped: no active GameGUI asset");
+		return;
+	}
+
+	GameGUIWidgetDef text;
+	text.type = "TextBox";
+	text.name = m_newWidgetName[0] != '\0' ? m_newWidgetName : "text";
+	text.skin = "TextBox";
+	text.text = m_newWidgetText[0] != '\0' ? m_newWidgetText : "New Text";
+	text.layer = "Main";
+	text.width = 360;
+	text.height = 48;
+	text.action = GameGUIActionType::None;
+
+	int framebufferWidth = 0;
+	int framebufferHeight = 0;
+	if (m_window)
+	{
+		m_window->GetFramebufferSize(framebufferWidth, framebufferHeight);
+	}
+	text.x = std::max(0, (framebufferWidth - text.width) / 2);
+	text.y = std::max(0, (framebufferHeight - text.height) / 2);
+
+	GameGUIAsset& asset = CurrentAsset();
+	int suffix = 1;
+	while (std::any_of(asset.widgets.begin(), asset.widgets.end(), [&text](const GameGUIWidgetDef& widget)
+	{
+		return widget.name == text.name;
+	}))
+	{
+		text.name = "text_" + std::to_string(++suffix);
+	}
+
+	asset.widgets.push_back(text);
+	m_selectedWidgetIndex = static_cast<int>(asset.widgets.size() - 1);
+	m_newWidgetName[0] = '\0';
+	m_newWidgetText[0] = '\0';
+	gDebug.LogMessage(
+		std::string("Created GameGUI text widget: name='") + text.name +
+		"', asset='" + asset.name +
+		"', pos=(" + std::to_string(text.x) + "," + std::to_string(text.y) + ")" +
+		", size=(" + std::to_string(text.width) + "x" + std::to_string(text.height) + ")");
 }
 
 void GameGUICreator::SaveCurrentAsset()
