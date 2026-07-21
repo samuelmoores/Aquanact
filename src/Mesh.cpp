@@ -19,19 +19,21 @@
 namespace {
 	const int VERTICES_PER_FACE = 3;
 
-	uint32_t CreateFlatNormalTexture()
+	uint32_t CreateTextureFromPixels(int width, int height, const unsigned char* pixels, bool mipmapped)
 	{
-		const unsigned char flatNormal[] = { 128, 128, 255, 255 };
 		uint32_t textureId = 0;
 		glGenTextures(1, &textureId);
 		glBindTexture(GL_TEXTURE_2D, textureId);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, mipmapped ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, flatNormal);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+		if (mipmapped)
+			glGenerateMipmap(GL_TEXTURE_2D);
 		return textureId;
 	}
+
 }
 
 Mesh::Mesh()
@@ -96,17 +98,14 @@ void Mesh::AdoptImportedModel(ImportedModel&& importedModel)
 	m_maxBounds = importedModel.maxBounds; // Imported object-space bounds.
 	m_meshMinBounds = importedModel.meshMinBounds; // Runtime AABB min for object picking/collision.
 	m_meshMaxBounds = importedModel.meshMaxBounds; // Runtime AABB max for object picking/collision.
-	m_sourcePath = std::move(importedModel.sourcePath); // Needed to resolve external textures next to the model file.
+	m_sourcePath = std::move(importedModel.sourcePath);
 
 	if (m_scene)
 	{
 		for (unsigned int i = 0; i < m_scene->mNumMeshes; ++i)
 		{
 			aiMaterial* mat = m_scene->mMaterials[m_scene->mMeshes[i]->mMaterialIndex];
-			LoadTexture(mat, aiTextureType_DIFFUSE, m_sourcePath); // Fallback to BASE_COLOR or embedded texture when available.
-
-			LoadTexture(mat, aiTextureType_SPECULAR, m_sourcePath); // Fallback to BASE_COLOR or embedded texture when available.
-			LoadTexture(mat, aiTextureType_NORMALS, m_sourcePath); // Fallback to HEIGHT/bump maps when available.
+			LoadMaterialTextures(mat);
 		}
 	}
 
@@ -314,231 +313,83 @@ void Mesh::SetBuffers(std::vector<Vertex3D> vertices, std::vector<uint32_t> face
 
 void Mesh::SetTexture(const char* colorFile)
 {
-	m_textureColor.push_back(0);
-	StbImage stb_image_color;
-	stb_image_color.loadFromFile(colorFile);
-
-	glGenTextures(1, &m_textureColor.back());
-	glBindTexture(GL_TEXTURE_2D, m_textureColor.back());
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexImage2D(
-		GL_TEXTURE_2D,
-		0,
-		GL_RGBA,
-		stb_image_color.getWidth(),
-		stb_image_color.getHeight(),
-		0,
-		GL_RGBA,
-		GL_UNSIGNED_BYTE,
-		stb_image_color.getData()
-	);
-	glGenerateMipmap(GL_TEXTURE_2D);
+	LoadTextureFile(TextureSlot::Diffuse, colorFile);
 }
 
-void Mesh::SetDiffuseTextureMemory(aiTexture* text)
+std::vector<uint32_t>& Mesh::TexturesForSlot(TextureSlot slot)
 {
-	m_textureColor.push_back(0);
-	StbImage stb_image_color;
-	stb_image_color.loadFromMemory(text);
-
-	glGenTextures(1, &m_textureColor.back());
-	glBindTexture(GL_TEXTURE_2D, m_textureColor.back());
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexImage2D(
-		GL_TEXTURE_2D,
-		0,
-		GL_RGBA,
-		stb_image_color.getWidth(),
-		stb_image_color.getHeight(),
-		0,
-		GL_RGBA,
-		GL_UNSIGNED_BYTE,
-		stb_image_color.getData()
-	);
-	glGenerateMipmap(GL_TEXTURE_2D);
+	switch (slot)
+	{
+	case TextureSlot::Diffuse:
+		return m_textureColor;
+	case TextureSlot::Specular:
+		return m_textureSpecular;
+	case TextureSlot::Normal:
+		return m_textureNormal;
+	}
+	return m_textureColor;
 }
 
-void Mesh::SetSpecularTextureMemory(aiTexture* text)
+void Mesh::LoadTextureFile(TextureSlot slot, const std::filesystem::path& texturePath)
 {
-	m_textureSpecular.push_back(0);
-	StbImage stb_image_color;
-	stb_image_color.loadFromMemory(text);
-
-	glGenTextures(1, &m_textureSpecular.back());
-	glBindTexture(GL_TEXTURE_2D, m_textureSpecular.back());
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexImage2D(
-		GL_TEXTURE_2D,
-		0,
-		GL_RGBA,
-		stb_image_color.getWidth(),
-		stb_image_color.getHeight(),
-		0,
-		GL_RGBA,
-		GL_UNSIGNED_BYTE,
-		stb_image_color.getData()
-	);
-	glGenerateMipmap(GL_TEXTURE_2D);
+	StbImage image;
+	image.loadFromFile(texturePath.string().c_str());
+	TexturesForSlot(slot).push_back(CreateTextureFromPixels(image.getWidth(), image.getHeight(), image.getData(), true));
 }
 
-void Mesh::SetNormalTextureMemory(aiTexture* text)
+void Mesh::LoadTextureMemory(TextureSlot slot, aiTexture* texture)
 {
-	m_textureNormal.push_back(0);
-	StbImage stb_image_normal;
-	stb_image_normal.loadFromMemory(text);
-
-	glGenTextures(1, &m_textureNormal.back());
-	glBindTexture(GL_TEXTURE_2D, m_textureNormal.back());
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexImage2D(
-		GL_TEXTURE_2D,
-		0,
-		GL_RGBA,
-		stb_image_normal.getWidth(),
-		stb_image_normal.getHeight(),
-		0,
-		GL_RGBA,
-		GL_UNSIGNED_BYTE,
-		stb_image_normal.getData()
-	);
-	glGenerateMipmap(GL_TEXTURE_2D);
+	StbImage image;
+	image.loadFromMemory(texture);
+	TexturesForSlot(slot).push_back(CreateTextureFromPixels(image.getWidth(), image.getHeight(), image.getData(), true));
 }
 
-void Mesh::SetNormalTexture(const char* normalFile)
+Mesh::TextureSlot Mesh::SlotForTextureType(aiTextureType textureType) const
 {
-	m_textureNormal.push_back(0);
-	StbImage stb_image_normal;
-	stb_image_normal.loadFromFile(normalFile);
-
-	glGenTextures(1, &m_textureNormal.back());
-	glBindTexture(GL_TEXTURE_2D, m_textureNormal.back());
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexImage2D(
-		GL_TEXTURE_2D,
-		0,
-		GL_RGBA,
-		stb_image_normal.getWidth(),
-		stb_image_normal.getHeight(),
-		0,
-		GL_RGBA,
-		GL_UNSIGNED_BYTE,
-		stb_image_normal.getData()
-	);
-	glGenerateMipmap(GL_TEXTURE_2D);
+	if (textureType == aiTextureType_SPECULAR)
+		return TextureSlot::Specular;
+	if (textureType == aiTextureType_NORMALS)
+		return TextureSlot::Normal;
+	return TextureSlot::Diffuse;
 }
 
-void Mesh::LoadTexture(aiMaterial* mat, aiTextureType textureType, const std::string& path)
+aiReturn Mesh::GetMaterialTexturePath(aiMaterial* mat, aiTextureType textureType, aiString& texturePath) const
 {
-	aiString texturePath;
-
 	aiReturn result = mat->GetTexture(textureType, 0, &texturePath);
 	if (result != AI_SUCCESS && textureType == aiTextureType_DIFFUSE)
-	{
 		result = mat->GetTexture(aiTextureType_BASE_COLOR, 0, &texturePath);
-	}
 	if (result != AI_SUCCESS && textureType == aiTextureType_NORMALS)
-	{
 		result = mat->GetTexture(aiTextureType_HEIGHT, 0, &texturePath);
-	}
+	return result;
+}
+
+void Mesh::LoadMaterialTextures(aiMaterial* mat)
+{
+	LoadTexture(mat, aiTextureType_DIFFUSE); // Fallback to BASE_COLOR.
+	LoadTexture(mat, aiTextureType_SPECULAR);
+	LoadTexture(mat, aiTextureType_NORMALS); // Fallback to HEIGHT/bump maps.
+}
+
+void Mesh::LoadTexture(aiMaterial* mat, aiTextureType textureType)
+{
+	const TextureSlot slot = SlotForTextureType(textureType);
+	aiString texturePath;
+	const aiReturn result = GetMaterialTexturePath(mat, textureType, texturePath);
 
 	if (result != AI_SUCCESS || texturePath.length == 0)
 	{
-		if (textureType == aiTextureType_SPECULAR)
-			m_textureSpecular.push_back(0);
-		else if (textureType == aiTextureType_NORMALS)
-			m_textureNormal.push_back(CreateFlatNormalTexture());
-		else
-			m_textureColor.push_back(0);
+		TexturesForSlot(slot).push_back(0);
 		return;
 	}
 
 	const aiTexture* embeddedTexture = m_scene ? m_scene->GetEmbeddedTexture(texturePath.C_Str()) : nullptr;
-	if (embeddedTexture && embeddedTexture->pcData != nullptr)
+	if (!embeddedTexture || !embeddedTexture->pcData || embeddedTexture->mHeight != 0)
 	{
-		if (embeddedTexture->mHeight == 0 && textureType == aiTextureType_DIFFUSE)
-		{
-			SetDiffuseTextureMemory(const_cast<aiTexture*>(embeddedTexture));
-			return;
-		}
-		if (embeddedTexture->mHeight == 0 && textureType == aiTextureType_SPECULAR)
-		{
-			SetSpecularTextureMemory(const_cast<aiTexture*>(embeddedTexture));
-			return;
-		}
-		if (embeddedTexture->mHeight == 0 && textureType == aiTextureType_NORMALS)
-		{
-			SetNormalTextureMemory(const_cast<aiTexture*>(embeddedTexture));
-			return;
-		}
-
-		if (textureType == aiTextureType_SPECULAR)
-			m_textureSpecular.push_back(0);
-		else if (textureType == aiTextureType_NORMALS)
-			m_textureNormal.push_back(CreateFlatNormalTexture());
-		else
-			m_textureColor.push_back(0);
+		TexturesForSlot(slot).push_back(0);
 		return;
 	}
 
-	std::string textureFileName = texturePath.C_Str();
-	size_t lastSlashIndex = textureFileName.find_last_of("/\\");
-	if (lastSlashIndex != std::string::npos)
-	{
-		textureFileName = textureFileName.substr(lastSlashIndex + 1);
-	}
-
-	std::filesystem::path texDir = path.empty()
-		? std::filesystem::path(".")
-		: std::filesystem::path(path).parent_path();
-	std::filesystem::path texPath = texDir / textureFileName;
-	if (textureType == aiTextureType_SPECULAR)
-	{
-		m_textureSpecular.push_back(0);
-		StbImage stb_image_color;
-		stb_image_color.loadFromFile(texPath.string().c_str());
-
-		glGenTextures(1, &m_textureSpecular.back());
-		glBindTexture(GL_TEXTURE_2D, m_textureSpecular.back());
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexImage2D(
-			GL_TEXTURE_2D,
-			0,
-			GL_RGBA,
-			stb_image_color.getWidth(),
-			stb_image_color.getHeight(),
-			0,
-			GL_RGBA,
-			GL_UNSIGNED_BYTE,
-			stb_image_color.getData()
-		);
-		glGenerateMipmap(GL_TEXTURE_2D);
-	}
-	else if (textureType == aiTextureType_NORMALS)
-	{
-		SetNormalTexture(texPath.string().c_str());
-	}
-	else
-	{
-		SetTexture(texPath.string().c_str());
-	}
+	LoadTextureMemory(slot, const_cast<aiTexture*>(embeddedTexture));
 }
 
 SubMeshMaterial Mesh::s_defaultMaterial = {

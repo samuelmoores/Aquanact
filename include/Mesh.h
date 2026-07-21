@@ -3,6 +3,7 @@
 #include <map>
 #include <vector>
 #include <memory>
+#include <filesystem>
 #include <StbImage.h>
 #include <ShaderProgram.h>
 #include <assimp/Importer.hpp>
@@ -59,11 +60,7 @@ class Mesh {
 		//getter setter
 		void SetBuffers(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces);
 		void SetTexture(const char* colorFile);
-		void SetDiffuseTextureMemory(aiTexture* text);
-		void SetSpecularTextureMemory(aiTexture* text);
-		void SetNormalTextureMemory(aiTexture* text);
-		void SetNormalTexture(const char* normalFile);
-		void LoadTexture(aiMaterial* mat, aiTextureType textureType, const std::string& path);
+		void LoadTexture(aiMaterial* mat, aiTextureType textureType);
 		const Skeleton& GetSkeleton() const;
 		Skeleton* GetSkeletonPtr();
 		const SubMeshMaterial& GetMaterial(int index) const;
@@ -81,7 +78,19 @@ class Mesh {
 
 
 	private:
+		enum class TextureSlot {
+			Diffuse,
+			Specular,
+			Normal
+		};
+
 		void AdoptImportedModel(ImportedModel&& importedModel);
+		void LoadMaterialTextures(aiMaterial* mat);
+		void LoadTextureFile(TextureSlot slot, const std::filesystem::path& texturePath);
+		void LoadTextureMemory(TextureSlot slot, aiTexture* texture);
+		TextureSlot SlotForTextureType(aiTextureType textureType) const;
+		aiReturn GetMaterialTexturePath(aiMaterial* mat, aiTextureType textureType, aiString& texturePath) const;
+		std::vector<uint32_t>& TexturesForSlot(TextureSlot slot);
 		std::vector<Vertex3D> m_vertices;
 		std::vector<uint32_t> m_faces;
 		std::vector<uint32_t> m_vao;
