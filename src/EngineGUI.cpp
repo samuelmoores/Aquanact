@@ -23,6 +23,7 @@
 #include <imgui_impl_opengl3.h>
 #include <filesystem>
 #include <algorithm>
+#include <cctype>
 #include <cstring>
 #include <cstdint>
 #include <string>
@@ -35,6 +36,16 @@ namespace {
 #else
 		return std::filesystem::current_path();
 #endif
+	}
+
+	std::filesystem::path GameIncludeRoot()
+	{
+		return SourceRoot() / "include" / "Game";
+	}
+
+	std::filesystem::path GameSourceRoot()
+	{
+		return SourceRoot() / "src" / "Game";
 	}
 }
 
@@ -264,6 +275,14 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& scen
 			}
 			ImGui::EndMenu();
 		}
+		if (ImGui::BeginMenu("Code"))
+		{
+			if (ImGui::MenuItem("Add Code File"))
+			{
+				m_addCodeFilePopupRequested = true;
+			}
+			ImGui::EndMenu();
+		}
 		if (ImGui::BeginMenu("UI"))
 		{
 			if (ImGui::MenuItem("GameGUI Creator"))
@@ -278,6 +297,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& scen
 	}
 
 	DrawBuildGamePopup();
+	DrawAddCodeFilePopup();
 
 	ImGui::Begin("File Explorer");
 	if (ImGui::Button("Models"))
@@ -542,6 +562,139 @@ void EngineGUI::DrawBuildGamePopup()
 		{
 			ImGui::Separator();
 			ImGui::TextUnformatted(statusMessage.c_str());
+		}
+
+		ImGui::EndPopup();
+	}
+}
+
+std::string EngineGUI::NormalizeGameClassName(const std::string& input)
+{
+	std::string output;
+	output.reserve(input.size());
+	bool capitalizeNext = true;
+	for (unsigned char ch : input)
+	{
+		if (std::isalnum(ch))
+		{
+			output.push_back(capitalizeNext ? static_cast<char>(std::toupper(ch)) : static_cast<char>(ch));
+			capitalizeNext = false;
+		}
+		else
+		{
+			capitalizeNext = true;
+		}
+	}
+	return output;
+}
+
+std::string EngineGUI::MakeHeaderTemplate(const std::string& className)
+{
+	return
+		"#pragma once\n\n"
+		"#include \"Game/GameObject.h\"\n\n"
+		"// Generated gameplay class. Start here if you want to add game behavior.\n"
+		"//\n"
+		"// This class inherits from GameObject, so it must implement:\n"
+		"// - TypeName()\n"
+		"// - GetBindableMembers()\n"
+		"//\n"
+		"// TypeName() tells the engine/editor what this gameplay type is called.\n"
+		"// GetBindableMembers() tells the engine/editor which variables or\n"
+		"// functions are available for UI binding later.\n"
+		"class " + className + " final : public GameObject\n"
+		"{\n"
+		"public:\n"
+		"\texplicit " + className + "(std::string name = \"" + className + "\");\n\n"
+		"\tconst char* TypeName() const override;\n"
+		"\tstd::vector<BindableMember> GetBindableMembers() const override;\n"
+		"};\n";
+}
+
+std::string EngineGUI::MakeSourceTemplate(const std::string& className)
+{
+	return
+		"#include \"Game/" + className + ".h\"\n\n"
+		"#include <utility>\n\n"
+		"" + className + "::" + className + "(std::string name)\n"
+		"\t: GameObject(std::move(name))\n"
+		"{\n"
+		"}\n\n"
+		"const char* " + className + "::TypeName() const\n"
+		"{\n"
+		"\treturn \"" + className + "\";\n"
+		"}\n\n"
+		"std::vector<BindableMember> " + className + "::GetBindableMembers() const\n"
+		"{\n"
+		"\treturn {};\n"
+		"}\n";
+}
+
+void EngineGUI::CreateGameCodeFile(const std::string& className)
+{
+	const std::filesystem::path headerPath = GameIncludeRoot() / (className + ".h");
+	const std::filesystem::path sourcePath = GameSourceRoot() / (className + ".cpp");
+
+	const std::filesystem::path headerDir = headerPath.parent_path();
+	const std::filesystem::path sourceDir = sourcePath.parent_path();
+	std::error_code ec;
+	std::filesystem::create_directories(headerDir, ec);
+	std::filesystem::create_directories(sourceDir, ec);
+
+	const bool headerWritten = gFileSystem.WriteTextFile(headerPath, MakeHeaderTemplate(className));
+	const bool sourceWritten = gFileSystem.WriteTextFile(sourcePath, MakeSourceTemplate(className));
+
+	if (headerWritten && sourceWritten)
+	{
+		m_addCodeFileStatusMessage = "Created " + headerPath.string() + " and " + sourcePath.string();
+	}
+	else
+	{
+		m_addCodeFileStatusMessage = "Failed to create one or more files.";
+	}
+}
+
+void EngineGUI::DrawAddCodeFilePopup()
+{
+	if (m_addCodeFilePopupRequested)
+	{
+		ImGui::OpenPopup("Add Code File##AquanactAddCodeFile");
+		m_addCodeFilePopupRequested = false;
+		m_addCodeFileCreated = false;
+		m_addCodeFileStatusMessage.clear();
+	}
+
+	if (ImGui::BeginPopupModal("Add Code File##AquanactAddCodeFile", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		ImGui::TextUnformatted("Create a new gameplay class:");
+		ImGui::InputText("Class Name", m_newCodeFileName, sizeof(m_newCodeFileName));
+
+		if (ImGui::Button("Create"))
+		{
+			const std::string className = NormalizeGameClassName(m_newCodeFileName);
+			if (className.empty())
+			{
+				m_addCodeFileStatusMessage = "Enter a valid class name.";
+			}
+			else
+			{
+				std::strncpy(m_newCodeFileName, className.c_str(), sizeof(m_newCodeFileName) - 1);
+				m_newCodeFileName[sizeof(m_newCodeFileName) - 1] = '\0';
+				CreateGameCodeFile(className);
+				m_addCodeFileCreated = true;
+			}
+		}
+
+		ImGui::SameLine();
+		if (ImGui::Button("Close"))
+		{
+			ImGui::CloseCurrentPopup();
+		}
+
+		if (!m_addCodeFileStatusMessage.empty())
+		{
+			ImGui::Separator();
+			ImGui::TextUnformatted(m_addCodeFileStatusMessage.c_str());
 		}
 
 		ImGui::EndPopup();

@@ -9,8 +9,8 @@ PlayerHealth::PlayerHealth(std::string name)
 std::vector<BindableMember> PlayerHealth::GetBindableMembers() const
 {
 	return {
-		{ "health", "Health", "int", BindableMember::Kind::Property },
-		{ "maxHealth", "Max Health", "int", BindableMember::Kind::Property },
+		{ "health", "Health", "int", BindableMember::Kind::Variable },
+		{ "maxHealth", "Max Health", "int", BindableMember::Kind::Variable },
 		{ "GetHealthText", "Health Text", "string", BindableMember::Kind::Function },
 	};
 }

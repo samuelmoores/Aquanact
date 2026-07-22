@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 class Window;
 class Camera;
 class FileManager;
@@ -22,6 +24,11 @@ public:
 
 private:
 	void DrawBuildGamePopup();
+	void DrawAddCodeFilePopup();
+	static std::string NormalizeGameClassName(const std::string& input);
+	static std::string MakeHeaderTemplate(const std::string& className);
+	static std::string MakeSourceTemplate(const std::string& className);
+	void CreateGameCodeFile(const std::string& className);
 
 	Window* m_window = nullptr;
 	bool m_showAxis = true;
@@ -32,4 +39,8 @@ private:
 	int m_bootTextureHeight = 0;
 	int m_selectedSceneObjectIndex = -1;
 	bool m_buildGamePopupRequested = false;
+	bool m_addCodeFilePopupRequested = false;
+	bool m_addCodeFileCreated = false;
+	char m_newCodeFileName[128] = "PlayerHealth";
+	std::string m_addCodeFileStatusMessage;
 };
