@@ -1,0 +1,89 @@
+Game Code System Three-Phase Report
+
+Date: July 22, 2026
+Scope: Design for a staged game code workflow
+
+Summary
+- Designed a three-phase plan for game code development that starts with simple external compilation and engine restart, progresses to C++ hot reload, and ends with a C# scripting system.
+- Established the core idea that the same gameplay-facing data model should be preserved across all three phases so the final scripting system does not require a full redesign.
+- Focused on keeping bindings, object registration, and UI-facing metadata stable from the beginning.
+
+1. Phase 1: external compile with engine restart
+- The first phase keeps game code outside the main engine runtime, but does not attempt live reload.
+- Developers edit game code, build it, and restart the engine to test changes.
+- This phase has the lowest implementation risk and is the easiest place to validate the core game code workflow.
+- It is the right stage to define:
+  - the `GameObject` base class
+  - the bindable metadata model
+  - the object registry
+  - the UI binding asset format
+- Even though restart is required, the architecture should already be shaped like a reloadable system.
+
+2. Phase 2: hot reload for C++ game code
+- The second phase moves game code into a reloadable native module, likely a DLL.
+- The engine remains open while the game module is rebuilt and reloaded.
+- This phase improves iteration speed without changing the gameplay-facing abstraction layer.
+- The important rule is that the engine should continue to talk to game code through the same stable metadata and registry concepts introduced in phase 1.
+- If the engine can already discover objects, variables, and callable functions by name, the hot reload layer becomes an implementation detail rather than a redesign.
+
+3. Phase 3: C# scripting system
+- The third phase replaces native gameplay implementation with a managed scripting runtime.
+- The engine hosts C# scripts and loads gameplay assemblies at runtime.
+- The same gameplay concepts from the first two phases should remain visible:
+  - gameplay objects
+  - bindable properties
+  - bindable functions
+  - events
+  - UI bindings
+- The final scripting system becomes much easier if phase 1 and phase 2 already used a metadata-driven model instead of direct engine coupling.
+
+4. Shared abstractions that should survive all three phases
+- The following concepts should be designed once and reused across every phase:
+  - `GameObject` as the gameplay-facing base class
+  - `BindableMember` metadata for properties and functions
+  - a `GameObjectRegistry` for live object discovery
+  - a widget binding descriptor for `GameGUI`
+  - event and command naming for gameplay actions
+- These abstractions should not depend on whether the implementation is native C++, hot-reloaded C++, or C#.
+- The more the engine relies on plain metadata and names instead of concrete class layout, the easier the eventual scripting transition becomes.
+
+5. Recommended phase 1 contract
+- Define `GameObject` as the common gameplay base type.
+- Let each game class report what is bindable through metadata.
+- Keep variable and function access simple and explicit.
+- Register live objects in a central registry so the editor and UI can discover them.
+- Store UI bindings as data in the GameGUI asset rather than hard-coding widget behavior.
+- This gives the engine a stable gameplay/UI contract before hot reload or scripting is introduced.
+
+6. Recommended phase 2 contract
+- Preserve the phase 1 metadata model exactly as much as possible.
+- Move the game implementation into a separate module while keeping the object registry and binding schema unchanged.
+- Keep object identity, member names, and UI asset binding fields stable.
+- This allows the engine to reload code without forcing the GUI and editor to relearn how gameplay data is described.
+
+7. Recommended phase 3 contract
+- Make the C# layer expose the same gameplay-facing concepts that the native system already used.
+- Reuse the same naming and metadata conventions for bindable members.
+- Keep the engine-side UI binding format unchanged if possible.
+- The scripting layer should plug into the existing registry and binding architecture instead of replacing it.
+
+8. Why this design reduces future work
+- The biggest risk in switching to C# later is coupling the engine too tightly to native C++ implementation details early on.
+- If the current system is built around names, metadata, and explicit registration, the final scripting layer mostly becomes a new backend for the same contract.
+- That means the editor, GameGUI, and asset format can survive each phase with minimal disruption.
+
+9. Practical implementation guidance
+- Start by implementing the smallest usable version of `GameObject` and the registry.
+- Add UI binding support using string-based object and member references.
+- Use manual metadata registration first rather than trying to build reflection-style automation too early.
+- Keep functions read-only and getter-like for the first version of binding.
+- Delay advanced tooling until the core data flow is proven.
+
+10. Final recommendation
+- Build the system as if C# is the final destination, even while the first implementation stays in native C++.
+- Preserve the same gameplay object model, binding metadata, and registry flow across all phases.
+- That keeps phase 1 simple, phase 2 practical, and phase 3 far less invasive than it would be otherwise.
+
+Closing note
+- The three-phase path is viable and well-structured.
+- The key to making it work is not the language change itself, but the stability of the gameplay/UI contract that sits above the implementation details.

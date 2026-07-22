@@ -79,8 +79,10 @@ namespace {
 
 			widget.type = readField("\"type\":", widgetPos);
 			widget.name = readField("\"name\":", widgetPos);
+			widget.parentName = readField("\"parent\":", widgetPos);
 			widget.skin = readField("\"skin\":", widgetPos);
 			widget.text = readField("\"text\":", widgetPos);
+			widget.texture = readField("\"texture\":", widgetPos);
 			widget.layer = readField("\"layer\":", widgetPos);
 			widget.x = std::stoi(readField("\"x\":", widgetPos));
 			widget.y = std::stoi(readField("\"y\":", widgetPos));

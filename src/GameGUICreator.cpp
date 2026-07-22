@@ -12,6 +12,7 @@
 #include <sstream>
 #include <algorithm>
 #include <cstdio>
+#include <functional>
 
 namespace {
 	const char* ActionLabel(GameGUIActionType action)
@@ -51,6 +52,39 @@ namespace {
 			return GameGUIActionType::PauseGame;
 		}
 		return GameGUIActionType::None;
+	}
+
+	bool WouldCreateParentCycle(const GameGUIAsset& asset, const std::string& childName, const std::string& parentName)
+	{
+		if (childName.empty() || parentName.empty())
+		{
+			return false;
+		}
+		if (childName == parentName)
+		{
+			return true;
+		}
+
+		std::string currentParent = parentName;
+		while (!currentParent.empty())
+		{
+			if (currentParent == childName)
+			{
+				return true;
+			}
+
+			auto it = std::find_if(asset.widgets.begin(), asset.widgets.end(), [&currentParent](const GameGUIWidgetDef& widget)
+			{
+				return widget.name == currentParent;
+			});
+			if (it == asset.widgets.end())
+			{
+				return false;
+			}
+			currentParent = it->parentName;
+		}
+
+		return false;
 	}
 
 	std::filesystem::path AssetDirectory()
@@ -116,8 +150,10 @@ namespace {
 
 			widget.type = readField("\"type\":", widgetPos);
 			widget.name = readField("\"name\":", widgetPos);
+			widget.parentName = readField("\"parent\":", widgetPos);
 			widget.skin = readField("\"skin\":", widgetPos);
 			widget.text = readField("\"text\":", widgetPos);
+			widget.texture = readField("\"texture\":", widgetPos);
 			widget.layer = readField("\"layer\":", widgetPos);
 			widget.x = std::stoi(readField("\"x\":", widgetPos));
 			widget.y = std::stoi(readField("\"y\":", widgetPos));
@@ -165,7 +201,9 @@ void GameGUICreator::startUp(Window& window)
 	m_newAssetName[0] = '\0';
 	m_newWidgetName[0] = '\0';
 	m_newWidgetText[0] = '\0';
+	m_newWidgetTexture[0] = '\0';
 	m_newWidgetIsText = false;
+	m_newWidgetIsImage = false;
 	m_newWidgetAction = GameGUIActionType::None;
 	m_initialized = true;
 	if (!m_assets.empty())
@@ -184,7 +222,9 @@ void GameGUICreator::shutDown()
 	m_newAssetName[0] = '\0';
 	m_newWidgetName[0] = '\0';
 	m_newWidgetText[0] = '\0';
+	m_newWidgetTexture[0] = '\0';
 	m_newWidgetIsText = false;
+	m_newWidgetIsImage = false;
 	m_newWidgetAction = GameGUIActionType::None;
 	m_assets.clear();
 	m_selectedAssetIndex = -1;
@@ -280,15 +320,28 @@ void GameGUICreator::Draw(const Camera&)
 			{
 				m_showCreateWidgetPopup = true;
 				m_newWidgetIsText = false;
+				m_newWidgetIsImage = false;
 				m_newWidgetName[0] = '\0';
 				m_newWidgetText[0] = '\0';
+				m_newWidgetTexture[0] = '\0';
 			}
 			if (ImGui::MenuItem("Create Text", nullptr, false, m_selectedAssetIndex >= 0))
 			{
 				m_showCreateWidgetPopup = true;
 				m_newWidgetIsText = true;
+				m_newWidgetIsImage = false;
 				m_newWidgetName[0] = '\0';
 				std::snprintf(m_newWidgetText, sizeof(m_newWidgetText), "New Text");
+				m_newWidgetTexture[0] = '\0';
+			}
+			if (ImGui::MenuItem("Create Image", nullptr, false, m_selectedAssetIndex >= 0))
+			{
+				m_showCreateWidgetPopup = true;
+				m_newWidgetIsText = false;
+				m_newWidgetIsImage = true;
+				m_newWidgetName[0] = '\0';
+				m_newWidgetText[0] = '\0';
+				std::snprintf(m_newWidgetTexture, sizeof(m_newWidgetTexture), "textures/example.png");
 			}
 			ImGui::EndMenu();
 		}
@@ -327,29 +380,116 @@ void GameGUICreator::Draw(const Camera&)
 	if (m_selectedAssetIndex >= 0 && m_selectedAssetIndex < static_cast<int>(m_assets.size()))
 	{
 		GameGUIAsset& asset = CurrentAsset();
-		for (std::size_t i = 0; i < asset.widgets.size(); ++i)
+		const auto hasChildren = [&asset](const GameGUIWidgetDef& widget)
 		{
-			const GameGUIWidgetDef& widget = asset.widgets[i];
-			const bool selected = m_selectedWidgetIndex == static_cast<int>(i);
-			if (ImGui::Selectable(widget.name.c_str(), selected))
+			return std::any_of(asset.widgets.begin(), asset.widgets.end(), [&widget](const GameGUIWidgetDef& child)
 			{
-				m_selectedWidgetIndex = static_cast<int>(i);
+				return child.parentName == widget.name;
+			});
+		};
+
+		std::function<void(const std::string&)> drawChildren;
+		drawChildren = [&](const std::string& parentName)
+		{
+			for (std::size_t i = 0; i < asset.widgets.size(); ++i)
+			{
+				GameGUIWidgetDef& widget = asset.widgets[i];
+				if (widget.parentName != parentName)
+				{
+					continue;
+				}
+
+				const bool selected = m_selectedWidgetIndex == static_cast<int>(i);
+				const bool widgetHasChildren = hasChildren(widget);
+				ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth;
+				if (selected)
+				{
+					flags |= ImGuiTreeNodeFlags_Selected;
+				}
+				if (!widgetHasChildren)
+				{
+					flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+				}
+
+				const std::string label = widget.name + " (" + widget.type + ")##WidgetTree" + std::to_string(i);
+				const bool open = ImGui::TreeNodeEx(label.c_str(), flags);
+				if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
+				{
+					m_selectedWidgetIndex = static_cast<int>(i);
+				}
+
+				if (widgetHasChildren && open)
+				{
+					drawChildren(widget.name);
+					ImGui::TreePop();
+				}
 			}
-		}
+		};
+
+		drawChildren("");
+
 		if (m_selectedWidgetIndex >= 0 && m_selectedWidgetIndex < static_cast<int>(asset.widgets.size()))
 		{
 			GameGUIWidgetDef& widget = asset.widgets[static_cast<std::size_t>(m_selectedWidgetIndex)];
 			ImGui::Separator();
 			ImGui::Text("Name: %s", widget.name.c_str());
 			ImGui::Text("Type: %s", widget.type.c_str());
+			const char* parentLabel = widget.parentName.empty() ? "<None>" : widget.parentName.c_str();
+			if (ImGui::BeginCombo("Parent", parentLabel))
+			{
+				const bool noneSelected = widget.parentName.empty();
+				if (ImGui::Selectable("<None>", noneSelected))
+				{
+					widget.parentName.clear();
+					SyncRuntimePreview();
+				}
+				if (noneSelected)
+				{
+					ImGui::SetItemDefaultFocus();
+				}
+
+				for (const GameGUIWidgetDef& parentCandidate : asset.widgets)
+				{
+					if (parentCandidate.name == widget.name ||
+						WouldCreateParentCycle(asset, widget.name, parentCandidate.name))
+					{
+						continue;
+					}
+
+					const bool selected = widget.parentName == parentCandidate.name;
+					if (ImGui::Selectable(parentCandidate.name.c_str(), selected))
+					{
+						widget.parentName = parentCandidate.name;
+						SyncRuntimePreview();
+					}
+					if (selected)
+					{
+						ImGui::SetItemDefaultFocus();
+					}
+				}
+				ImGui::EndCombo();
+			}
 			ImGui::Text("Position: %d, %d", widget.x, widget.y);
 			ImGui::Text("Size: %d x %d", widget.width, widget.height);
-			char textBuffer[128] = { 0 };
-			std::snprintf(textBuffer, sizeof(textBuffer), "%s", widget.text.c_str());
-			if (ImGui::InputText("Text", textBuffer, sizeof(textBuffer)))
+			if (widget.type == "ImageBox" || widget.type == "Image")
 			{
-				widget.text = textBuffer;
-				SyncRuntimePreview();
+				char textureBuffer[256] = { 0 };
+				std::snprintf(textureBuffer, sizeof(textureBuffer), "%s", widget.texture.c_str());
+				if (ImGui::InputText("Texture", textureBuffer, sizeof(textureBuffer)))
+				{
+					widget.texture = textureBuffer;
+					SyncRuntimePreview();
+				}
+			}
+			else
+			{
+				char textBuffer[128] = { 0 };
+				std::snprintf(textBuffer, sizeof(textBuffer), "%s", widget.text.c_str());
+				if (ImGui::InputText("Text", textBuffer, sizeof(textBuffer)))
+				{
+					widget.text = textBuffer;
+					SyncRuntimePreview();
+				}
 			}
 			float position[2] = { static_cast<float>(widget.x), static_cast<float>(widget.y) };
 			if (ImGui::DragFloat2("Move", position, 1.0f))
@@ -418,11 +558,16 @@ void GameGUICreator::DrawCreateWidgetPopup()
 
 	if (ImGui::BeginPopupModal("Create Widget", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 	{
-		ImGui::TextUnformatted(m_newWidgetIsText ? "Create a text widget:" : "Create a button widget:");
+		const char* widgetKind = m_newWidgetIsImage ? "Create an image widget:" : (m_newWidgetIsText ? "Create a text widget:" : "Create a button widget:");
+		ImGui::TextUnformatted(widgetKind);
 		ImGui::InputText("Name", m_newWidgetName, sizeof(m_newWidgetName));
 		if (m_newWidgetIsText)
 		{
 			ImGui::InputText("Text", m_newWidgetText, sizeof(m_newWidgetText));
+		}
+		else if (m_newWidgetIsImage)
+		{
+			ImGui::InputText("Texture", m_newWidgetTexture, sizeof(m_newWidgetTexture));
 		}
 		else
 		{
@@ -452,12 +597,16 @@ void GameGUICreator::DrawCreateWidgetPopup()
 			{
 				AddTextWidget();
 			}
+			else if (m_newWidgetIsImage)
+			{
+				AddImageWidget();
+			}
 			else
 			{
 				AddButtonWidget();
 			}
 			SyncRuntimePreview();
-			gDebug.LogMessage(m_newWidgetIsText ? "Create Text requested" : "Create Button requested");
+			gDebug.LogMessage(m_newWidgetIsImage ? "Create Image requested" : (m_newWidgetIsText ? "Create Text requested" : "Create Button requested"));
 			ImGui::CloseCurrentPopup();
 		}
 		ImGui::SameLine();
@@ -583,6 +732,55 @@ void GameGUICreator::AddTextWidget()
 		", size=(" + std::to_string(text.width) + "x" + std::to_string(text.height) + ")");
 }
 
+void GameGUICreator::AddImageWidget()
+{
+	if (m_selectedAssetIndex < 0 || m_selectedAssetIndex >= static_cast<int>(m_assets.size()))
+	{
+		gDebug.LogMessage("AddImageWidget skipped: no active GameGUI asset");
+		return;
+	}
+
+	GameGUIWidgetDef image;
+	image.type = "ImageBox";
+	image.name = m_newWidgetName[0] != '\0' ? m_newWidgetName : "image";
+	image.skin = "ImageBox";
+	image.texture = m_newWidgetTexture[0] != '\0' ? m_newWidgetTexture : "textures/example.png";
+	image.layer = "Main";
+	image.width = 256;
+	image.height = 256;
+	image.action = GameGUIActionType::None;
+
+	int framebufferWidth = 0;
+	int framebufferHeight = 0;
+	if (m_window)
+	{
+		m_window->GetFramebufferSize(framebufferWidth, framebufferHeight);
+	}
+	image.x = std::max(0, (framebufferWidth - image.width) / 2);
+	image.y = std::max(0, (framebufferHeight - image.height) / 2);
+
+	GameGUIAsset& asset = CurrentAsset();
+	int suffix = 1;
+	while (std::any_of(asset.widgets.begin(), asset.widgets.end(), [&image](const GameGUIWidgetDef& widget)
+	{
+		return widget.name == image.name;
+	}))
+	{
+		image.name = "image_" + std::to_string(++suffix);
+	}
+
+	asset.widgets.push_back(image);
+	m_selectedWidgetIndex = static_cast<int>(asset.widgets.size() - 1);
+	m_newWidgetName[0] = '\0';
+	m_newWidgetTexture[0] = '\0';
+	gDebug.LogMessage(
+		std::string("Created GameGUI image widget: name='") + image.name +
+		"', asset='" + asset.name +
+		"', texture='" + image.texture +
+		"', pos=(" + std::to_string(image.x) + "," + std::to_string(image.y) + ")" +
+		", size=(" + std::to_string(image.width) + "x" + std::to_string(image.height) + ")");
+}
+
 void GameGUICreator::SaveCurrentAsset()
 {
 	if (m_selectedAssetIndex < 0 || m_selectedAssetIndex >= static_cast<int>(m_assets.size()))
@@ -606,8 +804,10 @@ void GameGUICreator::SaveCurrentAsset()
 		json << "    {\n";
 		json << "      \"type\": \"" << widget.type << "\",\n";
 		json << "      \"name\": \"" << widget.name << "\",\n";
+		json << "      \"parent\": \"" << widget.parentName << "\",\n";
 		json << "      \"skin\": \"" << widget.skin << "\",\n";
 		json << "      \"text\": \"" << widget.text << "\",\n";
+		json << "      \"texture\": \"" << widget.texture << "\",\n";
 		json << "      \"layer\": \"" << widget.layer << "\",\n";
 		json << "      \"x\": " << widget.x << ",\n";
 		json << "      \"y\": " << widget.y << ",\n";
@@ -668,7 +868,15 @@ void GameGUICreator::DeleteSelectedWidget()
 		return;
 	}
 
+	const std::string deletedWidgetName = asset.widgets[static_cast<std::size_t>(m_selectedWidgetIndex)].name;
 	asset.widgets.erase(asset.widgets.begin() + m_selectedWidgetIndex);
+	for (GameGUIWidgetDef& widget : asset.widgets)
+	{
+		if (widget.parentName == deletedWidgetName)
+		{
+			widget.parentName.clear();
+		}
+	}
 	if (asset.widgets.empty())
 	{
 		m_selectedWidgetIndex = -1;

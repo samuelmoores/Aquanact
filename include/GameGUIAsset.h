@@ -15,8 +15,10 @@ struct GameGUIWidgetDef
 {
 	std::string type;
 	std::string name;
+	std::string parentName;
 	std::string skin;
 	std::string text;
+	std::string texture;
 	std::string layer = "Main";
 	int x = 0;
 	int y = 0;

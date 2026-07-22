@@ -1,0 +1,74 @@
+EventSystem and GameGUI Binding Work Report
+
+Date: July 22, 2026
+Scope: ~1.5 hours of early implementation work
+
+Summary
+- Started laying the groundwork for an event-driven gameplay/UI bridge so `GameplayManager` can publish gameplay events and `GameGUI` button widgets can subscribe to them.
+- Began defining a second binding path for gameplay state back into the UI, so gameplay variables can drive text and image widgets instead of relying only on one-way button clicks.
+- The current focus is on establishing a clean interface layer before expanding into full gameplay object synchronization.
+
+1. Event system direction
+- The first goal was to move beyond direct, hard-coded UI callbacks and start shaping a reusable event system inside `GameplayManager`.
+- The intent is for gameplay code to expose named events or event channels that the UI layer can connect to at runtime.
+- This makes `GameGUI` buttons behave more like bound controls than isolated widgets.
+- The long-term benefit is that gameplay actions such as pause, resume, quit, menu navigation, and future gameplay commands can all be routed through the same system.
+
+2. Button-to-gameplay wiring
+- The UI side is being positioned so `GameGUI` button objects can call into gameplay events without knowing the full gameplay implementation details.
+- Instead of each button directly invoking a specific gameplay function, buttons should be able to bind to an event identifier or command handler.
+- This allows the same button creation flow to support multiple gameplay actions through data-driven configuration.
+- It also keeps the GameGUI asset structure closer to a presentation layer and less tied to the internal gameplay code.
+
+3. Gameplay-to-UI variable binding
+- A second connection path was identified for pushing gameplay state back into UI widgets.
+- The goal here is to bind gameplay variables to text widgets and image widgets so the UI can reflect live gameplay state.
+- Example use cases include score text, health text, ammo counts, status labels, portrait icons, objective markers, and state-dependent images.
+- The UI should be able to listen for variable changes rather than polling manually in every frame.
+- This creates a more maintainable path for keeping gameplay objects and GUI objects synchronized.
+
+4. UI object binding model
+- The practical direction is to give GUI widgets a lightweight binding description.
+- For text widgets, the binding should map a gameplay value to a caption or formatted string.
+- For image widgets, the binding should map a gameplay value, enum, state, or asset reference to a texture or icon update.
+- For buttons, the binding should map a click action to a gameplay event or command.
+- This makes the UI definition more declarative and easier to author over time.
+
+5. Initial design considerations
+- The event system should likely support at least these concepts:
+  - event name or ID
+  - sender/source
+  - payload or arguments
+  - subscribe/unsubscribe lifecycle
+  - one-to-many notification
+- The variable binding layer should likely support:
+  - watched gameplay values
+  - change notifications
+  - widget target type checks
+  - text formatting for numeric and string values
+  - image/texture selection from gameplay state
+- A unified binding system would make it easier to connect gameplay objects back into the GameGUI without scattering special-case code.
+
+6. Why this work matters
+- The current UI path is functional for direct interactions, but it does not yet scale well for broader gameplay integration.
+- An event system inside `GameplayManager` provides a consistent way to communicate outward to UI and other systems.
+- Variable bindings provide the inverse path, letting gameplay state actively drive the interface.
+- Together, these two directions create a proper gameplay/UI bridge instead of a one-off button handling path.
+
+7. Current status
+- Conceptual architecture is in progress.
+- The event side is being shaped around gameplay actions that UI buttons can trigger.
+- The binding side is being shaped around gameplay values that text and image widgets can observe.
+- No final API contract has been locked yet, but the direction is now clear enough to continue implementation in the next session.
+
+8. Next implementation steps
+- Define the core event types and subscription interface for `GameplayManager`.
+- Add a binding registration path in `GameGUI` for button widgets.
+- Add variable binding support for text widgets.
+- Add variable binding support for image widgets.
+- Decide whether bindings should be resolved by string IDs, object references, or both.
+- Establish lifecycle rules so bindings are cleaned up safely when gameplay objects or UI widgets are destroyed.
+
+Closing note
+- This session was focused on architecture setup rather than finished behavior.
+- The main outcome is a clear two-way UI strategy: gameplay events flowing into buttons, and gameplay variables flowing back into text and image widgets.

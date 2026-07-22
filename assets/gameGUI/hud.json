@@ -4,11 +4,12 @@
     {
       "type": "Button",
       "name": "pause",
+      "parent": "",
       "skin": "ButtonSkin",
       "text": "Test Button",
       "layer": "Main",
-      "x": 330,
-      "y": 60,
+      "x": 921,
+      "y": 452,
       "width": 320,
       "height": 90,
       "visible": true,
@@ -18,6 +19,7 @@
     {
       "type": "Button",
       "name": "quit",
+      "parent": "",
       "skin": "ButtonSkin",
       "text": "Test Button",
       "layer": "Main",
@@ -28,6 +30,36 @@
       "visible": true,
       "alpha": 1,
       "action": "QuitGame"
+    },
+    {
+      "type": "TextBox",
+      "name": "pause_text",
+      "parent": "pause",
+      "skin": "TextBox",
+      "text": "Pause",
+      "layer": "Main",
+      "x": 125,
+      "y": 30,
+      "width": 360,
+      "height": 48,
+      "visible": true,
+      "alpha": 1,
+      "action": "None"
+    },
+    {
+      "type": "TextBox",
+      "name": "quit_text",
+      "parent": "quit",
+      "skin": "TextBox",
+      "text": "Quit",
+      "layer": "Main",
+      "x": 148,
+      "y": 30,
+      "width": 360,
+      "height": 48,
+      "visible": true,
+      "alpha": 1,
+      "action": "None"
     }
   ]
 }

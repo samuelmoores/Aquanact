@@ -12,6 +12,7 @@
 
 #include <MYGUI/MyGUI_Button.h>
 #include <MYGUI/MyGUI_Gui.h>
+#include <MYGUI/MyGUI_ImageBox.h>
 #include <MYGUI/MyGUI_TextBox.h>
 #include <MYGUI/MyGUI_OpenGLDataManager.h>
 #include <MYGUI/MyGUI_OpenGLPlatform.h>
@@ -20,6 +21,7 @@
 #include <MYGUI/MyGUI_OpenGLImageLoader.h>
 #include <algorithm>
 #include <fstream>
+#include <unordered_map>
 #include <Texture.h>
 
 namespace {
@@ -198,9 +200,54 @@ void GameGUI::LoadUIAsset(const GameGUIAsset& asset)
 
 	ClearUI();
 	m_loadedAsset = asset;
+	std::unordered_map<std::string, MyGUI::Widget*> createdWidgets;
 	for (const GameGUIWidgetDef& widget : m_loadedAsset.widgets)
 	{
-		CreateWidgetFromDef(widget);
+		if (!widget.parentName.empty())
+		{
+			continue;
+		}
+
+		MyGUI::Widget* createdWidget = CreateWidgetFromDef(widget, nullptr);
+		if (createdWidget)
+		{
+			createdWidgets[widget.name] = createdWidget;
+			m_runtimeWidgets.push_back(createdWidget);
+		}
+	}
+
+	bool madeProgress = true;
+	while (madeProgress)
+	{
+		madeProgress = false;
+		for (const GameGUIWidgetDef& widget : m_loadedAsset.widgets)
+		{
+			if (widget.parentName.empty() || createdWidgets.find(widget.name) != createdWidgets.end())
+			{
+				continue;
+			}
+
+			const auto parentIt = createdWidgets.find(widget.parentName);
+			if (parentIt == createdWidgets.end())
+			{
+				continue;
+			}
+
+			MyGUI::Widget* createdWidget = CreateWidgetFromDef(widget, parentIt->second);
+			if (createdWidget)
+			{
+				createdWidgets[widget.name] = createdWidget;
+				madeProgress = true;
+			}
+		}
+	}
+
+	for (const GameGUIWidgetDef& widget : m_loadedAsset.widgets)
+	{
+		if (!widget.parentName.empty() && createdWidgets.find(widget.name) == createdWidgets.end())
+		{
+			gDebug.LogMessage("GameGUI skipped child widget with missing/cyclic parent: " + widget.name);
+		}
 	}
 }
 
@@ -222,19 +269,13 @@ void GameGUI::ClearUI()
 	m_runtimeWidgets.clear();
 }
 
-void GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def)
+MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* parent)
 {
 	if (def.type == "Button")
 	{
-		MyGUI::Button* button = m_gui->createWidget<MyGUI::Button>(
-			def.skin,
-			def.x,
-			def.y,
-			def.width,
-			def.height,
-			MyGUI::Align::Default,
-			def.layer,
-			def.name);
+		MyGUI::Button* button = parent ?
+			parent->createWidget<MyGUI::Button>(def.skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.name) :
+			m_gui->createWidget<MyGUI::Button>(def.skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.layer, def.name);
 		if (button)
 		{
 			button->setCaption(def.text);
@@ -244,40 +285,69 @@ void GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def)
 			// built-in behaviors without hardcoding them into the widget assets.
 			button->eventMouseButtonClick += MyGUI::newDelegate(this, &GameGUI::OnWidgetClicked);
 			gDebug.LogMessage(std::string("GameGUI click handler bound for widget: ") + def.name);
-			MyGUI::LayerManager::getInstance().upLayerItem(button);
-			m_runtimeWidgets.push_back(button);
+			if (!parent)
+			{
+				MyGUI::LayerManager::getInstance().upLayerItem(button);
+			}
 			gDebug.LogMessage(
 				std::string("GameGUI widget created: name='") + def.name +
 				"', type='" + def.type +
 				"', skin='" + def.skin +
 				"', layer='" + def.layer + "'");
+			return button;
 		}
 	}
 	else if (def.type == "TextBox" || def.type == "Text")
 	{
-		MyGUI::TextBox* text = m_gui->createWidget<MyGUI::TextBox>(
-			def.skin.empty() ? "TextBox" : def.skin,
-			def.x,
-			def.y,
-			def.width,
-			def.height,
-			MyGUI::Align::Default,
-			def.layer,
-			def.name);
+		const std::string skin = def.skin.empty() ? "TextBox" : def.skin;
+		MyGUI::TextBox* text = parent ?
+			parent->createWidget<MyGUI::TextBox>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.name) :
+			m_gui->createWidget<MyGUI::TextBox>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.layer, def.name);
 		if (text)
 		{
 			text->setCaption(def.text);
 			text->setVisible(def.visible);
 			text->setAlpha(def.alpha);
-			MyGUI::LayerManager::getInstance().upLayerItem(text);
-			m_runtimeWidgets.push_back(text);
+			if (!parent)
+			{
+				MyGUI::LayerManager::getInstance().upLayerItem(text);
+			}
 			gDebug.LogMessage(
 				std::string("GameGUI widget created: name='") + def.name +
 				"', type='" + def.type +
 				"', skin='" + def.skin +
 				"', layer='" + def.layer + "'");
+			return text;
 		}
 	}
+	else if (def.type == "ImageBox" || def.type == "Image")
+	{
+		const std::string skin = def.skin.empty() ? "ImageBox" : def.skin;
+		MyGUI::ImageBox* image = parent ?
+			parent->createWidget<MyGUI::ImageBox>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.name) :
+			m_gui->createWidget<MyGUI::ImageBox>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.layer, def.name);
+		if (image)
+		{
+			if (!def.texture.empty())
+			{
+				image->setImageTexture(def.texture);
+			}
+			image->setVisible(def.visible);
+			image->setAlpha(def.alpha);
+			if (!parent)
+			{
+				MyGUI::LayerManager::getInstance().upLayerItem(image);
+			}
+			gDebug.LogMessage(
+				std::string("GameGUI widget created: name='") + def.name +
+				"', type='" + def.type +
+				"', skin='" + def.skin +
+				"', layer='" + def.layer + "'");
+			return image;
+		}
+	}
+
+	return nullptr;
 }
 
 void GameGUI::OnWidgetClicked(MyGUI::Widget* sender)

@@ -41,7 +41,7 @@ public:
 
 private:
 	// Converts the asset-level widget description into an actual MyGUI widget.
-	void CreateWidgetFromDef(const GameGUIWidgetDef& def);
+	MyGUI::Widget* CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* parent);
 	// Handles runtime widget clicks for simple built-in actions like quitting.
 	void OnWidgetClicked(MyGUI::Widget* sender);
 

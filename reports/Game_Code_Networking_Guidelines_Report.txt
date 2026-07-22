@@ -1,0 +1,125 @@
+Game Code Networking Guidelines Report
+
+Date: July 22, 2026
+Scope: Good practices for the game code system with future multiplayer support in mind
+
+Summary
+- Defined a set of implementation guidelines for the game code system so gameplay, UI binding, save/load, and future networking can share the same architecture without major rewrites.
+- The main goal is to keep gameplay state explicit, metadata-driven, and registry-backed so networking can later replicate state and events with less special-case code.
+- These guidelines are meant to support the current single-player development flow while preserving a clean path toward multiplayer.
+
+1. Keep gameplay state explicit
+- Gameplay data should live in clearly defined game objects instead of being scattered across hidden globals or engine-only state.
+- Variables that matter to gameplay, UI, save/load, or networking should be stored as named members with clear ownership.
+- Avoid making gameplay behavior depend on hard-to-trace side effects or engine internals that cannot be easily serialized or replicated later.
+- The more explicit the gameplay state is now, the easier it will be to synchronize later.
+
+2. Use a registry for live game objects
+- Every live gameplay object should register itself with a central registry or manager.
+- The registry should provide stable object identity and lookup by ID or name.
+- This helps the editor inspect live game code, helps the UI binding system discover source objects, and gives networking a natural place to resolve replicated object references.
+- A registry-backed architecture is much easier to extend than pointer-based ad hoc access.
+
+3. Keep metadata separate from implementation
+- Bindable, serializable, and network-relevant information should be described through metadata rather than inferred from raw code structure.
+- Metadata should describe what a member is, how it can be used, and whether it can be bound, saved, or replicated.
+- This allows the same gameplay object to serve multiple systems without each one needing its own custom reflection logic.
+- A single metadata model can support UI binding, editor inspection, persistence, and replication.
+
+4. Prefer stable object IDs over raw pointers
+- UI bindings, save data, and future network messages should reference game objects through stable IDs or names instead of raw memory addresses.
+- Raw pointers are fine inside a short-lived implementation detail, but they are not a good long-term contract for game state synchronization.
+- Stable IDs make it easier to restore state after reload, reconnect a widget after rebind, or apply replicated updates to the correct object.
+- This also reduces the risk of lifetime bugs when objects are created or destroyed during play.
+
+5. Distinguish state from events
+- Persistent game state and transient gameplay events should be treated differently.
+- Examples of persistent state:
+  - health
+  - score
+  - ammo
+  - position
+  - inventory contents
+- Examples of transient events:
+  - jump
+  - shoot
+  - open door
+  - pause
+  - interact
+- Persistent state is a good candidate for replication snapshots or delta updates.
+- Transient events are better represented as commands or network events.
+
+6. Design bindable members to be network-friendly
+- A member marked bindable should ideally also be easy to serialize or replicate if needed later.
+- Keep bindable types simple where possible:
+  - int
+  - float
+  - bool
+  - string
+  - small enums
+- If a value is complex, consider exposing a simpler derived field for UI and networking instead of binding directly to a large internal object.
+- Good bindable design now will reduce the need for special replication adapters later.
+
+7. Keep getter functions side-effect free
+- Functions exposed for binding should be read-only or effectively read-only whenever possible.
+- A bindable function should ideally return a value without mutating gameplay state.
+- Side-effect free getters are easier to cache, inspect, replicate, and reason about across clients.
+- This also keeps UI bindings safer and less surprising in the editor.
+
+8. Separate authoritative writes from observation
+- Only one part of the system should normally own the right to change a given gameplay value.
+- Other systems should observe or request changes rather than directly mutating the state from everywhere.
+- This is especially important for future networking, where authority rules will matter.
+- If state ownership is already clear in single-player, the multiplayer version will be much easier to define.
+
+9. Use event-driven updates where possible
+- When gameplay values change, notify listeners instead of forcing every system to poll constantly.
+- The same event or change notification can drive:
+  - UI updates
+  - editor refresh
+  - save-state dirty tracking
+  - future network replication
+- Event-driven state changes reduce duplicated logic and make state transitions easier to trace.
+
+10. Keep serialization first-class
+- Any gameplay object that may become relevant to networking should also be reasonably serializable.
+- If a state value cannot be saved cleanly, it will often also be difficult to replicate cleanly.
+- The project should prefer simple, explicit serialization formats for gameplay state.
+- This creates a clear path for snapshots, reconnects, and state restore.
+
+11. Avoid hidden engine coupling
+- Game code should not depend too heavily on engine internals that are hard to isolate or replay.
+- The more gameplay can rely on the game code layer and registry layer, the easier it will be to move that state across a network.
+- UI, rendering, and editor concerns should remain consumers of gameplay state, not the primary source of truth.
+
+12. Make object lifetime predictable
+- Object creation and destruction should follow a clear lifecycle.
+- The registry should be informed when objects appear or disappear.
+- Bindings should be removed cleanly when a source object or widget goes away.
+- Predictable lifetime management is important now and becomes essential once replicated objects and remote clients are involved.
+
+13. Keep network-facing data model-compatible with UI bindings
+- Where possible, the same metadata used for UI binding should also describe what can be replicated.
+- A property that is visible to the UI is often a good candidate for future sync, provided authority and update frequency are appropriate.
+- This does not mean every bindable variable should be networked, but it does mean the architecture should not prevent that.
+- The best outcome is one metadata model with separate flags for bindable, serializable, and replicable.
+
+14. Start with simple data shapes
+- Simple gameplay data is easier to test, serialize, and replicate.
+- Use narrow, readable types before introducing more complex nested structures.
+- If a state concept can be represented as a small enum or scalar, prefer that over a large opaque structure.
+- Simpler data will reduce the amount of plumbing required when networking is introduced.
+
+15. Recommended rule set for new game code
+- New game code should:
+  - register itself in the live object registry
+  - expose explicit metadata for bindable members
+  - keep getter functions side-effect free
+  - use stable IDs for references
+  - separate persistent state from transient events
+  - keep serialization support in mind from the start
+- Following these rules now will preserve flexibility for UI, hot reload, save/load, and multiplayer later.
+
+Closing note
+- The current game code system should be treated as a foundation, not a one-off single-player solution.
+- If the game code layer stays metadata-driven and registry-driven, future networking can reuse the same concepts instead of rebuilding them from scratch.
