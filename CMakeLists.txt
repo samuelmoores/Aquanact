@@ -26,55 +26,55 @@ endif()
 set(AQUANACT_VCPKG_TARGET_TRIPLET "${VCPKG_TARGET_TRIPLET}")
 
 set(SOURCES
-    "src/main.cpp"
-    "include/ShaderProgram.h" "src/ShaderProgram.cpp"
-    "include/StbImage.h" "src/StbImage.cpp"
-    "include/Mesh.h" "src/Mesh.cpp"
-    "include/ModelImporter.h" "src/ModelImporter.cpp"
-    "include/Camera.h"
-    "include/EngineCamera.h" "src/EngineCamera.cpp"
-    "include/GameCamera.h" "src/GameCamera.cpp"
-    "include/Renderer.h"
-    "include/Object3D.h" "src/Object3D.cpp"
-    "include/Axis.h" "src/Axis.cpp"
-    "include/Grid.h" "src/Grid.cpp"
-    "include/Texture.h"
-    "include/Line.h" "src/Line.cpp"
-    "include/Debug.h" "src/Debug.cpp"
-    "include/GameGUIAsset.h"
-    "include/EngineGUI.h" "src/EngineGUI.cpp"
-    "include/GameGUI.h" "src/GameGUI.cpp"
-    "include/GameGUIManager.h" "src/GameGUIManager.cpp"
-    "include/GameGUICreator.h" "src/GameGUICreator.cpp"
-    "include/FrontEndManager.h" "src/FrontEndManager.cpp"
-    "include/FileManager.h" "src/FileManager.cpp"
-    "include/FileSystem.h" "src/FileSystem.cpp"
-    "include/SceneManager.h" "src/SceneManager.cpp"
-    "include/ProjectManager.h" "src/ProjectManager.cpp"
-    "include/Animation.h" "src/Animation.cpp"
-    "include/Animator.h" "src/Animator.cpp"
-    "include/AnimatorComponent.h" "src/AnimatorComponent.cpp"
-    "include/Controller.h" "src/Controller.cpp"
-    "include/Game/GameObject.h" "src/Game/GameObject.cpp"
-    "include/Game/GameObjectRegistry.h" "src/Game/GameObjectRegistry.cpp"
+    "src/Engine/main.cpp"
+    "include/Engine/ShaderProgram.h" "src/Engine/ShaderProgram.cpp"
+    "include/Engine/StbImage.h" "src/Engine/StbImage.cpp"
+    "include/Engine/Mesh.h" "src/Engine/Mesh.cpp"
+    "include/Engine/ModelImporter.h" "src/Engine/ModelImporter.cpp"
+    "include/Engine/Camera.h"
+    "include/Engine/EngineCamera.h" "src/Engine/EngineCamera.cpp"
+    "include/Engine/GameCamera.h" "src/Engine/GameCamera.cpp"
+    "include/Engine/Renderer.h"
+    "include/Engine/Object3D.h" "src/Engine/Object3D.cpp"
+    "include/Engine/Axis.h" "src/Engine/Axis.cpp"
+    "include/Engine/Grid.h" "src/Engine/Grid.cpp"
+    "include/Engine/Texture.h"
+    "include/Engine/Line.h" "src/Engine/Line.cpp"
+    "include/Engine/Debug.h" "src/Engine/Debug.cpp"
+    "include/Engine/GameGUIAsset.h"
+    "include/Engine/EngineGUI.h" "src/Engine/EngineGUI.cpp"
+    "include/Engine/GameGUI.h" "src/Engine/GameGUI.cpp"
+    "include/Engine/GameGUIManager.h" "src/Engine/GameGUIManager.cpp"
+    "include/Engine/GameGUICreator.h" "src/Engine/GameGUICreator.cpp"
+    "include/Engine/FrontEndManager.h" "src/Engine/FrontEndManager.cpp"
+    "include/Engine/FileManager.h" "src/Engine/FileManager.cpp"
+    "include/Engine/FileSystem.h" "src/Engine/FileSystem.cpp"
+    "include/Engine/SceneManager.h" "src/Engine/SceneManager.cpp"
+    "include/Engine/ProjectManager.h" "src/Engine/ProjectManager.cpp"
+    "include/Engine/Animation.h" "src/Engine/Animation.cpp"
+    "include/Engine/Animator.h" "src/Engine/Animator.cpp"
+    "include/Engine/AnimatorComponent.h" "src/Engine/AnimatorComponent.cpp"
+    "include/Engine/Controller.h" "src/Engine/Controller.cpp"
+    "include/Engine/GameObject.h" "src/Engine/GameObject.cpp"
+    "include/Engine/GameObjectRegistry.h" "src/Engine/GameObjectRegistry.cpp"
     "include/Game/PlayerHealth.h" "src/Game/PlayerHealth.cpp"
-    "include/Window.h" "src/Window.cpp"
-    "include/Input.h" "src/Input.cpp"
-    "include/GameplayManager.h" "src/GameplayManager.cpp"
-    "include/RenderManager.h" "src/RenderManager.cpp"
-    "include/GraphicsDevice.h"
-    "include/OpenGLGraphicsDevice.h" "src/OpenGLGraphicsDevice.cpp"
-    "include/OpenGLGraphics.h" "src/OpenGLGraphics.cpp"
-    "include/Physics.h" "src/Physics.cpp"
-    "include/MathUtils.h" "src/MathUtils.cpp"
-    "include/Audio.h" "src/Audio.cpp"
-    "include/RenderCommand.h"
-    "include/FrameAllocator.h"
-    "include/GLHeaders.h"
-    "include/AquanactBuildSystem.h" "src/AquanactBuildSystem.cpp"
+    "include/Engine/Window.h" "src/Engine/Window.cpp"
+    "include/Engine/Input.h" "src/Engine/Input.cpp"
+    "include/Engine/GameplayManager.h" "src/Engine/GameplayManager.cpp"
+    "include/Engine/RenderManager.h" "src/Engine/RenderManager.cpp"
+    "include/Engine/GraphicsDevice.h"
+    "include/Engine/OpenGLGraphicsDevice.h" "src/Engine/OpenGLGraphicsDevice.cpp"
+    "include/Engine/OpenGLGraphics.h" "src/Engine/OpenGLGraphics.cpp"
+    "include/Engine/Physics.h" "src/Engine/Physics.cpp"
+    "include/Engine/MathUtils.h" "src/Engine/MathUtils.cpp"
+    "include/Engine/Audio.h" "src/Engine/Audio.cpp"
+    "include/Engine/RenderCommand.h"
+    "include/Engine/FrameAllocator.h"
+    "include/Engine/GLHeaders.h"
+    "include/Engine/AquanactBuildSystem.h" "src/Engine/AquanactBuildSystem.cpp"
 )
 
-add_executable (AquanactEngine ${SOURCES} "include/LightingManager.h" "src/LightingManager.cpp")
+add_executable (AquanactEngine ${SOURCES} "include/Engine/LightingManager.h" "src/Engine/LightingManager.cpp")
 target_compile_definitions(AquanactEngine PRIVATE AQUANACT_EDITOR)
 target_compile_definitions(AquanactEngine PRIVATE AQUANACT_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
 target_compile_definitions(AquanactEngine PRIVATE MYGUI_STATIC)
@@ -84,7 +84,7 @@ target_compile_definitions(AquanactEngine PRIVATE AQUANACT_MYGUI_OPENGL_LIBRARY=
 target_compile_definitions(AquanactEngine PRIVATE AQUANACT_FREETYPE_LIBRARY="freetype")
 target_compile_features(AquanactEngine PRIVATE cxx_std_20)
 
-add_executable (AquanactGame WIN32 ${SOURCES} "include/LightingManager.h" "src/LightingManager.cpp")
+add_executable (AquanactGame WIN32 ${SOURCES} "include/Engine/LightingManager.h" "src/Engine/LightingManager.cpp")
 target_compile_definitions(AquanactGame PRIVATE AQUANACT_GAME)
 target_compile_definitions(AquanactGame PRIVATE AQUANACT_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
 target_compile_definitions(AquanactGame PRIVATE MYGUI_STATIC)
@@ -95,8 +95,8 @@ target_compile_definitions(AquanactGame PRIVATE AQUANACT_FREETYPE_LIBRARY="freet
 target_compile_features(AquanactGame PRIVATE cxx_std_20)
 
 add_executable (AquanactBuildTool
-    "src/BuildToolMain.cpp"
-    "include/AquanactBuildSystem.h" "src/AquanactBuildSystem.cpp")
+    "src/Engine/BuildToolMain.cpp"
+    "include/Engine/AquanactBuildSystem.h" "src/Engine/AquanactBuildSystem.cpp")
 target_compile_definitions(AquanactBuildTool PRIVATE AQUANACT_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
 
 if (MSVC)
@@ -107,6 +107,12 @@ if (MSVC)
         "/LIBPATH:C:/Program Files (x86)/Windows Kits/10/Lib/10.0.26100.0/um/x64"
     )
     target_link_options(AquanactGame PRIVATE
+        "/LIBPATH:C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/lib/x64"
+        "/LIBPATH:C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/ATLMFC/lib/x64"
+        "/LIBPATH:C:/Program Files (x86)/Windows Kits/10/Lib/10.0.26100.0/ucrt/x64"
+        "/LIBPATH:C:/Program Files (x86)/Windows Kits/10/Lib/10.0.26100.0/um/x64"
+    )
+    target_link_options(AquanactBuildTool PRIVATE
         "/LIBPATH:C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/lib/x64"
         "/LIBPATH:C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/ATLMFC/lib/x64"
         "/LIBPATH:C:/Program Files (x86)/Windows Kits/10/Lib/10.0.26100.0/ucrt/x64"
@@ -218,5 +224,6 @@ add_custom_target(copymygui
 add_dependencies(AquanactEngine copyshaders copymodels)
 add_dependencies(AquanactEngine copymygui)
 add_dependencies(AquanactGame copyshaders copymodels copymygui)
+
 
 

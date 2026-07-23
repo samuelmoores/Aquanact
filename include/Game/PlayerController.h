@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Game/GameObject.h"
+#include "Engine/GameObject.h"
 
 // Generated gameplay class. Start here if you want to add game behavior.
 //

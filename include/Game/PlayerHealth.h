@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Game/GameObject.h"
+#include "Engine/GameObject.h"
 
 // Example child class that shows the minimum required shape.
 //
