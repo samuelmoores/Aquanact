@@ -19,6 +19,7 @@ public:
 	bool SetActiveLevel(const std::string& name);
 	Level* ActiveLevel();
 	const Level* ActiveLevel() const;
+	void ResetActiveLevelEntitiesToDefaultPosition();
 	const std::vector<std::unique_ptr<Level>>& Levels() const { return m_levels; }
 
 private:

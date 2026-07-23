@@ -4,6 +4,7 @@
 #include "Engine/Globals.h"
 #include "Engine/RenderManager.h"
 #include "Engine/Input.h"
+#include "Engine/LevelManager.h"
 #include "Engine/FileSystem.h"
 
 #include <algorithm>
@@ -364,6 +365,7 @@ void GameGUIManager::DrawReturnButton()
 	ImGui::Begin("Engine");
 	if (ImGui::Button("Return"))
 	{
+		gLevelManager.ResetActiveLevelEntitiesToDefaultPosition();
 		gEngineState.SetMode(EngineMode::Editor);
 		gRenderManager.SetEditorMode();
 		LogAction("Return to editor requested");

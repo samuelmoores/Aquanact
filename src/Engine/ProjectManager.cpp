@@ -213,44 +213,63 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const LevelM
 		return false;
 	}
 
-	std::string contents = "AquanactProject 7\n";
-	const Level* activeLevel = levelManager.ActiveLevel();
-	static const std::vector<std::unique_ptr<Entity>> emptyObjects;
-	const auto& objects = activeLevel ? activeLevel->Objects() : emptyObjects;
-	for (const auto& object : objects)
+	std::string contents = "AquanactProject 8\n";
+	const auto& levels = levelManager.Levels();
+	if (levels.empty())
 	{
-		if (!object)
-		{
-			continue;
-		}
-
-		const glm::vec3 position = object->Position();
-		const glm::vec3 rotation = object->Rotation();
-		const glm::vec3 scale = object->Scale();
-
-		const std::filesystem::path portableSourcePath = MakePortableSourcePath(path, object->SourcePath());
-		contents += "object;";
-		contents += EscapeField(portableSourcePath.string());
-		contents += ";";
-		contents += std::to_string(position.x) + ";" + std::to_string(position.y) + ";" + std::to_string(position.z) + ";";
-		contents += std::to_string(rotation.x) + ";" + std::to_string(rotation.y) + ";" + std::to_string(rotation.z) + ";";
-		contents += std::to_string(scale.x) + ";" + std::to_string(scale.y) + ";" + std::to_string(scale.z) + "\n";
+		contents += "level;Default;1\n";
 	}
-
-	for (const auto& object : objects)
+	else
 	{
-		if (!object)
+		for (const auto& level : levels)
 		{
-			continue;
-		}
+			if (!level)
+			{
+				continue;
+			}
 
-		if (Controller* controller = object->GetController())
-		{
-			contents += "component;";
-			contents += EscapeField(MakePortableSourcePath(path, object->SourcePath()).string());
-			contents += ";controller;";
-			contents += std::to_string(controller->MoveSpeed());
+			contents += "level;";
+			contents += EscapeField(level->Name());
+			contents += ";";
+			contents += BoolField(levelManager.ActiveLevel() == level.get());
 			contents += "\n";
+
+			for (const auto& object : level->Objects())
+			{
+				if (!object)
+				{
+					continue;
+				}
+
+				const glm::vec3 position = object->Position();
+				const glm::vec3 rotation = object->Rotation();
+				const glm::vec3 scale = object->Scale();
+
+				const std::filesystem::path portableSourcePath = MakePortableSourcePath(path, object->SourcePath());
+				contents += "object;";
+				contents += EscapeField(portableSourcePath.string());
+				contents += ";";
+				contents += std::to_string(position.x) + ";" + std::to_string(position.y) + ";" + std::to_string(position.z) + ";";
+				contents += std::to_string(rotation.x) + ";" + std::to_string(rotation.y) + ";" + std::to_string(rotation.z) + ";";
+				contents += std::to_string(scale.x) + ";" + std::to_string(scale.y) + ";" + std::to_string(scale.z) + "\n";
+			}
+
+			for (const auto& object : level->Objects())
+			{
+				if (!object)
+				{
+					continue;
+				}
+
+				if (Controller* controller = object->GetController())
+				{
+					contents += "component;";
+					contents += EscapeField(MakePortableSourcePath(path, object->SourcePath()).string());
+					contents += ";controller;";
+					contents += std::to_string(controller->MoveSpeed());
+					contents += "\n";
+				}
+			}
 		}
 	}
 
@@ -322,17 +341,24 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 	std::istringstream file(fileContents);
 	std::string header;
 	std::getline(file, header);
-	if (header != "AquanactProject 1" && header != "AquanactProject 2" && header != "AquanactProject 3" && header != "AquanactProject 4" && header != "AquanactProject 5" && header != "AquanactProject 6" && header != "AquanactProject 7")
+	if (header != "AquanactProject 8")
 	{
 		return false;
 	}
 
-	std::vector<std::unique_ptr<Entity>> loadedObjects;
 	struct PendingController {
 		std::filesystem::path sourcePath;
 		float moveSpeed = 50.0f;
+		std::string levelName;
 	};
 	std::vector<PendingController> pendingControllers;
+	struct PendingLevel {
+		std::string name;
+		bool active = false;
+		std::vector<std::unique_ptr<Entity>> objects;
+	};
+	std::vector<PendingLevel> pendingLevels;
+	PendingLevel* currentLevel = nullptr;
 	// GameGUI state is loaded in two phases: we collect the saved asset names
 	// here, then hand them back to the runtime GUI after the level finishes loading.
 	std::vector<std::string> pendingGameGUIAssets;
@@ -459,9 +485,15 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 		{
 			try
 			{
+				if (!currentLevel)
+				{
+					gDebug.LogMessage("Encountered controller before any level definition in project file: " + line);
+					return false;
+				}
 				pendingControllers.push_back(PendingController{
 					ResolveSourcePath(path, fields[1]),
-					std::stof(fields[3])
+					std::stof(fields[3]),
+					currentLevel ? currentLevel->name : std::string()
 				});
 			}
 			catch (const std::exception& ex)
@@ -473,9 +505,32 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 			continue;
 		}
 
+		if (fields.size() >= 2 && fields[0] == "level")
+		{
+			PendingLevel level;
+			level.name = UnescapeField(fields[1]);
+			if (level.name.empty())
+			{
+				level.name = "Level";
+			}
+			if (fields.size() >= 3)
+			{
+				level.active = ParseBoolField(fields[2]);
+			}
+			pendingLevels.push_back(std::move(level));
+			currentLevel = &pendingLevels.back();
+			continue;
+		}
+
 		if (fields.size() != 11 || fields[0] != "object")
 		{
 			continue;
+		}
+
+		if (!currentLevel)
+		{
+			gDebug.LogMessage("Encountered object before any level definition in project file: " + line);
+			return false;
 		}
 
 		try
@@ -497,7 +552,11 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 				std::stof(fields[9]),
 				std::stof(fields[10])));
 			object->SetIgnoreCameraCollision(true);
-			loadedObjects.push_back(std::move(object));
+			object->SetDefaultPosition(object->Position());
+			if (currentLevel)
+			{
+				currentLevel->objects.push_back(std::move(object));
+			}
 		}
 		catch (const std::exception& ex)
 		{
@@ -508,16 +567,57 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 	}
 
 	levelManager.Clear();
-	gGameplayManager.shutDown();
-	Level* defaultLevel = levelManager.CreateLevel("Default");
-	for (auto& object : loadedObjects)
+	if (pendingLevels.empty())
 	{
-		Entity* loadedObject = defaultLevel ? defaultLevel->AddObject(std::move(object)) : nullptr;
+		gDebug.LogMessage("Project file did not contain any level definitions.");
+		return false;
 	}
+
+	Level* activeLevel = nullptr;
+	for (auto& pendingLevel : pendingLevels)
+	{
+		Level* level = levelManager.CreateLevel(pendingLevel.name);
+		if (!level)
+		{
+			continue;
+		}
+
+		if (pendingLevel.active)
+		{
+			activeLevel = level;
+		}
+
+		for (auto& object : pendingLevel.objects)
+		{
+			level->AddObject(std::move(object));
+		}
+	}
+
+	if (!activeLevel)
+	{
+		activeLevel = levelManager.Levels().front().get();
+	}
+	levelManager.SetActiveLevel(activeLevel->Name());
 
 	for (const auto& pendingController : pendingControllers)
 	{
-		for (const auto& object : defaultLevel->Objects())
+		Level* targetLevel = nullptr;
+		for (const auto& level : levelManager.Levels())
+		{
+			if (level && level->Name() == pendingController.levelName)
+			{
+				targetLevel = level.get();
+				break;
+			}
+		}
+
+		if (!targetLevel)
+		{
+			gDebug.LogMessage("Controller references missing level: " + pendingController.levelName);
+			return false;
+		}
+
+		for (const auto& object : targetLevel->Objects())
 		{
 			if (!object || object->SourcePath() != pendingController.sourcePath.string())
 			{

@@ -1,6 +1,7 @@
 #include "Engine/LevelManager.h"
 
 #include "Engine/Level.h"
+#include "Engine/Entity.h"
 
 #include <algorithm>
 
@@ -19,10 +20,6 @@ Level* LevelManager::startUp()
 		if (!m_levels.empty())
 		{
 			m_activeLevel = m_levels.front().get();
-		}
-		else
-		{
-			m_activeLevel = CreateLevel("Default");
 		}
 	}
 
@@ -73,4 +70,20 @@ Level* LevelManager::ActiveLevel()
 const Level* LevelManager::ActiveLevel() const
 {
 	return m_activeLevel;
+}
+
+void LevelManager::ResetActiveLevelEntitiesToDefaultPosition()
+{
+	if (!m_activeLevel)
+	{
+		return;
+	}
+
+	for (const auto& object : m_activeLevel->Objects())
+	{
+		if (object)
+		{
+			object->ResetToDefaultPosition();
+		}
+	}
 }
