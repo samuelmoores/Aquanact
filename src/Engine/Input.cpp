@@ -1,8 +1,6 @@
 #include "Engine/Input.h"
 
 #include "Engine/Window.h"
-#include "Engine/EngineCamera.h"
-#include "Engine/RenderManager.h"
 #include "Engine/Globals.h"
 #include "GLFW/glfw3.h"
 
@@ -25,11 +23,6 @@ void Input::startUp(Window& window)
 	// same raw mouse events in game mode.
 	m_previousMouseButtonCallback = glfwSetMouseButtonCallback(m_window->GLFW(), &Input::MouseButtonCallback);
 	m_previousCursorPosCallback = glfwSetCursorPosCallback(m_window->GLFW(), &Input::CursorPosCallback);
-
-	if (gEngineState.IsEditorMode())
-	{
-		AttachCamera(gRenderManager.GetEngineCamera());
-	}
 }
 
 void Input::shutDown()
@@ -48,11 +41,6 @@ void Input::shutDown()
 	m_lookActive = false;
 	m_lookBecameActive = false;
 	m_mouseDelta = glm::vec2(0.0f);
-}
-
-void Input::AttachCamera(EngineCamera& camera)
-{
-	m_camera = &camera;
 }
 
 void Input::Update()
@@ -105,10 +93,6 @@ void Input::Update()
 		const glm::vec2 cursorPos(static_cast<float>(x), static_cast<float>(y));
 		m_mouseDelta = cursorPos - m_lastCursorPos;
 		m_lastCursorPos = cursorPos;
-	}
-
-	if (m_camera) {
-		m_camera->UpdateFly(*this);
 	}
 }
 

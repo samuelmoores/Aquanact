@@ -5,7 +5,6 @@
 #include "GLFW/glfw3.h"
 
 class Window;
-class EngineCamera;
 
 class Input {
 public:
@@ -14,7 +13,6 @@ public:
 	void startUp(Window& window);
 	void shutDown();
 	void Update();
-	void AttachCamera(EngineCamera& camera);
 
 	glm::vec3 MoveInput() const;
 	glm::vec2 MouseDelta() const;
@@ -40,5 +38,4 @@ private:
 	float m_deltaTime = 0.0f;
 	bool m_lookBecameActive = false;
 	bool m_windowFocused = false;
-	EngineCamera* m_camera = nullptr;
 };

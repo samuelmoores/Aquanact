@@ -513,13 +513,6 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 	for (auto& object : loadedObjects)
 	{
 		Entity* loadedObject = defaultLevel ? defaultLevel->AddObject(std::move(object)) : nullptr;
-		if (loadedObject)
-		{
-			if (Controller* controller = loadedObject->GetController())
-			{
-				gGameplayManager.RegisterController(controller);
-			}
-		}
 	}
 
 	for (const auto& pendingController : pendingControllers)

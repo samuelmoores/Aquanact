@@ -12,6 +12,23 @@ void LevelManager::Clear()
 
 LevelManager::~LevelManager() = default;
 
+Level* LevelManager::startUp()
+{
+	if (!m_activeLevel)
+	{
+		if (!m_levels.empty())
+		{
+			m_activeLevel = m_levels.front().get();
+		}
+		else
+		{
+			m_activeLevel = CreateLevel("Default");
+		}
+	}
+
+	return m_activeLevel;
+}
+
 Level* LevelManager::CreateLevel(std::string name)
 {
 	auto level = std::make_unique<Level>(std::move(name));

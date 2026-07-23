@@ -109,11 +109,12 @@ static int RunApplication(int argc, char** argv)
     gWindow.startUp();
     gRenderManager.startUp(gWindow);
     gFrontEndManager.startUp(gWindow);
-    gGameplayManager.startUp();
     gInput.startUp(gWindow);
     gDebug.startUp();
     gFileManager.startUp();
     gProjectManager.LoadProject(launchConfig.projectPath, gLevelManager);
+    Level* activeLevel = gLevelManager.startUp();
+    gGameplayManager.startUp(gLevelManager, activeLevel);
 
     while (!gWindow.ShouldClose())
         mainLoop();

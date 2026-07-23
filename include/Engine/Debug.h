@@ -8,6 +8,7 @@ class Camera;
 class EngineGUI;
 class Input;
 class Entity;
+class GameplayManager;
 
 class Debug {
 public:
@@ -60,6 +61,7 @@ public:
 	float GridSize() const;
 	float GridSpacing() const;
 	double StartupToFirstDrawMs() const;
+	void SetGameplayContext(const std::string& activeLevelName, std::size_t activeLevelObjects, std::size_t controllerCount, const std::string& engineMode);
 
 private:
 	// Rebuilds the axis/grid helpers when the grid configuration changes.
@@ -79,7 +81,12 @@ private:
 	float m_lastFps = 0.0f;
 	double m_startupToFirstDrawMs = -1.0;
 	bool m_controllerRegistered = false;
+	bool m_controllerOwnerBound = false;
 	std::string m_gameplayObjectName;
+	std::string m_activeLevelName;
+	std::string m_engineMode;
+	std::size_t m_activeLevelObjects = 0;
+	std::size_t m_controllerCount = 0;
 	glm::vec3 m_gameplayMoveInput{ 0.0f };
 	float m_gameplayMoveSpeed = 0.0f;
 	float m_gameplayDt = 0.0f;

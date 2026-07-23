@@ -12,6 +12,7 @@ public:
 	LevelManager() = default;
 	~LevelManager();
 
+	Level* startUp();
 	void Clear();
 	Level* CreateLevel(std::string name);
 	Level* FindLevel(const std::string& name) const;

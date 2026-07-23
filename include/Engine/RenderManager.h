@@ -8,6 +8,7 @@
 #include "Engine/Camera.h"
 #include "Engine/EngineCamera.h"
 #include "Engine/GameCamera.h"
+#include "Engine/CameraManager.h"
 #include "Engine/RenderCommand.h"
 #include "Engine/OpenGLGraphicsDevice.h"
 #include "Engine/LightingManager.h"
@@ -27,9 +28,11 @@ public:
 	const EngineCamera& GetEngineCamera() const { return *m_engineCamera; }
 	GameCamera& GetGameCamera() { return *m_gameCamera; }
 	const GameCamera& GetGameCamera() const { return *m_gameCamera; }
-	void SetActiveCamera(Camera& camera) { m_activeCamera = &camera; }
-	Camera& ActiveCamera() { return *m_activeCamera; }
-	const Camera& ActiveCamera() const { return *m_activeCamera; }
+	void SetEditorMode() { m_cameraManager.SetEditorMode(*m_engineCamera); }
+	void SetGameMode() { m_cameraManager.SetGameMode(*m_gameCamera); }
+	void SetActiveCamera(Camera& camera) { m_cameraManager.SetActiveCamera(camera); }
+	Camera& ActiveCamera() { return m_cameraManager.ActiveCamera(); }
+	const Camera& ActiveCamera() const { return m_cameraManager.ActiveCamera(); }
 	LightingManager& Lights() { return *m_lightingManager; }
 	const LightingManager& Lights() const { return *m_lightingManager; }
 	void Submit(const RenderCommand& command);
@@ -51,7 +54,7 @@ public:
 private:
 	std::unique_ptr<EngineCamera> m_engineCamera;
 	std::unique_ptr<GameCamera> m_gameCamera;
-	Camera* m_activeCamera = nullptr;
+	CameraManager m_cameraManager;
 	OpenGLGraphicsDevice m_device;
 	FrameAllocator m_frameAllocator;
 	RenderCommand* m_commands = nullptr;

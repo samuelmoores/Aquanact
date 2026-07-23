@@ -3,6 +3,7 @@
 #include "Engine/GameGUI.h"
 #include "Engine/Globals.h"
 #include "Engine/RenderManager.h"
+#include "Engine/Input.h"
 #include "Engine/FileSystem.h"
 
 #include <algorithm>
@@ -364,7 +365,7 @@ void GameGUIManager::DrawReturnButton()
 	if (ImGui::Button("Return"))
 	{
 		gEngineState.SetMode(EngineMode::Editor);
-		gRenderManager.SetActiveCamera(gRenderManager.GetEngineCamera());
+		gRenderManager.SetEditorMode();
 		LogAction("Return to editor requested");
 	}
 	ImGui::End();

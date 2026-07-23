@@ -7,6 +7,7 @@
 #include "Engine/Camera.h"
 #include "Engine/Input.h"
 #include "Engine/Globals.h"
+#include "Engine/GameplayManager.h"
 #include "Engine/RenderManager.h"
 #include "Engine/LightingManager.h"
 #include "Engine/FrameAllocator.h"
@@ -236,6 +237,11 @@ void Debug::drawGameModeInput(const Input& input)
 	ImGui::Text("Window focused: %s", input.WindowFocused() ? "yes" : "no");
 	ImGui::Text("Look active: %s", input.LookActive() ? "yes" : "no");
 	ImGui::Text("Look became active: %s", input.LookBecameActive() ? "yes" : "no");
+	ImGui::Text("Engine mode: %s", gEngineState.IsGameMode() ? "Game" : "Editor");
+	const Level* activeLevel = gLevelManager.ActiveLevel();
+	ImGui::Text("Active level: %s", activeLevel ? activeLevel->Name().c_str() : "<none>");
+	ImGui::Text("Active level objects: %zu", activeLevel ? activeLevel->Objects().size() : 0);
+	ImGui::Text("Registered controllers: %zu", gGameplayManager.ControllerCount());
 	const glm::vec3 move = input.MoveInput();
 	const glm::vec2 mouse = input.MouseDelta();
 	ImGui::Separator();
@@ -246,7 +252,12 @@ void Debug::drawGameModeInput(const Input& input)
 
 	ImGui::Begin("Gameplay Diagnostics");
 	ImGui::Text("Controller registered: %s", m_controllerRegistered ? "yes" : "no");
+	ImGui::Text("Controller owner bound: %s", m_controllerOwnerBound ? "yes" : "no");
 	ImGui::Text("Object: %s", m_gameplayObjectName.empty() ? "<none>" : m_gameplayObjectName.c_str());
+	ImGui::Text("Active level: %s", m_activeLevelName.empty() ? "<none>" : m_activeLevelName.c_str());
+	ImGui::Text("Engine mode: %s", m_engineMode.empty() ? "<none>" : m_engineMode.c_str());
+	ImGui::Text("Active level objects: %zu", m_activeLevelObjects);
+	ImGui::Text("Registered controller count: %zu", m_controllerCount);
 	ImGui::Separator();
 	ImGui::Text("Move input: %.2f, %.2f, %.2f", m_gameplayMoveInput.x, m_gameplayMoveInput.y, m_gameplayMoveInput.z);
 	ImGui::Text("Move speed: %.2f", m_gameplayMoveSpeed);
@@ -261,12 +272,21 @@ void Debug::SetGameplayDiagnostics(bool controllerRegistered, const std::string&
 	// Gameplay systems push their latest state here so the debug overlay can show it without
 	// reaching back into the controller or object layer every frame.
 	m_controllerRegistered = controllerRegistered;
+	m_controllerOwnerBound = objectName != "<unbound>";
 	m_gameplayObjectName = objectName;
 	m_gameplayMoveInput = moveInput;
 	m_gameplayMoveSpeed = moveSpeed;
 	m_gameplayDt = dt;
 	m_gameplayDelta = delta;
 	m_gameplayPosition = position;
+}
+
+void Debug::SetGameplayContext(const std::string& activeLevelName, std::size_t activeLevelObjects, std::size_t controllerCount, const std::string& engineMode)
+{
+	m_activeLevelName = activeLevelName;
+	m_activeLevelObjects = activeLevelObjects;
+	m_controllerCount = controllerCount;
+	m_engineMode = engineMode;
 }
 
 void Debug::LogMessage(const std::string& message)

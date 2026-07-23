@@ -7,6 +7,7 @@
 #include "Engine/FrontEndManager.h"
 #include "Engine/AquanactBuildSystem.h"
 #include "Engine/Globals.h"
+#include "Engine/Input.h"
 #include "Engine/LevelManager.h"
 #include "Engine/ProjectManager.h"
 #include "Engine/Window.h"
@@ -265,15 +266,26 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 			if (ImGui::MenuItem("Play"))
 			{
 				gEngineState.SetMode(EngineMode::Game);
-				gRenderManager.SetActiveCamera(gRenderManager.GetGameCamera());
+				gRenderManager.SetGameMode();
+				gGameplayManager.StartGameSession();
 			}
 			if (ImGui::MenuItem("Set Game Camera"))
 			{
-				gRenderManager.GetGameCamera().CopyFrom(gRenderManager.GetEngineCamera());
+				gRenderManager.GetGameCamera().SetPose(
+					gRenderManager.GetEngineCamera().GetPosition(),
+					gRenderManager.GetEngineCamera().GetFacing());
 			}
 			if (ImGui::MenuItem("Build Game"))
 			{
 				m_buildGamePopupRequested = true;
+			}
+			ImGui::EndMenu();
+		}
+		if (ImGui::BeginMenu("Level"))
+		{
+			if (ImGui::MenuItem("New Level"))
+			{
+				m_newLevelPopupRequested = true;
 			}
 			ImGui::EndMenu();
 		}
@@ -290,7 +302,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 			if (ImGui::MenuItem("GameGUI Creator"))
 			{
 				gFrontEndManager.OpenGameGUICreator();
-				gRenderManager.SetActiveCamera(gRenderManager.GetGameCamera());
+				gRenderManager.SetGameMode();
 				gDebug.LogMessage("GameGUI Creator opened.");
 			}
 			ImGui::EndMenu();
@@ -300,6 +312,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 
 	DrawBuildGamePopup();
 	DrawAddCodeFilePopup();
+	DrawNewLevelPopup();
 
 	ImGui::Begin("File Explorer");
 	if (ImGui::Button("Models"))
@@ -341,6 +354,29 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 		{
 			fileManager.SelectPath(entryPath);
 		}
+	}
+	ImGui::End();
+
+	ImGui::Begin("Levels");
+	const auto& levels = levelManager.Levels();
+	for (std::size_t i = 0; i < levels.size(); ++i)
+	{
+		const auto& level = levels[i];
+		if (!level)
+		{
+			continue;
+		}
+
+		const bool selected = levelManager.ActiveLevel() == level.get();
+		const std::string label = level->Name() + "##LevelItem" + std::to_string(i);
+		if (ImGui::Selectable(label.c_str(), selected))
+		{
+			levelManager.SetActiveLevel(level->Name());
+		}
+	}
+	if (levels.empty())
+	{
+		ImGui::TextUnformatted("No levels created.");
 	}
 	ImGui::End();
 
@@ -732,6 +768,82 @@ void EngineGUI::SetShowAxis(bool showAxis)
 void EngineGUI::SetShowGrid(bool showGrid)
 {
 	m_showGrid = showGrid;
+}
+
+void EngineGUI::DrawNewLevelPopup()
+{
+	if (m_newLevelPopupRequested)
+	{
+		ImGui::OpenPopup("New Level##AquanactNewLevel");
+		m_newLevelPopupRequested = false;
+		m_newLevelStatusMessage.clear();
+	}
+
+	if (ImGui::BeginPopupModal("New Level##AquanactNewLevel", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		ImGui::TextUnformatted("Create a new level:");
+		ImGui::InputText("Name", m_newLevelName, sizeof(m_newLevelName));
+
+		if (ImGui::Button("Create"))
+		{
+			const std::string levelName = NormalizeLevelName(m_newLevelName);
+			if (levelName.empty())
+			{
+				m_newLevelStatusMessage = "Enter a valid level name.";
+			}
+			else if (gLevelManager.FindLevel(levelName))
+			{
+				m_newLevelStatusMessage = "Level already exists.";
+			}
+			else
+			{
+				Level* level = gLevelManager.CreateLevel(levelName);
+				if (level)
+				{
+					gLevelManager.SetActiveLevel(levelName);
+					m_newLevelStatusMessage = "Created level " + levelName + ".";
+				}
+				else
+				{
+					m_newLevelStatusMessage = "Failed to create level.";
+				}
+			}
+		}
+
+		ImGui::SameLine();
+		if (ImGui::Button("Close"))
+		{
+			ImGui::CloseCurrentPopup();
+		}
+
+		if (!m_newLevelStatusMessage.empty())
+		{
+			ImGui::Separator();
+			ImGui::TextUnformatted(m_newLevelStatusMessage.c_str());
+		}
+
+		ImGui::EndPopup();
+	}
+}
+
+std::string EngineGUI::NormalizeLevelName(const std::string& input)
+{
+	std::string output;
+	output.reserve(input.size());
+	bool capitalizeNext = true;
+	for (unsigned char ch : input)
+	{
+		if (std::isalnum(ch))
+		{
+			output.push_back(capitalizeNext ? static_cast<char>(std::toupper(ch)) : static_cast<char>(ch));
+			capitalizeNext = false;
+		}
+		else
+		{
+			capitalizeNext = true;
+		}
+	}
+	return output;
 }
 
 

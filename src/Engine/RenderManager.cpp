@@ -41,18 +41,15 @@ void RenderManager::startUp(Window& window)
 		m_gameCamera->startUp();
 	}
 
-	if (gEngineState.IsEditorMode())
+	if (!m_engineCamera)
 	{
-		if (!m_engineCamera)
-		{
-			m_engineCamera = std::make_unique<EngineCamera>();
-		}
-		m_engineCamera->startUp();
-		m_activeCamera = m_engineCamera.get();
+		m_engineCamera = std::make_unique<EngineCamera>();
 	}
-	else
+	m_engineCamera->startUp();
+	m_cameraManager.startUp(*m_engineCamera, *m_gameCamera);
+	if (gEngineState.IsGameMode())
 	{
-		m_activeCamera = m_gameCamera.get();
+		m_cameraManager.SetGameMode(*m_gameCamera);
 	}
 
 	//Graphics Device
@@ -96,6 +93,7 @@ void RenderManager::shutDown()
 		m_gameCamera->shutDown();
 		m_gameCamera.reset();
 	}
+	m_cameraManager.shutDown();
 	m_commands = nullptr;
 	m_commandCapacity = 0;
 	m_commandCount = 0;
@@ -203,7 +201,11 @@ void RenderManager::Loop()
 	m_lastFrameBuildTime = buildEnd - buildStart;
 
 	// Submit the built commands using the currently selected camera.
-	Flush(ActiveCamera());
+	if (gEngineState.IsEditorMode())
+	{
+		m_cameraManager.Update(gInput);
+	}
+	Flush(m_cameraManager.ActiveCamera());
 
 	// Draw ImGui overlays after the 3D pass.
 	if (gEngineState.IsEditorMode())

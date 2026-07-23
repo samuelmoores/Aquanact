@@ -12,14 +12,14 @@ void Controller::Update(Entity&, float dt)
 {
 	if (m_owner == nullptr)
 	{
-		gDebug.SetGameplayDiagnostics(false, "<unbound>", glm::vec3(0.0f), m_moveSpeed, dt, glm::vec3(0.0f), glm::vec3(0.0f));
+		gDebug.SetGameplayDiagnostics(m_registered, "<unbound>", glm::vec3(0.0f), m_moveSpeed, dt, glm::vec3(0.0f), glm::vec3(0.0f));
 		return;
 	}
 
 	const glm::vec3 moveInput = gInput.MoveInput();
 	if (moveInput.x == 0.0f && moveInput.z == 0.0f)
 	{
-		gDebug.SetGameplayDiagnostics(true, m_owner->Name(), moveInput, m_moveSpeed, dt, glm::vec3(0.0f), m_owner->Position());
+		gDebug.SetGameplayDiagnostics(m_registered, m_owner->Name(), moveInput, m_moveSpeed, dt, glm::vec3(0.0f), m_owner->Position());
 		return;
 	}
 
@@ -42,7 +42,7 @@ void Controller::Update(Entity&, float dt)
 	movement.y = 0.0f;
 	if (glm::length(movement) <= 0.0001f)
 	{
-		gDebug.SetGameplayDiagnostics(true, m_owner->Name(), moveInput, m_moveSpeed, dt, glm::vec3(0.0f), m_owner->Position());
+		gDebug.SetGameplayDiagnostics(m_registered, m_owner->Name(), moveInput, m_moveSpeed, dt, glm::vec3(0.0f), m_owner->Position());
 		return;
 	}
 
@@ -52,6 +52,6 @@ void Controller::Update(Entity&, float dt)
 
 	const glm::vec3 delta = movement * m_moveSpeed * dt;
 	m_owner->Move(delta);
-	gDebug.SetGameplayDiagnostics(true, m_owner->Name(), moveInput, m_moveSpeed, dt, delta, m_owner->Position());
+	gDebug.SetGameplayDiagnostics(m_registered, m_owner->Name(), moveInput, m_moveSpeed, dt, delta, m_owner->Position());
 }
 
