@@ -57,6 +57,8 @@ set(SOURCES
     "include/Engine/Controller.h" "src/Engine/Controller.cpp"
     "include/Engine/GameObject.h" "src/Engine/GameObject.cpp"
     "include/Engine/GameObjectRegistry.h" "src/Engine/GameObjectRegistry.cpp"
+    "include/Engine/EventManager.h" "src/Engine/EventManager.cpp"
+    "include/Game/Enemy.h" "src/Game/Enemy.cpp"
     "include/Game/PlayerHealth.h" "src/Game/PlayerHealth.cpp"
     "include/Engine/Window.h" "src/Engine/Window.cpp"
     "include/Engine/Input.h" "src/Engine/Input.cpp"

@@ -1,21 +1,39 @@
 #include "Engine/GameplayManager.h"
 
 #include "Engine/Controller.h"
+#include "Engine/EventManager.h"
 #include "Engine/Globals.h"
 #include "Engine/SceneManager.h"
 #include "Engine/Object3D.h"
+#include "Game/Enemy.h"
+#include "Game/PlayerHealth.h"
 
 #include <algorithm>
+#include <iostream>
+#include <utility>
+
+GameplayManager::~GameplayManager() = default;
 
 void GameplayManager::startUp()
 {
 	m_controllers.clear();
+	m_eventManager.Clear();
+	m_demoPlayerHealth = std::make_unique<PlayerHealth>();
+	m_demoEnemy = std::make_unique<Enemy>();
+	m_demoPlayerHealth->SubscribeToDamage(m_eventManager);
+	m_demoEnemy->SubscribeToStart(m_eventManager);
+	std::cout << "Initial PlayerHealth value: " << m_demoPlayerHealth->Health() << "\n";
+	m_eventManager.DispatchStart();
+	std::cout << "PlayerHealth value after Start dispatch: " << m_demoPlayerHealth->Health() << "\n";
 	m_paused = false;
 }
 
 void GameplayManager::shutDown()
 {
 	m_controllers.clear();
+	m_demoEnemy.reset();
+	m_demoPlayerHealth.reset();
+	m_eventManager.Clear();
 	m_paused = false;
 }
 

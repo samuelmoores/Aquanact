@@ -2,6 +2,8 @@
 
 #include "Engine/GameObject.h"
 
+class EventManager;
+
 // Example child class that shows the minimum required shape.
 //
 // To compile successfully, any new GameObject child must:
@@ -28,6 +30,7 @@ public:
 	void SetMaxHealth(int maxHealth) { m_maxHealth = maxHealth; }
 
 	std::string GetHealthText() const;
+	void SubscribeToDamage(EventManager& events);
 
 private:
 	int m_health = 100;

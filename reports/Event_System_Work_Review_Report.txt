@@ -1,0 +1,58 @@
+Event System Work Review Report
+
+Date: July 23, 2026
+Scope: EventManager prototype, gameplay wiring, and proof-of-life testing
+
+Summary
+- Built a minimal engine-owned `EventManager` and wired it into `GameplayManager` as the owner of event lifecycle and dispatch.
+- Added a default `Start` event and a `Damage` event to prove the system can register, subscribe, and dispatch gameplay events.
+- Added two example gameplay classes, `PlayerHealth` and `Enemy`, to demonstrate a basic event flow where `Enemy` dispatches `Damage` on `Start` and `PlayerHealth` reacts by reducing health.
+- Moved the demo setup out of `main.cpp` and into `GameplayManager::startUp()` so event/bootstrap logic lives in gameplay startup rather than app entrypoint code.
+
+What Was Implemented
+- `EventManager` now owns named `Event` objects.
+- `Event` stores a list of listeners and dispatches them through a simple callback interface.
+- `GameplayManager` owns an `EventManager` instance.
+- `PlayerHealth` subscribes to `Damage` through the manager and applies damage when the event fires.
+- `Enemy` subscribes to `Start`, keeps a reference to the event manager, and dispatches `Damage` from its `OnStart()` handler.
+- Startup prints confirm the health value before and after the event dispatch path.
+
+Observed Behavior
+- Initial health prints as `100`.
+- `Start` dispatch triggers `Enemy::OnStart()`.
+- `Enemy` dispatches `Damage`.
+- `PlayerHealth` receives `Damage` and reduces health to `75`.
+- Final printed health after the start dispatch is `75`.
+
+Important Design Decisions
+- The event manager is engine-owned rather than a free-floating global in the demo flow.
+- The demo proof was moved into `GameplayManager::startUp()` so it is tied to gameplay initialization instead of the application entrypoint.
+- Event subscription is explicit and tied to named events, which keeps the system simple for phase 1.
+- The current implementation uses callback listeners rather than the more advanced late-bound function-call model from the architecture book.
+
+Notes on Limitations
+- The current event system is still a prototype.
+- It is callback-based and does not yet model payload-rich event objects.
+- The demo wiring is still proof-of-life code and should eventually be separated from real gameplay setup.
+- Event naming is string-based, so it is easy to use but still vulnerable to typos until a stronger registry or ID system is added.
+
+Good Follow-Up Work
+- Replace the demo proof wiring with a small test scene or dedicated gameplay bootstrap path.
+- Add explicit event unsubscription during object teardown so listeners do not linger after object destruction.
+- Decide whether events should stay callback-based or move toward richer event objects with payload data.
+- Add a small event payload type for `Damage` so damage amount is not hardcoded in the listener.
+- Add a second consumer for `Damage`, such as a debug log or UI update, to confirm the system supports multiple subscribers.
+- Add a `HealthChanged` event so gameplay state changes can be broadcast separately from damage triggers.
+
+Suggested First Tasks for Tomorrow Morning
+- Confirm the console output still shows the health drop from `100` to `75`.
+- Move the demo event hookup into a small helper or test fixture so `GameplayManager::startUp()` stays focused on engine startup.
+- Add unsubscribe handling for `PlayerHealth` and `Enemy`.
+- Decide whether `Damage` should carry a payload struct instead of hardcoding `25` in the handler.
+- Sketch the next iteration of the system around either:
+  - simple broadcast events only, or
+  - event objects with data payloads
+- If the current direction is good, start planning a `HealthChanged` event and a second subscriber such as a GUI text update.
+
+Closing Note
+- The current implementation proves that the engine can own an event manager, wire gameplay objects together through named events, and dispatch a startup-triggered gameplay action without using `main.cpp` as the demo harness.
