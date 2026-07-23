@@ -6,7 +6,7 @@
 #include <utility>
 
 Enemy::Enemy(std::string name)
-	: GameObject(std::move(name))
+	: Entity(std::move(name))
 {
 }
 

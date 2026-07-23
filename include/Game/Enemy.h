@@ -1,10 +1,10 @@
 #pragma once
 
-#include "Engine/GameObject.h"
+#include "Engine/Entity.h"
 
 class EventManager;
 
-class Enemy final : public GameObject
+class Enemy final : public Entity
 {
 public:
 	explicit Enemy(std::string name = "Enemy");

@@ -1,7 +1,7 @@
 #include <Engine/Globals.h>
 #include <Engine/RenderManager.h>
-#include <Engine/Object3D.h>
-#include <Engine/SceneManager.h>
+#include <Engine/Entity.h>
+#include <Engine/LevelManager.h>
 #include <Engine/ProjectManager.h>
 #include <Engine/GameplayManager.h>
 #include <Engine/Window.h>
@@ -23,7 +23,7 @@ FrontEndManager gFrontEndManager;
 Debug gDebug;
 FileSystem gFileSystem;
 FileManager gFileManager(gFileSystem);
-SceneManager gSceneManager;
+LevelManager gLevelManager;
 ProjectManager gProjectManager(gFileSystem);
 GameplayManager gGameplayManager;
 Input gInput;
@@ -113,7 +113,7 @@ static int RunApplication(int argc, char** argv)
     gInput.startUp(gWindow);
     gDebug.startUp();
     gFileManager.startUp();
-    gProjectManager.LoadProject(launchConfig.projectPath, gSceneManager);
+    gProjectManager.LoadProject(launchConfig.projectPath, gLevelManager);
 
     while (!gWindow.ShouldClose())
         mainLoop();
@@ -124,7 +124,6 @@ static int RunApplication(int argc, char** argv)
     gFileManager.shutDown();
     gFrontEndManager.shutDown();
     gGameplayManager.shutDown();
-    gSceneManager.Clear();
     gInput.shutDown();
     gRenderManager.shutDown();
     gWindow.shutDown();

@@ -4,7 +4,7 @@
 #include "Engine/Window.h"
 #include "Engine/Camera.h"
 #include "Engine/FileManager.h"
-#include "Engine/SceneManager.h"
+#include "Engine/LevelManager.h"
 #include "Engine/ProjectManager.h"
 #include "Engine/Globals.h"
 
@@ -80,7 +80,7 @@ void FrontEndManager::BeginFrame()
 	}
 }
 
-void FrontEndManager::Draw(const Camera& camera, FileManager& fileManager, SceneManager& sceneManager, ProjectManager& projectManager)
+void FrontEndManager::Draw(const Camera& camera, FileManager& fileManager, LevelManager& levelManager, ProjectManager& projectManager)
 {
 	if (!IsEditorMode())
 	{
@@ -89,7 +89,7 @@ void FrontEndManager::Draw(const Camera& camera, FileManager& fileManager, Scene
 
 	if (m_mode == FrontEndMode::EngineEditor && m_engineGUI)
 	{
-		m_engineGUI->Draw(camera, fileManager, sceneManager, projectManager);
+		m_engineGUI->Draw(camera, fileManager, levelManager, projectManager);
 	}
 	else if (m_mode == FrontEndMode::GameGUICreator && m_uiCreator)
 	{

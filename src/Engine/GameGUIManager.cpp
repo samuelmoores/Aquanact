@@ -113,7 +113,7 @@ void GameGUIManager::startUp(Window& window)
 		m_runtime = std::make_unique<GameGUI>();
 	}
 	// The runtime wrapper owns the live MyGUI session; the manager layers asset
-	// loading and scene placement on top of that runtime instance.
+	// loading and level placement on top of that runtime instance.
 	m_runtime->startUp(window);
 
 	m_assets.clear();

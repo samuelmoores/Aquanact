@@ -7,11 +7,11 @@
 #include "Engine/Camera.h"
 #include "Engine/Input.h"
 #include "Engine/Globals.h"
-#include "Engine/SceneManager.h"
 #include "Engine/RenderManager.h"
 #include "Engine/LightingManager.h"
 #include "Engine/FrameAllocator.h"
 #include "Engine/GLHeaders.h"
+#include "Engine/LevelManager.h"
 
 #include <imgui.h>
 #include <chrono>
@@ -72,7 +72,7 @@ void Debug::startUp()
 
 void Debug::shutDown()
 {
-	// Release overlay helpers first so they cannot outlive the renderer or scene data.
+	// Release overlay helpers first so they cannot outlive the renderer or level data.
 	delete m_axis;
 	m_axis = nullptr;
 	delete m_grid;
@@ -209,7 +209,8 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 
 	ImGui::Begin("Debug Stats");
 	ImGui::Text("FPS: %.1f", m_lastFps);
-	ImGui::Text("Scene objects: %zu", gSceneManager.Objects().size());
+	const Level* activeLevel = gLevelManager.ActiveLevel();
+	ImGui::Text("Level objects: %zu", activeLevel ? activeLevel->Objects().size() : 0);
 	ImGui::Separator();
 	ImGui::Text("Render commands: %zu", gRenderManager.LastFrameCommandCount());
 	ImGui::Text("Skipped objects: %zu", gRenderManager.LastFrameSkippedObjects());

@@ -1,21 +1,21 @@
 #pragma once
 
-#include "Engine/GameObject.h"
+#include "Engine/Entity.h"
 
 class EventManager;
 
 // Example child class that shows the minimum required shape.
 //
-// To compile successfully, any new GameObject child must:
-// - inherit from GameObject
+// To compile successfully, any new Entity child must:
+// - inherit from Entity
 // - implement TypeName()
 // - implement GetBindableMembers()
-// - construct the GameObject base with a name
+// - construct the Entity base with a name
 //
 // The actual gameplay data (`health`, `maxHealth`) is private here, but the
 // class exposes getters/setters and reports those members in
 // GetBindableMembers() so other systems can inspect them later.
-class PlayerHealth final : public GameObject
+class PlayerHealth final : public Entity
 {
 public:
 	explicit PlayerHealth(std::string name = "PlayerHealth");

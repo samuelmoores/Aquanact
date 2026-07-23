@@ -4,10 +4,9 @@
 #include "Engine/Controller.h"
 #include "Engine/AnimatorComponent.h"
 #include "Engine/Globals.h"
-#include "Engine/Object3D.h"
+#include "Engine/Entity.h"
 #include "Engine/FrontEndManager.h"
 #include "Engine/FileSystem.h"
-#include "Engine/SceneManager.h"
 #include "Engine/RenderManager.h"
 #include "Engine/GameplayManager.h"
 
@@ -207,7 +206,7 @@ ProjectManager::ProjectManager(FileSystem& fileSystem)
 {
 }
 
-bool ProjectManager::SaveProject(const std::filesystem::path& path, const SceneManager& sceneManager) const
+bool ProjectManager::SaveProject(const std::filesystem::path& path, const LevelManager& levelManager) const
 {
 	if (!m_fileSystem)
 	{
@@ -215,7 +214,10 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const SceneM
 	}
 
 	std::string contents = "AquanactProject 7\n";
-	for (const auto& object : sceneManager.Objects())
+	const Level* activeLevel = levelManager.ActiveLevel();
+	static const std::vector<std::unique_ptr<Entity>> emptyObjects;
+	const auto& objects = activeLevel ? activeLevel->Objects() : emptyObjects;
+	for (const auto& object : objects)
 	{
 		if (!object)
 		{
@@ -235,7 +237,7 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const SceneM
 		contents += std::to_string(scale.x) + ";" + std::to_string(scale.y) + ";" + std::to_string(scale.z) + "\n";
 	}
 
-	for (const auto& object : sceneManager.Objects())
+	for (const auto& object : objects)
 	{
 		if (!object)
 		{
@@ -284,7 +286,7 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const SceneM
 	}
 
 	// Persist the runtime GameGUI placement list with the project so the same
-	// UI assets are restored when the scene is reopened.
+	// UI assets are restored when the level is reopened.
 	for (const auto& assetName : gFrontEndManager.RuntimeGUI().SceneAssets())
 	{
 		contents += "gameguiasset;";
@@ -304,7 +306,7 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const SceneM
 	return m_fileSystem->WriteTextFile(path, contents);
 }
 
-bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager& sceneManager) const
+bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager& levelManager) const
 {
 	if (!m_fileSystem)
 	{
@@ -325,14 +327,14 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 		return false;
 	}
 
-	std::vector<std::unique_ptr<Object3D>> loadedObjects;
+	std::vector<std::unique_ptr<Entity>> loadedObjects;
 	struct PendingController {
 		std::filesystem::path sourcePath;
 		float moveSpeed = 50.0f;
 	};
 	std::vector<PendingController> pendingControllers;
 	// GameGUI state is loaded in two phases: we collect the saved asset names
-	// here, then hand them back to the runtime GUI after the scene finishes loading.
+	// here, then hand them back to the runtime GUI after the level finishes loading.
 	std::vector<std::string> pendingGameGUIAssets;
 	std::string pendingActiveGameGUIAsset;
 	gRenderManager.Lights().PointLights().clear();
@@ -481,7 +483,7 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 			const std::filesystem::path sourcePath = ResolveSourcePath(path, fields[1]);
 			gDebug.LogMessage("Loading mesh: " + sourcePath.string());
 			const std::string sourcePathString = sourcePath.string();
-			auto object = std::make_unique<Object3D>(sourcePathString.c_str());
+			auto object = std::make_unique<Entity>(sourcePathString.c_str());
 			object->Translate(glm::vec3(
 				std::stof(fields[2]),
 				std::stof(fields[3]),
@@ -505,11 +507,12 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 		}
 	}
 
-	sceneManager.Clear();
+	levelManager.Clear();
 	gGameplayManager.shutDown();
+	Level* defaultLevel = levelManager.CreateLevel("Default");
 	for (auto& object : loadedObjects)
 	{
-		Object3D* loadedObject = sceneManager.AddObject(std::move(object));
+		Entity* loadedObject = defaultLevel ? defaultLevel->AddObject(std::move(object)) : nullptr;
 		if (loadedObject)
 		{
 			if (Controller* controller = loadedObject->GetController())
@@ -521,7 +524,7 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 
 	for (const auto& pendingController : pendingControllers)
 	{
-		for (const auto& object : sceneManager.Objects())
+		for (const auto& object : defaultLevel->Objects())
 		{
 			if (!object || object->SourcePath() != pendingController.sourcePath.string())
 			{
@@ -541,7 +544,7 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 		}
 	}
 
-	// Rebuild the runtime GameGUI placement list after the scene and controllers
+	// Rebuild the runtime GameGUI placement list after the level and controllers
 	// are restored so the UI matches the saved project state.
 	gFrontEndManager.RuntimeGUI().SetSceneAssets(pendingGameGUIAssets);
 	if (!pendingActiveGameGUIAsset.empty())

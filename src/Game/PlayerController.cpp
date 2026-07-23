@@ -3,7 +3,7 @@
 #include <utility>
 
 PlayerController::PlayerController(std::string name)
-	: GameObject(std::move(name))
+	: Entity(std::move(name))
 {
 }
 

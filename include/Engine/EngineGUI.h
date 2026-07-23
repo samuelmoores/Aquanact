@@ -5,7 +5,7 @@
 class Window;
 class Camera;
 class FileManager;
-class SceneManager;
+class LevelManager;
 class ProjectManager;
 
 class EngineGUI {
@@ -14,7 +14,7 @@ public:
 	void startUp(Window& window);
 	void shutDown();
 	void BeginFrame();
-	void Draw(const Camera& camera, FileManager& fileManager, SceneManager& sceneManager, ProjectManager& projectManager);
+	void Draw(const Camera& camera, FileManager& fileManager, LevelManager& levelManager, ProjectManager& projectManager);
 	void EndFrame();
 
 	bool ShowAxis() const;
@@ -37,7 +37,7 @@ private:
 	unsigned int m_bootTexture = 0;
 	int m_bootTextureWidth = 0;
 	int m_bootTextureHeight = 0;
-	int m_selectedSceneObjectIndex = -1;
+	int m_selectedLevelObjectIndex = -1;
 	bool m_buildGamePopupRequested = false;
 	bool m_addCodeFilePopupRequested = false;
 	bool m_addCodeFileCreated = false;

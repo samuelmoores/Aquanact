@@ -1,6 +1,6 @@
 #include "Engine/AnimatorComponent.h"
 
-#include "Engine/Object3D.h"
+#include "Engine/Entity.h"
 #include "Engine/Animation.h"
 #include <algorithm>
 #include <filesystem>
@@ -49,7 +49,7 @@ const char* AnimatorComponent::Name() const
 	return "Animator";
 }
 
-void AnimatorComponent::Update(Object3D&, float dt)
+void AnimatorComponent::Update(Entity&, float dt)
 {
 	if (m_animator)
 	{

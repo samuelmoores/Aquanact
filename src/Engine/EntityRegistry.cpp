@@ -1,13 +1,13 @@
-#include "Engine/GameObjectRegistry.h"
+#include "Engine/EntityRegistry.h"
 
 #include <algorithm>
 
-void GameObjectRegistry::Clear()
+void EntityRegistry::Clear()
 {
 	m_objects.clear();
 }
 
-void GameObjectRegistry::Register(GameObject* object)
+void EntityRegistry::Register(Entity* object)
 {
 	if (!object)
 	{
@@ -20,15 +20,15 @@ void GameObjectRegistry::Register(GameObject* object)
 	}
 }
 
-void GameObjectRegistry::Unregister(GameObject* object)
+void EntityRegistry::Unregister(Entity* object)
 {
 	const auto it = std::remove(m_objects.begin(), m_objects.end(), object);
 	m_objects.erase(it, m_objects.end());
 }
 
-GameObject* GameObjectRegistry::FindByName(const std::string& name) const
+Entity* EntityRegistry::FindByName(const std::string& name) const
 {
-	for (GameObject* object : m_objects)
+	for (Entity* object : m_objects)
 	{
 		if (object && object->Name() == name)
 		{

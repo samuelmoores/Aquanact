@@ -2,15 +2,15 @@
 
 #include <filesystem>
 
-class SceneManager;
+class LevelManager;
 class FileSystem;
 
 class ProjectManager {
 public:
 	explicit ProjectManager(FileSystem& fileSystem);
 
-	bool SaveProject(const std::filesystem::path& path, const SceneManager& sceneManager) const;
-	bool LoadProject(const std::filesystem::path& path, SceneManager& sceneManager) const;
+	bool SaveProject(const std::filesystem::path& path, const LevelManager& levelManager) const;
+	bool LoadProject(const std::filesystem::path& path, LevelManager& levelManager) const;
 
 private:
 	FileSystem* m_fileSystem = nullptr;

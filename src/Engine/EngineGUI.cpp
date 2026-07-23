@@ -7,11 +7,11 @@
 #include "Engine/FrontEndManager.h"
 #include "Engine/AquanactBuildSystem.h"
 #include "Engine/Globals.h"
-#include "Engine/SceneManager.h"
+#include "Engine/LevelManager.h"
 #include "Engine/ProjectManager.h"
 #include "Engine/Window.h"
 #include "Engine/Camera.h"
-#include "Engine/Object3D.h"
+#include "Engine/Entity.h"
 #include "Engine/Controller.h"
 #include "Engine/AnimatorComponent.h"
 #include "Engine/GLHeaders.h"
@@ -182,12 +182,14 @@ void EngineGUI::BeginFrame()
 	ImGui::NewFrame();
 }
 
-void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& sceneManager, ProjectManager& projectManager)
+void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& levelManager, ProjectManager& projectManager)
 {
-	const auto& objects = sceneManager.Objects();
-	if (m_selectedSceneObjectIndex >= static_cast<int>(objects.size()))
+	const Level* activeLevel = levelManager.ActiveLevel();
+	static const std::vector<std::unique_ptr<Entity>> emptyObjects;
+	const auto& objects = activeLevel ? activeLevel->Objects() : emptyObjects;
+	if (m_selectedLevelObjectIndex >= static_cast<int>(objects.size()))
 	{
-		m_selectedSceneObjectIndex = -1;
+		m_selectedLevelObjectIndex = -1;
 	}
 
 	if (ImGui::BeginMainMenuBar())
@@ -207,11 +209,11 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& scen
 		{
 			if (ImGui::MenuItem("Save Project"))
 			{
-				projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", sceneManager);
+				projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", levelManager);
 			}
 			if (ImGui::MenuItem("Load Project"))
 			{
-				projectManager.LoadProject("C:/dev/Aquanact/assets/projects/project.aqua", sceneManager);
+				projectManager.LoadProject("C:/dev/Aquanact/assets/projects/project.aqua", levelManager);
 			}
 			ImGui::Separator();
 			const bool canImport = fileManager.CanImportSelection();
@@ -342,29 +344,29 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& scen
 	}
 	ImGui::End();
 
-	ImGui::Begin("Scene");
+	ImGui::Begin("Level");
 	for (size_t i = 0; i < objects.size(); ++i)
 	{
 		const auto& object = objects[i];
 		const std::string label = object ? object->Name() : std::string("<null>");
 		const std::string visibleLabel = label.empty() ? "<unnamed>" : label;
-		const std::string selectableId = visibleLabel + "##SceneObject" + std::to_string(i);
-		const bool selected = m_selectedSceneObjectIndex == static_cast<int>(i);
+		const std::string selectableId = visibleLabel + "##LevelObject" + std::to_string(i);
+		const bool selected = m_selectedLevelObjectIndex == static_cast<int>(i);
 		if (ImGui::Selectable(selectableId.c_str(), selected))
 		{
-			m_selectedSceneObjectIndex = static_cast<int>(i);
+			m_selectedLevelObjectIndex = static_cast<int>(i);
 		}
 	}
 	ImGui::End();
 
-	ImGui::Begin("Object");
-	if (m_selectedSceneObjectIndex < 0 || m_selectedSceneObjectIndex >= static_cast<int>(objects.size()))
+	ImGui::Begin("Entity");
+	if (m_selectedLevelObjectIndex < 0 || m_selectedLevelObjectIndex >= static_cast<int>(objects.size()))
 	{
-		ImGui::TextUnformatted("No scene object selected.");
+			ImGui::TextUnformatted("No entity selected.");
 	}
 	else
 	{
-		auto& object = objects[static_cast<std::size_t>(m_selectedSceneObjectIndex)];
+		auto& object = objects[static_cast<std::size_t>(m_selectedLevelObjectIndex)];
 		if (!object)
 		{
 			ImGui::TextUnformatted("Selected object is null.");
@@ -436,6 +438,8 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& scen
 				editedZ = defaultWorldCenterPosition.z;
 			}
 
+			ImGui::Separator();
+			ImGui::TextUnformatted("Animation");
 			if (animatorComponent)
 			{
 				static char selectedStateName[64] = "";
@@ -450,8 +454,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& scen
 					selectedStateInitialized = true;
 				}
 
-				ImGui::Separator();
-				ImGui::TextUnformatted("Initial Animation");
+				ImGui::TextUnformatted("Animator component present");
 				if (ImGui::BeginCombo("##InitialAnimation", selectedStateName[0] != '\0' ? selectedStateName : "<select animation>"))
 				{
 					for (const auto& state : animatorComponent->States())
@@ -470,6 +473,10 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& scen
 					}
 					ImGui::EndCombo();
 				}
+			}
+			else
+			{
+				ImGui::TextUnformatted("No animator component on this entity.");
 			}
 		}
 	}
@@ -592,17 +599,17 @@ std::string EngineGUI::MakeHeaderTemplate(const std::string& className)
 {
 	return
 		"#pragma once\n\n"
-		"#include \"Engine/GameObject.h\"\n\n"
+		"#include \"Engine/Entity.h\"\n\n"
 		"// Generated gameplay class. Start here if you want to add game behavior.\n"
 		"//\n"
-		"// This class inherits from GameObject, so it must implement:\n"
+		"// This class inherits from Entity, so it must implement:\n"
 		"// - TypeName()\n"
 		"// - GetBindableMembers()\n"
 		"//\n"
 		"// TypeName() tells the engine/editor what this gameplay type is called.\n"
 		"// GetBindableMembers() tells the engine/editor which variables or\n"
 		"// functions are available for UI binding later.\n"
-		"class " + className + " final : public GameObject\n"
+		"class " + className + " final : public Entity\n"
 		"{\n"
 		"public:\n"
 		"\texplicit " + className + "(std::string name = \"" + className + "\");\n\n"
@@ -617,7 +624,7 @@ std::string EngineGUI::MakeSourceTemplate(const std::string& className)
 		"#include \"Game/" + className + ".h\"\n\n"
 		"#include <utility>\n\n"
 		"" + className + "::" + className + "(std::string name)\n"
-		"\t: GameObject(std::move(name))\n"
+		"\t: Entity(std::move(name))\n"
 		"{\n"
 		"}\n\n"
 		"const char* " + className + "::TypeName() const\n"

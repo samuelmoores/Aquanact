@@ -13,7 +13,7 @@
 #include "Engine/LightingManager.h"
 
 class Window;
-class SceneManager;
+class LevelManager;
 
 class RenderManager {
 public:

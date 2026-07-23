@@ -80,7 +80,7 @@ void Mesh::AdoptImportedModel(ImportedModel&& importedModel)
 	m_animationSources = std::move(importedModel.animationSources); // Used to name animation states in AnimatorComponent.
 
 	// Mesh payload used directly by rendering and object setup.
-	m_skinned = importedModel.skinned; // Cached so Object3D can decide whether to attach AnimatorComponent.
+	m_skinned = importedModel.skinned; // Cached so Entity can decide whether to attach AnimatorComponent.
 	m_vertices = std::move(importedModel.vertices); // Final imported vertex buffer for GPU upload.
 	m_faces = std::move(importedModel.faces); // Final imported index buffer for GPU upload.
 	m_facesSize = std::move(importedModel.facesSize); // One index-count entry per imported submesh.

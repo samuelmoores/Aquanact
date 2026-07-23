@@ -6,7 +6,7 @@
 #include <utility>
 
 PlayerHealth::PlayerHealth(std::string name)
-	: GameObject(std::move(name))
+	: Entity(std::move(name))
 {
 }
 

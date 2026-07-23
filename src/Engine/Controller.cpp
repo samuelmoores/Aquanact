@@ -4,11 +4,11 @@
 #include "Engine/Globals.h"
 #include "Engine/Debug.h"
 #include "Engine/RenderManager.h"
-#include "Engine/Object3D.h"
+#include "Engine/Entity.h"
 
 #include <cmath>
 
-void Controller::Update(Object3D&, float dt)
+void Controller::Update(Entity&, float dt)
 {
 	if (m_owner == nullptr)
 	{

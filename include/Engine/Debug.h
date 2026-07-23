@@ -7,7 +7,7 @@
 class Camera;
 class EngineGUI;
 class Input;
-class Object3D;
+class Entity;
 
 class Debug {
 public:

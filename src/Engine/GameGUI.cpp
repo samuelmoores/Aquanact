@@ -102,11 +102,11 @@ void GameGUI::startUp(Window& window)
 		int framebufferHeight = 0;
 		window.GetFramebufferSize(framebufferWidth, framebufferHeight);
 		m_platform->getRenderManagerPtr()->setViewSize(framebufferWidth, framebufferHeight);
-		// MyGUI resolves XML resources through its data manager. Registering the build
-		// output root lets it find the copied MyGUI media folder and the XML skin files
-		// referenced by the runtime widgets.
+		// MyGUI resolves XML resources through its data manager. Register the build
+		// output root without recursion so it can find the copied XML/PNG skin files
+		// without scanning nested build-tree copies under vcpkg.
 		const std::filesystem::path resourceRoot = gFileSystem.ExecutableDirectory();
-		MyGUI::OpenGLDataManager::getInstance().addResourceLocation(resourceRoot.string(), true);
+		MyGUI::OpenGLDataManager::getInstance().addResourceLocation(resourceRoot.string(), false);
 
 		// Gui has to exist only after the platform and resources are available. That
 		// ordering fixed the runtime exceptions we saw during the first integration pass.
@@ -170,7 +170,7 @@ void GameGUI::Draw()
 	// MyGUI needs a per-frame tick so internal widget state and input-driven updates
 	// advance before the renderer submits the overlay.
 	m_gui->frameEvent(0.0f);
-	// The final bug was not in MyGUI itself, but in inherited scene render state.
+	// The final bug was not in MyGUI itself, but in inherited level render state.
 	// The GUI pass must start from a clean overlay-friendly OpenGL state.
 	glDisable(GL_DEPTH_TEST);
 	glDisable(GL_CULL_FACE);
@@ -178,7 +178,7 @@ void GameGUI::Draw()
 	glDisable(GL_SCISSOR_TEST);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	// Clear 3D state that leaked in from the scene pass. MyGUI's OpenGL renderer
+	// Clear 3D state that leaked in from the level pass. MyGUI's OpenGL renderer
 	// expects to control its own simple overlay pipeline.
 	glUseProgram(0);
 	glBindVertexArray(0);

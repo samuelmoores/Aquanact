@@ -6,7 +6,7 @@
 class Window;
 class Camera;
 class FileManager;
-class SceneManager;
+class LevelManager;
 class ProjectManager;
 #include "Engine/EngineGUI.h"
 #include "Engine/GameGUIManager.h"
@@ -26,7 +26,7 @@ public:
 	void shutDown();
 
 	void BeginFrame();
-	void Draw(const Camera& camera, FileManager& fileManager, SceneManager& sceneManager, ProjectManager& projectManager);
+	void Draw(const Camera& camera, FileManager& fileManager, LevelManager& levelManager, ProjectManager& projectManager);
 	void EndFrame();
 
 	// FrontEndMode only controls which editor surface is visible; EngineState

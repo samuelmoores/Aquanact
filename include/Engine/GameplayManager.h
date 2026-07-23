@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Engine/EventManager.h"
+#include "Engine/LevelManager.h"
 #include "Game/Enemy.h"
 #include "Game/PlayerHealth.h"
 
@@ -24,10 +25,13 @@ public:
 	bool IsPaused() const;
 
 	EventManager& Events() { return m_eventManager; }
+	LevelManager& Levels() { return m_levelManager; }
+	const LevelManager& Levels() const { return m_levelManager; }
 
 private:
 	std::vector<Controller*> m_controllers;
 	EventManager m_eventManager;
+	LevelManager m_levelManager;
 	std::unique_ptr<PlayerHealth> m_demoPlayerHealth;
 	std::unique_ptr<Enemy> m_demoEnemy;
 	bool m_paused = false;

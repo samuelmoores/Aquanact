@@ -10,7 +10,7 @@
 #include "Engine/Animator.h"
 #include "Engine/Mesh.h"
 
-class Object3D;
+class Entity;
 
 class AnimatorComponent : public Component {
 public:
@@ -28,7 +28,7 @@ public:
 	AnimatorComponent(Mesh* mesh);
 
 	const char* Name() const override;
-	void Update(Object3D& owner, float dt) override;
+	void Update(Entity& owner, float dt) override;
 
 	Animator* GetAnimator();
 	const Animator* GetAnimator() const;

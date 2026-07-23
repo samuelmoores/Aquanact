@@ -5,13 +5,17 @@
 #include "Engine/EngineCamera.h"
 #include "Engine/GameCamera.h"
 #include "Engine/Window.h"
-#include "Engine/Object3D.h"
-#include "Engine/SceneManager.h"
+#include "Engine/Entity.h"
 #include "Engine/Input.h"
+#include "Engine/Level.h"
+#include "Engine/LevelManager.h"
+
 #include <chrono>
 #include <iomanip>
 #include <iostream>
 #include <algorithm>
+#include <memory>
+#include <vector>
 
 void RenderManager::startUp(Window& window)
 {
@@ -107,7 +111,7 @@ void RenderManager::Submit(const RenderCommand& command)
 		const std::size_t previousCapacity = m_commandCapacity;
 
 		// Grow exponentially to avoid resizing on every extra object. If this is the
-		// first allocation, start with a small fixed minimum so tiny scenes still work.
+		// first allocation, start with a small fixed minimum so tiny levels still work.
 		const std::size_t requiredCapacity = std::max<std::size_t>(previousCapacity == 0 ? 64 : previousCapacity * 2, m_commandCount + 1);
 
 		// Preserve a pointer to the old buffer before replacing the arena contents.
@@ -176,8 +180,11 @@ void RenderManager::Loop()
 	m_device.Clear(0.0f, 0.0f, 0.0f, 0.0f);
 	m_device.BeginFrame();
 
-	// Build render commands from the current scene.
-	for (const auto& object : gSceneManager.Objects())
+	// Build render commands from the current level.
+	const Level* activeLevel = gLevelManager.ActiveLevel();
+	static const std::vector<std::unique_ptr<Entity>> emptyObjects;
+	const auto& objects = activeLevel ? activeLevel->Objects() : emptyObjects;
+	for (const auto& object : objects)
 	{
 		if (!object || !object->GetMesh() || !object->GetShader())
 		{
@@ -203,14 +210,14 @@ void RenderManager::Loop()
 	{
 		const auto debugStart = std::chrono::high_resolution_clock::now();
 		gFrontEndManager.BeginFrame();
-		// Draw editor overlays from the same camera as the scene so preview modes stay consistent.
+		// Draw editor overlays from the same camera as the level so preview modes stay consistent.
 		// Use active camera since the game camera can be used as a preview in editor mode
 		gDebug.draw(ActiveCamera(), gFrontEndManager.EditorGUI());
 		const auto debugEnd = std::chrono::high_resolution_clock::now();
 		m_lastFrameDebugOverlayTime = debugEnd - debugStart;
 
 		const auto editorGuiStart = std::chrono::high_resolution_clock::now();
-		gFrontEndManager.Draw(*m_engineCamera, gFileManager, gSceneManager, gProjectManager);
+		gFrontEndManager.Draw(*m_engineCamera, gFileManager, gLevelManager, gProjectManager);
 		const auto editorGuiEnd = std::chrono::high_resolution_clock::now();
 		m_lastFrameEditorGuiTime = editorGuiEnd - editorGuiStart;
 

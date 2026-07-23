@@ -1,9 +1,9 @@
 #include "Engine/FileManager.h"
 #include "Engine/Debug.h"
 #include "Engine/Globals.h"
-#include "Engine/Object3D.h"
+#include "Engine/LevelManager.h"
+#include "Engine/Entity.h"
 #include "Engine/FileSystem.h"
-#include "Engine/SceneManager.h"
 #include "Engine/Globals.h"
 
 FileManager::FileManager(FileSystem& fileSystem)
@@ -117,9 +117,13 @@ bool FileManager::ImportSelected()
 
 	try
 	{
-		auto importedObject = std::make_unique<Object3D>(absolutePath.string().c_str());
+		auto importedObject = std::make_unique<Entity>(absolutePath.string().c_str());
 		importedObject->SetIgnoreCameraCollision(true);
-		gSceneManager.AddObject(std::move(importedObject));
+		if (!gLevelManager.ActiveLevel())
+		{
+			gLevelManager.CreateLevel("Default");
+		}
+		gLevelManager.ActiveLevel()->AddObject(std::move(importedObject));
 		gDebug.LogMessage("Imported FBX: " + absolutePath.string());
 		return true;
 	}

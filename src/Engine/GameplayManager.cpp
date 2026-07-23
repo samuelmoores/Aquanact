@@ -3,8 +3,7 @@
 #include "Engine/Controller.h"
 #include "Engine/EventManager.h"
 #include "Engine/Globals.h"
-#include "Engine/SceneManager.h"
-#include "Engine/Object3D.h"
+#include "Engine/Level.h"
 #include "Game/Enemy.h"
 #include "Game/PlayerHealth.h"
 
@@ -18,6 +17,8 @@ void GameplayManager::startUp()
 {
 	m_controllers.clear();
 	m_eventManager.Clear();
+	m_levelManager.Clear();
+	m_levelManager.CreateLevel("Default");
 	m_demoPlayerHealth = std::make_unique<PlayerHealth>();
 	m_demoEnemy = std::make_unique<Enemy>();
 	m_demoPlayerHealth->SubscribeToDamage(m_eventManager);
@@ -34,6 +35,7 @@ void GameplayManager::shutDown()
 	m_demoEnemy.reset();
 	m_demoPlayerHealth.reset();
 	m_eventManager.Clear();
+	m_levelManager.Clear();
 	m_paused = false;
 }
 
@@ -63,7 +65,13 @@ void GameplayManager::Update(float dt)
 		return;
 	}
 
-	for (const auto& object : gSceneManager.Objects())
+	const Level* activeLevel = m_levelManager.ActiveLevel();
+	if (!activeLevel)
+	{
+		return;
+	}
+
+	for (const auto& object : activeLevel->Objects())
 	{
 		if (object)
 		{

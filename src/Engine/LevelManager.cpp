@@ -1,0 +1,59 @@
+#include "Engine/LevelManager.h"
+
+#include "Engine/Level.h"
+
+#include <algorithm>
+
+void LevelManager::Clear()
+{
+	m_levels.clear();
+	m_activeLevel = nullptr;
+}
+
+LevelManager::~LevelManager() = default;
+
+Level* LevelManager::CreateLevel(std::string name)
+{
+	auto level = std::make_unique<Level>(std::move(name));
+	Level* rawLevel = level.get();
+	m_levels.push_back(std::move(level));
+	if (!m_activeLevel)
+	{
+		m_activeLevel = rawLevel;
+	}
+	return rawLevel;
+}
+
+Level* LevelManager::FindLevel(const std::string& name) const
+{
+	for (const auto& level : m_levels)
+	{
+		if (level && level->Name() == name)
+		{
+			return level.get();
+		}
+	}
+	return nullptr;
+}
+
+bool LevelManager::SetActiveLevel(const std::string& name)
+{
+	Level* level = FindLevel(name);
+	if (!level)
+	{
+		return false;
+	}
+
+	m_activeLevel = level;
+	return true;
+}
+
+Level* LevelManager::ActiveLevel()
+{
+	return m_activeLevel;
+}
+
+const Level* LevelManager::ActiveLevel() const
+{
+	return m_activeLevel;
+}
