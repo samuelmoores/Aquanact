@@ -59,6 +59,16 @@ ShaderProgram* Entity::GetShader() { return &m_shader; }
 AnimatorComponent* Entity::GetAnimatorComponent() { return GetComponent<AnimatorComponent>(); }
 Controller* Entity::GetController() { return GetComponent<Controller>(); }
 void Entity::UpdateComponents(float dt) { for (auto& component : m_components) if (component) component->Update(*this, dt); }
+void Entity::FirstFrameComponents()
+{
+	for (auto& component : m_components)
+	{
+		if (component)
+		{
+			component->FirstFrame(*this);
+		}
+	}
+}
 glm::mat4 Entity::BuildModelMatrix()
 {
 	auto m = glm::translate(glm::mat4(1), m_position);

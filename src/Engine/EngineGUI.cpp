@@ -15,6 +15,8 @@
 #include "Engine/Entity.h"
 #include "Engine/Controller.h"
 #include "Engine/AnimatorComponent.h"
+#include "Game/Enemy.h"
+#include "Game/PlayerHealth.h"
 #include "Engine/GLHeaders.h"
 #include "Engine/StbImage.h"
 #include "Engine/FileSystem.h"
@@ -421,6 +423,8 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 			ImGui::Text("Name: %s", object->Name().empty() ? "<unnamed>" : object->Name().c_str());
 			AnimatorComponent* animatorComponent = object->GetAnimatorComponent();
 			Controller* controller = object->GetController();
+			PlayerHealth* playerHealth = object->GetComponent<PlayerHealth>();
+			Enemy* enemy = object->GetComponent<Enemy>();
 
 			ImGui::Separator();
 			ImGui::TextUnformatted("Gameplay");
@@ -438,6 +442,47 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 				controller = object->AddComponent<Controller>();
 				controller->SetOwner(object.get());
 				gGameplayManager.RegisterController(controller);
+			}
+
+			ImGui::Separator();
+			ImGui::TextUnformatted("Components");
+			if (playerHealth)
+			{
+				ImGui::BulletText("PlayerHealth");
+				ImGui::SameLine();
+				if (ImGui::SmallButton("Remove##PlayerHealth"))
+				{
+					object->RemoveComponent<PlayerHealth>();
+				}
+			}
+			else
+			{
+				ImGui::BulletText("PlayerHealth: missing");
+			}
+
+			if (enemy)
+			{
+				ImGui::BulletText("Enemy");
+				ImGui::SameLine();
+				if (ImGui::SmallButton("Remove##Enemy"))
+				{
+					object->RemoveComponent<Enemy>();
+				}
+			}
+			else
+			{
+				ImGui::BulletText("Enemy: missing");
+			}
+
+			if (ImGui::Button("Add Component"))
+			{
+				m_selectedComponentEntityIndex = m_selectedLevelObjectIndex;
+				m_addComponentPopupRequested = true;
+				ImGui::OpenPopup("Add Component##AquanactAddComponent");
+			}
+			if (m_addComponentPopupRequested && m_selectedComponentEntityIndex == m_selectedLevelObjectIndex)
+			{
+				DrawAddComponentPopup(*object);
 			}
 
 			ImGui::Separator();
@@ -747,6 +792,39 @@ void EngineGUI::DrawAddCodeFilePopup()
 			ImGui::TextUnformatted(m_addCodeFileStatusMessage.c_str());
 		}
 
+		ImGui::EndPopup();
+	}
+}
+
+void EngineGUI::DrawAddComponentPopup(Entity& entity)
+{
+	if (m_addComponentPopupRequested)
+	{
+		ImGui::OpenPopup("Add Component##AquanactAddComponent");
+		m_addComponentPopupRequested = false;
+	}
+
+	if (ImGui::BeginPopupModal("Add Component##AquanactAddComponent", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		ImGui::Text("Add a component to %s", entity.Name().empty() ? "<unnamed>" : entity.Name().c_str());
+
+		const bool hasPlayerHealth = entity.GetComponent<PlayerHealth>() != nullptr;
+		const bool hasEnemy = entity.GetComponent<Enemy>() != nullptr;
+
+		if (ImGui::MenuItem("PlayerHealth", nullptr, false, !hasPlayerHealth))
+		{
+			entity.AddComponent<PlayerHealth>();
+		}
+		if (ImGui::MenuItem("Enemy", nullptr, false, !hasEnemy))
+		{
+			entity.AddComponent<Enemy>();
+		}
+
+		ImGui::Separator();
+		if (ImGui::Button("Close"))
+		{
+			ImGui::CloseCurrentPopup();
+		}
 		ImGui::EndPopup();
 	}
 }

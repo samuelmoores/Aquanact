@@ -1,9 +1,6 @@
 #pragma once
 
-#include "Engine/EventManager.h"
 #include "Engine/LevelManager.h"
-#include "Game/Enemy.h"
-#include "Game/PlayerHealth.h"
 
 #include <memory>
 #include <vector>
@@ -14,7 +11,7 @@ class GameplayManager {
 public:
 	~GameplayManager();
 
-	void startUp(LevelManager& levelManager, Level* activeLevel = nullptr);
+	void startUp(LevelManager& levelManager);
 	void shutDown();
 	void StartGameSession();
 
@@ -27,17 +24,10 @@ public:
 	bool IsPaused() const;
 	std::size_t ControllerCount() const { return m_controllers.size(); }
 
-	EventManager& Events() { return m_eventManager; }
-	LevelManager& Levels() { return *m_levelManager; }
-	const LevelManager& Levels() const { return *m_levelManager; }
-
 private:
-	void BindActiveLevel(const Level* activeLevel);
+	void BindActiveLevel(Level* activeLevel);
 	std::vector<Controller*> m_controllers;
-	EventManager m_eventManager;
 	LevelManager* m_levelManager = nullptr;
-	const Level* m_boundActiveLevel = nullptr;
-	std::unique_ptr<PlayerHealth> m_demoPlayerHealth;
-	std::unique_ptr<Enemy> m_demoEnemy;
+	Level* m_boundActiveLevel = nullptr;
 	bool m_paused = false;
 };

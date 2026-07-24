@@ -1,4 +1,5 @@
 #include <Engine/Globals.h>
+#include <Engine/EventManager.h>
 #include <Engine/RenderManager.h>
 #include <Engine/Entity.h>
 #include <Engine/LevelManager.h>
@@ -21,6 +22,7 @@ Window gWindow;
 RenderManager gRenderManager;
 FrontEndManager gFrontEndManager;
 Debug gDebug;
+EventManager gEventManager;
 FileSystem gFileSystem;
 FileManager gFileManager(gFileSystem);
 LevelManager gLevelManager;
@@ -113,8 +115,11 @@ static int RunApplication(int argc, char** argv)
     gDebug.startUp();
     gFileManager.startUp();
     gProjectManager.LoadProject(launchConfig.projectPath, gLevelManager);
-    Level* activeLevel = gLevelManager.startUp();
-    gGameplayManager.startUp(gLevelManager, activeLevel);
+    gGameplayManager.startUp(gLevelManager);
+    if (gEngineState.IsGameMode())
+    {
+        gGameplayManager.StartGameSession();
+    }
 
     while (!gWindow.ShouldClose())
         mainLoop();

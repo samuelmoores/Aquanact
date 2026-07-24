@@ -1,20 +1,13 @@
 #pragma once
 
-#include "Engine/Entity.h"
+#include "Engine/Component.h"
 
-class EventManager;
-
-class Enemy final : public Entity
+class Enemy final : public Component
 {
 public:
-	explicit Enemy(std::string name = "Enemy");
+	Enemy() = default;
 
-	const char* TypeName() const override { return "Enemy"; }
-	std::vector<BindableMember> GetBindableMembers() const override { return {}; }
-
-	void SubscribeToStart(EventManager& events);
-	void OnStart();
-
-private:
-	EventManager* m_events = nullptr;
+	const char* Name() const override { return "Enemy"; }
+	void Update(Entity&, float) override {}
+	void FirstFrame(Entity&) override;
 };

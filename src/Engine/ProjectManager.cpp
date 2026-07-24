@@ -9,6 +9,8 @@
 #include "Engine/FileSystem.h"
 #include "Engine/RenderManager.h"
 #include "Engine/GameplayManager.h"
+#include "Game/Enemy.h"
+#include "Game/PlayerHealth.h"
 
 #include <glm/glm.hpp>
 #include <fstream>
@@ -213,7 +215,7 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const LevelM
 		return false;
 	}
 
-	std::string contents = "AquanactProject 8\n";
+	std::string contents = "AquanactProject 9\n";
 	const auto& levels = levelManager.Levels();
 	if (levels.empty())
 	{
@@ -268,6 +270,22 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const LevelM
 					contents += ";controller;";
 					contents += std::to_string(controller->MoveSpeed());
 					contents += "\n";
+				}
+
+				if (const PlayerHealth* playerHealth = object->GetComponent<PlayerHealth>())
+				{
+					contents += "component;";
+					contents += EscapeField(MakePortableSourcePath(path, object->SourcePath()).string());
+					contents += ";playerhealth;";
+					contents += std::to_string(playerHealth->Health()) + ";" + std::to_string(playerHealth->MaxHealth());
+					contents += "\n";
+				}
+
+				if (object->GetComponent<Enemy>())
+				{
+					contents += "component;";
+					contents += EscapeField(MakePortableSourcePath(path, object->SourcePath()).string());
+					contents += ";enemy\n";
 				}
 			}
 		}
@@ -341,7 +359,7 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 	std::istringstream file(fileContents);
 	std::string header;
 	std::getline(file, header);
-	if (header != "AquanactProject 8")
+	if (header != "AquanactProject 9")
 	{
 		return false;
 	}
@@ -351,7 +369,17 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 		float moveSpeed = 50.0f;
 		std::string levelName;
 	};
+	struct PendingComponent {
+		std::filesystem::path sourcePath;
+		std::string levelName;
+		std::string type;
+		int value1 = 0;
+		int value2 = 0;
+		bool hasValue1 = false;
+		bool hasValue2 = false;
+	};
 	std::vector<PendingController> pendingControllers;
+	std::vector<PendingComponent> pendingComponents;
 	struct PendingLevel {
 		std::string name;
 		bool active = false;
@@ -505,6 +533,64 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 			continue;
 		}
 
+		if (fields.size() >= 3 && fields[0] == "component" && fields[2] == "playerhealth")
+		{
+			try
+			{
+				if (!currentLevel)
+				{
+					gDebug.LogMessage("Encountered playerhealth component before any level definition in project file: " + line);
+					return false;
+				}
+				PendingComponent component;
+				component.sourcePath = ResolveSourcePath(path, fields[1]);
+				component.levelName = currentLevel->name;
+				component.type = "playerhealth";
+				if (fields.size() >= 4)
+				{
+					component.value1 = std::stoi(fields[3]);
+					component.hasValue1 = true;
+				}
+				if (fields.size() >= 5)
+				{
+					component.value2 = std::stoi(fields[4]);
+					component.hasValue2 = true;
+				}
+				pendingComponents.push_back(std::move(component));
+			}
+			catch (const std::exception& ex)
+			{
+				gDebug.LogMessage("Failed to load playerhealth component from line: " + line);
+				gDebug.LogMessage("Reason: " + std::string(ex.what()));
+				return false;
+			}
+			continue;
+		}
+
+		if (fields.size() == 3 && fields[0] == "component" && fields[2] == "enemy")
+		{
+			try
+			{
+				if (!currentLevel)
+				{
+					gDebug.LogMessage("Encountered enemy component before any level definition in project file: " + line);
+					return false;
+				}
+				PendingComponent component;
+				component.sourcePath = ResolveSourcePath(path, fields[1]);
+				component.levelName = currentLevel->name;
+				component.type = "enemy";
+				pendingComponents.push_back(std::move(component));
+			}
+			catch (const std::exception& ex)
+			{
+				gDebug.LogMessage("Failed to load enemy component from line: " + line);
+				gDebug.LogMessage("Reason: " + std::string(ex.what()));
+				return false;
+			}
+			continue;
+		}
+
 		if (fields.size() >= 2 && fields[0] == "level")
 		{
 			PendingLevel level;
@@ -633,6 +719,58 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 			controller->SetOwner(object.get());
 			controller->SetMoveSpeed(pendingController.moveSpeed);
 			gGameplayManager.RegisterController(controller);
+			break;
+		}
+	}
+
+	for (const auto& pendingComponent : pendingComponents)
+	{
+		Level* targetLevel = nullptr;
+		for (const auto& level : levelManager.Levels())
+		{
+			if (level && level->Name() == pendingComponent.levelName)
+			{
+				targetLevel = level.get();
+				break;
+			}
+		}
+
+		if (!targetLevel)
+		{
+			gDebug.LogMessage("Component references missing level: " + pendingComponent.levelName);
+			return false;
+		}
+
+		for (const auto& object : targetLevel->Objects())
+		{
+			if (!object || object->SourcePath() != pendingComponent.sourcePath.string())
+			{
+				continue;
+			}
+
+			if (pendingComponent.type == "playerhealth")
+			{
+				PlayerHealth* playerHealth = object->GetComponent<PlayerHealth>();
+				if (!playerHealth)
+				{
+					playerHealth = object->AddComponent<PlayerHealth>();
+				}
+				if (pendingComponent.hasValue1)
+				{
+					playerHealth->SetHealth(pendingComponent.value1);
+				}
+				if (pendingComponent.hasValue2)
+				{
+					playerHealth->SetMaxHealth(pendingComponent.value2);
+				}
+			}
+			else if (pendingComponent.type == "enemy")
+			{
+				if (!object->GetComponent<Enemy>())
+				{
+					object->AddComponent<Enemy>();
+				}
+			}
 			break;
 		}
 	}

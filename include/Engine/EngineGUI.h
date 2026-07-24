@@ -7,6 +7,7 @@ class Camera;
 class FileManager;
 class LevelManager;
 class ProjectManager;
+class Entity;
 
 class EngineGUI {
 public:
@@ -26,6 +27,7 @@ private:
 	void DrawBuildGamePopup();
 	void DrawAddCodeFilePopup();
 	void DrawNewLevelPopup();
+	void DrawAddComponentPopup(Entity& entity);
 	static std::string NormalizeGameClassName(const std::string& input);
 	static std::string MakeHeaderTemplate(const std::string& className);
 	static std::string MakeSourceTemplate(const std::string& className);
@@ -43,9 +45,11 @@ private:
 	bool m_buildGamePopupRequested = false;
 	bool m_addCodeFilePopupRequested = false;
 	bool m_newLevelPopupRequested = false;
+	bool m_addComponentPopupRequested = false;
 	bool m_addCodeFileCreated = false;
 	char m_newCodeFileName[128] = "PlayerHealth";
 	char m_newLevelName[128] = "Level1";
+	int m_selectedComponentEntityIndex = -1;
 	std::string m_addCodeFileStatusMessage;
 	std::string m_newLevelStatusMessage;
 };

@@ -1,27 +1,17 @@
 #pragma once
 
-#include "Engine/Entity.h"
+#include "Engine/Component.h"
 
-class EventManager;
+#include <string>
 
-// Example child class that shows the minimum required shape.
-//
-// To compile successfully, any new Entity child must:
-// - inherit from Entity
-// - implement TypeName()
-// - implement GetBindableMembers()
-// - construct the Entity base with a name
-//
-// The actual gameplay data (`health`, `maxHealth`) is private here, but the
-// class exposes getters/setters and reports those members in
-// GetBindableMembers() so other systems can inspect them later.
-class PlayerHealth final : public Entity
+class PlayerHealth final : public Component
 {
 public:
-	explicit PlayerHealth(std::string name = "PlayerHealth");
+	PlayerHealth() = default;
 
-	const char* TypeName() const override { return "PlayerHealth"; }
-	std::vector<BindableMember> GetBindableMembers() const override;
+	const char* Name() const override { return "PlayerHealth"; }
+	void Update(Entity&, float) override {}
+	void FirstFrame(Entity&) override;
 
 	int Health() const { return m_health; }
 	void SetHealth(int health) { m_health = health; }
@@ -30,7 +20,7 @@ public:
 	void SetMaxHealth(int maxHealth) { m_maxHealth = maxHealth; }
 
 	std::string GetHealthText() const;
-	void SubscribeToDamage(EventManager& events);
+	void SubscribeToDamage();
 
 private:
 	int m_health = 100;

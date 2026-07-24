@@ -40,6 +40,9 @@ public:
 
 	virtual const char* TypeName() const { return "Entity"; }
 	virtual std::vector<BindableMember> GetBindableMembers() const { return {}; }
+	virtual void startUp() {}
+	virtual void FirstFrame() {}
+	void FirstFrameComponents();
 
 	Mesh* GetMesh();
 	ShaderProgram* GetShader();
@@ -52,6 +55,8 @@ public:
 	const T* GetComponent() const;
 	template<typename T, typename... Args>
 	T* AddComponent(Args&&... args);
+	template<typename T>
+	bool RemoveComponent();
 
 	void UpdateComponents(float dt);
 	glm::mat4 BuildModelMatrix();
@@ -164,4 +169,18 @@ T* Entity::AddComponent(Args&&... args)
 	T* raw = component.get();
 	m_components.push_back(std::move(component));
 	return raw;
+}
+
+template<typename T>
+bool Entity::RemoveComponent()
+{
+	for (auto it = m_components.begin(); it != m_components.end(); ++it)
+	{
+		if (dynamic_cast<T*>(it->get()))
+		{
+			m_components.erase(it);
+			return true;
+		}
+	}
+	return false;
 }

@@ -40,7 +40,6 @@ void Event::Dispatch()
 
 EventManager::EventManager()
 {
-	CreateEvent("Start");
 	CreateEvent("Damage");
 }
 
@@ -76,14 +75,8 @@ void EventManager::Dispatch(const std::string& name)
 	}
 }
 
-void EventManager::DispatchStart()
-{
-	Dispatch("Start");
-}
-
 void EventManager::Clear()
 {
 	m_events.clear();
-	CreateEvent("Start");
 	CreateEvent("Damage");
 }

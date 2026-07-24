@@ -1,45 +1,30 @@
 #include "Engine/GameplayManager.h"
 
 #include "Engine/Controller.h"
-#include "Engine/EventManager.h"
 #include "Engine/Debug.h"
 #include "Engine/Globals.h"
 #include "Engine/Level.h"
-#include "Game/Enemy.h"
-#include "Game/PlayerHealth.h"
 
 #include <algorithm>
-#include <iostream>
 #include <utility>
 
 GameplayManager::~GameplayManager() = default;
 
-void GameplayManager::startUp(LevelManager& levelManager, Level* activeLevel)
+void GameplayManager::startUp(LevelManager& levelManager)
 {
 	m_levelManager = &levelManager;
-	m_boundActiveLevel = activeLevel;
 	m_controllers.clear();
-	m_eventManager.Clear();
-	m_demoPlayerHealth = std::make_unique<PlayerHealth>();
-	m_demoEnemy = std::make_unique<Enemy>();
-	m_demoPlayerHealth->SubscribeToDamage(m_eventManager);
-	m_demoEnemy->SubscribeToStart(m_eventManager);
-	std::cout << "Initial PlayerHealth value: " << m_demoPlayerHealth->Health() << "\n";
-	m_eventManager.DispatchStart();
-	std::cout << "PlayerHealth value after Start dispatch: " << m_demoPlayerHealth->Health() << "\n";
 	m_paused = false;
-	if (m_boundActiveLevel)
+	if (m_levelManager)
 	{
-		BindActiveLevel(m_boundActiveLevel);
+		m_levelManager->startUp();
 	}
+	BindActiveLevel(m_levelManager ? m_levelManager->ActiveLevel() : nullptr);
 }
 
 void GameplayManager::shutDown()
 {
 	m_controllers.clear();
-	m_demoEnemy.reset();
-	m_demoPlayerHealth.reset();
-	m_eventManager.Clear();
 	m_levelManager = nullptr;
 	m_boundActiveLevel = nullptr;
 	m_paused = false;
@@ -64,6 +49,12 @@ void GameplayManager::StartGameSession()
 		}
 	}
 
+	m_levelManager->startUp();
+	Level* activeLevel = m_levelManager->ActiveLevel();
+	if (activeLevel)
+	{
+		activeLevel->FirstFrame();
+	}
 	m_boundActiveLevel = nullptr;
 	RefreshControllersFromActiveLevel();
 }
@@ -119,7 +110,7 @@ void GameplayManager::RefreshControllersFromActiveLevel()
 	}
 }
 
-void GameplayManager::BindActiveLevel(const Level* activeLevel)
+void GameplayManager::BindActiveLevel(Level* activeLevel)
 {
 	if (m_boundActiveLevel == activeLevel)
 	{
@@ -158,7 +149,7 @@ void GameplayManager::Update(float dt)
 		return;
 	}
 
-	const Level* activeLevel = m_levelManager ? m_levelManager->ActiveLevel() : nullptr;
+	Level* activeLevel = m_levelManager ? m_levelManager->ActiveLevel() : nullptr;
 	if (!activeLevel)
 	{
 		return;

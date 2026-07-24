@@ -39,7 +39,6 @@ public:
 	const Event* FindEvent(const std::string& name) const;
 
 	void Dispatch(const std::string& name);
-	void DispatchStart();
 	void Clear();
 
 private:

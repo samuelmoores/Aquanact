@@ -1,4 +1,8 @@
 #include "Engine/Level.h"
+#include "Engine/EventManager.h"
+#include "Engine/Globals.h"
+
+#include <iostream>
 
 Level::Level(std::string name)
 	: m_name(std::move(name))
@@ -12,19 +16,51 @@ void Level::SetName(std::string name)
 	m_name = std::move(name);
 }
 
-void Level::Clear()
+void Level::startUp()
 {
-	m_objects.clear();
+	gEventManager.Clear();
+	for (const auto& entity : m_entities)
+	{
+		if (entity)
+		{
+			entity->startUp();
+		}
+	}
+	m_firstFramePending = true;
 }
 
-Entity* Level::AddObject(std::unique_ptr<Entity> object)
+void Level::FirstFrame()
 {
-	if (!object)
+	if (!m_firstFramePending)
+	{
+		return;
+	}
+
+	m_firstFramePending = false;
+	for (const auto& entity : m_entities)
+	{
+		if (entity)
+		{
+			entity->FirstFrameComponents();
+		}
+	}
+}
+
+void Level::Clear()
+{
+	m_entities.clear();
+	gEventManager.Clear();
+	m_firstFramePending = false;
+}
+
+Entity* Level::AddObject(std::unique_ptr<Entity> entity)
+{
+	if (!entity)
 	{
 		return nullptr;
 	}
 
-	Entity* rawObject = object.get();
-	m_objects.push_back(std::move(object));
-	return rawObject;
+	Entity* rawEntity = entity.get();
+	m_entities.push_back(std::move(entity));
+	return rawEntity;
 }

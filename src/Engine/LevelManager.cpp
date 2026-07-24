@@ -23,6 +23,11 @@ Level* LevelManager::startUp()
 		}
 	}
 
+	if (m_activeLevel)
+	{
+		m_activeLevel->startUp();
+	}
+
 	return m_activeLevel;
 }
 

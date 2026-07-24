@@ -1,32 +1,19 @@
 #include "Game/PlayerHealth.h"
 
 #include "Engine/EventManager.h"
+#include "Engine/Globals.h"
+#include "Engine/Entity.h"
 
 #include <iostream>
-#include <utility>
-
-PlayerHealth::PlayerHealth(std::string name)
-	: Entity(std::move(name))
-{
-}
-
-std::vector<BindableMember> PlayerHealth::GetBindableMembers() const
-{
-	return {
-		{ "health", "Health", "int", BindableMember::Kind::Variable },
-		{ "maxHealth", "Max Health", "int", BindableMember::Kind::Variable },
-		{ "GetHealthText", "Health Text", "string", BindableMember::Kind::Function },
-	};
-}
 
 std::string PlayerHealth::GetHealthText() const
 {
 	return std::to_string(m_health) + "/" + std::to_string(m_maxHealth);
 }
 
-void PlayerHealth::SubscribeToDamage(EventManager& events)
+void PlayerHealth::SubscribeToDamage()
 {
-	events.GetEvent("Damage").Subscribe(this, [this]()
+	gEventManager.GetEvent("Damage").Subscribe(this, [this]()
 	{
 		m_health -= 25;
 		if (m_health < 0)
@@ -35,4 +22,9 @@ void PlayerHealth::SubscribeToDamage(EventManager& events)
 		}
 		std::cout << "PlayerHealth received Damage and now has " << m_health << " health\n";
 	});
+}
+
+void PlayerHealth::FirstFrame(Entity&)
+{
+	SubscribeToDamage();
 }
