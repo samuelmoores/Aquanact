@@ -407,7 +407,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 	ImGui::Begin("Entity");
 	if (m_selectedLevelObjectIndex < 0 || m_selectedLevelObjectIndex >= static_cast<int>(objects.size()))
 	{
-			ImGui::TextUnformatted("No entity selected.");
+		ImGui::TextUnformatted("No entity selected.");
 	}
 	else
 	{
@@ -421,69 +421,8 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 			const glm::vec3 worldCenterPosition = object->WorldCenterPosition();
 			const glm::vec3 defaultWorldCenterPosition = object->InitialWorldCenterPosition();
 			ImGui::Text("Name: %s", object->Name().empty() ? "<unnamed>" : object->Name().c_str());
-			AnimatorComponent* animatorComponent = object->GetAnimatorComponent();
-			Controller* controller = object->GetController();
-			PlayerHealth* playerHealth = object->GetComponent<PlayerHealth>();
-			Enemy* enemy = object->GetComponent<Enemy>();
-
-			ImGui::Separator();
-			ImGui::TextUnformatted("Gameplay");
-			if (controller)
-			{
-				float moveSpeed = controller->MoveSpeed();
-				ImGui::SetNextItemWidth(140.0f);
-				if (ImGui::InputFloat("Move Speed", &moveSpeed, 0.0f, 0.0f, "%.1f"))
-				{
-					controller->SetMoveSpeed(moveSpeed);
-				}
-			}
-			else if (ImGui::Button("Add Controller"))
-			{
-				controller = object->AddComponent<Controller>();
-				controller->SetOwner(object.get());
-				gGameplayManager.RegisterController(controller);
-			}
-
-			ImGui::Separator();
-			ImGui::TextUnformatted("Components");
-			if (playerHealth)
-			{
-				ImGui::BulletText("PlayerHealth");
-				ImGui::SameLine();
-				if (ImGui::SmallButton("Remove##PlayerHealth"))
-				{
-					object->RemoveComponent<PlayerHealth>();
-				}
-			}
-			else
-			{
-				ImGui::BulletText("PlayerHealth: missing");
-			}
-
-			if (enemy)
-			{
-				ImGui::BulletText("Enemy");
-				ImGui::SameLine();
-				if (ImGui::SmallButton("Remove##Enemy"))
-				{
-					object->RemoveComponent<Enemy>();
-				}
-			}
-			else
-			{
-				ImGui::BulletText("Enemy: missing");
-			}
-
-	if (ImGui::Button("Add Component"))
-	{
-		m_selectedComponentEntityIndex = m_selectedLevelObjectIndex;
-		m_addComponentPopupRequested = true;
-		ImGui::OpenPopup("Add Component##AquanactAddComponent");
-	}
-	if (m_addComponentPopupRequested && m_selectedComponentEntityIndex == m_selectedLevelObjectIndex)
-	{
-		DrawAddComponentPopup(*object);
-	}
+			ImGui::Text("Type: %s", object->TypeName());
+			ImGui::Text("Source: %s", object->SourcePath().empty() ? "<none>" : object->SourcePath().c_str());
 
 			ImGui::Separator();
 			ImGui::TextUnformatted("Position");
@@ -527,44 +466,92 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 			}
 
 			ImGui::Separator();
-			ImGui::TextUnformatted("Animation");
-			if (animatorComponent)
+			ImGui::TextUnformatted("Components");
+			std::vector<Component*> components = object->Components();
+			for (Component* component : components)
 			{
-				static char selectedStateName[64] = "";
-				static bool selectedStateInitialized = false;
-				if (!selectedStateInitialized || animatorComponent->States().empty())
+				if (!component)
 				{
-					if (!animatorComponent->States().empty())
-					{
-						std::strncpy(selectedStateName, animatorComponent->States().front().name.c_str(), sizeof(selectedStateName) - 1);
-						selectedStateName[sizeof(selectedStateName) - 1] = '\0';
-					}
-					selectedStateInitialized = true;
+					continue;
 				}
 
-				ImGui::TextUnformatted("Animator component present");
-				if (ImGui::BeginCombo("##InitialAnimation", selectedStateName[0] != '\0' ? selectedStateName : "<select animation>"))
+				const std::string componentLabel = component->Name();
+				const bool open = ImGui::CollapsingHeader(componentLabel.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
+				if (!open)
 				{
-					for (const auto& state : animatorComponent->States())
+					continue;
+				}
+
+				if (AnimatorComponent* animator = dynamic_cast<AnimatorComponent*>(component))
+				{
+					static char selectedStateName[64] = "";
+					static bool selectedStateInitialized = false;
+					if (!selectedStateInitialized || animator->States().empty())
 					{
-						const bool selected = std::strcmp(selectedStateName, state.name.c_str()) == 0;
-						if (ImGui::Selectable(state.name.c_str(), selected))
+						if (!animator->States().empty())
 						{
-							std::strncpy(selectedStateName, state.name.c_str(), sizeof(selectedStateName) - 1);
+							std::strncpy(selectedStateName, animator->States().front().name.c_str(), sizeof(selectedStateName) - 1);
 							selectedStateName[sizeof(selectedStateName) - 1] = '\0';
-							animatorComponent->SetDesiredState(selectedStateName);
 						}
-						if (selected)
-						{
-							ImGui::SetItemDefaultFocus();
-						}
+						selectedStateInitialized = true;
 					}
-					ImGui::EndCombo();
+
+					if (ImGui::BeginCombo("##InitialAnimation", selectedStateName[0] != '\0' ? selectedStateName : "<select animation>"))
+					{
+						for (const auto& state : animator->States())
+						{
+							const bool selected = std::strcmp(selectedStateName, state.name.c_str()) == 0;
+							if (ImGui::Selectable(state.name.c_str(), selected))
+							{
+								std::strncpy(selectedStateName, state.name.c_str(), sizeof(selectedStateName) - 1);
+								selectedStateName[sizeof(selectedStateName) - 1] = '\0';
+								animator->SetDesiredState(selectedStateName);
+							}
+							if (selected)
+							{
+								ImGui::SetItemDefaultFocus();
+							}
+						}
+						ImGui::EndCombo();
+					}
+				}
+				else if (Controller* controller = dynamic_cast<Controller*>(component))
+				{
+					float moveSpeed = controller->MoveSpeed();
+					ImGui::SetNextItemWidth(140.0f);
+					if (ImGui::InputFloat("Move Speed", &moveSpeed, 0.0f, 0.0f, "%.1f"))
+					{
+						controller->SetMoveSpeed(moveSpeed);
+					}
+				}
+				else if (PlayerHealth* playerHealth = dynamic_cast<PlayerHealth*>(component))
+				{
+					ImGui::Text("Health: %s", playerHealth->GetHealthText().c_str());
+					if (ImGui::Button("Heal to Max"))
+					{
+						playerHealth->SetHealth(playerHealth->MaxHealth());
+					}
+				}
+				else if (Enemy* enemy = dynamic_cast<Enemy*>(component))
+				{
+					ImGui::TextUnformatted("Enemy behavior component");
+					(void)enemy;
+				}
+				else
+				{
+					ImGui::TextUnformatted("No editor controls for this component.");
 				}
 			}
-			else
+
+			if (ImGui::Button("Add Component"))
 			{
-				ImGui::TextUnformatted("No animator component on this entity.");
+				m_selectedComponentEntityIndex = m_selectedLevelObjectIndex;
+				m_addComponentPopupRequested = true;
+				ImGui::OpenPopup("Add Component##AquanactAddComponent");
+			}
+			if (m_addComponentPopupRequested && m_selectedComponentEntityIndex == m_selectedLevelObjectIndex)
+			{
+				DrawAddComponentPopup(*object);
 			}
 		}
 	}
