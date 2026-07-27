@@ -40,6 +40,7 @@ private:
 	float m_blendFactor = 1.0f;
 	float m_blendSpeed = 3.0f;
 	float m_currentTime = 0.0f;
+	float m_nextTime = 0.0f;
 	float m_prevTicks   = 0.0f;
 };
 

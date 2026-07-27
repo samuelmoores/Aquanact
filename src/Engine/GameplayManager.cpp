@@ -1,6 +1,7 @@
 #include "Engine/GameplayManager.h"
 
 #include "Engine/Controller.h"
+#include "Engine/AnimatorComponent.h"
 #include "Engine/Debug.h"
 #include "Engine/Globals.h"
 #include "Engine/Level.h"
@@ -167,6 +168,30 @@ void GameplayManager::Update(float dt)
 		if (object)
 		{
 			object->UpdateComponents(dt);
+			if (AnimatorComponent* animator = object->GetAnimatorComponent())
+			{
+				std::string stateListText;
+				for (const auto& state : animator->States())
+				{
+					stateListText += state.name + " -> clip " + std::to_string(state.clipIndex) + "\n";
+				}
+				gDebug.SetAnimationDiagnostics(
+					animator->CurrentState(),
+					animator->DesiredState(),
+					animator->LastTransitionDebug(),
+					animator->LastTransitionFrom(),
+					animator->LastTransitionTo(),
+					animator->LastTransitionLeftOperandText(),
+					animator->LastTransitionComparatorText(),
+					animator->LastTransitionRightOperandText(),
+					animator->LastTransitionLeftValue(),
+					animator->LastTransitionRightValue(),
+					animator->LastTransitionPassed(),
+					animator->LastResolvedTargetState(),
+					animator->LastResolvedTargetClipIndex(),
+					animator->LastResolvedTargetFound(),
+					stateListText);
+			}
 		}
 	}
 

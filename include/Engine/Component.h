@@ -3,6 +3,20 @@
 #include <string>
 #include <vector>
 
+struct BindableMember
+{
+	enum class Kind
+	{
+		Variable,
+		Function,
+	};
+
+	std::string name;
+	std::string displayName;
+	std::string typeName;
+	Kind kind = Kind::Variable;
+};
+
 struct BindableEvent
 {
 	std::string name;
@@ -19,6 +33,8 @@ public:
 	virtual void startUp(Entity&) {}
 	virtual void Update(Entity&, float) {}
 	virtual void FirstFrame(Entity&) {}
+	virtual std::vector<BindableMember> GetBindableMembers() const { return {}; }
+	virtual bool TryGetBindableValue(const std::string&, float&) const { return false; }
 	virtual std::vector<BindableEvent> GetBindableEvents() const { return {}; }
 	virtual std::string GetBindableEventText(const std::string&) const { return {}; }
 

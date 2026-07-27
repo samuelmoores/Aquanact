@@ -265,6 +265,31 @@ void Debug::drawGameModeInput(const Input& input)
 	ImGui::Text("Applied delta: %.3f, %.3f, %.3f", m_gameplayDelta.x, m_gameplayDelta.y, m_gameplayDelta.z);
 	ImGui::Text("Position: %.3f, %.3f, %.3f", m_gameplayPosition.x, m_gameplayPosition.y, m_gameplayPosition.z);
 	ImGui::End();
+
+	ImGui::Begin("Animation Diagnostics");
+	ImGui::Text("Current state: %s", m_animationCurrentState.empty() ? "<none>" : m_animationCurrentState.c_str());
+	ImGui::Text("Desired state: %s", m_animationDesiredState.empty() ? "<none>" : m_animationDesiredState.c_str());
+	ImGui::TextWrapped("Last transition: %s", m_animationLastTransitionDebug.empty() ? "<none>" : m_animationLastTransitionDebug.c_str());
+	ImGui::Text("Last transition from: %s", m_animationLastTransitionFrom.empty() ? "<none>" : m_animationLastTransitionFrom.c_str());
+	ImGui::Text("Last transition to: %s", m_animationLastTransitionTo.empty() ? "<none>" : m_animationLastTransitionTo.c_str());
+	ImGui::Text("Last condition: %s %s %s",
+		m_animationLastTransitionLeftOperandText.empty() ? "<none>" : m_animationLastTransitionLeftOperandText.c_str(),
+		m_animationLastTransitionComparatorText.empty() ? "<none>" : m_animationLastTransitionComparatorText.c_str(),
+		m_animationLastTransitionRightOperandText.empty() ? "<none>" : m_animationLastTransitionRightOperandText.c_str());
+	ImGui::Text("Resolved operand values: %.3f %s %.3f",
+		m_animationLastTransitionLeftValue,
+		m_animationLastTransitionComparatorText.empty() ? "<none>" : m_animationLastTransitionComparatorText.c_str(),
+		m_animationLastTransitionRightValue);
+	ImGui::Text("Condition passed: %s", m_animationLastTransitionPassed ? "yes" : "no");
+	ImGui::Text("Resolved target: %s", m_animationLastResolvedTargetState.empty() ? "<none>" : m_animationLastResolvedTargetState.c_str());
+	ImGui::Text("Resolved clip index: %d", m_animationLastResolvedTargetClipIndex);
+	ImGui::Text("Resolved target found: %s", m_animationLastResolvedTargetFound ? "yes" : "no");
+	ImGui::Separator();
+	ImGui::TextUnformatted("States:");
+	ImGui::BeginChild("AnimatorStateList", ImVec2(0.0f, 120.0f), true);
+	ImGui::TextUnformatted(m_animationStateListText.empty() ? "<none>" : m_animationStateListText.c_str());
+	ImGui::EndChild();
+	ImGui::End();
 }
 
 void Debug::SetGameplayDiagnostics(bool controllerRegistered, const std::string& objectName, const glm::vec3& moveInput, float moveSpeed, float dt, const glm::vec3& delta, const glm::vec3& position)
@@ -279,6 +304,25 @@ void Debug::SetGameplayDiagnostics(bool controllerRegistered, const std::string&
 	m_gameplayDt = dt;
 	m_gameplayDelta = delta;
 	m_gameplayPosition = position;
+}
+
+void Debug::SetAnimationDiagnostics(const std::string& currentState, const std::string& desiredState, const std::string& lastTransitionDebug, const std::string& lastTransitionFrom, const std::string& lastTransitionTo, const std::string& lastTransitionLeftOperandText, const std::string& lastTransitionComparatorText, const std::string& lastTransitionRightOperandText, float lastTransitionLeftValue, float lastTransitionRightValue, bool lastTransitionPassed, const std::string& lastResolvedTargetState, int lastResolvedTargetClipIndex, bool lastResolvedTargetFound, const std::string& stateListText)
+{
+	m_animationCurrentState = currentState;
+	m_animationDesiredState = desiredState;
+	m_animationLastTransitionDebug = lastTransitionDebug;
+	m_animationLastTransitionFrom = lastTransitionFrom;
+	m_animationLastTransitionTo = lastTransitionTo;
+	m_animationLastTransitionLeftOperandText = lastTransitionLeftOperandText;
+	m_animationLastTransitionComparatorText = lastTransitionComparatorText;
+	m_animationLastTransitionRightOperandText = lastTransitionRightOperandText;
+	m_animationLastTransitionLeftValue = lastTransitionLeftValue;
+	m_animationLastTransitionRightValue = lastTransitionRightValue;
+	m_animationLastTransitionPassed = lastTransitionPassed;
+	m_animationLastResolvedTargetState = lastResolvedTargetState;
+	m_animationLastResolvedTargetClipIndex = lastResolvedTargetClipIndex;
+	m_animationLastResolvedTargetFound = lastResolvedTargetFound;
+	m_animationStateListText = stateListText;
 }
 
 void Debug::SetGameplayContext(const std::string& activeLevelName, std::size_t activeLevelObjects, std::size_t controllerCount, const std::string& engineMode)

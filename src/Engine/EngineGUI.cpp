@@ -50,6 +50,187 @@ namespace {
 	{
 		return SourceRoot() / "src" / "Game";
 	}
+
+	struct AnimatorBindingSource
+	{
+		std::string componentName;
+		std::string label;
+		std::vector<BindableMember> members;
+	};
+
+	bool IsAnimatorConditionMember(const BindableMember& member)
+	{
+		std::string typeName = member.typeName;
+		std::transform(typeName.begin(), typeName.end(), typeName.begin(), [](unsigned char ch)
+		{
+			return static_cast<char>(std::tolower(ch));
+		});
+		return typeName == "bool" || typeName == "int" || typeName == "float" || typeName == "double";
+	}
+
+	std::vector<BindableMember> AnimatorConditionMembers(const std::vector<BindableMember>& members)
+	{
+		std::vector<BindableMember> result;
+		for (const BindableMember& member : members)
+		{
+			if (IsAnimatorConditionMember(member))
+			{
+				result.push_back(member);
+			}
+		}
+		return result;
+	}
+
+	std::vector<AnimatorBindingSource> AnimatorBindingSources(Entity* owner)
+	{
+		std::vector<AnimatorBindingSource> sources;
+		if (!owner)
+		{
+			return sources;
+		}
+
+		std::vector<BindableMember> entityMembers = AnimatorConditionMembers(owner->GetBindableMembers());
+		if (!entityMembers.empty())
+		{
+			sources.push_back({ {}, "Entity", std::move(entityMembers) });
+		}
+
+		for (Component* component : owner->Components())
+		{
+			if (!component)
+			{
+				continue;
+			}
+
+			std::vector<BindableMember> members = AnimatorConditionMembers(component->GetBindableMembers());
+			if (!members.empty())
+			{
+				sources.push_back({ component->Name(), component->Name(), std::move(members) });
+			}
+		}
+		return sources;
+	}
+
+	void SetDefaultAnimatorOperand(AnimatorComponent::Operand& operand, const std::vector<AnimatorBindingSource>& sources)
+	{
+		operand = {};
+		for (const AnimatorBindingSource& source : sources)
+		{
+			for (const BindableMember& member : source.members)
+			{
+				if (source.componentName == "Controller" && member.name == "IsMoving")
+				{
+					operand.type = AnimatorComponent::OperandType::Binding;
+					operand.componentName = source.componentName;
+					operand.memberName = member.name;
+					return;
+				}
+			}
+		}
+
+		if (!sources.empty() && !sources.front().members.empty())
+		{
+			operand.type = AnimatorComponent::OperandType::Binding;
+			operand.componentName = sources.front().componentName;
+			operand.memberName = sources.front().members.front().name;
+		}
+	}
+
+	void DrawAnimatorOperandEditor(
+		const char* label,
+		AnimatorComponent::Operand& operand,
+		const std::vector<AnimatorBindingSource>& sources)
+	{
+		ImGui::PushID(label);
+		ImGui::TextUnformatted(label);
+
+		const char* operandTypes[] = { "Constant", "Binding" };
+		int operandType = static_cast<int>(operand.type);
+		if (ImGui::Combo("Type", &operandType, operandTypes, IM_ARRAYSIZE(operandTypes)))
+		{
+			operand.type = static_cast<AnimatorComponent::OperandType>(operandType);
+			if (operand.type == AnimatorComponent::OperandType::Binding && operand.memberName.empty())
+			{
+				SetDefaultAnimatorOperand(operand, sources);
+				operand.type = AnimatorComponent::OperandType::Binding;
+			}
+		}
+
+		if (operand.type == AnimatorComponent::OperandType::Constant)
+		{
+			ImGui::SetNextItemWidth(160.0f);
+			ImGui::InputFloat("Value", &operand.constantValue, 0.0f, 0.0f, "%.3f");
+			ImGui::PopID();
+			return;
+		}
+
+		const AnimatorBindingSource* selectedSource = nullptr;
+		for (const AnimatorBindingSource& source : sources)
+		{
+			if (source.componentName == operand.componentName)
+			{
+				selectedSource = &source;
+				break;
+			}
+		}
+
+		const char* sourceLabel = selectedSource ? selectedSource->label.c_str() : "<select source>";
+		if (ImGui::BeginCombo("Source", sourceLabel))
+		{
+			for (const AnimatorBindingSource& source : sources)
+			{
+				const bool selected = source.componentName == operand.componentName;
+				if (ImGui::Selectable(source.label.c_str(), selected))
+				{
+					operand.componentName = source.componentName;
+					operand.memberName = source.members.empty() ? std::string{} : source.members.front().name;
+				}
+				if (selected)
+				{
+					ImGui::SetItemDefaultFocus();
+				}
+			}
+			ImGui::EndCombo();
+		}
+
+		if (!selectedSource)
+		{
+			ImGui::TextDisabled("No bindable source selected.");
+			ImGui::PopID();
+			return;
+		}
+
+		const BindableMember* selectedMember = nullptr;
+		for (const BindableMember& member : selectedSource->members)
+		{
+			if (member.name == operand.memberName)
+			{
+				selectedMember = &member;
+				break;
+			}
+		}
+		const char* memberLabel = selectedMember
+			? (selectedMember->displayName.empty() ? selectedMember->name.c_str() : selectedMember->displayName.c_str())
+			: "<select member>";
+		if (ImGui::BeginCombo("Member", memberLabel))
+		{
+			for (const BindableMember& member : selectedSource->members)
+			{
+				const bool selected = member.name == operand.memberName;
+				const char* displayName = member.displayName.empty() ? member.name.c_str() : member.displayName.c_str();
+				if (ImGui::Selectable(displayName, selected))
+				{
+					operand.memberName = member.name;
+				}
+				if (selected)
+				{
+					ImGui::SetItemDefaultFocus();
+				}
+			}
+			ImGui::EndCombo();
+		}
+		ImGui::PopID();
+	}
 }
 
 void EngineGUI::startUp(Window& window)
@@ -484,35 +665,14 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 
 				if (AnimatorComponent* animator = dynamic_cast<AnimatorComponent*>(component))
 				{
-					static char selectedStateName[64] = "";
-					static bool selectedStateInitialized = false;
-					if (!selectedStateInitialized || animator->States().empty())
+					if (ImGui::Button("Open State Machine"))
 					{
-						if (!animator->States().empty())
-						{
-							std::strncpy(selectedStateName, animator->States().front().name.c_str(), sizeof(selectedStateName) - 1);
-							selectedStateName[sizeof(selectedStateName) - 1] = '\0';
-						}
-						selectedStateInitialized = true;
+						m_animatorStateMachinePopupRequested = true;
+						ImGui::OpenPopup("State Machine##AquanactAnimatorStateMachine");
 					}
-
-					if (ImGui::BeginCombo("##InitialAnimation", selectedStateName[0] != '\0' ? selectedStateName : "<select animation>"))
+					if (m_animatorStateMachinePopupRequested)
 					{
-						for (const auto& state : animator->States())
-						{
-							const bool selected = std::strcmp(selectedStateName, state.name.c_str()) == 0;
-							if (ImGui::Selectable(state.name.c_str(), selected))
-							{
-								std::strncpy(selectedStateName, state.name.c_str(), sizeof(selectedStateName) - 1);
-								selectedStateName[sizeof(selectedStateName) - 1] = '\0';
-								animator->SetDesiredState(selectedStateName);
-							}
-							if (selected)
-							{
-								ImGui::SetItemDefaultFocus();
-							}
-						}
-						ImGui::EndCombo();
+						DrawAnimatorStateMachinePopup(*animator);
 					}
 				}
 				else if (Controller* controller = dynamic_cast<Controller*>(component))
@@ -599,6 +759,194 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 	ImGui::End();
 
 	gFrontEndManager.RuntimeGUI().DrawEditorWindow();
+}
+
+void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
+{
+	AnimatorStateMachineUiState& ui = m_animatorUiState[&animator];
+	const std::vector<AnimatorBindingSource> bindingSources = AnimatorBindingSources(animator.Owner());
+
+	if (!ui.initialized || animator.States().empty())
+	{
+		ui.initialStateName[0] = '\0';
+		ui.transitionFromState[0] = '\0';
+		ui.transitionToState[0] = '\0';
+		if (!animator.States().empty())
+		{
+			std::strncpy(ui.initialStateName, animator.States().front().name.c_str(), sizeof(ui.initialStateName) - 1);
+			ui.initialStateName[sizeof(ui.initialStateName) - 1] = '\0';
+			std::strncpy(ui.transitionFromState, animator.States().front().name.c_str(), sizeof(ui.transitionFromState) - 1);
+			ui.transitionFromState[sizeof(ui.transitionFromState) - 1] = '\0';
+			if (animator.States().size() > 1)
+			{
+				std::strncpy(ui.transitionToState, animator.States()[1].name.c_str(), sizeof(ui.transitionToState) - 1);
+				ui.transitionToState[sizeof(ui.transitionToState) - 1] = '\0';
+			}
+		}
+		ui.initialized = true;
+	}
+
+	if (ImGui::BeginPopupModal("State Machine##AquanactAnimatorStateMachine", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		ImGui::Text("Animator state machine");
+		ImGui::Text("States: %zu", animator.States().size());
+		ImGui::Text("Transitions: %zu", animator.Transitions().size());
+		ImGui::Separator();
+
+		ImGui::TextUnformatted("Initial animation");
+		if (ImGui::BeginCombo("##InitialAnimation", ui.initialStateName[0] != '\0' ? ui.initialStateName : "<select animation>"))
+		{
+			for (const auto& state : animator.States())
+			{
+				const bool selected = std::strcmp(ui.initialStateName, state.name.c_str()) == 0;
+				if (ImGui::Selectable(state.name.c_str(), selected))
+				{
+					std::strncpy(ui.initialStateName, state.name.c_str(), sizeof(ui.initialStateName) - 1);
+					ui.initialStateName[sizeof(ui.initialStateName) - 1] = '\0';
+					animator.SetInitialState(ui.initialStateName);
+				}
+				if (selected)
+				{
+					ImGui::SetItemDefaultFocus();
+				}
+			}
+			ImGui::EndCombo();
+		}
+
+		ImGui::Separator();
+		ImGui::TextUnformatted("Transitions");
+		for (const auto& transition : animator.Transitions())
+		{
+			const std::string leftOperand = AnimatorComponent::OperandToString(transition.condition.left);
+			const std::string rightOperand = AnimatorComponent::OperandToString(transition.condition.right);
+			ImGui::BulletText("%s -> %s  (%.2f s)  if %s %s %s",
+				transition.from.c_str(),
+				transition.to.c_str(),
+				transition.blendSeconds,
+				leftOperand.c_str(),
+				AnimatorComponent::ComparatorToString(transition.condition.comparator),
+				rightOperand.c_str());
+		}
+		if (animator.Transitions().empty())
+		{
+			ImGui::TextUnformatted("<no transitions>");
+		}
+
+		ImGui::Separator();
+		if (ImGui::Button("Add Transition"))
+		{
+			ui.addTransitionPopupInitialized = false;
+			ImGui::OpenPopup("Add Transition##AquanactAnimatorStateMachine");
+		}
+
+		if (ImGui::BeginPopupModal("Add Transition##AquanactAnimatorStateMachine", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+		{
+			if (!ui.addTransitionPopupInitialized)
+			{
+				if (!animator.States().empty())
+				{
+					std::strncpy(ui.transitionFromState, animator.States().front().name.c_str(), sizeof(ui.transitionFromState) - 1);
+					ui.transitionFromState[sizeof(ui.transitionFromState) - 1] = '\0';
+					if (animator.States().size() > 1)
+					{
+						std::strncpy(ui.transitionToState, animator.States()[1].name.c_str(), sizeof(ui.transitionToState) - 1);
+						ui.transitionToState[sizeof(ui.transitionToState) - 1] = '\0';
+					}
+				}
+				SetDefaultAnimatorOperand(ui.leftOperand, bindingSources);
+				ui.rightOperand = {};
+				ui.rightOperand.constantValue = 1.0f;
+				ui.comparator = AnimatorComponent::Comparator::Equal;
+				ui.transitionBlendSeconds = 0.25f;
+				ui.addTransitionPopupInitialized = true;
+			}
+
+			ImGui::TextUnformatted("From");
+			if (ImGui::BeginCombo("##TransitionFrom", ui.transitionFromState[0] != '\0' ? ui.transitionFromState : "<from>"))
+			{
+				for (const auto& state : animator.States())
+				{
+					const bool selected = std::strcmp(ui.transitionFromState, state.name.c_str()) == 0;
+					if (ImGui::Selectable(state.name.c_str(), selected))
+					{
+						std::strncpy(ui.transitionFromState, state.name.c_str(), sizeof(ui.transitionFromState) - 1);
+						ui.transitionFromState[sizeof(ui.transitionFromState) - 1] = '\0';
+					}
+					if (selected)
+					{
+						ImGui::SetItemDefaultFocus();
+					}
+				}
+				ImGui::EndCombo();
+			}
+
+			ImGui::TextUnformatted("To");
+			if (ImGui::BeginCombo("##TransitionTo", ui.transitionToState[0] != '\0' ? ui.transitionToState : "<to>"))
+			{
+				for (const auto& state : animator.States())
+				{
+					const bool selected = std::strcmp(ui.transitionToState, state.name.c_str()) == 0;
+					if (ImGui::Selectable(state.name.c_str(), selected))
+					{
+						std::strncpy(ui.transitionToState, state.name.c_str(), sizeof(ui.transitionToState) - 1);
+						ui.transitionToState[sizeof(ui.transitionToState) - 1] = '\0';
+					}
+					if (selected)
+					{
+						ImGui::SetItemDefaultFocus();
+					}
+				}
+				ImGui::EndCombo();
+			}
+
+			ImGui::SetNextItemWidth(120.0f);
+			ImGui::InputFloat("Blend Seconds", &ui.transitionBlendSeconds, 0.0f, 0.0f, "%.2f");
+
+			ImGui::SeparatorText("Condition");
+			DrawAnimatorOperandEditor("A", ui.leftOperand, bindingSources);
+
+			const char* comparatorOptions[] = { "Equal", "Not Equal", "Greater", "Less", "Greater Equal", "Less Equal" };
+			int comparatorIndex = static_cast<int>(ui.comparator);
+			if (ImGui::Combo("Comparator", &comparatorIndex, comparatorOptions, IM_ARRAYSIZE(comparatorOptions)))
+			{
+				ui.comparator = static_cast<AnimatorComponent::Comparator>(comparatorIndex);
+			}
+
+			DrawAnimatorOperandEditor("B", ui.rightOperand, bindingSources);
+
+			if (ImGui::Button("Create"))
+			{
+				AnimatorComponent::Condition condition;
+				condition.left = ui.leftOperand;
+				condition.comparator = ui.comparator;
+				condition.right = ui.rightOperand;
+				animator.AddTransition(ui.transitionFromState, ui.transitionToState, ui.transitionBlendSeconds, condition);
+				ui.addTransitionPopupInitialized = false;
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Cancel"))
+			{
+				ui.addTransitionPopupInitialized = false;
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::EndPopup();
+		}
+
+		ImGui::Separator();
+		if (ImGui::Button("Close"))
+		{
+			m_animatorStateMachinePopupRequested = false;
+			m_animatorUiState.erase(&animator);
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
+	else if (m_animatorStateMachinePopupRequested && !ImGui::IsPopupOpen("State Machine##AquanactAnimatorStateMachine"))
+	{
+		m_animatorStateMachinePopupRequested = false;
+		m_animatorUiState.erase(&animator);
+	}
 }
 
 void EngineGUI::DrawBuildGamePopup()
@@ -796,6 +1144,7 @@ void EngineGUI::DrawAddComponentPopup(Entity& entity)
 
 		const bool hasPlayerHealth = entity.GetComponent<PlayerHealth>() != nullptr;
 		const bool hasEnemy = entity.GetComponent<Enemy>() != nullptr;
+		const bool hasAnimator = entity.GetComponent<AnimatorComponent>() != nullptr;
 
 		if (ImGui::MenuItem("PlayerHealth", nullptr, false, !hasPlayerHealth))
 		{
@@ -804,6 +1153,10 @@ void EngineGUI::DrawAddComponentPopup(Entity& entity)
 		if (ImGui::MenuItem("Enemy", nullptr, false, !hasEnemy))
 		{
 			entity.AddComponent<Enemy>();
+		}
+		if (ImGui::MenuItem("Animator", nullptr, false, !hasAnimator))
+		{
+			entity.AddComponent<AnimatorComponent>(entity.GetMesh());
 		}
 
 		ImGui::Separator();

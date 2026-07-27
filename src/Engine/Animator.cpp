@@ -33,11 +33,12 @@ void Animator::AddClip(Animation* clip)
 
 void Animator::Play(int clipIndex, float blendSeconds)
 {
+	if (clipIndex < 0 || clipIndex >= static_cast<int>(m_clips.size())) return;
 	if (clipIndex == m_currentClip && m_blendFactor >= 1.0f) return;
 	m_nextClip    = clipIndex;
 	m_blendFactor = 0.0f;
 	m_blendSpeed = blendSeconds > 0.0f ? (1.0f / blendSeconds) : 9999.0f;
-	m_currentTime = 0.0f;
+	m_nextTime = 0.0f;
 	m_prevTicks = 0.0f;
 }
 
@@ -69,19 +70,24 @@ void Animator::Update(float dt)
 
 	if (m_blendFactor < 1.0f)
 	{
+		m_nextTime += dt;
 		m_blendFactor += dt * m_blendSpeed;
 		if (m_blendFactor >= 1.0f)
 		{
-			m_blendFactor  = 1.0f;
-			m_currentClip  = m_nextClip;
+			m_blendFactor = 1.0f;
 		}
 		Animation* a = m_clips[m_currentClip].get();
 		Animation* b = m_clips[m_nextClip].get();
 		float ticksA = fmodf(m_currentTime * a->TicksPerSecond(), a->Duration());
-		float ticksB = fmodf(m_currentTime * b->TicksPerSecond(), b->Duration());
+		float ticksB = fmodf(m_nextTime * b->TicksPerSecond(), b->Duration());
 		TraverseBlend(ticksA, ticksB, m_blendFactor, m_rootNode, aiMatrix4x4(), a, b);
 		FireEvents(m_nextClip, m_prevTicks, ticksB, b->Duration());
 		m_prevTicks = ticksB;
+		if (m_blendFactor >= 1.0f)
+		{
+			m_currentClip = m_nextClip;
+			m_currentTime = m_nextTime;
+		}
 	}
 	else
 	{

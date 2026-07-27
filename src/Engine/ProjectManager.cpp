@@ -215,7 +215,7 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const LevelM
 		return false;
 	}
 
-	std::string contents = "AquanactProject 9\n";
+	std::string contents = "AquanactProject 11\n";
 	const auto& levels = levelManager.Levels();
 	if (levels.empty())
 	{
@@ -286,6 +286,53 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const LevelM
 					contents += "component;";
 					contents += EscapeField(MakePortableSourcePath(path, object->SourcePath()).string());
 					contents += ";enemy\n";
+				}
+
+				if (const AnimatorComponent* animator = object->GetComponent<AnimatorComponent>())
+				{
+					contents += "component;";
+					contents += EscapeField(MakePortableSourcePath(path, object->SourcePath()).string());
+					contents += ";animator;";
+					contents += EscapeField(animator->InitialState());
+					contents += ";";
+					contents += std::to_string(animator->States().size());
+					for (const auto& state : animator->States())
+					{
+						contents += ";";
+						contents += EscapeField(state.name);
+						contents += ";";
+						contents += std::to_string(state.clipIndex);
+					}
+					contents += ";";
+					contents += std::to_string(animator->Transitions().size());
+					for (const auto& transition : animator->Transitions())
+					{
+						contents += ";";
+						contents += EscapeField(transition.from);
+						contents += ";";
+						contents += EscapeField(transition.to);
+						contents += ";";
+						contents += std::to_string(transition.blendSeconds);
+						contents += ";";
+						contents += std::to_string(static_cast<int>(transition.condition.left.type));
+						contents += ";";
+						contents += std::to_string(transition.condition.left.constantValue);
+						contents += ";";
+						contents += EscapeField(transition.condition.left.componentName);
+						contents += ";";
+						contents += EscapeField(transition.condition.left.memberName);
+						contents += ";";
+						contents += std::to_string(static_cast<int>(transition.condition.comparator));
+						contents += ";";
+						contents += std::to_string(static_cast<int>(transition.condition.right.type));
+						contents += ";";
+						contents += std::to_string(transition.condition.right.constantValue);
+						contents += ";";
+						contents += EscapeField(transition.condition.right.componentName);
+						contents += ";";
+						contents += EscapeField(transition.condition.right.memberName);
+					}
+					contents += "\n";
 				}
 			}
 		}
@@ -359,7 +406,16 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 	std::istringstream file(fileContents);
 	std::string header;
 	std::getline(file, header);
-	if (header != "AquanactProject 9")
+	int projectVersion = 0;
+	if (header == "AquanactProject 10")
+	{
+		projectVersion = 10;
+	}
+	else if (header == "AquanactProject 11")
+	{
+		projectVersion = 11;
+	}
+	else
 	{
 		return false;
 	}
@@ -373,6 +429,27 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 		std::filesystem::path sourcePath;
 		std::string levelName;
 		std::string type;
+		std::string initialState;
+		struct AnimatorStateData {
+			std::string name;
+			int clipIndex = -1;
+		};
+		struct AnimatorTransitionData {
+			struct OperandData {
+				int type = 0;
+				float constantValue = 0.0f;
+				std::string componentName;
+				std::string memberName;
+			};
+			std::string from;
+			std::string to;
+			float blendSeconds = 0.33f;
+			OperandData left;
+			int comparator = 0;
+			OperandData right;
+		};
+		std::vector<AnimatorStateData> animatorStates;
+		std::vector<AnimatorTransitionData> animatorTransitions;
 		int value1 = 0;
 		int value2 = 0;
 		bool hasValue1 = false;
@@ -591,6 +668,99 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 			continue;
 		}
 
+		if (fields.size() >= 6 && fields[0] == "component" && fields[2] == "animator")
+		{
+			try
+			{
+				if (!currentLevel)
+				{
+					gDebug.LogMessage("Encountered animator component before any level definition in project file: " + line);
+					return false;
+				}
+				PendingComponent component;
+				component.sourcePath = ResolveSourcePath(path, fields[1]);
+				component.levelName = currentLevel->name;
+				component.type = "animator";
+				component.initialState = UnescapeField(fields[3]);
+				const int stateCount = std::stoi(fields[4]);
+				std::size_t index = 5;
+				for (int i = 0; i < stateCount; ++i)
+				{
+					if (index + 1 >= fields.size())
+					{
+						gDebug.LogMessage("Animator state data truncated in line: " + line);
+						return false;
+					}
+					PendingComponent::AnimatorStateData state;
+					state.name = UnescapeField(fields[index++]);
+					state.clipIndex = std::stoi(fields[index++]);
+					component.animatorStates.push_back(std::move(state));
+				}
+				if (index >= fields.size())
+				{
+					gDebug.LogMessage("Animator transition count missing in line: " + line);
+					return false;
+				}
+				const int transitionCount = std::stoi(fields[index++]);
+				for (int i = 0; i < transitionCount; ++i)
+				{
+					const std::size_t transitionFieldCount = projectVersion >= 11 ? 12 : 6;
+					if (index + transitionFieldCount > fields.size())
+					{
+						gDebug.LogMessage("Animator transition data truncated in line: " + line);
+						return false;
+					}
+					PendingComponent::AnimatorTransitionData transition;
+					transition.from = UnescapeField(fields[index++]);
+					transition.to = UnescapeField(fields[index++]);
+					transition.blendSeconds = std::stof(fields[index++]);
+					if (projectVersion >= 11)
+					{
+						transition.left.type = std::stoi(fields[index++]);
+						transition.left.constantValue = std::stof(fields[index++]);
+						transition.left.componentName = UnescapeField(fields[index++]);
+						transition.left.memberName = UnescapeField(fields[index++]);
+						transition.comparator = std::stoi(fields[index++]);
+						transition.right.type = std::stoi(fields[index++]);
+						transition.right.constantValue = std::stof(fields[index++]);
+						transition.right.componentName = UnescapeField(fields[index++]);
+						transition.right.memberName = UnescapeField(fields[index++]);
+					}
+					else
+					{
+						const int legacyConditionSource = std::stoi(fields[index++]);
+						transition.comparator = std::stoi(fields[index++]);
+						transition.right.constantValue = std::stof(fields[index++]);
+						if (legacyConditionSource == 1)
+						{
+							transition.left.type = static_cast<int>(AnimatorComponent::OperandType::Binding);
+							transition.left.componentName = "Controller";
+							transition.left.memberName = "IsMoving";
+						}
+						else if (legacyConditionSource == 2)
+						{
+							transition.left.type = static_cast<int>(AnimatorComponent::OperandType::Binding);
+							transition.left.componentName = "Controller";
+							transition.left.memberName = "MoveSpeed";
+						}
+						else
+						{
+							transition.left.constantValue = 1.0f;
+						}
+					}
+					component.animatorTransitions.push_back(std::move(transition));
+				}
+				pendingComponents.push_back(std::move(component));
+			}
+			catch (const std::exception& ex)
+			{
+				gDebug.LogMessage("Failed to load animator component from line: " + line);
+				gDebug.LogMessage("Reason: " + std::string(ex.what()));
+				return false;
+			}
+			continue;
+		}
+
 		if (fields.size() >= 2 && fields[0] == "level")
 		{
 			PendingLevel level;
@@ -769,6 +939,36 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 				if (!object->GetComponent<Enemy>())
 				{
 					object->AddComponent<Enemy>();
+				}
+			}
+			else if (pendingComponent.type == "animator")
+			{
+				AnimatorComponent* animator = object->GetComponent<AnimatorComponent>();
+				if (!animator)
+				{
+					animator = object->AddComponent<AnimatorComponent>(object->GetMesh());
+				}
+				for (const auto& state : pendingComponent.animatorStates)
+				{
+					animator->AddState(state.name, state.clipIndex);
+				}
+				for (const auto& transition : pendingComponent.animatorTransitions)
+				{
+					AnimatorComponent::Condition condition;
+					condition.left.type = static_cast<AnimatorComponent::OperandType>(transition.left.type);
+					condition.left.constantValue = transition.left.constantValue;
+					condition.left.componentName = transition.left.componentName;
+					condition.left.memberName = transition.left.memberName;
+					condition.comparator = static_cast<AnimatorComponent::Comparator>(transition.comparator);
+					condition.right.type = static_cast<AnimatorComponent::OperandType>(transition.right.type);
+					condition.right.constantValue = transition.right.constantValue;
+					condition.right.componentName = transition.right.componentName;
+					condition.right.memberName = transition.right.memberName;
+					animator->AddTransition(transition.from, transition.to, transition.blendSeconds, condition);
+				}
+				if (!pendingComponent.initialState.empty())
+				{
+					animator->SetInitialState(pendingComponent.initialState);
 				}
 			}
 			break;

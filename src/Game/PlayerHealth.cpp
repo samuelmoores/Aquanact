@@ -11,6 +11,29 @@ std::string PlayerHealth::GetHealthText() const
 	return std::to_string(m_health) + "/" + std::to_string(m_maxHealth);
 }
 
+std::vector<BindableMember> PlayerHealth::GetBindableMembers() const
+{
+	return {
+		{ "Health", "Health", "int", BindableMember::Kind::Function },
+		{ "MaxHealth", "Max Health", "int", BindableMember::Kind::Function },
+	};
+}
+
+bool PlayerHealth::TryGetBindableValue(const std::string& memberName, float& value) const
+{
+	if (memberName == "Health")
+	{
+		value = static_cast<float>(m_health);
+		return true;
+	}
+	if (memberName == "MaxHealth")
+	{
+		value = static_cast<float>(m_maxHealth);
+		return true;
+	}
+	return false;
+}
+
 std::vector<BindableEvent> PlayerHealth::GetBindableEvents() const
 {
 	return {

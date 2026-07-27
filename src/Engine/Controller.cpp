@@ -8,6 +8,29 @@
 
 #include <cmath>
 
+std::vector<BindableMember> Controller::GetBindableMembers() const
+{
+	return {
+		{ "IsMoving", "Is Moving", "bool", BindableMember::Kind::Function },
+		{ "MoveSpeed", "Move Speed", "float", BindableMember::Kind::Function },
+	};
+}
+
+bool Controller::TryGetBindableValue(const std::string& memberName, float& value) const
+{
+	if (memberName == "IsMoving")
+	{
+		value = m_isMoving ? 1.0f : 0.0f;
+		return true;
+	}
+	if (memberName == "MoveSpeed")
+	{
+		value = m_moveSpeed;
+		return true;
+	}
+	return false;
+}
+
 void Controller::Update(Entity&, float dt)
 {
 	Entity* owner = Owner();
@@ -18,8 +41,10 @@ void Controller::Update(Entity&, float dt)
 	}
 
 	const glm::vec3 moveInput = gInput.MoveInput();
-	if (moveInput.x == 0.0f && moveInput.z == 0.0f)
+	const float inputMagnitude = glm::length(glm::vec2(moveInput.x, moveInput.z));
+	if (inputMagnitude <= m_movementDeadzone)
 	{
+		m_isMoving = false;
 		gDebug.SetGameplayDiagnostics(m_registered, owner->Name(), moveInput, m_moveSpeed, dt, glm::vec3(0.0f), owner->Position());
 		return;
 	}
@@ -43,11 +68,13 @@ void Controller::Update(Entity&, float dt)
 	movement.y = 0.0f;
 	if (glm::length(movement) <= 0.0001f)
 	{
+		m_isMoving = false;
 		gDebug.SetGameplayDiagnostics(m_registered, owner->Name(), moveInput, m_moveSpeed, dt, glm::vec3(0.0f), owner->Position());
 		return;
 	}
 
 	movement = glm::normalize(movement);
+	m_isMoving = true;
 	const float targetYaw = std::atan2(movement.x, movement.z);
 	owner->SetRotation(glm::vec3(owner->Rotation().x, targetYaw, owner->Rotation().z));
 

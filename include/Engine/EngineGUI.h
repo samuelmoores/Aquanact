@@ -1,6 +1,9 @@
 #pragma once
 
+#include "Engine/AnimatorComponent.h"
+
 #include <string>
+#include <unordered_map>
 
 class Window;
 class Camera;
@@ -24,10 +27,23 @@ public:
 	void SetShowGrid(bool showGrid);
 
 private:
+	struct AnimatorStateMachineUiState {
+		bool initialized = false;
+		char initialStateName[64] = "";
+		char transitionFromState[64] = "";
+		char transitionToState[64] = "";
+		float transitionBlendSeconds = 0.25f;
+		bool addTransitionPopupInitialized = false;
+		AnimatorComponent::Operand leftOperand;
+		AnimatorComponent::Operand rightOperand;
+		AnimatorComponent::Comparator comparator = AnimatorComponent::Comparator::Equal;
+	};
+
 	void DrawBuildGamePopup();
 	void DrawAddCodeFilePopup();
 	void DrawNewLevelPopup();
 	void DrawAddComponentPopup(Entity& entity);
+	void DrawAnimatorStateMachinePopup(AnimatorComponent& animator);
 	static std::string NormalizeGameClassName(const std::string& input);
 	static std::string MakeHeaderTemplate(const std::string& className);
 	static std::string MakeSourceTemplate(const std::string& className);
@@ -46,10 +62,12 @@ private:
 	bool m_addCodeFilePopupRequested = false;
 	bool m_newLevelPopupRequested = false;
 	bool m_addComponentPopupRequested = false;
+	bool m_animatorStateMachinePopupRequested = false;
 	bool m_addCodeFileCreated = false;
 	char m_newCodeFileName[128] = "PlayerHealth";
 	char m_newLevelName[128] = "Level1";
 	int m_selectedComponentEntityIndex = -1;
 	std::string m_addCodeFileStatusMessage;
 	std::string m_newLevelStatusMessage;
+	std::unordered_map<AnimatorComponent*, AnimatorStateMachineUiState> m_animatorUiState;
 };

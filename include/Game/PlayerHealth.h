@@ -13,6 +13,8 @@ public:
 	void startUp(Entity&) override;
 	void Update(Entity&, float) override {}
 	void FirstFrame(Entity&) override;
+	std::vector<BindableMember> GetBindableMembers() const override;
+	bool TryGetBindableValue(const std::string& memberName, float& value) const override;
 	std::vector<BindableEvent> GetBindableEvents() const override;
 	std::string GetBindableEventText(const std::string& eventName) const override;
 

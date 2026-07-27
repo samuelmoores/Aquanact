@@ -13,20 +13,6 @@
 class AnimatorComponent;
 class Controller;
 
-struct BindableMember
-{
-	enum class Kind
-	{
-		Variable,
-		Function,
-	};
-
-	std::string name;
-	std::string displayName;
-	std::string typeName;
-	Kind kind = Kind::Variable;
-};
-
 class Entity
 {
 public:
@@ -40,6 +26,7 @@ public:
 
 	virtual const char* TypeName() const { return "Entity"; }
 	virtual std::vector<BindableMember> GetBindableMembers() const { return {}; }
+	virtual bool TryGetBindableValue(const std::string&, float&) const { return false; }
 	virtual std::vector<BindableEvent> GetBindableEvents() const { return {}; }
 	virtual void startUp();
 	virtual void FirstFrame() {}
