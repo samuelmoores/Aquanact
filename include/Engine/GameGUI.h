@@ -1,8 +1,10 @@
 #pragma once
 
 #include "Engine/GameGUIAsset.h"
+#include "Engine/Entity.h"
 
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include <MYGUI/MyGUI_OpenGLImageLoader.h>
 
@@ -42,6 +44,7 @@ public:
 private:
 	// Converts the asset-level widget description into an actual MyGUI widget.
 	MyGUI::Widget* CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* parent);
+	void BindWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* widget);
 	// Handles runtime widget clicks for simple built-in actions like quitting.
 	void OnWidgetClicked(MyGUI::Widget* sender);
 
@@ -51,6 +54,7 @@ private:
 	GameGUIImageLoader m_imageLoader;
 	MyGUI::Button* m_testButton = nullptr;
 	std::vector<MyGUI::Widget*> m_runtimeWidgets;
+	std::unordered_map<std::string, MyGUI::Widget*> m_runtimeWidgetLookup;
 	GameGUIAsset m_loadedAsset;
 	bool m_initialized = false;
 };

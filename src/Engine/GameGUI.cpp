@@ -2,6 +2,7 @@
 
 #include "Engine/Debug.h"
 #include "Engine/FrontEndManager.h"
+#include "Engine/EventManager.h"
 #include "Engine/Globals.h"
 #include "Engine/GameplayManager.h"
 #include "Engine/Window.h"
@@ -9,6 +10,8 @@
 #include "Engine/GLHeaders.h"
 #include "Engine/GameGUIAsset.h"
 #include "Engine/FileSystem.h"
+#include "Engine/Level.h"
+#include "Engine/LevelManager.h"
 
 #include <MYGUI/MyGUI_Button.h>
 #include <MYGUI/MyGUI_Gui.h>
@@ -32,6 +35,24 @@ namespace {
 			if (widget.name == name)
 			{
 				return &widget;
+			}
+		}
+		return nullptr;
+	}
+
+	Component* ResolveBoundComponent(const GameGUIWidgetDef& def)
+	{
+		Level* activeLevel = gLevelManager.ActiveLevel();
+		if (!activeLevel)
+		{
+			return nullptr;
+		}
+
+		for (const auto& entity : activeLevel->Entities())
+		{
+			if (entity && entity->Name() == def.bindEntity)
+			{
+				return entity->GetComponentByName(def.bindComponent);
 			}
 		}
 		return nullptr;
@@ -200,6 +221,7 @@ void GameGUI::LoadUIAsset(const GameGUIAsset& asset)
 
 	ClearUI();
 	m_loadedAsset = asset;
+	m_runtimeWidgetLookup.clear();
 	std::unordered_map<std::string, MyGUI::Widget*> createdWidgets;
 	for (const GameGUIWidgetDef& widget : m_loadedAsset.widgets)
 	{
@@ -213,6 +235,7 @@ void GameGUI::LoadUIAsset(const GameGUIAsset& asset)
 		{
 			createdWidgets[widget.name] = createdWidget;
 			m_runtimeWidgets.push_back(createdWidget);
+			m_runtimeWidgetLookup[widget.name] = createdWidget;
 		}
 	}
 
@@ -237,6 +260,7 @@ void GameGUI::LoadUIAsset(const GameGUIAsset& asset)
 			if (createdWidget)
 			{
 				createdWidgets[widget.name] = createdWidget;
+				m_runtimeWidgetLookup[widget.name] = createdWidget;
 				madeProgress = true;
 			}
 		}
@@ -249,13 +273,35 @@ void GameGUI::LoadUIAsset(const GameGUIAsset& asset)
 			gDebug.LogMessage("GameGUI skipped child widget with missing/cyclic parent: " + widget.name);
 		}
 	}
+
+	for (const GameGUIWidgetDef& widget : m_loadedAsset.widgets)
+	{
+		if (!widget.bindEvent.empty())
+		{
+			auto it = m_runtimeWidgetLookup.find(widget.name);
+			if (it != m_runtimeWidgetLookup.end())
+			{
+				BindWidgetFromDef(widget, it->second);
+			}
+		}
+	}
 }
 
 void GameGUI::ClearUI()
 {
+	for (const auto& [name, widget] : m_runtimeWidgetLookup)
+	{
+		(void)name;
+		if (widget)
+		{
+			gEventManager.Unsubscribe(widget);
+		}
+	}
+
 	if (!m_gui)
 	{
 		m_runtimeWidgets.clear();
+		m_runtimeWidgetLookup.clear();
 		return;
 	}
 
@@ -267,6 +313,7 @@ void GameGUI::ClearUI()
 		}
 	}
 	m_runtimeWidgets.clear();
+	m_runtimeWidgetLookup.clear();
 }
 
 MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* parent)
@@ -348,6 +395,57 @@ MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::
 	}
 
 	return nullptr;
+}
+
+void GameGUI::BindWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* widget)
+{
+	if (!widget || def.bindEntity.empty() || def.bindComponent.empty() || def.bindEvent.empty())
+	{
+		return;
+	}
+
+	auto* textWidget = dynamic_cast<MyGUI::TextBox*>(widget);
+	if (!textWidget)
+	{
+		gDebug.LogMessage("GameGUI binding ignored for non-text widget: " + def.name);
+		return;
+	}
+
+	Component* component = ResolveBoundComponent(def);
+	if (!component)
+	{
+		gDebug.LogMessage(
+			"GameGUI binding could not resolve component: " +
+			def.bindEntity + "." + def.bindComponent);
+		return;
+	}
+
+	const std::vector<BindableEvent> bindableEvents = component->GetBindableEvents();
+	const bool exposesEvent = std::any_of(bindableEvents.begin(), bindableEvents.end(), [&def](const BindableEvent& event)
+	{
+		return event.name == def.bindEvent;
+	});
+	if (!exposesEvent)
+	{
+		gDebug.LogMessage(
+			"GameGUI binding event is not exposed by component: " +
+			def.bindEntity + "." + def.bindComponent + "." + def.bindEvent);
+		return;
+	}
+
+	textWidget->setCaption(component->GetBindableEventText(def.bindEvent));
+	const std::string channel = component->BindableEventChannel(def.bindEvent);
+	gEventManager.GetEvent(channel).Subscribe(widget, [widget, binding = def]()
+	{
+		Component* currentComponent = ResolveBoundComponent(binding);
+		auto* currentTextWidget = dynamic_cast<MyGUI::TextBox*>(widget);
+		if (!currentComponent || !currentTextWidget)
+		{
+			return;
+		}
+		currentTextWidget->setCaption(currentComponent->GetBindableEventText(binding.bindEvent));
+	});
+	gDebug.LogMessage("GameGUI bound widget '" + def.name + "' to " + channel);
 }
 
 void GameGUI::OnWidgetClicked(MyGUI::Widget* sender)

@@ -474,16 +474,16 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 				ImGui::BulletText("Enemy: missing");
 			}
 
-			if (ImGui::Button("Add Component"))
-			{
-				m_selectedComponentEntityIndex = m_selectedLevelObjectIndex;
-				m_addComponentPopupRequested = true;
-				ImGui::OpenPopup("Add Component##AquanactAddComponent");
-			}
-			if (m_addComponentPopupRequested && m_selectedComponentEntityIndex == m_selectedLevelObjectIndex)
-			{
-				DrawAddComponentPopup(*object);
-			}
+	if (ImGui::Button("Add Component"))
+	{
+		m_selectedComponentEntityIndex = m_selectedLevelObjectIndex;
+		m_addComponentPopupRequested = true;
+		ImGui::OpenPopup("Add Component##AquanactAddComponent");
+	}
+	if (m_addComponentPopupRequested && m_selectedComponentEntityIndex == m_selectedLevelObjectIndex)
+	{
+		DrawAddComponentPopup(*object);
+	}
 
 			ImGui::Separator();
 			ImGui::TextUnformatted("Position");
@@ -801,7 +801,6 @@ void EngineGUI::DrawAddComponentPopup(Entity& entity)
 	if (m_addComponentPopupRequested)
 	{
 		ImGui::OpenPopup("Add Component##AquanactAddComponent");
-		m_addComponentPopupRequested = false;
 	}
 
 	if (ImGui::BeginPopupModal("Add Component##AquanactAddComponent", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
@@ -823,9 +822,14 @@ void EngineGUI::DrawAddComponentPopup(Entity& entity)
 		ImGui::Separator();
 		if (ImGui::Button("Close"))
 		{
+			m_addComponentPopupRequested = false;
 			ImGui::CloseCurrentPopup();
 		}
 		ImGui::EndPopup();
+	}
+	else if (m_addComponentPopupRequested && !ImGui::IsPopupOpen("Add Component##AquanactAddComponent"))
+	{
+		m_addComponentPopupRequested = false;
 	}
 }
 

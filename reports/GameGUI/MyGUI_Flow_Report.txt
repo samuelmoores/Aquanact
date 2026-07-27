@@ -171,4 +171,3 @@ The full path is:
 -> final action such as quit or pause
 
 In short, the lowest-level MyGUI click event is now converted into a data-driven GameGUI action that is authored in the UI creator, persisted in asset JSON, previewed through the runtime wrapper, and executed in the click handler.
-

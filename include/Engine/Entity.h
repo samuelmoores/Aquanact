@@ -40,7 +40,8 @@ public:
 
 	virtual const char* TypeName() const { return "Entity"; }
 	virtual std::vector<BindableMember> GetBindableMembers() const { return {}; }
-	virtual void startUp() {}
+	virtual std::vector<BindableEvent> GetBindableEvents() const { return {}; }
+	virtual void startUp();
 	virtual void FirstFrame() {}
 	void FirstFrameComponents();
 
@@ -48,6 +49,10 @@ public:
 	ShaderProgram* GetShader();
 	AnimatorComponent* GetAnimatorComponent();
 	Controller* GetController();
+	std::vector<Component*> Components();
+	std::vector<const Component*> Components() const;
+	Component* GetComponentByName(const std::string& name);
+	const Component* GetComponentByName(const std::string& name) const;
 
 	template<typename T>
 	T* GetComponent();
@@ -167,6 +172,7 @@ T* Entity::AddComponent(Args&&... args)
 {
 	auto component = std::make_unique<T>(std::forward<Args>(args)...);
 	T* raw = component.get();
+	raw->SetOwner(this);
 	m_components.push_back(std::move(component));
 	return raw;
 }

@@ -10,14 +10,17 @@ public:
 	PlayerHealth() = default;
 
 	const char* Name() const override { return "PlayerHealth"; }
+	void startUp(Entity&) override;
 	void Update(Entity&, float) override {}
 	void FirstFrame(Entity&) override;
+	std::vector<BindableEvent> GetBindableEvents() const override;
+	std::string GetBindableEventText(const std::string& eventName) const override;
 
 	int Health() const { return m_health; }
-	void SetHealth(int health) { m_health = health; }
+	void SetHealth(int health);
 
 	int MaxHealth() const { return m_maxHealth; }
-	void SetMaxHealth(int maxHealth) { m_maxHealth = maxHealth; }
+	void SetMaxHealth(int maxHealth);
 
 	std::string GetHealthText() const;
 	void SubscribeToDamage();

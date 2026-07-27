@@ -14,6 +14,19 @@
 #include <sstream>
 
 namespace {
+	GameGUIActionType StringToAction(const std::string& value)
+	{
+		if (value == "QuitGame")
+		{
+			return GameGUIActionType::QuitGame;
+		}
+		if (value == "PauseGame")
+		{
+			return GameGUIActionType::PauseGame;
+		}
+		return GameGUIActionType::None;
+	}
+
 	std::filesystem::path AssetDirectory()
 	{
 #ifdef AQUANACT_GAME
@@ -92,6 +105,10 @@ namespace {
 			widget.height = std::stoi(readField("\"height\":", widgetPos));
 			widget.visible = readField("\"visible\":", widgetPos).find("true") != std::string::npos;
 			widget.alpha = std::stof(readField("\"alpha\":", widgetPos));
+			widget.action = StringToAction(readField("\"action\":", widgetPos));
+			widget.bindEntity = readField("\"bindEntity\":", widgetPos);
+			widget.bindComponent = readField("\"bindComponent\":", widgetPos);
+			widget.bindEvent = readField("\"bindEvent\":", widgetPos);
 			asset.widgets.push_back(widget);
 			widgetPos = contents.find("\"type\": \"", widgetPos + 1);
 		}

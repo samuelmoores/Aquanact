@@ -58,6 +58,7 @@ set(SOURCES
     "include/Engine/Animator.h" "src/Engine/Animator.cpp"
     "include/Engine/AnimatorComponent.h" "src/Engine/AnimatorComponent.cpp"
     "include/Engine/Controller.h" "src/Engine/Controller.cpp"
+    "include/Engine/Component.h" "src/Engine/Component.cpp"
     "include/Engine/Entity.h" "src/Engine/Entity.cpp"
     "include/Engine/EntityRegistry.h" "src/Engine/EntityRegistry.cpp"
     "include/Engine/EventManager.h" "src/Engine/EventManager.cpp"

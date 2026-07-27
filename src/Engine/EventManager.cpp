@@ -14,6 +14,7 @@ const std::string& Event::Name() const
 
 void Event::Subscribe(void* owner, Callback callback)
 {
+	Unsubscribe(owner);
 	m_listeners.push_back({ owner, std::move(callback) });
 }
 
@@ -72,6 +73,15 @@ void EventManager::Dispatch(const std::string& name)
 	if (Event* event = FindEvent(name))
 	{
 		event->Dispatch();
+	}
+}
+
+void EventManager::Unsubscribe(void* owner)
+{
+	for (auto& [name, event] : m_events)
+	{
+		(void)name;
+		event.Unsubscribe(owner);
 	}
 }
 

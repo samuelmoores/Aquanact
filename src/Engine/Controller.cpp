@@ -10,7 +10,8 @@
 
 void Controller::Update(Entity&, float dt)
 {
-	if (m_owner == nullptr)
+	Entity* owner = Owner();
+	if (owner == nullptr)
 	{
 		gDebug.SetGameplayDiagnostics(m_registered, "<unbound>", glm::vec3(0.0f), m_moveSpeed, dt, glm::vec3(0.0f), glm::vec3(0.0f));
 		return;
@@ -19,7 +20,7 @@ void Controller::Update(Entity&, float dt)
 	const glm::vec3 moveInput = gInput.MoveInput();
 	if (moveInput.x == 0.0f && moveInput.z == 0.0f)
 	{
-		gDebug.SetGameplayDiagnostics(m_registered, m_owner->Name(), moveInput, m_moveSpeed, dt, glm::vec3(0.0f), m_owner->Position());
+		gDebug.SetGameplayDiagnostics(m_registered, owner->Name(), moveInput, m_moveSpeed, dt, glm::vec3(0.0f), owner->Position());
 		return;
 	}
 
@@ -42,16 +43,16 @@ void Controller::Update(Entity&, float dt)
 	movement.y = 0.0f;
 	if (glm::length(movement) <= 0.0001f)
 	{
-		gDebug.SetGameplayDiagnostics(m_registered, m_owner->Name(), moveInput, m_moveSpeed, dt, glm::vec3(0.0f), m_owner->Position());
+		gDebug.SetGameplayDiagnostics(m_registered, owner->Name(), moveInput, m_moveSpeed, dt, glm::vec3(0.0f), owner->Position());
 		return;
 	}
 
 	movement = glm::normalize(movement);
 	const float targetYaw = std::atan2(movement.x, movement.z);
-	m_owner->SetRotation(glm::vec3(m_owner->Rotation().x, targetYaw, m_owner->Rotation().z));
+	owner->SetRotation(glm::vec3(owner->Rotation().x, targetYaw, owner->Rotation().z));
 
 	const glm::vec3 delta = movement * m_moveSpeed * dt;
-	m_owner->Move(delta);
-	gDebug.SetGameplayDiagnostics(m_registered, m_owner->Name(), moveInput, m_moveSpeed, dt, delta, m_owner->Position());
+	owner->Move(delta);
+	gDebug.SetGameplayDiagnostics(m_registered, owner->Name(), moveInput, m_moveSpeed, dt, delta, owner->Position());
 }
 

@@ -58,6 +58,50 @@ Mesh* Entity::GetMesh() { return m_mesh; }
 ShaderProgram* Entity::GetShader() { return &m_shader; }
 AnimatorComponent* Entity::GetAnimatorComponent() { return GetComponent<AnimatorComponent>(); }
 Controller* Entity::GetController() { return GetComponent<Controller>(); }
+std::vector<Component*> Entity::Components()
+{
+	std::vector<Component*> components;
+	components.reserve(m_components.size());
+	for (auto& component : m_components)
+	{
+		components.push_back(component.get());
+	}
+	return components;
+}
+
+std::vector<const Component*> Entity::Components() const
+{
+	std::vector<const Component*> components;
+	components.reserve(m_components.size());
+	for (const auto& component : m_components)
+	{
+		components.push_back(component.get());
+	}
+	return components;
+}
+Component* Entity::GetComponentByName(const std::string& name)
+{
+	for (auto& component : m_components)
+	{
+		if (component && component->Name() == name)
+		{
+			return component.get();
+		}
+	}
+	return nullptr;
+}
+
+const Component* Entity::GetComponentByName(const std::string& name) const
+{
+	for (const auto& component : m_components)
+	{
+		if (component && component->Name() == name)
+		{
+			return component.get();
+		}
+	}
+	return nullptr;
+}
 void Entity::UpdateComponents(float dt) { for (auto& component : m_components) if (component) component->Update(*this, dt); }
 void Entity::FirstFrameComponents()
 {
@@ -66,6 +110,16 @@ void Entity::FirstFrameComponents()
 		if (component)
 		{
 			component->FirstFrame(*this);
+		}
+	}
+}
+void Entity::startUp()
+{
+	for (auto& component : m_components)
+	{
+		if (component)
+		{
+			component->startUp(*this);
 		}
 	}
 }

@@ -6,6 +6,8 @@
 #include "Engine/Window.h"
 #include "Engine/Camera.h"
 #include "Engine/Globals.h"
+#include "Engine/Level.h"
+#include "Engine/LevelManager.h"
 
 #include <imgui.h>
 #include <fstream>
@@ -87,6 +89,23 @@ namespace {
 		return false;
 	}
 
+	Entity* FindEntity(Level* level, const std::string& name)
+	{
+		if (!level)
+		{
+			return nullptr;
+		}
+
+		for (const auto& entity : level->Entities())
+		{
+			if (entity && entity->Name() == name)
+			{
+				return entity.get();
+			}
+		}
+		return nullptr;
+	}
+
 	std::filesystem::path AssetDirectory()
 	{
 #ifdef AQUANACT_SOURCE_ROOT
@@ -162,6 +181,9 @@ namespace {
 			widget.visible = readField("\"visible\":", widgetPos).find("true") != std::string::npos;
 			widget.alpha = std::stof(readField("\"alpha\":", widgetPos));
 			widget.action = StringToAction(readField("\"action\":", widgetPos));
+			widget.bindEntity = readField("\"bindEntity\":", widgetPos);
+			widget.bindComponent = readField("\"bindComponent\":", widgetPos);
+			widget.bindEvent = readField("\"bindEvent\":", widgetPos);
 			asset.widgets.push_back(widget);
 			widgetPos = contents.find("\"type\": \"", widgetPos + 1);
 		}
@@ -283,7 +305,6 @@ void GameGUICreator::Draw(const Camera&)
 			}
 			if (ImGui::MenuItem("Load UI", nullptr, false, m_selectedAssetIndex >= 0))
 			{
-				// Load now means "reload the selected asset from disk" after startup scan.
 				LoadCurrentAsset();
 				SyncRuntimePreview();
 				gDebug.LogMessage("Load UI requested");
@@ -351,7 +372,7 @@ void GameGUICreator::Draw(const Camera&)
 	DrawCreateAssetPopup();
 	DrawCreateWidgetPopup();
 
-		ImGui::Begin("GameGUI Assets");
+	ImGui::Begin("GameGUI Assets");
 	for (std::size_t i = 0; i < m_assets.size(); ++i)
 	{
 		const GameGUIAsset& asset = m_assets[i];
@@ -427,11 +448,28 @@ void GameGUICreator::Draw(const Camera&)
 		};
 
 		drawChildren("");
+	}
+	else
+	{
+		ImGui::TextUnformatted("No asset selected.");
+	}
+	ImGui::End();
 
-		if (m_selectedWidgetIndex >= 0 && m_selectedWidgetIndex < static_cast<int>(asset.widgets.size()))
+	ImGui::Begin("Details");
+	if (m_selectedAssetIndex < 0 || m_selectedAssetIndex >= static_cast<int>(m_assets.size()))
+	{
+		ImGui::TextUnformatted("No asset selected.");
+	}
+	else
+	{
+		GameGUIAsset& asset = CurrentAsset();
+		if (m_selectedWidgetIndex < 0 || m_selectedWidgetIndex >= static_cast<int>(asset.widgets.size()))
+		{
+			ImGui::TextUnformatted("No widget selected.");
+		}
+		else
 		{
 			GameGUIWidgetDef& widget = asset.widgets[static_cast<std::size_t>(m_selectedWidgetIndex)];
-			ImGui::Separator();
 			ImGui::Text("Name: %s", widget.name.c_str());
 			ImGui::Text("Type: %s", widget.type.c_str());
 			const char* parentLabel = widget.parentName.empty() ? "<None>" : widget.parentName.c_str();
@@ -450,8 +488,7 @@ void GameGUICreator::Draw(const Camera&)
 
 				for (const GameGUIWidgetDef& parentCandidate : asset.widgets)
 				{
-					if (parentCandidate.name == widget.name ||
-						WouldCreateParentCycle(asset, widget.name, parentCandidate.name))
+					if (parentCandidate.name == widget.name || WouldCreateParentCycle(asset, widget.name, parentCandidate.name))
 					{
 						continue;
 					}
@@ -498,6 +535,132 @@ void GameGUICreator::Draw(const Camera&)
 				widget.y = static_cast<int>(position[1]);
 				SyncRuntimePreview();
 			}
+			ImGui::Separator();
+			ImGui::TextUnformatted("Event Binding");
+			const bool supportsTextBinding = widget.type == "TextBox" || widget.type == "Text";
+			Level* activeLevel = gLevelManager.ActiveLevel();
+			if (!supportsTextBinding)
+			{
+				ImGui::TextDisabled("Event text binding is available for Text widgets.");
+			}
+			else if (!activeLevel)
+			{
+				ImGui::TextDisabled("No active level is available.");
+			}
+			else
+			{
+				const char* entityLabel = widget.bindEntity.empty() ? "<Select Entity>" : widget.bindEntity.c_str();
+				if (ImGui::BeginCombo("Entity", entityLabel))
+				{
+					for (const auto& entity : activeLevel->Entities())
+					{
+						if (!entity)
+						{
+							continue;
+						}
+
+						const bool selected = widget.bindEntity == entity->Name();
+						if (ImGui::Selectable(entity->Name().c_str(), selected))
+						{
+							widget.bindEntity = entity->Name();
+							widget.bindComponent.clear();
+							widget.bindEvent.clear();
+							SyncRuntimePreview();
+						}
+						if (selected)
+						{
+							ImGui::SetItemDefaultFocus();
+						}
+					}
+					ImGui::EndCombo();
+				}
+
+				Entity* boundEntity = FindEntity(activeLevel, widget.bindEntity);
+				if (!widget.bindEntity.empty() && !boundEntity)
+				{
+					ImGui::TextDisabled("The selected entity no longer exists.");
+				}
+
+				ImGui::BeginDisabled(!boundEntity);
+				const char* componentLabel = widget.bindComponent.empty() ? "<Select Component>" : widget.bindComponent.c_str();
+				if (ImGui::BeginCombo("Component", componentLabel))
+				{
+					for (Component* component : boundEntity ? boundEntity->Components() : std::vector<Component*>{})
+					{
+						if (!component || component->GetBindableEvents().empty())
+						{
+							continue;
+						}
+
+						const bool selected = widget.bindComponent == component->Name();
+						if (ImGui::Selectable(component->Name(), selected))
+						{
+							widget.bindComponent = component->Name();
+							widget.bindEvent.clear();
+							SyncRuntimePreview();
+						}
+						if (selected)
+						{
+							ImGui::SetItemDefaultFocus();
+						}
+					}
+					ImGui::EndCombo();
+				}
+				ImGui::EndDisabled();
+
+				Component* boundComponent = boundEntity ? boundEntity->GetComponentByName(widget.bindComponent) : nullptr;
+				if (!widget.bindComponent.empty() && boundEntity && !boundComponent)
+				{
+					ImGui::TextDisabled("The selected component no longer exists.");
+				}
+
+				ImGui::BeginDisabled(!boundComponent);
+				const char* eventLabel = widget.bindEvent.empty() ? "<Select Event>" : widget.bindEvent.c_str();
+				std::vector<BindableEvent> bindableEvents = boundComponent ? boundComponent->GetBindableEvents() : std::vector<BindableEvent>{};
+				const auto selectedEvent = std::find_if(bindableEvents.begin(), bindableEvents.end(), [&widget](const BindableEvent& event)
+				{
+					return event.name == widget.bindEvent;
+				});
+				if (selectedEvent != bindableEvents.end() && !selectedEvent->displayName.empty())
+				{
+					eventLabel = selectedEvent->displayName.c_str();
+				}
+				if (ImGui::BeginCombo("Event", eventLabel))
+				{
+					for (const BindableEvent& event : bindableEvents)
+					{
+						const bool selected = widget.bindEvent == event.name;
+						const char* label = event.displayName.empty() ? event.name.c_str() : event.displayName.c_str();
+						if (ImGui::Selectable(label, selected))
+						{
+							widget.bindEvent = event.name;
+							SyncRuntimePreview();
+						}
+						if (selected)
+						{
+							ImGui::SetItemDefaultFocus();
+						}
+					}
+					ImGui::EndCombo();
+				}
+				ImGui::EndDisabled();
+
+				if (!widget.bindEvent.empty() && boundComponent && selectedEvent == bindableEvents.end())
+				{
+					ImGui::TextDisabled("The selected event is no longer exposed.");
+				}
+
+				if (!widget.bindEntity.empty() || !widget.bindComponent.empty() || !widget.bindEvent.empty())
+				{
+					if (ImGui::Button("Clear Binding"))
+					{
+						widget.bindEntity.clear();
+						widget.bindComponent.clear();
+						widget.bindEvent.clear();
+						SyncRuntimePreview();
+					}
+				}
+			}
 			if (ImGui::Button("Delete Widget"))
 			{
 				DeleteSelectedWidget();
@@ -506,7 +669,6 @@ void GameGUICreator::Draw(const Camera&)
 	}
 	ImGui::End();
 }
-
 void GameGUICreator::EndFrame()
 {
 }
@@ -815,7 +977,10 @@ void GameGUICreator::SaveCurrentAsset()
 		json << "      \"height\": " << widget.height << ",\n";
 		json << "      \"visible\": " << (widget.visible ? "true" : "false") << ",\n";
 		json << "      \"alpha\": " << widget.alpha << ",\n";
-		json << "      \"action\": \"" << ActionToString(widget.action) << "\"\n";
+		json << "      \"action\": \"" << ActionToString(widget.action) << "\",\n";
+		json << "      \"bindEntity\": \"" << widget.bindEntity << "\",\n";
+		json << "      \"bindComponent\": \"" << widget.bindComponent << "\",\n";
+		json << "      \"bindEvent\": \"" << widget.bindEvent << "\"\n";
 		json << "    }" << (i + 1 < asset.widgets.size() ? "," : "") << "\n";
 	}
 	json << "  ]\n";
@@ -946,5 +1111,6 @@ bool GameGUICreator::IsCurrentAssetStoredOnDisk() const
 
 	return std::filesystem::exists(AssetPathFor(CurrentAsset()));
 }
+
 
 

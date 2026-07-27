@@ -39,6 +39,7 @@ public:
 	const Event* FindEvent(const std::string& name) const;
 
 	void Dispatch(const std::string& name);
+	void Unsubscribe(void* owner);
 	void Clear();
 
 private:

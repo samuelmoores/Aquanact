@@ -18,7 +18,6 @@ void Level::SetName(std::string name)
 
 void Level::startUp()
 {
-	gEventManager.Clear();
 	for (const auto& entity : m_entities)
 	{
 		if (entity)

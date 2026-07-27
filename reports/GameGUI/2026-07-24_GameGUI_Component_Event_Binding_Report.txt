@@ -1,0 +1,198 @@
+GameGUI Component Event Binding Implementation Report
+
+Date: July 24, 2026
+Review target: Monday, July 27, 2026
+Scope: Entity-component event discovery, GameGUI authoring, runtime binding, and event lifecycle
+
+Summary
+- Implemented the first working end-to-end path for binding a GameGUI Text widget to an event exposed by a component on an entity.
+- Added a designer-facing Entity -> Component -> Event selection flow in the GameGUI Creator.
+- Added component metadata that lets the editor discover bindable events without hard-coding component types into the GameGUI Creator.
+- Added runtime binding resolution so saved bindings work in both the editor preview and the built game.
+- Scoped bindable event channels to a specific entity and component instance.
+- Corrected event subscription lifecycle problems discovered during implementation.
+- Built both AquanactEngine.exe and AquanactGame.exe successfully after the changes.
+
+1. Intended designer workflow
+- Add a Text widget in the GameGUI Creator.
+- Select the widget in the Widgets window.
+- In Event Binding, select:
+  - an entity from the active level
+  - a component attached to that entity
+  - an event exposed by that component
+- Save the GameGUI asset.
+- At runtime, the Text widget resolves the selected component, displays its current value, and updates when that component dispatches the selected event.
+
+The first concrete example is:
+
+    Player -> PlayerHealth -> Health Changed
+
+2. Widget asset binding data
+- GameGUIWidgetDef now stores:
+  - bindEntity
+  - bindComponent
+  - bindEvent
+- GameGUICreator saves and loads all three fields in the GameGUI JSON asset.
+- GameGUIManager also loads the fields, which is required for packaged-game startup.
+- The runtime loader was also corrected to preserve widget actions and textures while loading the complete widget definition.
+
+Example serialized binding:
+
+    "bindEntity": "Player",
+    "bindComponent": "PlayerHealth",
+    "bindEvent": "HealthChanged"
+
+3. Component event metadata
+- Component now exposes GetBindableEvents().
+- Each BindableEvent contains:
+  - an internal event name
+  - a designer-facing display name
+- Component also exposes GetBindableEventText(), which converts the component's current state into the text shown by a bound Text widget.
+- Components that do not expose bindable events are omitted from the component picker.
+
+PlayerHealth currently exposes:
+
+    Internal name: HealthChanged
+    Display name: Health Changed
+    Display value: currentHealth/maxHealth
+
+This keeps the GameGUI Creator independent of PlayerHealth. A future component can participate by exposing its own event metadata and display value through the same Component interface.
+
+4. GameGUI Creator picker
+- Replaced the free-form Entity, Component, and Event text inputs with cascading selectors.
+- The Entity selector reads entities from LevelManager's active level.
+- Selecting a different entity clears the previous component and event selections.
+- The Component selector lists only components that expose at least one bindable event.
+- Selecting a different component clears the previous event selection.
+- The Event selector shows designer-facing event labels while storing the stable internal event name.
+- A Clear Binding button removes all three binding fields.
+- The inspector reports when:
+  - there is no active level
+  - the saved entity no longer exists
+  - the saved component no longer exists
+  - the component no longer exposes the saved event
+- Event text binding is currently limited to Text and TextBox widgets.
+
+5. Runtime binding flow
+- GameGUI loads the widget asset and creates the MyGUI widgets.
+- After widget creation, it resolves the binding against LevelManager's active level.
+- Resolution follows:
+
+    binding entity name
+        -> Entity
+        -> component name
+        -> Component
+        -> bindable event metadata
+
+- If the binding resolves, GameGUI immediately sets the Text widget caption from GetBindableEventText().
+- GameGUI then subscribes the widget to the component's scoped event channel.
+- When the event fires, the callback resolves the component again and refreshes the caption.
+- Invalid bindings are logged through the engine diagnostics rather than silently doing nothing.
+
+6. Instance-scoped event channels
+- Bindable UI events no longer use a single global event name such as HealthChanged.
+- Component builds a scoped channel using:
+
+    EntityName.ComponentName.EventName
+
+- Example:
+
+    Player.PlayerHealth.HealthChanged
+
+- This prevents a health event from one entity from updating widgets bound to a different entity's PlayerHealth component.
+- Global gameplay events such as Damage remain global and continue to use their simple event names.
+
+7. Component ownership
+- Component now stores a pointer to its owning Entity.
+- Entity::AddComponent() assigns the owner automatically.
+- Controller now uses the common Component owner instead of maintaining a second owner field.
+- Component ownership is used to construct the scoped event channel.
+
+8. PlayerHealth event behavior
+- PlayerHealth exposes HealthChanged as a bindable event.
+- SetHealth() dispatches HealthChanged after changing and clamping health.
+- SetMaxHealth() dispatches HealthChanged after changing maximum health.
+- The Damage event listener now calls SetHealth() instead of modifying m_health directly.
+- As a result, taking damage updates both gameplay state and any Text widget bound to HealthChanged.
+
+9. Subscription lifecycle corrections
+- Event::Subscribe() now replaces an existing subscription from the same owner instead of accumulating duplicates.
+- This makes repeated level or gameplay startup idempotent for subscriptions.
+- EventManager can now unsubscribe an owner from every event.
+- GameGUI unsubscribes all runtime widgets, including child widgets, before destroying or rebuilding the UI.
+- Component teardown removes subscriptions owned directly by that component.
+- Level::startUp() no longer clears the entire global event manager.
+
+Removing the event-manager clear from Level::startUp() was necessary because the runtime GUI can load and subscribe before a game session starts. Clearing the event manager during level startup removed valid GUI subscriptions before the first gameplay event was dispatched.
+
+10. Runtime and built-game behavior
+- GameGUI Creator preview uses the active level to resolve bindings.
+- Saved binding fields are loaded by GameGUIManager.
+- The same resolution path is used by the editor runtime and AquanactGame.
+- The built game therefore does not require editor-only code to reconnect a saved binding.
+
+11. Files changed for this implementation
+- include/Engine/Component.h
+- src/Engine/Component.cpp
+- include/Engine/Entity.h
+- src/Engine/Entity.cpp
+- include/Engine/EventManager.h
+- src/Engine/EventManager.cpp
+- include/Engine/GameGUIAsset.h
+- include/Engine/GameGUI.h
+- src/Engine/GameGUI.cpp
+- src/Engine/GameGUICreator.cpp
+- src/Engine/GameGUIManager.cpp
+- include/Engine/Controller.h
+- src/Engine/Controller.cpp
+- include/Game/PlayerHealth.h
+- src/Game/PlayerHealth.cpp
+- src/Engine/Level.cpp
+- CMakeLists.txt
+
+12. Build validation
+- Command:
+
+    cmake --build out/build/x64-debug --config Debug
+
+- Result:
+  - AquanactEngine.exe linked successfully.
+  - AquanactGame.exe linked successfully.
+- git diff --check completed without whitespace errors.
+- Line-ending conversion warnings remain informational for the Windows worktree.
+
+13. Known limitations
+- Entity and component references are currently stored by name rather than stable IDs.
+- Renaming an entity or component can invalidate an existing saved binding.
+- Bindable UI events currently produce text through GetBindableEventText(); typed payloads and formatting rules are not implemented.
+- Only Text/TextBox output binding is implemented.
+- Image, progress bar, visibility, color, and button-command binding need separate typed adapters.
+- Event names remain strings and are not validated at compile time.
+- The asset parsing logic is duplicated between GameGUICreator and GameGUIManager.
+- FirstFrame gameplay subscriptions and dispatches can still be order-sensitive if one component dispatches before another component has subscribed.
+
+14. Monday review checklist
+- Open the project and confirm the intended level is active.
+- Confirm the Player entity has a PlayerHealth component.
+- Open GameGUI Creator and create or select a Text widget.
+- Bind the widget to Player -> PlayerHealth -> Health Changed.
+- Save the GameGUI asset.
+- Press Play and confirm the Text widget immediately displays the current health value.
+- Trigger the Damage event and confirm the displayed health changes from 100/100 to 75/100.
+- Return to the editor, press Play again, and confirm the binding does not fire twice.
+- Launch AquanactGame.exe and confirm the saved binding resolves without opening the editor.
+- Check diagnostics for a message similar to:
+
+    GameGUI bound widget '<widget name>' to Player.PlayerHealth.HealthChanged
+
+15. Recommended next pass
+- Replace name-based entity references with persistent entity IDs saved in the project.
+- Introduce a typed binding value so components expose int, float, bool, string, and asset references without pre-formatting everything as text.
+- Move GameGUI asset parsing into one shared serializer used by both GameGUICreator and GameGUIManager.
+- Add a component startup phase for subscriptions, followed by FirstFrame dispatch, so gameplay event ordering is deterministic.
+- Add automated tests for scoped event isolation and subscription cleanup.
+
+Closing note
+- The binding system has moved from a design sketch to a working vertical slice.
+- The editor can discover bindable component events, save the selection as asset data, and reconnect it in the runtime.
+- PlayerHealth now proves the complete path from component state change to a live MyGUI Text widget.

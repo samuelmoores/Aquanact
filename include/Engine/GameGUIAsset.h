@@ -27,6 +27,9 @@ struct GameGUIWidgetDef
 	bool visible = true;
 	float alpha = 1.0f;
 	GameGUIActionType action = GameGUIActionType::None;
+	std::string bindEntity;
+	std::string bindComponent;
+	std::string bindEvent;
 };
 
 struct GameGUIAsset

@@ -7,6 +7,7 @@
       "parent": "",
       "skin": "ButtonSkin",
       "text": "Test Button",
+      "texture": "",
       "layer": "Main",
       "x": 921,
       "y": 452,
@@ -14,7 +15,10 @@
       "height": 90,
       "visible": true,
       "alpha": 1,
-      "action": "PauseGame"
+      "action": "PauseGame",
+      "bindEntity": "",
+      "bindComponent": "",
+      "bindEvent": ""
     },
     {
       "type": "Button",
@@ -22,6 +26,7 @@
       "parent": "",
       "skin": "ButtonSkin",
       "text": "Test Button",
+      "texture": "",
       "layer": "Main",
       "x": 907,
       "y": 561,
@@ -29,7 +34,10 @@
       "height": 90,
       "visible": true,
       "alpha": 1,
-      "action": "QuitGame"
+      "action": "QuitGame",
+      "bindEntity": "",
+      "bindComponent": "",
+      "bindEvent": ""
     },
     {
       "type": "TextBox",
@@ -37,6 +45,7 @@
       "parent": "pause",
       "skin": "TextBox",
       "text": "Pause",
+      "texture": "",
       "layer": "Main",
       "x": 125,
       "y": 30,
@@ -44,7 +53,10 @@
       "height": 48,
       "visible": true,
       "alpha": 1,
-      "action": "None"
+      "action": "None",
+      "bindEntity": "",
+      "bindComponent": "",
+      "bindEvent": ""
     },
     {
       "type": "TextBox",
@@ -52,6 +64,7 @@
       "parent": "quit",
       "skin": "TextBox",
       "text": "Quit",
+      "texture": "",
       "layer": "Main",
       "x": 148,
       "y": 30,
@@ -59,7 +72,29 @@
       "height": 48,
       "visible": true,
       "alpha": 1,
-      "action": "None"
+      "action": "None",
+      "bindEntity": "",
+      "bindComponent": "",
+      "bindEvent": ""
+    },
+    {
+      "type": "TextBox",
+      "name": "PlayerHealth",
+      "parent": "",
+      "skin": "TextBox",
+      "text": "100",
+      "texture": "",
+      "layer": "Main",
+      "x": 931,
+      "y": 464,
+      "width": 360,
+      "height": 48,
+      "visible": true,
+      "alpha": 1,
+      "action": "None",
+      "bindEntity": "character.fbx",
+      "bindComponent": "PlayerHealth",
+      "bindEvent": "HealthChanged"
     }
   ]
 }
