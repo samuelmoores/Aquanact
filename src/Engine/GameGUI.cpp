@@ -277,15 +277,15 @@ void GameGUI::Draw()
 			continue;
 		}
 
-		auto* image = dynamic_cast<MyGUI::ImageBox*>(it->second);
-		if (!image)
+		auto* progressBar = dynamic_cast<MyGUI::ProgressBar*>(it->second);
+		if (!progressBar)
 		{
 			continue;
 		}
 
 		const float percent = ReadProgressPercent(widget);
-		const int width = std::max(1, static_cast<int>(std::lround(static_cast<float>(widget.width) * percent)));
-		image->setSize(width, widget.height);
+		progressBar->setProgressRange(100);
+		progressBar->setProgressPosition(static_cast<std::size_t>(std::lround(percent * 100.0f)));
 	}
 
 	// MyGUI needs a per-frame tick so internal widget state and input-driven updates
@@ -499,23 +499,21 @@ MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::
 	}
 	else if (def.type == "ProgressBar")
 	{
-		const std::string skin = def.skin.empty() ? "ImageBox" : def.skin;
-		MyGUI::ImageBox* image = parent ?
-			parent->createWidget<MyGUI::ImageBox>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.name) :
-			m_gui->createWidget<MyGUI::ImageBox>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.layer, def.name);
-		if (image)
+		const std::string skin = def.skin.empty() ? "ProgressBar" : def.skin;
+		MyGUI::ProgressBar* progress = parent ?
+			parent->createWidget<MyGUI::ProgressBar>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.name) :
+			m_gui->createWidget<MyGUI::ProgressBar>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.layer, def.name);
+		if (progress)
 		{
-			if (!def.texture.empty())
-			{
-				image->setImageTexture(def.texture);
-			}
-			image->setVisible(def.visible);
-			image->setAlpha(def.alpha);
+			progress->setProgressRange(100);
+			progress->setProgressPosition(0);
+			progress->setVisible(def.visible);
+			progress->setAlpha(def.alpha);
 			if (!parent)
 			{
-				MyGUI::LayerManager::getInstance().upLayerItem(image);
+				MyGUI::LayerManager::getInstance().upLayerItem(progress);
 			}
-			return image;
+			return progress;
 		}
 	}
 

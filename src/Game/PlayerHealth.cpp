@@ -78,10 +78,10 @@ void PlayerHealth::SubscribeToDamage()
 void PlayerHealth::startUp(Entity&)
 {
 	SubscribeToDamage();
+	SetHealth(m_maxHealth);
 	std::cout << "PlayerHealth subbed to Damage\n";
 }
 
 void PlayerHealth::FirstFrame(Entity&)
 {
-	
 }

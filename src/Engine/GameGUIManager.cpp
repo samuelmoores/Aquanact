@@ -14,6 +14,40 @@
 #include <sstream>
 
 namespace {
+	int ReadIntField(const std::string& value, int fallback = 0)
+	{
+		if (value.empty())
+		{
+			return fallback;
+		}
+
+		try
+		{
+			return std::stoi(value);
+		}
+		catch (...)
+		{
+			return fallback;
+		}
+	}
+
+	float ReadFloatField(const std::string& value, float fallback = 0.0f)
+	{
+		if (value.empty())
+		{
+			return fallback;
+		}
+
+		try
+		{
+			return std::stof(value);
+		}
+		catch (...)
+		{
+			return fallback;
+		}
+	}
+
 	GameGUIActionType StringToAction(const std::string& value)
 	{
 		if (value == "QuitGame")
@@ -99,15 +133,17 @@ namespace {
 			widget.text = readField("\"text\":", widgetPos);
 			widget.texture = readField("\"texture\":", widgetPos);
 			widget.layer = readField("\"layer\":", widgetPos);
-			widget.x = std::stoi(readField("\"x\":", widgetPos));
-			widget.y = std::stoi(readField("\"y\":", widgetPos));
-			widget.width = std::stoi(readField("\"width\":", widgetPos));
-			widget.height = std::stoi(readField("\"height\":", widgetPos));
+			widget.x = ReadIntField(readField("\"x\":", widgetPos));
+			widget.y = ReadIntField(readField("\"y\":", widgetPos));
+			widget.width = ReadIntField(readField("\"width\":", widgetPos), 100);
+			widget.height = ReadIntField(readField("\"height\":", widgetPos), 30);
+			widget.fontSize = ReadIntField(readField("\"fontSize\":", widgetPos), 0);
 			widget.visible = readField("\"visible\":", widgetPos).find("true") != std::string::npos;
-			widget.alpha = std::stof(readField("\"alpha\":", widgetPos));
+			widget.alpha = ReadFloatField(readField("\"alpha\":", widgetPos), 1.0f);
 			widget.action = StringToAction(readField("\"action\":", widgetPos));
 			widget.bindEntity = readField("\"bindEntity\":", widgetPos);
 			widget.bindComponent = readField("\"bindComponent\":", widgetPos);
+			widget.bindMember = readField("\"bindMember\":", widgetPos);
 			widget.bindEvent = readField("\"bindEvent\":", widgetPos);
 			asset.widgets.push_back(widget);
 			widgetPos = contents.find("\"type\": \"", widgetPos + 1);
