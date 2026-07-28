@@ -30,6 +30,7 @@ public:
 	virtual ~Component();
 
 	virtual const char* Name() const = 0;
+	virtual int ExecutionOrder() const { return 0; }
 	virtual void startUp(Entity&) {}
 	virtual void Update(Entity&, float) {}
 	virtual void FirstFrame(Entity&) {}

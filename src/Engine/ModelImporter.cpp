@@ -97,7 +97,7 @@ ImportedModel ModelImporter::Import(const std::string& path, bool flipUvs) const
 
 		model.facesSize.push_back(static_cast<int>(mesh->mNumFaces * VERTICES_PER_FACE));
 
-		model.skinned = mesh->mNumBones != 0;
+		model.skinned = model.skinned || mesh->mNumBones != 0;
 		if (model.skinned)
 		{
 			std::map<std::string, int> boneMap = model.skeleton.boneMapping;
@@ -152,7 +152,8 @@ ImportedModel ModelImporter::Import(const std::string& path, bool flipUvs) const
 	model.faces = std::move(faces);
 
 	const auto animDir = std::filesystem::path(path).parent_path() / "animations";
-	if (std::filesystem::exists(animDir) && std::filesystem::is_directory(animDir))
+	const std::string modelStem = ToLower(std::filesystem::path(path).stem().string());
+	if (model.skinned && std::filesystem::exists(animDir) && std::filesystem::is_directory(animDir))
 	{
 		for (const auto& entry : std::filesystem::recursive_directory_iterator(animDir))
 		{
@@ -164,6 +165,13 @@ ImportedModel ModelImporter::Import(const std::string& path, bool flipUvs) const
 			std::string ext = ToLower(entry.path().extension().string());
 			static const std::vector<std::string> modelExts = { ".fbx", ".obj", ".gltf", ".glb", ".dae" };
 			if (std::find(modelExts.begin(), modelExts.end(), ext) == modelExts.end())
+			{
+				continue;
+			}
+
+			const std::string animationStem = ToLower(entry.path().stem().string());
+			const std::string animationPrefix = modelStem + "_";
+			if (animationStem != modelStem && animationStem.rfind(animationPrefix, 0) != 0)
 			{
 				continue;
 			}

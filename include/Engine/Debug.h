@@ -34,7 +34,7 @@ public:
 	// Game-mode overlay: shows only the runtime input and gameplay diagnostics.
 	void drawGameModeInput(const Input& input);
 	// Cached controller/object state that powers the gameplay diagnostic panel.
-	void SetGameplayDiagnostics(bool controllerRegistered, const std::string& objectName, const glm::vec3& moveInput, float moveSpeed, float dt, const glm::vec3& delta, const glm::vec3& position);
+	void SetGameplayDiagnostics(const std::string& objectName, const glm::vec3& moveInput, float moveSpeed, float dt, const glm::vec3& delta, const glm::vec3& position);
 	// Cached animation state shown in the gameplay debugger.
 	void SetAnimationDiagnostics(const std::string& currentState, const std::string& desiredState, const std::string& lastTransitionDebug, const std::string& lastTransitionFrom, const std::string& lastTransitionTo, const std::string& lastTransitionLeftOperandText, const std::string& lastTransitionComparatorText, const std::string& lastTransitionRightOperandText, float lastTransitionLeftValue, float lastTransitionRightValue, bool lastTransitionPassed, const std::string& lastResolvedTargetState, int lastResolvedTargetClipIndex, bool lastResolvedTargetFound, const std::string& stateListText);
 	// Basic logging writes to the in-memory debug log window.
@@ -82,7 +82,6 @@ private:
 	float m_gridSpacing = 50.0f;
 	float m_lastFps = 0.0f;
 	double m_startupToFirstDrawMs = -1.0;
-	bool m_controllerRegistered = false;
 	bool m_controllerOwnerBound = false;
 	std::string m_gameplayObjectName;
 	std::string m_activeLevelName;

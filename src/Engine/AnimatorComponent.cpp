@@ -21,7 +21,7 @@ namespace {
 
 AnimatorComponent::AnimatorComponent(Mesh* mesh)
 {
-	if (!mesh)
+	if (!mesh || !mesh->Skinned())
 	{
 		return;
 	}

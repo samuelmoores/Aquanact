@@ -6,28 +6,21 @@
 #include "Engine/Globals.h"
 #include "Engine/Level.h"
 
-#include <algorithm>
-#include <utility>
-
 GameplayManager::~GameplayManager() = default;
 
 void GameplayManager::startUp(LevelManager& levelManager)
 {
 	m_levelManager = &levelManager;
-	m_controllers.clear();
 	m_paused = false;
 	if (m_levelManager)
 	{
 		m_levelManager->startUp();
 	}
-	BindActiveLevel(m_levelManager ? m_levelManager->ActiveLevel() : nullptr);
 }
 
 void GameplayManager::shutDown()
 {
-	m_controllers.clear();
 	m_levelManager = nullptr;
-	m_boundActiveLevel = nullptr;
 	m_paused = false;
 }
 
@@ -56,91 +49,25 @@ void GameplayManager::StartGameSession()
 	{
 		activeLevel->FirstFrame();
 	}
-	m_boundActiveLevel = nullptr;
-	RefreshControllersFromActiveLevel();
 }
 
-void GameplayManager::RegisterController(Controller* controller)
+std::size_t GameplayManager::ControllerCount() const
 {
-	if (!controller)
-	{
-		return;
-	}
-
-	if (std::find(m_controllers.begin(), m_controllers.end(), controller) == m_controllers.end())
-	{
-		controller->SetRegistered(true);
-		m_controllers.push_back(controller);
-	}
-}
-
-void GameplayManager::UnregisterController(Controller* controller)
-{
-	const auto it = std::remove(m_controllers.begin(), m_controllers.end(), controller);
-	m_controllers.erase(it, m_controllers.end());
-	if (controller)
-	{
-		controller->SetRegistered(false);
-	}
-}
-
-void GameplayManager::RefreshControllersFromActiveLevel()
-{
-	m_controllers.clear();
 	const Level* activeLevel = m_levelManager ? m_levelManager->ActiveLevel() : nullptr;
 	if (!activeLevel)
 	{
-		return;
+		return 0;
 	}
 
+	std::size_t count = 0;
 	for (const auto& object : activeLevel->Objects())
 	{
-		if (!object)
+		if (object && object->GetController())
 		{
-			continue;
-		}
-
-		if (Controller* controller = object->GetController())
-		{
-			if (!controller->Owner())
-			{
-				controller->SetOwner(object.get());
-			}
-			RegisterController(controller);
+			++count;
 		}
 	}
-}
-
-void GameplayManager::BindActiveLevel(Level* activeLevel)
-{
-	if (m_boundActiveLevel == activeLevel)
-	{
-		return;
-	}
-
-	m_boundActiveLevel = activeLevel;
-	m_controllers.clear();
-	if (!activeLevel)
-	{
-		return;
-	}
-
-	for (const auto& object : activeLevel->Objects())
-	{
-		if (!object)
-		{
-			continue;
-		}
-
-		if (Controller* controller = object->GetController())
-		{
-			if (!controller->Owner())
-			{
-				controller->SetOwner(object.get());
-			}
-			RegisterController(controller);
-		}
-	}
+	return count;
 }
 
 void GameplayManager::Update(float dt)
@@ -156,11 +83,10 @@ void GameplayManager::Update(float dt)
 		return;
 	}
 
-	BindActiveLevel(activeLevel);
 	gDebug.SetGameplayContext(
 		activeLevel->Name(),
 		activeLevel->Objects().size(),
-		m_controllers.size(),
+		ControllerCount(),
 		gEngineState.IsGameMode() ? "Game" : "Editor");
 
 	for (const auto& object : activeLevel->Objects())
@@ -195,13 +121,6 @@ void GameplayManager::Update(float dt)
 		}
 	}
 
-	for (Controller* controller : m_controllers)
-	{
-		if (controller && controller->Owner())
-		{
-			controller->Update(*controller->Owner(), dt);
-		}
-	}
 }
 
 void GameplayManager::SetPaused(bool paused)

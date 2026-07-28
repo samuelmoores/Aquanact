@@ -656,10 +656,12 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 					continue;
 				}
 
+				ImGui::PushID(component);
 				const std::string componentLabel = component->Name();
 				const bool open = ImGui::CollapsingHeader(componentLabel.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
 				if (!open)
 				{
+					ImGui::PopID();
 					continue;
 				}
 
@@ -701,17 +703,86 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 				{
 					ImGui::TextUnformatted("No editor controls for this component.");
 				}
+
+				bool removeComponent = false;
+				ImGui::Separator();
+				if (ImGui::Button("Remove Component"))
+				{
+					ImGui::OpenPopup("Remove Component##Confirm");
+				}
+				if (ImGui::BeginPopupModal("Remove Component##Confirm", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+				{
+					ImGui::Text("Remove %s from %s?", componentLabel.c_str(), object->Name().c_str());
+					ImGui::TextDisabled("This change is permanent after the project is saved.");
+					if (ImGui::Button("Remove"))
+					{
+						removeComponent = true;
+						ImGui::CloseCurrentPopup();
+					}
+					ImGui::SameLine();
+					if (ImGui::Button("Cancel"))
+					{
+						ImGui::CloseCurrentPopup();
+					}
+					ImGui::EndPopup();
+				}
+
+				if (removeComponent)
+				{
+					if (AnimatorComponent* animator = dynamic_cast<AnimatorComponent*>(component))
+					{
+						m_animatorUiState.erase(animator);
+						m_animatorStateMachinePopupRequested = false;
+					}
+					object->RemoveComponent(component);
+					ImGui::PopID();
+					continue;
+				}
+				ImGui::PopID();
 			}
 
-			if (ImGui::Button("Add Component"))
+			ImGui::SetNextItemWidth(180.0f);
+			if (ImGui::BeginCombo("##AddComponent", "Add Component"))
 			{
-				m_selectedComponentEntityIndex = m_selectedLevelObjectIndex;
-				m_addComponentPopupRequested = true;
-				ImGui::OpenPopup("Add Component##AquanactAddComponent");
-			}
-			if (m_addComponentPopupRequested && m_selectedComponentEntityIndex == m_selectedLevelObjectIndex)
-			{
-				DrawAddComponentPopup(*object);
+				const bool hasController = object->GetComponent<Controller>() != nullptr;
+				const bool hasPlayerHealth = object->GetComponent<PlayerHealth>() != nullptr;
+				const bool hasEnemy = object->GetComponent<Enemy>() != nullptr;
+				const bool hasAnimator = object->GetComponent<AnimatorComponent>() != nullptr;
+
+				ImGui::BeginDisabled(hasController);
+				if (ImGui::Selectable("Controller"))
+				{
+					object->AddComponent<Controller>();
+				}
+				ImGui::EndDisabled();
+
+				ImGui::BeginDisabled(hasPlayerHealth);
+				if (ImGui::Selectable("PlayerHealth"))
+				{
+					object->AddComponent<PlayerHealth>();
+				}
+				ImGui::EndDisabled();
+
+				ImGui::BeginDisabled(hasEnemy);
+				if (ImGui::Selectable("Enemy"))
+				{
+					object->AddComponent<Enemy>();
+				}
+				ImGui::EndDisabled();
+
+				ImGui::BeginDisabled(hasAnimator || object->GetMesh() == nullptr || !object->GetMesh()->Skinned());
+				if (ImGui::Selectable("Animator"))
+				{
+					object->AddComponent<AnimatorComponent>(object->GetMesh());
+				}
+				ImGui::EndDisabled();
+
+				if (hasController && hasPlayerHealth && hasEnemy && hasAnimator)
+				{
+					ImGui::Separator();
+					ImGui::TextDisabled("All components are already attached.");
+				}
+				ImGui::EndCombo();
 			}
 		}
 	}
@@ -1128,48 +1199,6 @@ void EngineGUI::DrawAddCodeFilePopup()
 		}
 
 		ImGui::EndPopup();
-	}
-}
-
-void EngineGUI::DrawAddComponentPopup(Entity& entity)
-{
-	if (m_addComponentPopupRequested)
-	{
-		ImGui::OpenPopup("Add Component##AquanactAddComponent");
-	}
-
-	if (ImGui::BeginPopupModal("Add Component##AquanactAddComponent", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
-	{
-		ImGui::Text("Add a component to %s", entity.Name().empty() ? "<unnamed>" : entity.Name().c_str());
-
-		const bool hasPlayerHealth = entity.GetComponent<PlayerHealth>() != nullptr;
-		const bool hasEnemy = entity.GetComponent<Enemy>() != nullptr;
-		const bool hasAnimator = entity.GetComponent<AnimatorComponent>() != nullptr;
-
-		if (ImGui::MenuItem("PlayerHealth", nullptr, false, !hasPlayerHealth))
-		{
-			entity.AddComponent<PlayerHealth>();
-		}
-		if (ImGui::MenuItem("Enemy", nullptr, false, !hasEnemy))
-		{
-			entity.AddComponent<Enemy>();
-		}
-		if (ImGui::MenuItem("Animator", nullptr, false, !hasAnimator))
-		{
-			entity.AddComponent<AnimatorComponent>(entity.GetMesh());
-		}
-
-		ImGui::Separator();
-		if (ImGui::Button("Close"))
-		{
-			m_addComponentPopupRequested = false;
-			ImGui::CloseCurrentPopup();
-		}
-		ImGui::EndPopup();
-	}
-	else if (m_addComponentPopupRequested && !ImGui::IsPopupOpen("Add Component##AquanactAddComponent"))
-	{
-		m_addComponentPopupRequested = false;
 	}
 }
 

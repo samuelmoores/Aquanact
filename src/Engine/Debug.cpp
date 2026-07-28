@@ -241,7 +241,7 @@ void Debug::drawGameModeInput(const Input& input)
 	const Level* activeLevel = gLevelManager.ActiveLevel();
 	ImGui::Text("Active level: %s", activeLevel ? activeLevel->Name().c_str() : "<none>");
 	ImGui::Text("Active level objects: %zu", activeLevel ? activeLevel->Objects().size() : 0);
-	ImGui::Text("Registered controllers: %zu", gGameplayManager.ControllerCount());
+	ImGui::Text("Controller components: %zu", gGameplayManager.ControllerCount());
 	const glm::vec3 move = input.MoveInput();
 	const glm::vec2 mouse = input.MouseDelta();
 	ImGui::Separator();
@@ -251,13 +251,12 @@ void Debug::drawGameModeInput(const Input& input)
 	ImGui::End();
 
 	ImGui::Begin("Gameplay Diagnostics");
-	ImGui::Text("Controller registered: %s", m_controllerRegistered ? "yes" : "no");
 	ImGui::Text("Controller owner bound: %s", m_controllerOwnerBound ? "yes" : "no");
 	ImGui::Text("Object: %s", m_gameplayObjectName.empty() ? "<none>" : m_gameplayObjectName.c_str());
 	ImGui::Text("Active level: %s", m_activeLevelName.empty() ? "<none>" : m_activeLevelName.c_str());
 	ImGui::Text("Engine mode: %s", m_engineMode.empty() ? "<none>" : m_engineMode.c_str());
 	ImGui::Text("Active level objects: %zu", m_activeLevelObjects);
-	ImGui::Text("Registered controller count: %zu", m_controllerCount);
+	ImGui::Text("Controller component count: %zu", m_controllerCount);
 	ImGui::Separator();
 	ImGui::Text("Move input: %.2f, %.2f, %.2f", m_gameplayMoveInput.x, m_gameplayMoveInput.y, m_gameplayMoveInput.z);
 	ImGui::Text("Move speed: %.2f", m_gameplayMoveSpeed);
@@ -292,11 +291,10 @@ void Debug::drawGameModeInput(const Input& input)
 	ImGui::End();
 }
 
-void Debug::SetGameplayDiagnostics(bool controllerRegistered, const std::string& objectName, const glm::vec3& moveInput, float moveSpeed, float dt, const glm::vec3& delta, const glm::vec3& position)
+void Debug::SetGameplayDiagnostics(const std::string& objectName, const glm::vec3& moveInput, float moveSpeed, float dt, const glm::vec3& delta, const glm::vec3& position)
 {
 	// Gameplay systems push their latest state here so the debug overlay can show it without
 	// reaching back into the controller or object layer every frame.
-	m_controllerRegistered = controllerRegistered;
 	m_controllerOwnerBound = objectName != "<unbound>";
 	m_gameplayObjectName = objectName;
 	m_gameplayMoveInput = moveInput;

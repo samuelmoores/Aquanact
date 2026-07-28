@@ -6,8 +6,22 @@
 #include "Engine/Globals.h"
 #include "Engine/ModelImporter.h"
 
+#include <algorithm>
 #include <glm/gtc/matrix_transform.hpp>
 #include <utility>
+
+namespace
+{
+	std::vector<Component*> OrderedComponents(Entity& entity)
+	{
+		std::vector<Component*> components = entity.Components();
+		std::stable_sort(components.begin(), components.end(), [](const Component* left, const Component* right)
+		{
+			return left->ExecutionOrder() < right->ExecutionOrder();
+		});
+		return components;
+	}
+}
 
 Entity::Entity(std::string name)
 	: m_name(std::move(name))
@@ -102,25 +116,46 @@ const Component* Entity::GetComponentByName(const std::string& name) const
 	}
 	return nullptr;
 }
-void Entity::UpdateComponents(float dt) { for (auto& component : m_components) if (component) component->Update(*this, dt); }
+
+bool Entity::RemoveComponent(Component* component)
+{
+	if (!component)
+	{
+		return false;
+	}
+
+	const auto it = std::find_if(m_components.begin(), m_components.end(), [component](const auto& ownedComponent)
+	{
+		return ownedComponent.get() == component;
+	});
+	if (it == m_components.end())
+	{
+		return false;
+	}
+
+	m_components.erase(it);
+	return true;
+}
+
+void Entity::UpdateComponents(float dt)
+{
+	for (Component* component : OrderedComponents(*this))
+	{
+		component->Update(*this, dt);
+	}
+}
 void Entity::FirstFrameComponents()
 {
-	for (auto& component : m_components)
+	for (Component* component : OrderedComponents(*this))
 	{
-		if (component)
-		{
-			component->FirstFrame(*this);
-		}
+		component->FirstFrame(*this);
 	}
 }
 void Entity::startUp()
 {
-	for (auto& component : m_components)
+	for (Component* component : OrderedComponents(*this))
 	{
-		if (component)
-		{
-			component->startUp(*this);
-		}
+		component->startUp(*this);
 	}
 }
 glm::mat4 Entity::BuildModelMatrix()

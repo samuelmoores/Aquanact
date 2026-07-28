@@ -7,8 +7,8 @@
 #include "Engine/Entity.h"
 #include "Engine/FrontEndManager.h"
 #include "Engine/FileSystem.h"
+#include "Engine/LevelManager.h"
 #include "Engine/RenderManager.h"
-#include "Engine/GameplayManager.h"
 #include "Game/Enemy.h"
 #include "Game/PlayerHealth.h"
 
@@ -886,9 +886,7 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 			}
 
 			Controller* controller = object->AddComponent<Controller>();
-			controller->SetOwner(object.get());
 			controller->SetMoveSpeed(pendingController.moveSpeed);
-			gGameplayManager.RegisterController(controller);
 			break;
 		}
 	}

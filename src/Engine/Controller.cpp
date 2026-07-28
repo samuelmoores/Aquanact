@@ -36,7 +36,7 @@ void Controller::Update(Entity&, float dt)
 	Entity* owner = Owner();
 	if (owner == nullptr)
 	{
-		gDebug.SetGameplayDiagnostics(m_registered, "<unbound>", glm::vec3(0.0f), m_moveSpeed, dt, glm::vec3(0.0f), glm::vec3(0.0f));
+		gDebug.SetGameplayDiagnostics("<unbound>", glm::vec3(0.0f), m_moveSpeed, dt, glm::vec3(0.0f), glm::vec3(0.0f));
 		return;
 	}
 
@@ -45,7 +45,7 @@ void Controller::Update(Entity&, float dt)
 	if (inputMagnitude <= m_movementDeadzone)
 	{
 		m_isMoving = false;
-		gDebug.SetGameplayDiagnostics(m_registered, owner->Name(), moveInput, m_moveSpeed, dt, glm::vec3(0.0f), owner->Position());
+		gDebug.SetGameplayDiagnostics(owner->Name(), moveInput, m_moveSpeed, dt, glm::vec3(0.0f), owner->Position());
 		return;
 	}
 
@@ -69,7 +69,7 @@ void Controller::Update(Entity&, float dt)
 	if (glm::length(movement) <= 0.0001f)
 	{
 		m_isMoving = false;
-		gDebug.SetGameplayDiagnostics(m_registered, owner->Name(), moveInput, m_moveSpeed, dt, glm::vec3(0.0f), owner->Position());
+		gDebug.SetGameplayDiagnostics(owner->Name(), moveInput, m_moveSpeed, dt, glm::vec3(0.0f), owner->Position());
 		return;
 	}
 
@@ -80,6 +80,6 @@ void Controller::Update(Entity&, float dt)
 
 	const glm::vec3 delta = movement * m_moveSpeed * dt;
 	owner->Move(delta);
-	gDebug.SetGameplayDiagnostics(m_registered, owner->Name(), moveInput, m_moveSpeed, dt, delta, owner->Position());
+	gDebug.SetGameplayDiagnostics(owner->Name(), moveInput, m_moveSpeed, dt, delta, owner->Position());
 }
 

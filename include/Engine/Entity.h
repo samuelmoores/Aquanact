@@ -47,6 +47,7 @@ public:
 	const T* GetComponent() const;
 	template<typename T, typename... Args>
 	T* AddComponent(Args&&... args);
+	bool RemoveComponent(Component* component);
 	template<typename T>
 	bool RemoveComponent();
 
