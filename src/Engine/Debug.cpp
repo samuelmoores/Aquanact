@@ -196,38 +196,44 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 		sphere->draw(view, model);
 	}
 
-	ImGui::Begin("Debug Log");
-	if (ImGui::Button("Clear"))
+	if (m_showLogWindow)
 	{
-		m_logMessages.clear();
+		ImGui::Begin("Debug Log", &m_showLogWindow);
+		if (ImGui::Button("Clear"))
+		{
+			m_logMessages.clear();
+		}
+		ImGui::Separator();
+		for (const std::string& message : m_logMessages)
+		{
+			ImGui::TextUnformatted(message.c_str());
+		}
+		ImGui::End();
 	}
-	ImGui::Separator();
-	for (const std::string& message : m_logMessages)
-	{
-		ImGui::TextUnformatted(message.c_str());
-	}
-	ImGui::End();
 
-	ImGui::Begin("Debug Stats");
-	ImGui::Text("FPS: %.1f", m_lastFps);
-	const Level* activeLevel = gLevelManager.ActiveLevel();
-	ImGui::Text("Level objects: %zu", activeLevel ? activeLevel->Objects().size() : 0);
-	ImGui::Separator();
-	ImGui::Text("Render commands: %zu", gRenderManager.LastFrameCommandCount());
-	ImGui::Text("Skipped objects: %zu", gRenderManager.LastFrameSkippedObjects());
-	ImGui::Text("Build time: %.4f ms", gRenderManager.LastFrameBuildMs());
-	ImGui::Text("Flush time: %.4f ms", gRenderManager.LastFrameFlushMs());
-	ImGui::Separator();
-	ImGui::Text("Debug overlay: %.4f ms", gRenderManager.LastFrameDebugOverlayMs());
-	ImGui::Text("Editor GUI/MyGUI: %.4f ms", gRenderManager.LastFrameEditorGuiMs());
-	ImGui::Text("UI creator: %.4f ms", gRenderManager.LastFrameUiCreatorMs());
-	ImGui::Text("Runtime GUI: %.4f ms", gRenderManager.LastFrameRuntimeGuiMs());
-	ImGui::Text("Startup to first draw: %.2f s", m_startupToFirstDrawMs);
-	ImGui::Separator();
-	ImGui::Text("Frame allocator capacity: %.2f KB", static_cast<double>(gRenderManager.FrameAllocatorCapacityBytes()) / 1024.0);
-	ImGui::Text("Frame allocator used: %.2f KB", static_cast<double>(gRenderManager.FrameAllocatorUsedBytes()) / 1024.0);
-	ImGui::Text("Frame allocator peak: %.2f KB", static_cast<double>(gRenderManager.FrameAllocatorPeakBytes()) / 1024.0);
-	ImGui::End();
+	if (m_showStatsWindow)
+	{
+		ImGui::Begin("Debug Stats", &m_showStatsWindow);
+		ImGui::Text("FPS: %.1f", m_lastFps);
+		const Level* activeLevel = gLevelManager.ActiveLevel();
+		ImGui::Text("Level objects: %zu", activeLevel ? activeLevel->Objects().size() : 0);
+		ImGui::Separator();
+		ImGui::Text("Render commands: %zu", gRenderManager.LastFrameCommandCount());
+		ImGui::Text("Skipped objects: %zu", gRenderManager.LastFrameSkippedObjects());
+		ImGui::Text("Build time: %.4f ms", gRenderManager.LastFrameBuildMs());
+		ImGui::Text("Flush time: %.4f ms", gRenderManager.LastFrameFlushMs());
+		ImGui::Separator();
+		ImGui::Text("Debug overlay: %.4f ms", gRenderManager.LastFrameDebugOverlayMs());
+		ImGui::Text("Editor GUI/MyGUI: %.4f ms", gRenderManager.LastFrameEditorGuiMs());
+		ImGui::Text("UI creator: %.4f ms", gRenderManager.LastFrameUiCreatorMs());
+		ImGui::Text("Runtime GUI: %.4f ms", gRenderManager.LastFrameRuntimeGuiMs());
+		ImGui::Text("Startup to first draw: %.2f s", m_startupToFirstDrawMs);
+		ImGui::Separator();
+		ImGui::Text("Frame allocator capacity: %.2f KB", static_cast<double>(gRenderManager.FrameAllocatorCapacityBytes()) / 1024.0);
+		ImGui::Text("Frame allocator used: %.2f KB", static_cast<double>(gRenderManager.FrameAllocatorUsedBytes()) / 1024.0);
+		ImGui::Text("Frame allocator peak: %.2f KB", static_cast<double>(gRenderManager.FrameAllocatorPeakBytes()) / 1024.0);
+		ImGui::End();
+	}
 }
 
 void Debug::drawGameModeInput(const Input& input)
@@ -330,6 +336,11 @@ void Debug::SetGameplayContext(const std::string& activeLevelName, std::size_t a
 	m_controllerCount = controllerCount;
 	m_engineMode = engineMode;
 }
+
+bool Debug::ShowLogWindow() const { return m_showLogWindow; }
+bool Debug::ShowStatsWindow() const { return m_showStatsWindow; }
+void Debug::SetShowLogWindow(bool showLogWindow) { m_showLogWindow = showLogWindow; }
+void Debug::SetShowStatsWindow(bool showStatsWindow) { m_showStatsWindow = showStatsWindow; }
 
 void Debug::LogMessage(const std::string& message)
 {

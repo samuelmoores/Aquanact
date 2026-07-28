@@ -32,6 +32,8 @@ public:
 	void DrawEditorWindow();
 	void DrawDiagnosticsWindow();
 	void DrawReturnButton();
+	bool ShowEditorWindow() const;
+	void SetShowEditorWindow(bool showEditorWindow);
 	void LogAction(const std::string& message);
 	void RecordClick(const std::string& message);
 	void ClearUI();
@@ -49,5 +51,6 @@ private:
 	std::vector<std::string> m_actionLog;
 	std::string m_lastClickMessage;
 	int m_activeAssetIndex = -1;
+	bool m_showEditorWindow = false;
 };
 

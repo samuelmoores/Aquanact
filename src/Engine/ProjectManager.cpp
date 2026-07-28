@@ -17,6 +17,8 @@
 #include <fstream>
 #include <iomanip>
 #include <memory>
+#include <imgui.h>
+#include <cstring>
 #include <sstream>
 #include <stdexcept>
 #include <vector>
@@ -201,6 +203,49 @@ namespace {
 	bool ParseBoolField(const std::string& value)
 	{
 		return value == "1" || value == "true" || value == "True";
+	}
+
+	std::string HexEncode(const char* data, std::size_t size)
+	{
+		static constexpr char digits[] = "0123456789ABCDEF";
+		std::string encoded;
+		encoded.reserve(size * 2);
+		for (std::size_t i = 0; i < size; ++i)
+		{
+			const unsigned char byte = static_cast<unsigned char>(data[i]);
+			encoded.push_back(digits[(byte >> 4) & 0xF]);
+			encoded.push_back(digits[byte & 0xF]);
+		}
+		return encoded;
+	}
+
+	std::string HexDecode(const std::string& text)
+	{
+		auto hexValue = [](char ch) -> int
+		{
+			if (ch >= '0' && ch <= '9') return ch - '0';
+			if (ch >= 'A' && ch <= 'F') return 10 + (ch - 'A');
+			if (ch >= 'a' && ch <= 'f') return 10 + (ch - 'a');
+			return -1;
+		};
+
+		std::string decoded;
+		if (text.size() % 2 != 0)
+		{
+			return decoded;
+		}
+		decoded.reserve(text.size() / 2);
+		for (std::size_t i = 0; i < text.size(); i += 2)
+		{
+			const int hi = hexValue(text[i]);
+			const int lo = hexValue(text[i + 1]);
+			if (hi < 0 || lo < 0)
+			{
+				return {};
+			}
+			decoded.push_back(static_cast<char>((hi << 4) | lo));
+		}
+		return decoded;
 	}
 }
 
@@ -396,6 +441,13 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const LevelM
 		contents += "\n";
 	}
 
+	if (const char* imguiIniData = ImGui::SaveIniSettingsToMemory())
+	{
+		contents += "imguilayout;";
+		contents += HexEncode(imguiIniData, std::strlen(imguiIniData));
+		contents += "\n";
+	}
+
 	return m_fileSystem->WriteTextFile(path, contents);
 }
 
@@ -482,6 +534,7 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 	// here, then hand them back to the runtime GUI after the level finishes loading.
 	std::vector<std::string> pendingGameGUIAssets;
 	std::string pendingActiveGameGUIAsset;
+	std::string pendingImguiLayout;
 	gRenderManager.Lights().PointLights().clear();
 	std::string line;
 	while (std::getline(file, line))
@@ -597,6 +650,12 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 		if (fields.size() == 2 && fields[0] == "gameguiactive")
 		{
 			pendingActiveGameGUIAsset = UnescapeField(fields[1]);
+			continue;
+		}
+
+		if (fields.size() == 2 && fields[0] == "imguilayout")
+		{
+			pendingImguiLayout = HexDecode(fields[1]);
 			continue;
 		}
 
@@ -825,6 +884,7 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 				std::stof(fields[10])));
 			object->SetIgnoreCameraCollision(true);
 			object->SetDefaultPosition(object->Position());
+			object->SetDefaultRotation(object->Rotation());
 			if (currentLevel)
 			{
 				currentLevel->objects.push_back(std::move(object));
@@ -997,6 +1057,11 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 	if (!pendingActiveGameGUIAsset.empty())
 	{
 		gFrontEndManager.RuntimeGUI().ActivateAsset(pendingActiveGameGUIAsset);
+	}
+
+	if (!pendingImguiLayout.empty())
+	{
+		ImGui::LoadIniSettingsFromMemory(pendingImguiLayout.c_str(), pendingImguiLayout.size());
 	}
 
 	return true;

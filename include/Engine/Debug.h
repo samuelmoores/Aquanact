@@ -64,6 +64,10 @@ public:
 	float GridSpacing() const;
 	double StartupToFirstDrawMs() const;
 	void SetGameplayContext(const std::string& activeLevelName, std::size_t activeLevelObjects, std::size_t controllerCount, const std::string& engineMode);
+	bool ShowLogWindow() const;
+	bool ShowStatsWindow() const;
+	void SetShowLogWindow(bool showLogWindow);
+	void SetShowStatsWindow(bool showStatsWindow);
 
 private:
 	// Rebuilds the axis/grid helpers when the grid configuration changes.
@@ -82,6 +86,8 @@ private:
 	float m_gridSpacing = 50.0f;
 	float m_lastFps = 0.0f;
 	double m_startupToFirstDrawMs = -1.0;
+	bool m_showLogWindow = false;
+	bool m_showStatsWindow = false;
 	bool m_controllerOwnerBound = false;
 	std::string m_gameplayObjectName;
 	std::string m_activeLevelName;

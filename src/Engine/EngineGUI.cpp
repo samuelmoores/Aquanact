@@ -369,7 +369,7 @@ void EngineGUI::BeginFrame()
 
 void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& levelManager, ProjectManager& projectManager)
 {
-	const Level* activeLevel = levelManager.ActiveLevel();
+	Level* activeLevel = levelManager.ActiveLevel();
 	static const std::vector<std::unique_ptr<Entity>> emptyObjects;
 	const auto& objects = activeLevel ? activeLevel->Objects() : emptyObjects;
 	if (m_selectedLevelObjectIndex >= static_cast<int>(objects.size()))
@@ -406,6 +406,8 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 			{
 				fileManager.ImportSelected();
 			}
+			ImGui::Separator();
+			ImGui::MenuItem("Show File Explorer", nullptr, &m_showFileExplorer);
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("View"))
@@ -438,10 +440,25 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 		}
 		if (ImGui::BeginMenu("Lighting"))
 		{
+			ImGui::MenuItem("Show Lighting Window", nullptr, &m_showLightingWindow);
 			const bool canAddPointLight = gRenderManager.Lights().PointLights().size() < LightingManager::MaxPointLights;
 			if (ImGui::MenuItem("Add Point Light", nullptr, false, canAddPointLight))
 			{
 				gRenderManager.Lights().AddPointLight();
+			}
+			ImGui::EndMenu();
+		}
+		if (ImGui::BeginMenu("Debug"))
+		{
+			bool showLogWindow = gDebug.ShowLogWindow();
+			bool showStatsWindow = gDebug.ShowStatsWindow();
+			if (ImGui::MenuItem("Show Log Window", nullptr, &showLogWindow))
+			{
+				gDebug.SetShowLogWindow(showLogWindow);
+			}
+			if (ImGui::MenuItem("Show Stats Window", nullptr, &showStatsWindow))
+			{
+				gDebug.SetShowStatsWindow(showStatsWindow);
 			}
 			ImGui::EndMenu();
 		}
@@ -472,8 +489,31 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 			}
 			ImGui::EndMenu();
 		}
-		if (ImGui::BeginMenu("Level")) 
+		if (ImGui::BeginMenu("Level"))
 		{
+			ImGui::MenuItem("Show Level Window", nullptr, &m_showLevelWindow);
+			if (ImGui::BeginMenu("Levels"))
+			{
+				const auto& levels = levelManager.Levels();
+				for (const auto& level : levels)
+				{
+					if (!level)
+					{
+						continue;
+					}
+
+					const bool active = levelManager.ActiveLevel() == level.get();
+					if (ImGui::MenuItem(level->Name().c_str(), nullptr, active))
+					{
+						levelManager.SetActiveLevel(level->Name());
+					}
+				}
+				if (levels.empty())
+				{
+					ImGui::MenuItem("No levels created.", nullptr, false, false);
+				}
+				ImGui::EndMenu();
+			}
 			if (ImGui::MenuItem("New Level"))
 			{
 				m_newLevelPopupRequested = true;
@@ -490,12 +530,23 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 		}
 		if (ImGui::BeginMenu("UI"))
 		{
+			bool showGameGUIWindow = gFrontEndManager.RuntimeGUI().ShowEditorWindow();
+			if (ImGui::MenuItem("Show GameGUI Window", nullptr, &showGameGUIWindow))
+			{
+				gFrontEndManager.RuntimeGUI().SetShowEditorWindow(showGameGUIWindow);
+				m_showGameGUIWindow = showGameGUIWindow;
+			}
 			if (ImGui::MenuItem("GameGUI Creator"))
 			{
 				gFrontEndManager.OpenGameGUICreator();
 				gRenderManager.SetGameMode();
 				gDebug.LogMessage("GameGUI Creator opened.");
 			}
+			ImGui::EndMenu();
+		}
+		if (ImGui::BeginMenu("Entity"))
+		{
+			ImGui::MenuItem("Show Entity Window", nullptr, &m_showEntityWindow);
 			ImGui::EndMenu();
 		}
 		ImGui::EndMainMenuBar();
@@ -505,339 +556,422 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 	DrawAddCodeFilePopup();
 	DrawNewLevelPopup();
 
-	ImGui::Begin("File Explorer");
-	if (ImGui::Button("Models"))
+	m_showGameGUIWindow = gFrontEndManager.RuntimeGUI().ShowEditorWindow();
+	if (m_showFileExplorer)
 	{
-		fileManager.SetRootDirectory("C:/dev/Aquanact/assets/models");
-	}
-	ImGui::SameLine();
-	if (ImGui::Button("Textures"))
-	{
-		fileManager.SetRootDirectory("C:/dev/Aquanact/assets/textures");
-	}
-	ImGui::SameLine();
-	if (ImGui::Button("Projects"))
-	{
-		fileManager.SetRootDirectory("C:/dev/Aquanact/assets/projects");
-	}
-
-	if (fileManager.CanImportSelection())
-	{
-		if (ImGui::Button("Import Selected"))
+		bool open = m_showFileExplorer;
+		if (ImGui::Begin("File Explorer", &open))
 		{
-			fileManager.ImportSelected();
-		}
-	}
-
-	ImGui::Separator();
-	for (const auto& entry : fileManager.Entries())
-	{
-		if (entry.is_directory())
-		{
-			continue;
-		}
-
-		const std::filesystem::path entryPath = entry.path();
-		const std::string label = entryPath.filename().string();
-		const bool selected = fileManager.HasSelection() && fileManager.SelectedPath() == entryPath;
-
-		if (ImGui::Selectable(label.c_str(), selected))
-		{
-			fileManager.SelectPath(entryPath);
-		}
-	}
-	ImGui::End();
-
-	ImGui::Begin("Levels");
-	const auto& levels = levelManager.Levels();
-	for (std::size_t i = 0; i < levels.size(); ++i)
-	{
-		const auto& level = levels[i];
-		if (!level)
-		{
-			continue;
-		}
-
-		const bool selected = levelManager.ActiveLevel() == level.get();
-		const std::string label = level->Name() + "##LevelItem" + std::to_string(i);
-		if (ImGui::Selectable(label.c_str(), selected))
-		{
-			levelManager.SetActiveLevel(level->Name());
-		}
-	}
-	if (levels.empty())
-	{
-		ImGui::TextUnformatted("No levels created.");
-	}
-	ImGui::End();
-
-	ImGui::Begin("Level");
-	for (size_t i = 0; i < objects.size(); ++i)
-	{
-		const auto& object = objects[i];
-		const std::string label = object ? object->Name() : std::string("<null>");
-		const std::string visibleLabel = label.empty() ? "<unnamed>" : label;
-		const std::string selectableId = visibleLabel + "##LevelObject" + std::to_string(i);
-		const bool selected = m_selectedLevelObjectIndex == static_cast<int>(i);
-		if (ImGui::Selectable(selectableId.c_str(), selected))
-		{
-			m_selectedLevelObjectIndex = static_cast<int>(i);
-		}
-	}
-	ImGui::End();
-
-	ImGui::Begin("Entity");
-	if (m_selectedLevelObjectIndex < 0 || m_selectedLevelObjectIndex >= static_cast<int>(objects.size()))
-	{
-		ImGui::TextUnformatted("No entity selected.");
-	}
-	else
-	{
-		auto& object = objects[static_cast<std::size_t>(m_selectedLevelObjectIndex)];
-		if (!object)
-		{
-			ImGui::TextUnformatted("Selected object is null.");
-		}
-		else
-		{
-			const glm::vec3 worldCenterPosition = object->WorldCenterPosition();
-			const glm::vec3 defaultWorldCenterPosition = object->InitialWorldCenterPosition();
-			ImGui::Text("Name: %s", object->Name().empty() ? "<unnamed>" : object->Name().c_str());
-			ImGui::Text("Type: %s", object->TypeName());
-			ImGui::Text("Source: %s", object->SourcePath().empty() ? "<none>" : object->SourcePath().c_str());
-
-			ImGui::Separator();
-			ImGui::TextUnformatted("Position");
-			float editedX = worldCenterPosition.x;
-			float editedY = worldCenterPosition.y;
-			float editedZ = worldCenterPosition.z;
-			ImGui::SetNextItemWidth(120.0f);
-			if (ImGui::DragFloat("X##WorldCenter", &editedX, 0.1f, -FLT_MAX, FLT_MAX, "%.3f"))
+			if (ImGui::Button("Models"))
 			{
-				object->Translate(glm::vec3(editedX - worldCenterPosition.x, 0.0f, 0.0f));
+				fileManager.SetRootDirectory("C:/dev/Aquanact/assets/models");
 			}
 			ImGui::SameLine();
-			if (ImGui::Button("Reset X"))
+			if (ImGui::Button("Textures"))
 			{
-				object->Translate(glm::vec3(defaultWorldCenterPosition.x - worldCenterPosition.x, 0.0f, 0.0f));
-				editedX = defaultWorldCenterPosition.x;
-			}
-
-			ImGui::SetNextItemWidth(120.0f);
-			if (ImGui::DragFloat("Y##WorldCenter", &editedY, 0.1f, -FLT_MAX, FLT_MAX, "%.3f"))
-			{
-				object->Translate(glm::vec3(0.0f, editedY - worldCenterPosition.y, 0.0f));
+				fileManager.SetRootDirectory("C:/dev/Aquanact/assets/textures");
 			}
 			ImGui::SameLine();
-			if (ImGui::Button("Reset Y"))
+			if (ImGui::Button("Projects"))
 			{
-				object->Translate(glm::vec3(0.0f, defaultWorldCenterPosition.y - worldCenterPosition.y, 0.0f));
-				editedY = defaultWorldCenterPosition.y;
+				fileManager.SetRootDirectory("C:/dev/Aquanact/assets/projects");
 			}
 
-			ImGui::SetNextItemWidth(120.0f);
-			if (ImGui::DragFloat("Z##WorldCenter", &editedZ, 0.1f, -FLT_MAX, FLT_MAX, "%.3f"))
+			if (fileManager.CanImportSelection())
 			{
-				object->Translate(glm::vec3(0.0f, 0.0f, editedZ - worldCenterPosition.z));
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("Reset Z"))
-			{
-				object->Translate(glm::vec3(0.0f, 0.0f, defaultWorldCenterPosition.z - worldCenterPosition.z));
-				editedZ = defaultWorldCenterPosition.z;
+				if (ImGui::Button("Import Selected"))
+				{
+					fileManager.ImportSelected();
+				}
 			}
 
 			ImGui::Separator();
-			ImGui::TextUnformatted("Components");
-			std::vector<Component*> components = object->Components();
-			for (Component* component : components)
+			for (const auto& entry : fileManager.Entries())
 			{
-				if (!component)
+				if (entry.is_directory())
 				{
 					continue;
 				}
 
-				ImGui::PushID(component);
-				const std::string componentLabel = component->Name();
-				const bool open = ImGui::CollapsingHeader(componentLabel.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
-				if (!open)
+				const std::filesystem::path entryPath = entry.path();
+				const std::string label = entryPath.filename().string();
+				const bool selected = fileManager.HasSelection() && fileManager.SelectedPath() == entryPath;
+
+				if (ImGui::Selectable(label.c_str(), selected))
 				{
-					ImGui::PopID();
-					continue;
+					fileManager.SelectPath(entryPath);
+				}
+			}
+		}
+		ImGui::End();
+		m_showFileExplorer = open;
+	}
+
+	if (m_showLevelWindow)
+	{
+		bool open = m_showLevelWindow;
+		const Level* activeLevelForTitle = levelManager.ActiveLevel();
+		const std::string levelWindowTitle = activeLevelForTitle ? activeLevelForTitle->Name() : "Level";
+		if (ImGui::Begin(levelWindowTitle.c_str(), &open))
+		{
+			if (activeLevelForTitle)
+			{
+				const auto& levelObjects = activeLevelForTitle->Objects();
+				for (std::size_t i = 0; i < levelObjects.size(); ++i)
+				{
+					const auto& object = levelObjects[i];
+					const std::string label = object ? object->Name() : std::string("<null>");
+					const std::string visibleLabel = label.empty() ? "<unnamed>" : label;
+					const std::string selectableId = visibleLabel + "##LevelObject" + std::to_string(i);
+					const bool selected = m_selectedLevelObjectIndex == static_cast<int>(i);
+					if (ImGui::Selectable(selectableId.c_str(), selected))
+					{
+						m_selectedLevelObjectIndex = static_cast<int>(i);
+						m_showEntityWindow = true;
+					}
 				}
 
-				if (AnimatorComponent* animator = dynamic_cast<AnimatorComponent*>(component))
+				if (levelObjects.empty())
 				{
-					if (ImGui::Button("Open State Machine"))
-					{
-						m_animatorStateMachinePopupRequested = true;
-						ImGui::OpenPopup("State Machine##AquanactAnimatorStateMachine");
-					}
-					if (m_animatorStateMachinePopupRequested)
-					{
-						DrawAnimatorStateMachinePopup(*animator);
-					}
+					ImGui::TextUnformatted("No entities in this level.");
 				}
-				else if (Controller* controller = dynamic_cast<Controller*>(component))
+			}
+			else
+			{
+				ImGui::TextUnformatted("No active level selected.");
+			}
+		}
+		ImGui::End();
+		m_showLevelWindow = open;
+	}
+
+	if (m_showEntityWindow)
+	{
+		bool open = m_showEntityWindow;
+		if (ImGui::Begin("Entity", &open))
+		{
+			if (m_selectedLevelObjectIndex < 0 || m_selectedLevelObjectIndex >= static_cast<int>(objects.size()))
+			{
+				ImGui::TextUnformatted("No entity selected.");
+			}
+			else
+			{
+				auto& object = objects[static_cast<std::size_t>(m_selectedLevelObjectIndex)];
+				if (!object)
 				{
-					float moveSpeed = controller->MoveSpeed();
-					ImGui::SetNextItemWidth(140.0f);
-					if (ImGui::InputFloat("Move Speed", &moveSpeed, 0.0f, 0.0f, "%.1f"))
-					{
-						controller->SetMoveSpeed(moveSpeed);
-					}
-				}
-				else if (PlayerHealth* playerHealth = dynamic_cast<PlayerHealth*>(component))
-				{
-					ImGui::Text("Health: %s", playerHealth->GetHealthText().c_str());
-					if (ImGui::Button("Heal to Max"))
-					{
-						playerHealth->SetHealth(playerHealth->MaxHealth());
-					}
-				}
-				else if (Enemy* enemy = dynamic_cast<Enemy*>(component))
-				{
-					ImGui::TextUnformatted("Enemy behavior component");
-					(void)enemy;
+					ImGui::TextUnformatted("Selected object is null.");
 				}
 				else
 				{
-					ImGui::TextUnformatted("No editor controls for this component.");
-				}
+					const glm::vec3 worldCenterPosition = object->WorldCenterPosition();
+					const glm::vec3 defaultWorldCenterPosition = object->InitialWorldCenterPosition();
 
-				bool removeComponent = false;
-				ImGui::Separator();
-				if (ImGui::Button("Remove Component"))
-				{
-					ImGui::OpenPopup("Remove Component##Confirm");
-				}
-				if (ImGui::BeginPopupModal("Remove Component##Confirm", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
-				{
-					ImGui::Text("Remove %s from %s?", componentLabel.c_str(), object->Name().c_str());
-					ImGui::TextDisabled("This change is permanent after the project is saved.");
-					if (ImGui::Button("Remove"))
+					bool deleteEntity = false;
+					if (ImGui::Button("Delete"))
 					{
-						removeComponent = true;
-						ImGui::CloseCurrentPopup();
+						ImGui::OpenPopup("Delete Entity##Confirm");
 					}
 					ImGui::SameLine();
-					if (ImGui::Button("Cancel"))
+					ImGui::SetNextItemWidth(120.0f);
+					if (ImGui::BeginCombo("##AddComponent", "Add Component"))
 					{
-						ImGui::CloseCurrentPopup();
-					}
-					ImGui::EndPopup();
-				}
+						const bool hasController = object->GetComponent<Controller>() != nullptr;
+						const bool hasPlayerHealth = object->GetComponent<PlayerHealth>() != nullptr;
+						const bool hasEnemy = object->GetComponent<Enemy>() != nullptr;
+						const bool hasAnimator = object->GetComponent<AnimatorComponent>() != nullptr;
 
-				if (removeComponent)
-				{
-					if (AnimatorComponent* animator = dynamic_cast<AnimatorComponent*>(component))
-					{
-						m_animatorUiState.erase(animator);
-						m_animatorStateMachinePopupRequested = false;
+						ImGui::BeginDisabled(hasController);
+						if (ImGui::Selectable("PlayerController"))
+						{
+							object->AddComponent<PlayerController>();
+						}
+						ImGui::EndDisabled();
+
+						ImGui::BeginDisabled(hasController);
+						if (ImGui::Selectable("Controller"))
+						{
+							object->AddComponent<Controller>();
+						}
+						ImGui::EndDisabled();
+
+						ImGui::BeginDisabled(hasPlayerHealth);
+						if (ImGui::Selectable("PlayerHealth"))
+						{
+							object->AddComponent<PlayerHealth>();
+						}
+						ImGui::EndDisabled();
+
+						ImGui::BeginDisabled(hasEnemy);
+						if (ImGui::Selectable("Enemy"))
+						{
+							object->AddComponent<Enemy>();
+						}
+						ImGui::EndDisabled();
+
+						ImGui::BeginDisabled(hasAnimator || object->GetMesh() == nullptr || !object->GetMesh()->Skinned());
+						if (ImGui::Selectable("Animator"))
+						{
+							object->AddComponent<AnimatorComponent>(object->GetMesh());
+						}
+						ImGui::EndDisabled();
+
+						if (hasController && hasPlayerHealth && hasEnemy && hasAnimator)
+						{
+							ImGui::Separator();
+							ImGui::TextDisabled("All components are already attached.");
+						}
+						ImGui::EndCombo();
 					}
-					object->RemoveComponent(component);
-					ImGui::PopID();
-					continue;
+
+					if (ImGui::BeginPopupModal("Delete Entity##Confirm", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+					{
+						ImGui::Text("Delete %s from the scene?", object->Name().empty() ? "<unnamed>" : object->Name().c_str());
+						ImGui::TextDisabled("This removes the entity from the active level.");
+						if (ImGui::Button("Delete"))
+						{
+							deleteEntity = true;
+							ImGui::CloseCurrentPopup();
+						}
+						ImGui::SameLine();
+						if (ImGui::Button("Cancel"))
+						{
+							ImGui::CloseCurrentPopup();
+						}
+						ImGui::EndPopup();
+					}
+
+					if (deleteEntity && activeLevel && activeLevel->RemoveObject(object.get()))
+					{
+						m_selectedLevelObjectIndex = -1;
+					}
+
+					ImGui::Separator();
+					ImGui::TextUnformatted("Position");
+					const glm::vec3 position = object->Position();
+					const glm::vec3 defaultPosition = object->DefaultPosition();
+					ImGui::SameLine();
+					if (ImGui::SmallButton("Reset##Position"))
+					{
+						object->Translate(defaultPosition - position);
+					}
+					float editedX = position.x;
+					float editedY = position.y;
+					float editedZ = position.z;
+					ImGui::SetNextItemWidth(55.0f);
+					if (ImGui::DragFloat("X##Position", &editedX, 0.1f, -FLT_MAX, FLT_MAX, "%.2f"))
+					{
+						object->Translate(glm::vec3(editedX - position.x, 0.0f, 0.0f));
+					}
+					ImGui::SameLine();
+					ImGui::SetNextItemWidth(55.0f);
+					if (ImGui::DragFloat("Y##Position", &editedY, 0.1f, -FLT_MAX, FLT_MAX, "%.2f"))
+					{
+						object->Translate(glm::vec3(0.0f, editedY - position.y, 0.0f));
+					}
+					ImGui::SameLine();
+					ImGui::SetNextItemWidth(55.0f);
+					if (ImGui::DragFloat("Z##Position", &editedZ, 0.1f, -FLT_MAX, FLT_MAX, "%.2f"))
+					{
+						object->Translate(glm::vec3(0.0f, 0.0f, editedZ - position.z));
+					}
+
+					ImGui::Separator();
+					ImGui::TextUnformatted("Rotation");
+					const glm::vec3 defaultRotation = object->DefaultRotation();
+					ImGui::SameLine();
+					if (ImGui::SmallButton("Reset##Rotation"))
+					{
+						object->SetRotation(defaultRotation);
+					}
+					const glm::vec3 rotation = object->Rotation();
+					float editedRotX = rotation.x;
+					float editedRotY = rotation.y;
+					float editedRotZ = rotation.z;
+					ImGui::SetNextItemWidth(55.0f);
+					if (ImGui::DragFloat("X##Rotation", &editedRotX, 0.1f, -360.0f, 360.0f, "%.1f"))
+					{
+						object->SetRotation(glm::vec3(editedRotX, rotation.y, rotation.z));
+					}
+					ImGui::SameLine();
+					ImGui::SetNextItemWidth(55.0f);
+					if (ImGui::DragFloat("Y##Rotation", &editedRotY, 0.1f, -360.0f, 360.0f, "%.1f"))
+					{
+						object->SetRotation(glm::vec3(rotation.x, editedRotY, rotation.z));
+					}
+					ImGui::SameLine();
+					ImGui::SetNextItemWidth(55.0f);
+					if (ImGui::DragFloat("Z##Rotation", &editedRotZ, 0.1f, -360.0f, 360.0f, "%.1f"))
+					{
+						object->SetRotation(glm::vec3(rotation.x, rotation.y, editedRotZ));
+					}
+
+					ImGui::Separator();
+					ImGui::TextUnformatted("Components");
+					ImGui::Separator();
+					std::vector<Component*> components = object->Components();
+					for (std::size_t componentIndex = 0; componentIndex < components.size(); ++componentIndex)
+					{
+						Component* component = components[componentIndex];
+						if (!component)
+						{
+							continue;
+						}
+
+						if (componentIndex > 0)
+						{
+							ImGui::Separator();
+						}
+
+						ImGui::PushID(component);
+						const std::string componentLabel = component->Name();
+						const bool open = ImGui::CollapsingHeader(componentLabel.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
+						if (!open)
+						{
+							ImGui::PopID();
+							if (componentIndex + 1 < components.size())
+							{
+								ImGui::Separator();
+							}
+							continue;
+						}
+
+						if (ImGui::SmallButton("Remove"))
+						{
+							ImGui::OpenPopup("Remove Component##Confirm");
+						}
+
+						if (AnimatorComponent* animator = dynamic_cast<AnimatorComponent*>(component))
+						{
+							if (ImGui::Button("Open State Machine"))
+							{
+								m_animatorStateMachinePopupRequested = true;
+								ImGui::OpenPopup("State Machine##AquanactAnimatorStateMachine");
+							}
+							if (m_animatorStateMachinePopupRequested)
+							{
+								DrawAnimatorStateMachinePopup(*animator);
+							}
+						}
+						else if (Controller* controller = dynamic_cast<Controller*>(component))
+						{
+							float moveSpeed = controller->MoveSpeed();
+							ImGui::SetNextItemWidth(140.0f);
+							if (ImGui::InputFloat("Move Speed", &moveSpeed, 0.0f, 0.0f, "%.1f"))
+							{
+								controller->SetMoveSpeed(moveSpeed);
+							}
+						}
+						else if (PlayerHealth* playerHealth = dynamic_cast<PlayerHealth*>(component))
+						{
+							ImGui::Text("Health: %s", playerHealth->GetHealthText().c_str());
+							if (ImGui::Button("Heal to Max"))
+							{
+								playerHealth->SetHealth(playerHealth->MaxHealth());
+							}
+						}
+						else if (Enemy* enemy = dynamic_cast<Enemy*>(component))
+						{
+							ImGui::TextUnformatted("Enemy behavior component");
+							(void)enemy;
+						}
+						else
+						{
+							ImGui::TextUnformatted("No editor controls for this component.");
+						}
+
+						bool removeComponent = false;
+						if (ImGui::BeginPopupModal("Remove Component##Confirm", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+						{
+							ImGui::Text("Remove %s from %s?", componentLabel.c_str(), object->Name().c_str());
+							ImGui::TextDisabled("This change is permanent after the project is saved.");
+							if (ImGui::Button("Remove"))
+							{
+								removeComponent = true;
+								ImGui::CloseCurrentPopup();
+							}
+							ImGui::SameLine();
+							if (ImGui::Button("Cancel"))
+							{
+								ImGui::CloseCurrentPopup();
+							}
+							ImGui::EndPopup();
+						}
+
+						if (removeComponent)
+						{
+							if (AnimatorComponent* animator = dynamic_cast<AnimatorComponent*>(component))
+							{
+								m_animatorUiState.erase(animator);
+								m_animatorStateMachinePopupRequested = false;
+							}
+							object->RemoveComponent(component);
+							ImGui::PopID();
+							continue;
+						}
+						ImGui::PopID();
+						if (componentIndex + 1 < components.size())
+						{
+							ImGui::Separator();
+						}
+					}
+				}
+			}
+		}
+		ImGui::End();
+		m_showEntityWindow = open;
+	}
+
+	if (m_showLightingWindow)
+	{
+		bool open = m_showLightingWindow;
+		if (ImGui::Begin("Lighting", &open))
+		{
+			DirectionalLight& sunLight = gRenderManager.Lights().SunLight();
+			if (ImGui::CollapsingHeader("Sun Light", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				ImGui::DragFloat3("Direction", &sunLight.direction.x, 0.01f, -1.0f, 1.0f, "%.2f");
+				ImGui::ColorEdit3("Color", &sunLight.color.x);
+				ImGui::DragFloat("Intensity", &sunLight.intensity, 0.001f, 0.0f, 10.0f, "%.3f");
+				ImGui::DragFloat("Ambient", &sunLight.ambient, 0.001f, 0.00f, 1.00f, "%.3f");
+				if (ImGui::Button("Reset Sun"))
+				{
+					sunLight.direction = glm::vec3(-0.3f, -1.0f, 0.2f);
+					sunLight.color = glm::vec3(1.0f);
+					sunLight.intensity = 1.0f;
+					sunLight.ambient = 0.5f;
+				}
+			}
+			ImGui::SeparatorText("Point Lights");
+			std::vector<PointLight>& pointLights = gRenderManager.Lights().PointLights();
+			for (int i = 0; i < static_cast<int>(pointLights.size()); ++i)
+			{
+				PointLight& pointLight = pointLights[i];
+				ImGui::PushID(i);
+				const std::string header = "Point Light " + std::to_string(i + 1);
+				if (ImGui::CollapsingHeader(header.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
+				{
+					ImGui::DragFloat3("Position", &pointLight.position.x, 0.05f, -1000.0f, 1000.0f, "%.2f");
+					ImGui::ColorEdit3("Color", &pointLight.color.x);
+					ImGui::DragFloat("Intensity", &pointLight.intensity, 0.01f, 0.0f, 50.0f, "%.2f");
+					ImGui::DragFloat("Ambient", &pointLight.ambient, 0.001f, 0.0f, 1.0f, "%.3f");
+					float radius = pointLight.radius;
+					if (ImGui::DragFloat("Radius", &radius, 5.0f, 0.001f, 5000.0f, "%.2f"))
+					{
+						pointLight.SetRadius(radius);
+					}
+					ImGui::DragFloat("Radius Fade", &pointLight.radiusFade, 0.01f, 0.0f, 1.0f, "%.2f");
 				}
 				ImGui::PopID();
 			}
-
-			ImGui::SetNextItemWidth(180.0f);
-			if (ImGui::BeginCombo("##AddComponent", "Add Component"))
-			{
-				const bool hasController = object->GetComponent<Controller>() != nullptr;
-				const bool hasPlayerHealth = object->GetComponent<PlayerHealth>() != nullptr;
-				const bool hasEnemy = object->GetComponent<Enemy>() != nullptr;
-				const bool hasAnimator = object->GetComponent<AnimatorComponent>() != nullptr;
-
-				ImGui::BeginDisabled(hasController);
-				if (ImGui::Selectable("PlayerController"))
-				{
-					object->AddComponent<PlayerController>();
-				}
-				ImGui::EndDisabled();
-
-				ImGui::BeginDisabled(hasController);
-				if (ImGui::Selectable("Controller"))
-				{
-					object->AddComponent<Controller>();
-				}
-				ImGui::EndDisabled();
-
-				ImGui::BeginDisabled(hasPlayerHealth);
-				if (ImGui::Selectable("PlayerHealth"))
-				{
-					object->AddComponent<PlayerHealth>();
-				}
-				ImGui::EndDisabled();
-
-				ImGui::BeginDisabled(hasEnemy);
-				if (ImGui::Selectable("Enemy"))
-				{
-					object->AddComponent<Enemy>();
-				}
-				ImGui::EndDisabled();
-
-				ImGui::BeginDisabled(hasAnimator || object->GetMesh() == nullptr || !object->GetMesh()->Skinned());
-				if (ImGui::Selectable("Animator"))
-				{
-					object->AddComponent<AnimatorComponent>(object->GetMesh());
-				}
-				ImGui::EndDisabled();
-
-				if (hasController && hasPlayerHealth && hasEnemy && hasAnimator)
-				{
-					ImGui::Separator();
-					ImGui::TextDisabled("All components are already attached.");
-				}
-				ImGui::EndCombo();
-			}
 		}
+		ImGui::End();
+		m_showLightingWindow = open;
 	}
-	ImGui::End();
 
-	ImGui::Begin("Lighting");
-	DirectionalLight& sunLight = gRenderManager.Lights().SunLight();
-	if (ImGui::CollapsingHeader("Sun Light", ImGuiTreeNodeFlags_DefaultOpen))
+	if (m_showGameGUIWindow)
 	{
-		ImGui::DragFloat3("Direction", &sunLight.direction.x, 0.01f, -1.0f, 1.0f, "%.2f");
-		ImGui::ColorEdit3("Color", &sunLight.color.x);
-		ImGui::DragFloat("Intensity", &sunLight.intensity, 0.001f, 0.0f, 10.0f, "%.3f");
-		ImGui::DragFloat("Ambient", &sunLight.ambient, 0.001f, 0.00f, 1.00f, "%.3f");
-		if (ImGui::Button("Reset Sun"))
-		{
-			sunLight.direction = glm::vec3(-0.3f, -1.0f, 0.2f);
-			sunLight.color = glm::vec3(1.0f);
-			sunLight.intensity = 1.0f;
-			sunLight.ambient = 0.5f;
-		}
+		gFrontEndManager.RuntimeGUI().DrawEditorWindow();
 	}
-	ImGui::SeparatorText("Point Lights");
-	std::vector<PointLight>& pointLights = gRenderManager.Lights().PointLights();
-	for (int i = 0; i < static_cast<int>(pointLights.size()); ++i)
-	{
-		PointLight& pointLight = pointLights[i];
-		ImGui::PushID(i);
-		const std::string header = "Point Light " + std::to_string(i + 1);
-		if (ImGui::CollapsingHeader(header.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
-		{
-			ImGui::DragFloat3("Position", &pointLight.position.x, 0.05f, -1000.0f, 1000.0f, "%.2f");
-			ImGui::ColorEdit3("Color", &pointLight.color.x);
-			ImGui::DragFloat("Intensity", &pointLight.intensity, 0.01f, 0.0f, 50.0f, "%.2f");
-			ImGui::DragFloat("Ambient", &pointLight.ambient, 0.001f, 0.0f, 1.0f, "%.3f");
-			float radius = pointLight.radius;
-			if (ImGui::DragFloat("Radius", &radius, 5.0f, 0.001f, 5000.0f, "%.2f"))
-			{
-				pointLight.SetRadius(radius);
-			}
-			ImGui::DragFloat("Radius Fade", &pointLight.radiusFade, 0.01f, 0.0f, 1.0f, "%.2f");
-
-		}
-		ImGui::PopID();
-	}
-	ImGui::End();
-
-	gFrontEndManager.RuntimeGUI().DrawEditorWindow();
 }
 
 void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
@@ -1226,6 +1360,31 @@ bool EngineGUI::ShowGrid() const
 	return m_showGrid;
 }
 
+bool EngineGUI::ShowLevelWindow() const
+{
+	return m_showLevelWindow;
+}
+
+bool EngineGUI::ShowEntityWindow() const
+{
+	return m_showEntityWindow;
+}
+
+bool EngineGUI::ShowLightingWindow() const
+{
+	return m_showLightingWindow;
+}
+
+bool EngineGUI::ShowFileExplorer() const
+{
+	return m_showFileExplorer;
+}
+
+bool EngineGUI::ShowGameGUIWindow() const
+{
+	return m_showGameGUIWindow;
+}
+
 void EngineGUI::SetShowAxis(bool showAxis)
 {
 	m_showAxis = showAxis;
@@ -1234,6 +1393,31 @@ void EngineGUI::SetShowAxis(bool showAxis)
 void EngineGUI::SetShowGrid(bool showGrid)
 {
 	m_showGrid = showGrid;
+}
+
+void EngineGUI::SetShowLevelWindow(bool showLevelWindow)
+{
+	m_showLevelWindow = showLevelWindow;
+}
+
+void EngineGUI::SetShowEntityWindow(bool showEntityWindow)
+{
+	m_showEntityWindow = showEntityWindow;
+}
+
+void EngineGUI::SetShowLightingWindow(bool showLightingWindow)
+{
+	m_showLightingWindow = showLightingWindow;
+}
+
+void EngineGUI::SetShowFileExplorer(bool showFileExplorer)
+{
+	m_showFileExplorer = showFileExplorer;
+}
+
+void EngineGUI::SetShowGameGUIWindow(bool showGameGUIWindow)
+{
+	m_showGameGUIWindow = showGameGUIWindow;
 }
 
 void EngineGUI::DrawNewLevelPopup()

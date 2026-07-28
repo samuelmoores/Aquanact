@@ -20,6 +20,7 @@ public:
 	void FirstFrame();
 	void Clear();
 	Entity* AddObject(std::unique_ptr<Entity> entity);
+	bool RemoveObject(Entity* entity);
 	const std::vector<std::unique_ptr<Entity>>& Entities() const { return m_entities; }
 	const std::vector<std::unique_ptr<Entity>>& Objects() const { return m_entities; }
 

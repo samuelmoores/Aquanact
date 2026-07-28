@@ -346,7 +346,13 @@ const std::vector<std::string>& GameGUIManager::SceneAssets() const
 
 void GameGUIManager::DrawEditorWindow()
 {
-	ImGui::Begin("GameGUI");
+	bool open = m_showEditorWindow;
+	if (!ImGui::Begin("GameGUI", &open))
+	{
+		ImGui::End();
+		m_showEditorWindow = open;
+		return;
+	}
 	ImGui::TextUnformatted("Placed GameGUI assets");
 	for (std::size_t i = 0; i < m_sceneAssets.size(); ++i)
 	{
@@ -372,6 +378,7 @@ void GameGUIManager::DrawEditorWindow()
 		ImGui::EndCombo();
 	}
 	ImGui::End();
+	m_showEditorWindow = open;
 }
 
 void GameGUIManager::DrawDiagnosticsWindow()
@@ -424,6 +431,16 @@ void GameGUIManager::DrawReturnButton()
 		LogAction("Return to editor requested");
 	}
 	ImGui::End();
+}
+
+bool GameGUIManager::ShowEditorWindow() const
+{
+	return m_showEditorWindow;
+}
+
+void GameGUIManager::SetShowEditorWindow(bool showEditorWindow)
+{
+	m_showEditorWindow = showEditorWindow;
 }
 
 void GameGUIManager::LogAction(const std::string& message)

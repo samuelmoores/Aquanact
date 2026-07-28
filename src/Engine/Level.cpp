@@ -3,6 +3,7 @@
 #include "Engine/Globals.h"
 
 #include <iostream>
+#include <algorithm>
 
 Level::Level(std::string name)
 	: m_name(std::move(name))
@@ -62,4 +63,24 @@ Entity* Level::AddObject(std::unique_ptr<Entity> entity)
 	Entity* rawEntity = entity.get();
 	m_entities.push_back(std::move(entity));
 	return rawEntity;
+}
+
+bool Level::RemoveObject(Entity* entity)
+{
+	if (!entity)
+	{
+		return false;
+	}
+
+	const auto it = std::find_if(m_entities.begin(), m_entities.end(), [entity](const auto& ownedEntity)
+	{
+		return ownedEntity.get() == entity;
+	});
+	if (it == m_entities.end())
+	{
+		return false;
+	}
+
+	m_entities.erase(it);
+	return true;
 }

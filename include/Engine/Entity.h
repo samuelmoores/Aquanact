@@ -68,11 +68,14 @@ public:
 	glm::vec3 WorldCenterPosition();
 	glm::vec3 InitialWorldCenterPosition() const;
 	glm::vec3 DefaultPosition() const;
+	glm::vec3 DefaultRotation() const;
 	glm::vec3 Rotation() const;
 	glm::vec3 Scale() const;
 	void SetRotation(glm::vec3 newRotation);
 	void SetDefaultPosition(glm::vec3 position);
+	void SetDefaultRotation(glm::vec3 rotation);
 	void ResetToDefaultPosition();
+	void ResetToDefaultRotation();
 
 	void SetIgnoreCameraCollision(bool ignore) { m_ignoreCameraCollision = ignore; }
 	bool IgnoreCameraCollision() const { return m_ignoreCameraCollision; }
@@ -86,6 +89,7 @@ protected:
 	glm::vec3 m_scale{1.0f};
 	glm::vec3 m_initialWorldCenter{0.0f};
 	glm::vec3 m_defaultPosition{0.0f};
+	glm::vec3 m_defaultRotation{0.0f};
 	bool m_skinned = false;
 	bool m_ignoreCameraCollision = false;
 	std::string m_name;

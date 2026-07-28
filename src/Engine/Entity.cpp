@@ -180,13 +180,19 @@ glm::vec3 Entity::WorldPosition() { return glm::vec3(BuildModelMatrix()[3]); }
 glm::vec3 Entity::WorldCenterPosition() { const glm::vec3 localCenter = m_mesh ? m_mesh->centerAABB() : glm::vec3(0.0f); return glm::vec3(BuildModelMatrix() * glm::vec4(localCenter, 1.0f)); }
 glm::vec3 Entity::InitialWorldCenterPosition() const { return m_initialWorldCenter; }
 glm::vec3 Entity::DefaultPosition() const { return m_defaultPosition; }
+glm::vec3 Entity::DefaultRotation() const { return m_defaultRotation; }
 glm::vec3 Entity::Rotation() const { return m_rotation; }
 glm::vec3 Entity::Scale() const { return m_scale; }
 void Entity::SetRotation(glm::vec3 newRotation) { m_rotation = newRotation; }
 void Entity::SetDefaultPosition(glm::vec3 position) { m_defaultPosition = position; }
+void Entity::SetDefaultRotation(glm::vec3 rotation) { m_defaultRotation = rotation; }
 void Entity::ResetToDefaultPosition()
 {
 	const glm::vec3 delta = m_defaultPosition - m_position;
 	Translate(delta);
+}
+void Entity::ResetToDefaultRotation()
+{
+	m_rotation = m_defaultRotation;
 }
 bool Entity::HasAnimatorComponent() const { return GetComponent<AnimatorComponent>() != nullptr; }
