@@ -19,11 +19,19 @@ public:
 	void EndFrame();
 
 private:
+	enum class TexturePickerTarget {
+		None,
+		NewWidgetTexture,
+		SelectedWidgetTexture
+	};
+
 	void DrawCreateAssetPopup();
 	void DrawCreateWidgetPopup();
+	void DrawTexturePickerPopup();
 	std::filesystem::path AssetPathFor(const GameGUIAsset& asset) const;
 	GameGUIAsset& CurrentAsset();
 	const GameGUIAsset& CurrentAsset() const;
+	void OpenTexturePicker(TexturePickerTarget target);
 	void AddButtonWidget();
 	void AddTextWidget();
 	void AddImageWidget();
@@ -39,12 +47,19 @@ private:
 	bool m_initialized = false;
 	bool m_showCreateAssetPopup = false;
 	bool m_showCreateWidgetPopup = false;
+	bool m_showTexturePickerPopup = false;
 	bool m_newWidgetIsText = false;
 	bool m_newWidgetIsImage = false;
+	bool m_lockWidgetSize = false;
 	char m_newAssetName[64] = { 0 };
 	char m_newWidgetName[64] = { 0 };
 	char m_newWidgetText[128] = { 0 };
 	char m_newWidgetTexture[256] = { 0 };
+	TexturePickerTarget m_texturePickerTarget = TexturePickerTarget::None;
+	std::filesystem::path m_texturePickerRootDirectory;
+	std::filesystem::path m_texturePickerCurrentDirectory;
+	std::filesystem::path m_texturePickerSelectedPath;
+	float m_lockedWidgetSizeRatio = 1.0f;
 	GameGUIActionType m_newWidgetAction = GameGUIActionType::None;
 	std::vector<GameGUIAsset> m_assets;
 	int m_selectedAssetIndex = -1;

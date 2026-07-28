@@ -28,6 +28,37 @@
 #include <Engine/Texture.h>
 
 namespace {
+	std::filesystem::path ResolveGameGUIImagePath(const std::string& filename)
+	{
+		const std::filesystem::path requestedPath(filename);
+		std::error_code ec;
+		if (requestedPath.is_absolute() && std::filesystem::exists(requestedPath, ec) && !ec)
+		{
+			return requestedPath;
+		}
+
+		const std::filesystem::path executableRoot = gFileSystem.ExecutableDirectory();
+		const std::filesystem::path candidatePaths[] = {
+			requestedPath,
+			executableRoot / requestedPath,
+			executableRoot / "assets" / requestedPath,
+#ifdef AQUANACT_SOURCE_ROOT
+			std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets" / requestedPath,
+#endif
+		};
+
+		for (const std::filesystem::path& candidate : candidatePaths)
+		{
+			ec.clear();
+			if (!candidate.empty() && std::filesystem::exists(candidate, ec) && !ec)
+			{
+				return candidate;
+			}
+		}
+
+		return requestedPath;
+	}
+
 	const GameGUIWidgetDef* FindWidgetDef(const GameGUIAsset& asset, const std::string& name)
 	{
 		for (const auto& widget : asset.widgets)
@@ -67,7 +98,8 @@ void* GameGUIImageLoader::loadImage(int& _width, int& _height, MyGUI::PixelForma
 	try
 	{
 		StbImage image;
-		image.loadFromFile(_filename);
+		const std::filesystem::path resolvedPath = ResolveGameGUIImagePath(_filename);
+		image.loadFromFile(resolvedPath.string());
 
 		_width = image.getWidth();
 		_height = image.getHeight();
@@ -85,6 +117,7 @@ void* GameGUIImageLoader::loadImage(int& _width, int& _height, MyGUI::PixelForma
 	catch (const std::exception& e)
 	{
 		// If the image load fails, MyGUI needs a clean failure instead of partial data.
+		gDebug.LogMessage("GameGUI image load failed: requested='" + _filename + "', reason='" + e.what() + "'");
 		_width = 0;
 		_height = 0;
 		_format = MyGUI::PixelFormat::Unknow;
@@ -127,7 +160,12 @@ void GameGUI::startUp(Window& window)
 		// output root without recursion so it can find the copied XML/PNG skin files
 		// without scanning nested build-tree copies under vcpkg.
 		const std::filesystem::path resourceRoot = gFileSystem.ExecutableDirectory();
-		MyGUI::OpenGLDataManager::getInstance().addResourceLocation(resourceRoot.string(), false);
+		MyGUI::OpenGLDataManager& dataManager = MyGUI::OpenGLDataManager::getInstance();
+		dataManager.addResourceLocation(resourceRoot.string(), false);
+		dataManager.addResourceLocation((resourceRoot / "assets").string(), true);
+#ifdef AQUANACT_SOURCE_ROOT
+		dataManager.addResourceLocation((std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets").string(), true);
+#endif
 
 		// Gui has to exist only after the platform and resources are available. That
 		// ordering fixed the runtime exceptions we saw during the first integration pass.
@@ -353,6 +391,10 @@ MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::
 		if (text)
 		{
 			text->setCaption(def.text);
+			if (def.fontSize > 0)
+			{
+				text->setFontHeight(def.fontSize);
+			}
 			text->setVisible(def.visible);
 			text->setAlpha(def.alpha);
 			if (!parent)

@@ -6,6 +6,7 @@
 #include "Engine/Window.h"
 #include "Engine/Camera.h"
 #include "Engine/Globals.h"
+#include "Engine/FileSystem.h"
 #include "Engine/Level.h"
 #include "Engine/LevelManager.h"
 
@@ -13,10 +14,38 @@
 #include <fstream>
 #include <sstream>
 #include <algorithm>
+#include <cctype>
+#include <cmath>
 #include <cstdio>
 #include <functional>
 
 namespace {
+	int ReadIntField(const std::string& value, int fallback = 0)
+	{
+		if (value.empty())
+		{
+			return fallback;
+		}
+
+		try
+		{
+			return std::stoi(value);
+		}
+		catch (...)
+		{
+			return fallback;
+		}
+	}
+
+	std::filesystem::path SourceRoot()
+	{
+#ifdef AQUANACT_SOURCE_ROOT
+		return std::filesystem::path(AQUANACT_SOURCE_ROOT);
+#else
+		return std::filesystem::current_path();
+#endif
+	}
+
 	const char* ActionLabel(GameGUIActionType action)
 	{
 		switch (action)
@@ -117,6 +146,29 @@ namespace {
 #endif
 	}
 
+	std::filesystem::path TextureDirectory()
+	{
+		return SourceRoot() / "assets" / "textures";
+	}
+
+	bool IsSupportedTextureFile(const std::filesystem::path& path)
+	{
+		std::string extension = path.extension().string();
+		std::transform(extension.begin(), extension.end(), extension.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+		return extension == ".png" || extension == ".jpg" || extension == ".jpeg" || extension == ".bmp" || extension == ".tga";
+	}
+
+	std::string MakePortableTexturePath(const std::filesystem::path& absolutePath)
+	{
+		std::error_code ec;
+		const std::filesystem::path relativeToAssets = gFileSystem.Relative(absolutePath, SourceRoot() / "assets", ec);
+		if (!ec && !relativeToAssets.empty())
+		{
+			return relativeToAssets.generic_string();
+		}
+		return absolutePath.generic_string();
+	}
+
 	GameGUIAsset LoadAssetFile(const std::filesystem::path& assetPath)
 	{
 		GameGUIAsset asset;
@@ -174,10 +226,11 @@ namespace {
 			widget.text = readField("\"text\":", widgetPos);
 			widget.texture = readField("\"texture\":", widgetPos);
 			widget.layer = readField("\"layer\":", widgetPos);
-			widget.x = std::stoi(readField("\"x\":", widgetPos));
-			widget.y = std::stoi(readField("\"y\":", widgetPos));
-			widget.width = std::stoi(readField("\"width\":", widgetPos));
-			widget.height = std::stoi(readField("\"height\":", widgetPos));
+			widget.x = ReadIntField(readField("\"x\":", widgetPos));
+			widget.y = ReadIntField(readField("\"y\":", widgetPos));
+			widget.width = ReadIntField(readField("\"width\":", widgetPos), 100);
+			widget.height = ReadIntField(readField("\"height\":", widgetPos), 30);
+			widget.fontSize = ReadIntField(readField("\"fontSize\":", widgetPos), 0);
 			widget.visible = readField("\"visible\":", widgetPos).find("true") != std::string::npos;
 			widget.alpha = std::stof(readField("\"alpha\":", widgetPos));
 			widget.action = StringToAction(readField("\"action\":", widgetPos));
@@ -226,7 +279,14 @@ void GameGUICreator::startUp(Window& window)
 	m_newWidgetTexture[0] = '\0';
 	m_newWidgetIsText = false;
 	m_newWidgetIsImage = false;
+	m_lockWidgetSize = false;
 	m_newWidgetAction = GameGUIActionType::None;
+	m_showTexturePickerPopup = false;
+	m_texturePickerTarget = TexturePickerTarget::None;
+	m_texturePickerRootDirectory.clear();
+	m_texturePickerCurrentDirectory.clear();
+	m_texturePickerSelectedPath.clear();
+	m_lockedWidgetSizeRatio = 1.0f;
 	m_initialized = true;
 	if (!m_assets.empty())
 	{
@@ -247,7 +307,14 @@ void GameGUICreator::shutDown()
 	m_newWidgetTexture[0] = '\0';
 	m_newWidgetIsText = false;
 	m_newWidgetIsImage = false;
+	m_lockWidgetSize = false;
+	m_showTexturePickerPopup = false;
 	m_newWidgetAction = GameGUIActionType::None;
+	m_texturePickerTarget = TexturePickerTarget::None;
+	m_texturePickerRootDirectory.clear();
+	m_texturePickerCurrentDirectory.clear();
+	m_texturePickerSelectedPath.clear();
+	m_lockedWidgetSizeRatio = 1.0f;
 	m_assets.clear();
 	m_selectedAssetIndex = -1;
 	m_selectedWidgetIndex = -1;
@@ -371,6 +438,7 @@ void GameGUICreator::Draw(const Camera&)
 
 	DrawCreateAssetPopup();
 	DrawCreateWidgetPopup();
+	DrawTexturePickerPopup();
 
 	ImGui::Begin("GameGUI Assets");
 	for (std::size_t i = 0; i < m_assets.size(); ++i)
@@ -506,158 +574,201 @@ void GameGUICreator::Draw(const Camera&)
 				}
 				ImGui::EndCombo();
 			}
-			ImGui::Text("Position: %d, %d", widget.x, widget.y);
-			ImGui::Text("Size: %d x %d", widget.width, widget.height);
-			if (widget.type == "ImageBox" || widget.type == "Image")
+			int position[2] = { widget.x, widget.y };
+			if (ImGui::DragInt2("Position", position, 1.0f))
 			{
-				char textureBuffer[256] = { 0 };
-				std::snprintf(textureBuffer, sizeof(textureBuffer), "%s", widget.texture.c_str());
-				if (ImGui::InputText("Texture", textureBuffer, sizeof(textureBuffer)))
+				widget.x = position[0];
+				widget.y = position[1];
+				SyncRuntimePreview();
+			}
+			ImGui::SameLine();
+			if (ImGui::SmallButton("Reset##Position"))
+			{
+				widget.x = 0;
+				widget.y = 0;
+				SyncRuntimePreview();
+			}
+			if (widget.type == "TextBox" || widget.type == "Text")
+			{
+				int fontSize = widget.fontSize;
+				if (ImGui::DragInt("Font Size", &fontSize, 1.0f, 0, 200))
 				{
-					widget.texture = textureBuffer;
+					widget.fontSize = std::max(0, fontSize);
+					SyncRuntimePreview();
+				}
+				ImGui::SameLine();
+				if (ImGui::SmallButton("Reset##FontSize"))
+				{
+					widget.fontSize = 0;
 					SyncRuntimePreview();
 				}
 			}
 			else
 			{
-				char textBuffer[128] = { 0 };
-				std::snprintf(textBuffer, sizeof(textBuffer), "%s", widget.text.c_str());
-				if (ImGui::InputText("Text", textBuffer, sizeof(textBuffer)))
+				int size[2] = { widget.width, widget.height };
+				if (ImGui::Checkbox("Lock Size", &m_lockWidgetSize) && m_lockWidgetSize)
 				{
-					widget.text = textBuffer;
+					m_lockedWidgetSizeRatio = widget.height > 0 ? static_cast<float>(widget.width) / static_cast<float>(widget.height) : 1.0f;
+				}
+				if (ImGui::DragInt2("Size", size, 1.0f))
+				{
+					widget.width = std::max(1, size[0]);
+					widget.height = std::max(1, size[1]);
+					if (m_lockWidgetSize)
+					{
+						widget.height = std::max(1, static_cast<int>(std::lround(static_cast<float>(widget.width) / m_lockedWidgetSizeRatio)));
+						size[1] = widget.height;
+					}
+					SyncRuntimePreview();
+				}
+				ImGui::SameLine();
+				if (ImGui::SmallButton("Reset##Size"))
+				{
+					widget.width = 100;
+					widget.height = 30;
 					SyncRuntimePreview();
 				}
 			}
-			float position[2] = { static_cast<float>(widget.x), static_cast<float>(widget.y) };
-			if (ImGui::DragFloat2("Move", position, 1.0f))
+
+			if (widget.type == "ImageBox" || widget.type == "Image")
 			{
-				widget.x = static_cast<int>(position[0]);
-				widget.y = static_cast<int>(position[1]);
+				const char* textureLabel = widget.texture.empty() ? "<No Texture>" : widget.texture.c_str();
+				ImGui::Text("Texture: %s", textureLabel);
+				if (ImGui::Button("Browse...##SelectedWidgetTexture"))
+				{
+					OpenTexturePicker(TexturePickerTarget::SelectedWidgetTexture);
+				}
+			}
+
+			ImGui::Separator();
+			ImGui::TextUnformatted("Bindings");
+			Level* activeLevel = gLevelManager.ActiveLevel();
+			if (ImGui::Button("Add Binding") && widget.bindEntity.empty() && widget.bindComponent.empty() && widget.bindEvent.empty())
+			{
 				SyncRuntimePreview();
 			}
-			ImGui::Separator();
-			ImGui::TextUnformatted("Event Binding");
-			const bool supportsTextBinding = widget.type == "TextBox" || widget.type == "Text";
-			Level* activeLevel = gLevelManager.ActiveLevel();
-			if (!supportsTextBinding)
-			{
-				ImGui::TextDisabled("Event text binding is available for Text widgets.");
-			}
-			else if (!activeLevel)
+			if (!activeLevel)
 			{
 				ImGui::TextDisabled("No active level is available.");
 			}
 			else
 			{
-				const char* entityLabel = widget.bindEntity.empty() ? "<Select Entity>" : widget.bindEntity.c_str();
-				if (ImGui::BeginCombo("Entity", entityLabel))
+				if (widget.bindEntity.empty() && widget.bindComponent.empty() && widget.bindEvent.empty())
 				{
-					for (const auto& entity : activeLevel->Entities())
+					ImGui::TextDisabled("No binding configured.");
+				}
+				else
+				{
+					const char* entityLabel = widget.bindEntity.empty() ? "<Select Entity>" : widget.bindEntity.c_str();
+					if (ImGui::BeginCombo("Entity", entityLabel))
 					{
-						if (!entity)
+						for (const auto& entity : activeLevel->Entities())
 						{
-							continue;
-						}
+							if (!entity)
+							{
+								continue;
+							}
 
-						const bool selected = widget.bindEntity == entity->Name();
-						if (ImGui::Selectable(entity->Name().c_str(), selected))
+							const bool selected = widget.bindEntity == entity->Name();
+							if (ImGui::Selectable(entity->Name().c_str(), selected))
+							{
+								widget.bindEntity = entity->Name();
+								widget.bindComponent.clear();
+								widget.bindEvent.clear();
+								SyncRuntimePreview();
+							}
+							if (selected)
+							{
+								ImGui::SetItemDefaultFocus();
+							}
+						}
+						ImGui::EndCombo();
+					}
+
+					Entity* boundEntity = FindEntity(activeLevel, widget.bindEntity);
+					if (!widget.bindEntity.empty() && !boundEntity)
+					{
+						ImGui::TextDisabled("The selected entity no longer exists.");
+					}
+
+					ImGui::BeginDisabled(!boundEntity);
+					const char* componentLabel = widget.bindComponent.empty() ? "<Select Component>" : widget.bindComponent.c_str();
+					if (ImGui::BeginCombo("Component", componentLabel))
+					{
+						for (Component* component : boundEntity ? boundEntity->Components() : std::vector<Component*>{})
 						{
-							widget.bindEntity = entity->Name();
+							if (!component || component->GetBindableEvents().empty())
+							{
+								continue;
+							}
+
+							const bool selected = widget.bindComponent == component->Name();
+							if (ImGui::Selectable(component->Name(), selected))
+							{
+								widget.bindComponent = component->Name();
+								widget.bindEvent.clear();
+								SyncRuntimePreview();
+							}
+							if (selected)
+							{
+								ImGui::SetItemDefaultFocus();
+							}
+						}
+						ImGui::EndCombo();
+					}
+					ImGui::EndDisabled();
+
+					Component* boundComponent = boundEntity ? boundEntity->GetComponentByName(widget.bindComponent) : nullptr;
+					if (!widget.bindComponent.empty() && boundEntity && !boundComponent)
+					{
+						ImGui::TextDisabled("The selected component no longer exists.");
+					}
+
+					ImGui::BeginDisabled(!boundComponent);
+					const char* eventLabel = widget.bindEvent.empty() ? "<Select Event>" : widget.bindEvent.c_str();
+					std::vector<BindableEvent> bindableEvents = boundComponent ? boundComponent->GetBindableEvents() : std::vector<BindableEvent>{};
+					const auto selectedEvent = std::find_if(bindableEvents.begin(), bindableEvents.end(), [&widget](const BindableEvent& event)
+					{
+						return event.name == widget.bindEvent;
+					});
+					if (selectedEvent != bindableEvents.end() && !selectedEvent->displayName.empty())
+					{
+						eventLabel = selectedEvent->displayName.c_str();
+					}
+					if (ImGui::BeginCombo("Event", eventLabel))
+					{
+						for (const BindableEvent& event : bindableEvents)
+						{
+							const bool selected = widget.bindEvent == event.name;
+							const char* label = event.displayName.empty() ? event.name.c_str() : event.displayName.c_str();
+							if (ImGui::Selectable(label, selected))
+							{
+								widget.bindEvent = event.name;
+								SyncRuntimePreview();
+							}
+							if (selected)
+							{
+								ImGui::SetItemDefaultFocus();
+							}
+						}
+						ImGui::EndCombo();
+					}
+					ImGui::EndDisabled();
+
+					if (!widget.bindEvent.empty() && boundComponent && selectedEvent == bindableEvents.end())
+					{
+						ImGui::TextDisabled("The selected event is no longer exposed.");
+					}
+
+					if (!widget.bindEntity.empty() || !widget.bindComponent.empty() || !widget.bindEvent.empty())
+					{
+						if (ImGui::Button("Clear Binding"))
+						{
+							widget.bindEntity.clear();
 							widget.bindComponent.clear();
 							widget.bindEvent.clear();
 							SyncRuntimePreview();
 						}
-						if (selected)
-						{
-							ImGui::SetItemDefaultFocus();
-						}
-					}
-					ImGui::EndCombo();
-				}
-
-				Entity* boundEntity = FindEntity(activeLevel, widget.bindEntity);
-				if (!widget.bindEntity.empty() && !boundEntity)
-				{
-					ImGui::TextDisabled("The selected entity no longer exists.");
-				}
-
-				ImGui::BeginDisabled(!boundEntity);
-				const char* componentLabel = widget.bindComponent.empty() ? "<Select Component>" : widget.bindComponent.c_str();
-				if (ImGui::BeginCombo("Component", componentLabel))
-				{
-					for (Component* component : boundEntity ? boundEntity->Components() : std::vector<Component*>{})
-					{
-						if (!component || component->GetBindableEvents().empty())
-						{
-							continue;
-						}
-
-						const bool selected = widget.bindComponent == component->Name();
-						if (ImGui::Selectable(component->Name(), selected))
-						{
-							widget.bindComponent = component->Name();
-							widget.bindEvent.clear();
-							SyncRuntimePreview();
-						}
-						if (selected)
-						{
-							ImGui::SetItemDefaultFocus();
-						}
-					}
-					ImGui::EndCombo();
-				}
-				ImGui::EndDisabled();
-
-				Component* boundComponent = boundEntity ? boundEntity->GetComponentByName(widget.bindComponent) : nullptr;
-				if (!widget.bindComponent.empty() && boundEntity && !boundComponent)
-				{
-					ImGui::TextDisabled("The selected component no longer exists.");
-				}
-
-				ImGui::BeginDisabled(!boundComponent);
-				const char* eventLabel = widget.bindEvent.empty() ? "<Select Event>" : widget.bindEvent.c_str();
-				std::vector<BindableEvent> bindableEvents = boundComponent ? boundComponent->GetBindableEvents() : std::vector<BindableEvent>{};
-				const auto selectedEvent = std::find_if(bindableEvents.begin(), bindableEvents.end(), [&widget](const BindableEvent& event)
-				{
-					return event.name == widget.bindEvent;
-				});
-				if (selectedEvent != bindableEvents.end() && !selectedEvent->displayName.empty())
-				{
-					eventLabel = selectedEvent->displayName.c_str();
-				}
-				if (ImGui::BeginCombo("Event", eventLabel))
-				{
-					for (const BindableEvent& event : bindableEvents)
-					{
-						const bool selected = widget.bindEvent == event.name;
-						const char* label = event.displayName.empty() ? event.name.c_str() : event.displayName.c_str();
-						if (ImGui::Selectable(label, selected))
-						{
-							widget.bindEvent = event.name;
-							SyncRuntimePreview();
-						}
-						if (selected)
-						{
-							ImGui::SetItemDefaultFocus();
-						}
-					}
-					ImGui::EndCombo();
-				}
-				ImGui::EndDisabled();
-
-				if (!widget.bindEvent.empty() && boundComponent && selectedEvent == bindableEvents.end())
-				{
-					ImGui::TextDisabled("The selected event is no longer exposed.");
-				}
-
-				if (!widget.bindEntity.empty() || !widget.bindComponent.empty() || !widget.bindEvent.empty())
-				{
-					if (ImGui::Button("Clear Binding"))
-					{
-						widget.bindEntity.clear();
-						widget.bindComponent.clear();
-						widget.bindEvent.clear();
-						SyncRuntimePreview();
 					}
 				}
 			}
@@ -730,6 +841,11 @@ void GameGUICreator::DrawCreateWidgetPopup()
 		else if (m_newWidgetIsImage)
 		{
 			ImGui::InputText("Texture", m_newWidgetTexture, sizeof(m_newWidgetTexture));
+			ImGui::SameLine();
+			if (ImGui::Button("Browse...##NewWidgetTexture"))
+			{
+				OpenTexturePicker(TexturePickerTarget::NewWidgetTexture);
+			}
 		}
 		else
 		{
@@ -778,6 +894,159 @@ void GameGUICreator::DrawCreateWidgetPopup()
 		}
 		ImGui::EndPopup();
 	}
+}
+
+void GameGUICreator::DrawTexturePickerPopup()
+{
+	if (m_showTexturePickerPopup)
+	{
+		ImGui::OpenPopup("Select Texture");
+		m_showTexturePickerPopup = false;
+	}
+
+	if (!ImGui::BeginPopupModal("Select Texture", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		return;
+	}
+
+	if (m_texturePickerRootDirectory.empty())
+	{
+		m_texturePickerRootDirectory = TextureDirectory();
+		m_texturePickerCurrentDirectory = m_texturePickerRootDirectory;
+	}
+
+	ImGui::Text("Root: %s", m_texturePickerRootDirectory.generic_string().c_str());
+	ImGui::Text("Current: %s", m_texturePickerCurrentDirectory.generic_string().c_str());
+	const bool canGoUp = !m_texturePickerCurrentDirectory.empty() && m_texturePickerCurrentDirectory != m_texturePickerRootDirectory;
+	if (ImGui::Button("Up") && canGoUp)
+	{
+		m_texturePickerCurrentDirectory = m_texturePickerCurrentDirectory.parent_path();
+		m_texturePickerSelectedPath.clear();
+	}
+
+	ImGui::BeginChild("TextureFileExplorer", ImVec2(640.0f, 320.0f), true);
+	std::error_code ec;
+	if (!std::filesystem::exists(m_texturePickerCurrentDirectory, ec) || ec)
+	{
+		ImGui::TextDisabled("Texture directory does not exist.");
+	}
+	else
+	{
+		std::vector<std::filesystem::directory_entry> directories;
+		std::vector<std::filesystem::directory_entry> files;
+		for (const auto& entry : std::filesystem::directory_iterator(m_texturePickerCurrentDirectory, ec))
+		{
+			if (ec)
+			{
+				break;
+			}
+
+			if (entry.is_directory())
+			{
+				directories.push_back(entry);
+			}
+			else if (entry.is_regular_file() && IsSupportedTextureFile(entry.path()))
+			{
+				files.push_back(entry);
+			}
+		}
+
+		const auto sortEntries = [](std::vector<std::filesystem::directory_entry>& entries)
+		{
+			std::sort(entries.begin(), entries.end(), [](const std::filesystem::directory_entry& a, const std::filesystem::directory_entry& b)
+			{
+				return a.path().filename().string() < b.path().filename().string();
+			});
+		};
+		sortEntries(directories);
+		sortEntries(files);
+
+		for (const auto& entry : directories)
+		{
+			const std::string label = "[Dir] " + entry.path().filename().string();
+			if (ImGui::Selectable(label.c_str(), false))
+			{
+				m_texturePickerCurrentDirectory = entry.path();
+				m_texturePickerSelectedPath.clear();
+			}
+		}
+
+		for (const auto& entry : files)
+		{
+			const bool selected = m_texturePickerSelectedPath == entry.path();
+			if (ImGui::Selectable(entry.path().filename().string().c_str(), selected))
+			{
+				m_texturePickerSelectedPath = entry.path();
+			}
+		}
+
+		if (directories.empty() && files.empty())
+		{
+			ImGui::TextDisabled("No texture files found in this directory.");
+		}
+	}
+	ImGui::EndChild();
+
+	if (!m_texturePickerSelectedPath.empty())
+	{
+		ImGui::Text("Selected: %s", MakePortableTexturePath(m_texturePickerSelectedPath).c_str());
+	}
+	else
+	{
+		ImGui::TextDisabled("Selected: <None>");
+	}
+
+	const bool canSelect = !m_texturePickerSelectedPath.empty();
+	if (ImGui::Button("Select") && canSelect)
+	{
+		const TexturePickerTarget target = m_texturePickerTarget;
+		const std::string portablePath = MakePortableTexturePath(m_texturePickerSelectedPath);
+		if (target == TexturePickerTarget::NewWidgetTexture)
+		{
+			std::snprintf(m_newWidgetTexture, sizeof(m_newWidgetTexture), "%s", portablePath.c_str());
+		}
+		else if (target == TexturePickerTarget::SelectedWidgetTexture &&
+			m_selectedAssetIndex >= 0 && m_selectedAssetIndex < static_cast<int>(m_assets.size()))
+		{
+			GameGUIAsset& asset = CurrentAsset();
+			if (m_selectedWidgetIndex >= 0 && m_selectedWidgetIndex < static_cast<int>(asset.widgets.size()))
+			{
+				asset.widgets[static_cast<std::size_t>(m_selectedWidgetIndex)].texture = portablePath;
+				SyncRuntimePreview();
+			}
+		}
+
+		m_texturePickerTarget = TexturePickerTarget::None;
+		m_texturePickerSelectedPath.clear();
+		if (target == TexturePickerTarget::NewWidgetTexture)
+		{
+			m_showCreateWidgetPopup = true;
+		}
+		ImGui::CloseCurrentPopup();
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Cancel"))
+	{
+		const TexturePickerTarget target = m_texturePickerTarget;
+		m_texturePickerTarget = TexturePickerTarget::None;
+		m_texturePickerSelectedPath.clear();
+		if (target == TexturePickerTarget::NewWidgetTexture)
+		{
+			m_showCreateWidgetPopup = true;
+		}
+		ImGui::CloseCurrentPopup();
+	}
+
+	ImGui::EndPopup();
+}
+
+void GameGUICreator::OpenTexturePicker(TexturePickerTarget target)
+{
+	m_texturePickerTarget = target;
+	m_texturePickerRootDirectory = TextureDirectory();
+	m_texturePickerCurrentDirectory = m_texturePickerRootDirectory;
+	m_texturePickerSelectedPath.clear();
+	m_showTexturePickerPopup = true;
 }
 
 void GameGUICreator::AddGameGUIAsset(const std::string& name)
@@ -862,6 +1131,7 @@ void GameGUICreator::AddTextWidget()
 	text.layer = "Main";
 	text.width = 360;
 	text.height = 48;
+	text.fontSize = 0;
 	text.action = GameGUIActionType::None;
 
 	int framebufferWidth = 0;
@@ -910,6 +1180,7 @@ void GameGUICreator::AddImageWidget()
 	image.layer = "Main";
 	image.width = 256;
 	image.height = 256;
+	image.fontSize = 0;
 	image.action = GameGUIActionType::None;
 
 	int framebufferWidth = 0;
@@ -975,6 +1246,7 @@ void GameGUICreator::SaveCurrentAsset()
 		json << "      \"y\": " << widget.y << ",\n";
 		json << "      \"width\": " << widget.width << ",\n";
 		json << "      \"height\": " << widget.height << ",\n";
+		json << "      \"fontSize\": " << widget.fontSize << ",\n";
 		json << "      \"visible\": " << (widget.visible ? "true" : "false") << ",\n";
 		json << "      \"alpha\": " << widget.alpha << ",\n";
 		json << "      \"action\": \"" << ActionToString(widget.action) << "\",\n";

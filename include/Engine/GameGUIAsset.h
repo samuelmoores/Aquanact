@@ -24,6 +24,7 @@ struct GameGUIWidgetDef
 	int y = 0;
 	int width = 100;
 	int height = 30;
+	int fontSize = 0;
 	bool visible = true;
 	float alpha = 1.0f;
 	GameGUIActionType action = GameGUIActionType::None;
