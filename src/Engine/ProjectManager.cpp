@@ -2,6 +2,7 @@
 
 #include "Engine/Debug.h"
 #include "Engine/Controller.h"
+#include "Engine/PlayerController.h"
 #include "Engine/AnimatorComponent.h"
 #include "Engine/Globals.h"
 #include "Engine/Entity.h"
@@ -215,7 +216,7 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const LevelM
 		return false;
 	}
 
-	std::string contents = "AquanactProject 11\n";
+	std::string contents = "AquanactProject 12\n";
 	const auto& levels = levelManager.Levels();
 	if (levels.empty())
 	{
@@ -263,7 +264,15 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const LevelM
 					continue;
 				}
 
-				if (Controller* controller = object->GetController())
+				if (const PlayerController* playerController = object->GetComponent<PlayerController>())
+				{
+					contents += "component;";
+					contents += EscapeField(MakePortableSourcePath(path, object->SourcePath()).string());
+					contents += ";playercontroller;";
+					contents += std::to_string(playerController->MoveSpeed());
+					contents += "\n";
+				}
+				else if (Controller* controller = object->GetController())
 				{
 					contents += "component;";
 					contents += EscapeField(MakePortableSourcePath(path, object->SourcePath()).string());
@@ -415,6 +424,10 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 	{
 		projectVersion = 11;
 	}
+	else if (header == "AquanactProject 12")
+	{
+		projectVersion = 12;
+	}
 	else
 	{
 		return false;
@@ -424,6 +437,7 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 		std::filesystem::path sourcePath;
 		float moveSpeed = 50.0f;
 		std::string levelName;
+		bool playerControlled = false;
 	};
 	struct PendingComponent {
 		std::filesystem::path sourcePath;
@@ -586,7 +600,8 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 			continue;
 		}
 
-		if (fields.size() == 4 && fields[0] == "component" && fields[2] == "controller")
+		if (fields.size() == 4 && fields[0] == "component" &&
+			(fields[2] == "controller" || fields[2] == "playercontroller"))
 		{
 			try
 			{
@@ -598,7 +613,8 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 				pendingControllers.push_back(PendingController{
 					ResolveSourcePath(path, fields[1]),
 					std::stof(fields[3]),
-					currentLevel ? currentLevel->name : std::string()
+					currentLevel ? currentLevel->name : std::string(),
+					fields[2] == "playercontroller" || projectVersion <= 11
 				});
 			}
 			catch (const std::exception& ex)
@@ -885,7 +901,9 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 				continue;
 			}
 
-			Controller* controller = object->AddComponent<Controller>();
+			Controller* controller = pendingController.playerControlled
+				? static_cast<Controller*>(object->AddComponent<PlayerController>())
+				: object->AddComponent<Controller>();
 			controller->SetMoveSpeed(pendingController.moveSpeed);
 			break;
 		}

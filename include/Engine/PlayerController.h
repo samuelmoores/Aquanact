@@ -1,0 +1,21 @@
+#pragma once
+
+#include "Engine/Controller.h"
+
+class Input;
+
+class PlayerController final : public Controller
+{
+public:
+	PlayerController() = default;
+
+	const char* Name() const override { return "PlayerController"; }
+	void startUp(Entity& owner) override;
+	void Update(Entity& owner, float dt) override;
+
+	void SetInputDevice(const Input& input) { m_inputDevice = &input; }
+	const Input* InputDevice() const { return m_inputDevice; }
+
+private:
+	const Input* m_inputDevice = nullptr;
+};

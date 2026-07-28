@@ -14,6 +14,7 @@
 #include "Engine/Camera.h"
 #include "Engine/Entity.h"
 #include "Engine/Controller.h"
+#include "Engine/PlayerController.h"
 #include "Engine/AnimatorComponent.h"
 #include "Game/Enemy.h"
 #include "Game/PlayerHealth.h"
@@ -118,7 +119,7 @@ namespace {
 		{
 			for (const BindableMember& member : source.members)
 			{
-				if (source.componentName == "Controller" && member.name == "IsMoving")
+				if ((source.componentName == "PlayerController" || source.componentName == "Controller") && member.name == "IsMoving")
 				{
 					operand.type = AnimatorComponent::OperandType::Binding;
 					operand.componentName = source.componentName;
@@ -748,6 +749,13 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 				const bool hasPlayerHealth = object->GetComponent<PlayerHealth>() != nullptr;
 				const bool hasEnemy = object->GetComponent<Enemy>() != nullptr;
 				const bool hasAnimator = object->GetComponent<AnimatorComponent>() != nullptr;
+
+				ImGui::BeginDisabled(hasController);
+				if (ImGui::Selectable("PlayerController"))
+				{
+					object->AddComponent<PlayerController>();
+				}
+				ImGui::EndDisabled();
 
 				ImGui::BeginDisabled(hasController);
 				if (ImGui::Selectable("Controller"))

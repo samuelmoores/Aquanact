@@ -5,7 +5,7 @@
 
 class Entity;
 
-class Controller final : public Component {
+class Controller : public Component {
 public:
 	Controller() = default;
 
@@ -17,12 +17,20 @@ public:
 	bool IsMoving() const { return m_isMoving; }
 	std::vector<BindableMember> GetBindableMembers() const override;
 	bool TryGetBindableValue(const std::string& memberName, float& value) const override;
+	void SetMovementDirection(const glm::vec3& direction);
+	void StopMoving();
+	const glm::vec3& MovementDirection() const { return m_movementDirection; }
 
 	void Update(Entity&, float) override;
 
-private:
+	protected:
+	void SetDiagnosticInput(const glm::vec3& input) { m_diagnosticInput = input; }
+	void ApplyMovement(Entity& owner, float dt);
+
 	float m_moveSpeed = 50.0f;
 	bool m_isMoving = false;
 	float m_movementDeadzone = 0.01f;
+	glm::vec3 m_movementDirection{ 0.0f };
+	glm::vec3 m_diagnosticInput{ 0.0f };
 };
 

@@ -1,10 +1,8 @@
 #include "Engine/Controller.h"
 
-#include "Engine/Input.h"
-#include "Engine/Globals.h"
 #include "Engine/Debug.h"
-#include "Engine/RenderManager.h"
 #include "Engine/Entity.h"
+#include "Engine/Globals.h"
 
 #include <cmath>
 
@@ -31,55 +29,38 @@ bool Controller::TryGetBindableValue(const std::string& memberName, float& value
 	return false;
 }
 
-void Controller::Update(Entity&, float dt)
+void Controller::SetMovementDirection(const glm::vec3& direction)
 {
-	Entity* owner = Owner();
-	if (owner == nullptr)
-	{
-		gDebug.SetGameplayDiagnostics("<unbound>", glm::vec3(0.0f), m_moveSpeed, dt, glm::vec3(0.0f), glm::vec3(0.0f));
-		return;
-	}
-
-	const glm::vec3 moveInput = gInput.MoveInput();
-	const float inputMagnitude = glm::length(glm::vec2(moveInput.x, moveInput.z));
-	if (inputMagnitude <= m_movementDeadzone)
-	{
-		m_isMoving = false;
-		gDebug.SetGameplayDiagnostics(owner->Name(), moveInput, m_moveSpeed, dt, glm::vec3(0.0f), owner->Position());
-		return;
-	}
-
-	glm::vec3 forward = gRenderManager.GetGameCamera().GetFacing();
-	forward.y = 0.0f;
-	if (glm::length(forward) <= 0.0001f)
-	{
-		forward = glm::vec3(0.0f, 0.0f, 1.0f);
-	}
-	forward = glm::normalize(forward);
-
-	glm::vec3 right = glm::cross(forward, glm::vec3(0.0f, 1.0f, 0.0f));
-	if (glm::length(right) <= 0.0001f)
-	{
-		right = glm::vec3(1.0f, 0.0f, 0.0f);
-	}
-	right = glm::normalize(right);
-
-	glm::vec3 movement = forward * moveInput.z + right * moveInput.x;
-	movement.y = 0.0f;
-	if (glm::length(movement) <= 0.0001f)
-	{
-		m_isMoving = false;
-		gDebug.SetGameplayDiagnostics(owner->Name(), moveInput, m_moveSpeed, dt, glm::vec3(0.0f), owner->Position());
-		return;
-	}
-
-	movement = glm::normalize(movement);
-	m_isMoving = true;
-	const float targetYaw = std::atan2(movement.x, movement.z);
-	owner->SetRotation(glm::vec3(owner->Rotation().x, targetYaw, owner->Rotation().z));
-
-	const glm::vec3 delta = movement * m_moveSpeed * dt;
-	owner->Move(delta);
-	gDebug.SetGameplayDiagnostics(owner->Name(), moveInput, m_moveSpeed, dt, delta, owner->Position());
+	m_movementDirection = direction;
+	m_diagnosticInput = direction;
 }
 
+void Controller::StopMoving()
+{
+	m_movementDirection = glm::vec3(0.0f);
+	m_diagnosticInput = glm::vec3(0.0f);
+}
+
+void Controller::Update(Entity& owner, float dt)
+{
+	ApplyMovement(owner, dt);
+}
+
+void Controller::ApplyMovement(Entity& owner, float dt)
+{
+	if (glm::length(m_movementDirection) <= m_movementDeadzone)
+	{
+		m_isMoving = false;
+		gDebug.SetGameplayDiagnostics(owner.Name(), m_diagnosticInput, m_moveSpeed, dt, glm::vec3(0.0f), owner.Position());
+		return;
+	}
+
+	const glm::vec3 movement = glm::normalize(m_movementDirection);
+	m_isMoving = true;
+	const float targetYaw = std::atan2(movement.x, movement.z);
+	owner.SetRotation(glm::vec3(owner.Rotation().x, targetYaw, owner.Rotation().z));
+
+	const glm::vec3 delta = movement * m_moveSpeed * dt;
+	owner.Move(delta);
+	gDebug.SetGameplayDiagnostics(owner.Name(), m_diagnosticInput, m_moveSpeed, dt, delta, owner.Position());
+}

@@ -2,6 +2,7 @@
 
 #include "Engine/Entity.h"
 #include "Engine/Animation.h"
+#include "Engine/Controller.h"
 #include <algorithm>
 #include <filesystem>
 #include <sstream>
@@ -384,6 +385,11 @@ bool AnimatorComponent::ResolveOperand(const Operand& operand, const Entity& own
 	}
 
 	const Component* component = owner.GetComponentByName(operand.componentName);
+	if (!component && operand.componentName == "Controller")
+	{
+		// Preserve bindings saved before Controller was split into base and player components.
+		component = owner.GetComponent<Controller>();
+	}
 	return component && component->TryGetBindableValue(operand.memberName, value);
 }
 
