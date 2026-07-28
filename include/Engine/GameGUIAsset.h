@@ -30,6 +30,7 @@ struct GameGUIWidgetDef
 	GameGUIActionType action = GameGUIActionType::None;
 	std::string bindEntity;
 	std::string bindComponent;
+	std::string bindMember;
 	std::string bindEvent;
 };
 

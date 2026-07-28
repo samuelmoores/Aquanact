@@ -16,6 +16,7 @@
 #include <MYGUI/MyGUI_Button.h>
 #include <MYGUI/MyGUI_Gui.h>
 #include <MYGUI/MyGUI_ImageBox.h>
+#include <MYGUI/MyGUI_ProgressBar.h>
 #include <MYGUI/MyGUI_TextBox.h>
 #include <MYGUI/MyGUI_OpenGLDataManager.h>
 #include <MYGUI/MyGUI_OpenGLPlatform.h>
@@ -28,6 +29,43 @@
 #include <Engine/Texture.h>
 
 namespace {
+	float ReadProgressPercent(const GameGUIWidgetDef& def)
+	{
+		if (def.bindEntity.empty() || def.bindComponent.empty() || def.bindMember.empty())
+		{
+			return 0.0f;
+		}
+
+		Level* activeLevel = gLevelManager.ActiveLevel();
+		if (!activeLevel)
+		{
+			return 0.0f;
+		}
+
+		for (const auto& entity : activeLevel->Entities())
+		{
+			if (!entity || entity->Name() != def.bindEntity)
+			{
+				continue;
+			}
+
+			Component* component = entity->GetComponentByName(def.bindComponent);
+			if (!component)
+			{
+				return 0.0f;
+			}
+
+			float value = 0.0f;
+			if (!component->TryGetBindableValue(def.bindMember, value))
+			{
+				return 0.0f;
+			}
+			return std::clamp(value, 0.0f, 100.0f) / 100.0f;
+		}
+
+		return 0.0f;
+	}
+
 	std::filesystem::path ResolveGameGUIImagePath(const std::string& filename)
 	{
 		const std::filesystem::path requestedPath(filename);
@@ -224,6 +262,30 @@ void GameGUI::Draw()
 	if (!m_initialized)
 	{
 		return;
+	}
+
+	for (const GameGUIWidgetDef& widget : m_loadedAsset.widgets)
+	{
+		if (widget.type != "ProgressBar")
+		{
+			continue;
+		}
+
+		auto it = m_runtimeWidgetLookup.find(widget.name);
+		if (it == m_runtimeWidgetLookup.end())
+		{
+			continue;
+		}
+
+		auto* image = dynamic_cast<MyGUI::ImageBox*>(it->second);
+		if (!image)
+		{
+			continue;
+		}
+
+		const float percent = ReadProgressPercent(widget);
+		const int width = std::max(1, static_cast<int>(std::lround(static_cast<float>(widget.width) * percent)));
+		image->setSize(width, widget.height);
 	}
 
 	// MyGUI needs a per-frame tick so internal widget state and input-driven updates
@@ -432,6 +494,27 @@ MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::
 				"', type='" + def.type +
 				"', skin='" + def.skin +
 				"', layer='" + def.layer + "'");
+			return image;
+		}
+	}
+	else if (def.type == "ProgressBar")
+	{
+		const std::string skin = def.skin.empty() ? "ImageBox" : def.skin;
+		MyGUI::ImageBox* image = parent ?
+			parent->createWidget<MyGUI::ImageBox>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.name) :
+			m_gui->createWidget<MyGUI::ImageBox>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.layer, def.name);
+		if (image)
+		{
+			if (!def.texture.empty())
+			{
+				image->setImageTexture(def.texture);
+			}
+			image->setVisible(def.visible);
+			image->setAlpha(def.alpha);
+			if (!parent)
+			{
+				MyGUI::LayerManager::getInstance().upLayerItem(image);
+			}
 			return image;
 		}
 	}

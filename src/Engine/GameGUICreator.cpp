@@ -236,6 +236,7 @@ namespace {
 			widget.action = StringToAction(readField("\"action\":", widgetPos));
 			widget.bindEntity = readField("\"bindEntity\":", widgetPos);
 			widget.bindComponent = readField("\"bindComponent\":", widgetPos);
+			widget.bindMember = readField("\"bindMember\":", widgetPos);
 			widget.bindEvent = readField("\"bindEvent\":", widgetPos);
 			asset.widgets.push_back(widget);
 			widgetPos = contents.find("\"type\": \"", widgetPos + 1);
@@ -282,10 +283,12 @@ void GameGUICreator::startUp(Window& window)
 	m_lockWidgetSize = false;
 	m_newWidgetAction = GameGUIActionType::None;
 	m_showTexturePickerPopup = false;
+	m_showBindingPopup = false;
 	m_texturePickerTarget = TexturePickerTarget::None;
 	m_texturePickerRootDirectory.clear();
 	m_texturePickerCurrentDirectory.clear();
 	m_texturePickerSelectedPath.clear();
+	m_bindingWidgetName.clear();
 	m_lockedWidgetSizeRatio = 1.0f;
 	m_initialized = true;
 	if (!m_assets.empty())
@@ -314,6 +317,8 @@ void GameGUICreator::shutDown()
 	m_texturePickerRootDirectory.clear();
 	m_texturePickerCurrentDirectory.clear();
 	m_texturePickerSelectedPath.clear();
+	m_showBindingPopup = false;
+	m_bindingWidgetName.clear();
 	m_lockedWidgetSizeRatio = 1.0f;
 	m_assets.clear();
 	m_selectedAssetIndex = -1;
@@ -409,6 +414,7 @@ void GameGUICreator::Draw(const Camera&)
 				m_showCreateWidgetPopup = true;
 				m_newWidgetIsText = false;
 				m_newWidgetIsImage = false;
+				m_newWidgetIsProgressBar = false;
 				m_newWidgetName[0] = '\0';
 				m_newWidgetText[0] = '\0';
 				m_newWidgetTexture[0] = '\0';
@@ -418,6 +424,7 @@ void GameGUICreator::Draw(const Camera&)
 				m_showCreateWidgetPopup = true;
 				m_newWidgetIsText = true;
 				m_newWidgetIsImage = false;
+				m_newWidgetIsProgressBar = false;
 				m_newWidgetName[0] = '\0';
 				std::snprintf(m_newWidgetText, sizeof(m_newWidgetText), "New Text");
 				m_newWidgetTexture[0] = '\0';
@@ -427,6 +434,17 @@ void GameGUICreator::Draw(const Camera&)
 				m_showCreateWidgetPopup = true;
 				m_newWidgetIsText = false;
 				m_newWidgetIsImage = true;
+				m_newWidgetIsProgressBar = false;
+				m_newWidgetName[0] = '\0';
+				m_newWidgetText[0] = '\0';
+				std::snprintf(m_newWidgetTexture, sizeof(m_newWidgetTexture), "textures/example.png");
+			}
+			if (ImGui::MenuItem("Create Progress Bar", nullptr, false, m_selectedAssetIndex >= 0))
+			{
+				m_showCreateWidgetPopup = true;
+				m_newWidgetIsText = false;
+				m_newWidgetIsImage = false;
+				m_newWidgetIsProgressBar = true;
 				m_newWidgetName[0] = '\0';
 				m_newWidgetText[0] = '\0';
 				std::snprintf(m_newWidgetTexture, sizeof(m_newWidgetTexture), "textures/example.png");
@@ -438,6 +456,7 @@ void GameGUICreator::Draw(const Camera&)
 
 	DrawCreateAssetPopup();
 	DrawCreateWidgetPopup();
+	DrawBindingPopup();
 	DrawTexturePickerPopup();
 
 	ImGui::Begin("GameGUI Assets");
@@ -630,7 +649,7 @@ void GameGUICreator::Draw(const Camera&)
 				}
 			}
 
-			if (widget.type == "ImageBox" || widget.type == "Image")
+			if (widget.type == "ImageBox" || widget.type == "Image" || widget.type == "ProgressBar")
 			{
 				const char* textureLabel = widget.texture.empty() ? "<No Texture>" : widget.texture.c_str();
 				ImGui::Text("Texture: %s", textureLabel);
@@ -642,134 +661,30 @@ void GameGUICreator::Draw(const Camera&)
 
 			ImGui::Separator();
 			ImGui::TextUnformatted("Bindings");
-			Level* activeLevel = gLevelManager.ActiveLevel();
-			if (ImGui::Button("Add Binding") && widget.bindEntity.empty() && widget.bindComponent.empty() && widget.bindEvent.empty())
+			if (ImGui::Button("Add Binding"))
 			{
-				SyncRuntimePreview();
+				m_bindingWidgetName = widget.name;
+				m_showBindingPopup = true;
 			}
-			if (!activeLevel)
+			if (!widget.bindEntity.empty() || !widget.bindComponent.empty() || !widget.bindMember.empty() || !widget.bindEvent.empty())
 			{
-				ImGui::TextDisabled("No active level is available.");
-			}
-			else
-			{
-				if (widget.bindEntity.empty() && widget.bindComponent.empty() && widget.bindEvent.empty())
+				ImGui::Text("Entity: %s", widget.bindEntity.empty() ? "<None>" : widget.bindEntity.c_str());
+				ImGui::Text("Component: %s", widget.bindComponent.empty() ? "<None>" : widget.bindComponent.c_str());
+				if (widget.type == "ProgressBar")
 				{
-					ImGui::TextDisabled("No binding configured.");
+					ImGui::Text("Member: %s", widget.bindMember.empty() ? "<None>" : widget.bindMember.c_str());
 				}
 				else
 				{
-					const char* entityLabel = widget.bindEntity.empty() ? "<Select Entity>" : widget.bindEntity.c_str();
-					if (ImGui::BeginCombo("Entity", entityLabel))
-					{
-						for (const auto& entity : activeLevel->Entities())
-						{
-							if (!entity)
-							{
-								continue;
-							}
-
-							const bool selected = widget.bindEntity == entity->Name();
-							if (ImGui::Selectable(entity->Name().c_str(), selected))
-							{
-								widget.bindEntity = entity->Name();
-								widget.bindComponent.clear();
-								widget.bindEvent.clear();
-								SyncRuntimePreview();
-							}
-							if (selected)
-							{
-								ImGui::SetItemDefaultFocus();
-							}
-						}
-						ImGui::EndCombo();
-					}
-
-					Entity* boundEntity = FindEntity(activeLevel, widget.bindEntity);
-					if (!widget.bindEntity.empty() && !boundEntity)
-					{
-						ImGui::TextDisabled("The selected entity no longer exists.");
-					}
-
-					ImGui::BeginDisabled(!boundEntity);
-					const char* componentLabel = widget.bindComponent.empty() ? "<Select Component>" : widget.bindComponent.c_str();
-					if (ImGui::BeginCombo("Component", componentLabel))
-					{
-						for (Component* component : boundEntity ? boundEntity->Components() : std::vector<Component*>{})
-						{
-							if (!component || component->GetBindableEvents().empty())
-							{
-								continue;
-							}
-
-							const bool selected = widget.bindComponent == component->Name();
-							if (ImGui::Selectable(component->Name(), selected))
-							{
-								widget.bindComponent = component->Name();
-								widget.bindEvent.clear();
-								SyncRuntimePreview();
-							}
-							if (selected)
-							{
-								ImGui::SetItemDefaultFocus();
-							}
-						}
-						ImGui::EndCombo();
-					}
-					ImGui::EndDisabled();
-
-					Component* boundComponent = boundEntity ? boundEntity->GetComponentByName(widget.bindComponent) : nullptr;
-					if (!widget.bindComponent.empty() && boundEntity && !boundComponent)
-					{
-						ImGui::TextDisabled("The selected component no longer exists.");
-					}
-
-					ImGui::BeginDisabled(!boundComponent);
-					const char* eventLabel = widget.bindEvent.empty() ? "<Select Event>" : widget.bindEvent.c_str();
-					std::vector<BindableEvent> bindableEvents = boundComponent ? boundComponent->GetBindableEvents() : std::vector<BindableEvent>{};
-					const auto selectedEvent = std::find_if(bindableEvents.begin(), bindableEvents.end(), [&widget](const BindableEvent& event)
-					{
-						return event.name == widget.bindEvent;
-					});
-					if (selectedEvent != bindableEvents.end() && !selectedEvent->displayName.empty())
-					{
-						eventLabel = selectedEvent->displayName.c_str();
-					}
-					if (ImGui::BeginCombo("Event", eventLabel))
-					{
-						for (const BindableEvent& event : bindableEvents)
-						{
-							const bool selected = widget.bindEvent == event.name;
-							const char* label = event.displayName.empty() ? event.name.c_str() : event.displayName.c_str();
-							if (ImGui::Selectable(label, selected))
-							{
-								widget.bindEvent = event.name;
-								SyncRuntimePreview();
-							}
-							if (selected)
-							{
-								ImGui::SetItemDefaultFocus();
-							}
-						}
-						ImGui::EndCombo();
-					}
-					ImGui::EndDisabled();
-
-					if (!widget.bindEvent.empty() && boundComponent && selectedEvent == bindableEvents.end())
-					{
-						ImGui::TextDisabled("The selected event is no longer exposed.");
-					}
-
-					if (!widget.bindEntity.empty() || !widget.bindComponent.empty() || !widget.bindEvent.empty())
-					{
-						if (ImGui::Button("Clear Binding"))
-						{
-							widget.bindEntity.clear();
-							widget.bindComponent.clear();
-							widget.bindEvent.clear();
-							SyncRuntimePreview();
-						}
-					}
+					ImGui::Text("Event: %s", widget.bindEvent.empty() ? "<None>" : widget.bindEvent.c_str());
+				}
+				if (ImGui::Button("Clear Binding"))
+				{
+					widget.bindEntity.clear();
+					widget.bindComponent.clear();
+					widget.bindMember.clear();
+					widget.bindEvent.clear();
+					SyncRuntimePreview();
 				}
 			}
 			if (ImGui::Button("Delete Widget"))
@@ -831,14 +746,14 @@ void GameGUICreator::DrawCreateWidgetPopup()
 
 	if (ImGui::BeginPopupModal("Create Widget", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 	{
-		const char* widgetKind = m_newWidgetIsImage ? "Create an image widget:" : (m_newWidgetIsText ? "Create a text widget:" : "Create a button widget:");
+		const char* widgetKind = m_newWidgetIsProgressBar ? "Create a progress bar widget:" : (m_newWidgetIsImage ? "Create an image widget:" : (m_newWidgetIsText ? "Create a text widget:" : "Create a button widget:"));
 		ImGui::TextUnformatted(widgetKind);
 		ImGui::InputText("Name", m_newWidgetName, sizeof(m_newWidgetName));
 		if (m_newWidgetIsText)
 		{
 			ImGui::InputText("Text", m_newWidgetText, sizeof(m_newWidgetText));
 		}
-		else if (m_newWidgetIsImage)
+		else if (m_newWidgetIsImage || m_newWidgetIsProgressBar)
 		{
 			ImGui::InputText("Texture", m_newWidgetTexture, sizeof(m_newWidgetTexture));
 			ImGui::SameLine();
@@ -875,6 +790,10 @@ void GameGUICreator::DrawCreateWidgetPopup()
 			{
 				AddTextWidget();
 			}
+			else if (m_newWidgetIsProgressBar)
+			{
+				AddProgressBarWidget();
+			}
 			else if (m_newWidgetIsImage)
 			{
 				AddImageWidget();
@@ -884,7 +803,7 @@ void GameGUICreator::DrawCreateWidgetPopup()
 				AddButtonWidget();
 			}
 			SyncRuntimePreview();
-			gDebug.LogMessage(m_newWidgetIsImage ? "Create Image requested" : (m_newWidgetIsText ? "Create Text requested" : "Create Button requested"));
+			gDebug.LogMessage(m_newWidgetIsProgressBar ? "Create Progress Bar requested" : (m_newWidgetIsImage ? "Create Image requested" : (m_newWidgetIsText ? "Create Text requested" : "Create Button requested")));
 			ImGui::CloseCurrentPopup();
 		}
 		ImGui::SameLine();
@@ -894,6 +813,205 @@ void GameGUICreator::DrawCreateWidgetPopup()
 		}
 		ImGui::EndPopup();
 	}
+}
+
+void GameGUICreator::DrawBindingPopup()
+{
+	if (m_showBindingPopup)
+	{
+		ImGui::OpenPopup("Add Binding");
+		m_showBindingPopup = false;
+	}
+
+	if (!ImGui::BeginPopupModal("Add Binding", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		return;
+	}
+
+	GameGUIAsset& asset = CurrentAsset();
+	GameGUIWidgetDef* widget = nullptr;
+	for (GameGUIWidgetDef& candidate : asset.widgets)
+	{
+		if (candidate.name == m_bindingWidgetName)
+		{
+			widget = &candidate;
+			break;
+		}
+	}
+
+	if (!widget)
+	{
+		ImGui::TextDisabled("Binding target not found.");
+		if (ImGui::Button("Close"))
+		{
+			m_bindingWidgetName.clear();
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+		return;
+	}
+
+	Level* activeLevel = gLevelManager.ActiveLevel();
+	if (!activeLevel)
+	{
+		ImGui::TextDisabled("No active level is available.");
+		if (ImGui::Button("Close"))
+		{
+			m_bindingWidgetName.clear();
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+		return;
+	}
+
+	const char* entityLabel = widget->bindEntity.empty() ? "<Select Entity>" : widget->bindEntity.c_str();
+	if (ImGui::BeginCombo("Entity", entityLabel))
+	{
+		for (const auto& entity : activeLevel->Entities())
+		{
+			if (!entity)
+			{
+				continue;
+			}
+
+			const bool selected = widget->bindEntity == entity->Name();
+			if (ImGui::Selectable(entity->Name().c_str(), selected))
+			{
+				widget->bindEntity = entity->Name();
+				widget->bindComponent.clear();
+				widget->bindMember.clear();
+				widget->bindEvent.clear();
+				SyncRuntimePreview();
+			}
+			if (selected)
+			{
+				ImGui::SetItemDefaultFocus();
+			}
+		}
+		ImGui::EndCombo();
+	}
+
+	Entity* boundEntity = FindEntity(activeLevel, widget->bindEntity);
+	ImGui::BeginDisabled(!boundEntity);
+	const char* componentLabel = widget->bindComponent.empty() ? "<Select Component>" : widget->bindComponent.c_str();
+	if (ImGui::BeginCombo("Component", componentLabel))
+	{
+		for (Component* component : boundEntity ? boundEntity->Components() : std::vector<Component*>{})
+		{
+			if (!component)
+			{
+				continue;
+			}
+
+			if (widget->type == "ProgressBar")
+			{
+				if (component->GetBindableMembers().empty())
+				{
+					continue;
+				}
+			}
+			else if (component->GetBindableEvents().empty())
+			{
+				continue;
+			}
+
+			const bool selected = widget->bindComponent == component->Name();
+			if (ImGui::Selectable(component->Name(), selected))
+			{
+				widget->bindComponent = component->Name();
+				widget->bindMember.clear();
+				widget->bindEvent.clear();
+				SyncRuntimePreview();
+			}
+			if (selected)
+			{
+				ImGui::SetItemDefaultFocus();
+			}
+		}
+		ImGui::EndCombo();
+	}
+	ImGui::EndDisabled();
+
+	Component* boundComponent = boundEntity ? boundEntity->GetComponentByName(widget->bindComponent) : nullptr;
+	if (widget->type == "ProgressBar")
+	{
+		ImGui::BeginDisabled(!boundComponent);
+		const char* memberLabel = widget->bindMember.empty() ? "<Select Member>" : widget->bindMember.c_str();
+		std::vector<BindableMember> bindableMembers = boundComponent ? boundComponent->GetBindableMembers() : std::vector<BindableMember>{};
+		const auto selectedMember = std::find_if(bindableMembers.begin(), bindableMembers.end(), [&widget](const BindableMember& member)
+		{
+			return member.name == widget->bindMember;
+		});
+		if (selectedMember != bindableMembers.end() && !selectedMember->displayName.empty())
+		{
+			memberLabel = selectedMember->displayName.c_str();
+		}
+		if (ImGui::BeginCombo("Member", memberLabel))
+		{
+			for (const BindableMember& member : bindableMembers)
+			{
+				if (member.typeName != "int" && member.typeName != "float")
+				{
+					continue;
+				}
+
+				const bool selected = widget->bindMember == member.name;
+				const char* label = member.displayName.empty() ? member.name.c_str() : member.displayName.c_str();
+				if (ImGui::Selectable(label, selected))
+				{
+					widget->bindMember = member.name;
+					SyncRuntimePreview();
+				}
+				if (selected)
+				{
+					ImGui::SetItemDefaultFocus();
+				}
+			}
+			ImGui::EndCombo();
+		}
+		ImGui::EndDisabled();
+	}
+	else
+	{
+		ImGui::BeginDisabled(!boundComponent);
+		const char* eventLabel = widget->bindEvent.empty() ? "<Select Event>" : widget->bindEvent.c_str();
+		std::vector<BindableEvent> bindableEvents = boundComponent ? boundComponent->GetBindableEvents() : std::vector<BindableEvent>{};
+		const auto selectedEvent = std::find_if(bindableEvents.begin(), bindableEvents.end(), [&widget](const BindableEvent& event)
+		{
+			return event.name == widget->bindEvent;
+		});
+		if (selectedEvent != bindableEvents.end() && !selectedEvent->displayName.empty())
+		{
+			eventLabel = selectedEvent->displayName.c_str();
+		}
+		if (ImGui::BeginCombo("Event", eventLabel))
+		{
+			for (const BindableEvent& event : bindableEvents)
+			{
+				const bool selected = widget->bindEvent == event.name;
+				const char* label = event.displayName.empty() ? event.name.c_str() : event.displayName.c_str();
+				if (ImGui::Selectable(label, selected))
+				{
+					widget->bindEvent = event.name;
+					SyncRuntimePreview();
+				}
+				if (selected)
+				{
+					ImGui::SetItemDefaultFocus();
+				}
+			}
+			ImGui::EndCombo();
+		}
+		ImGui::EndDisabled();
+	}
+
+	if (ImGui::Button("Close"))
+	{
+		m_bindingWidgetName.clear();
+		ImGui::CloseCurrentPopup();
+	}
+
+	ImGui::EndPopup();
 }
 
 void GameGUICreator::DrawTexturePickerPopup()
@@ -1214,6 +1332,56 @@ void GameGUICreator::AddImageWidget()
 		", size=(" + std::to_string(image.width) + "x" + std::to_string(image.height) + ")");
 }
 
+void GameGUICreator::AddProgressBarWidget()
+{
+	if (m_selectedAssetIndex < 0 || m_selectedAssetIndex >= static_cast<int>(m_assets.size()))
+	{
+		gDebug.LogMessage("AddProgressBarWidget skipped: no active GameGUI asset");
+		return;
+	}
+
+	GameGUIWidgetDef progress;
+	progress.type = "ProgressBar";
+	progress.name = m_newWidgetName[0] != '\0' ? m_newWidgetName : "progress";
+	progress.skin = "ImageBox";
+	progress.texture = m_newWidgetTexture[0] != '\0' ? m_newWidgetTexture : "textures/example.png";
+	progress.layer = "Main";
+	progress.width = 256;
+	progress.height = 32;
+	progress.fontSize = 0;
+	progress.action = GameGUIActionType::None;
+
+	int framebufferWidth = 0;
+	int framebufferHeight = 0;
+	if (m_window)
+	{
+		m_window->GetFramebufferSize(framebufferWidth, framebufferHeight);
+	}
+	progress.x = std::max(0, (framebufferWidth - progress.width) / 2);
+	progress.y = std::max(0, (framebufferHeight - progress.height) / 2);
+
+	GameGUIAsset& asset = CurrentAsset();
+	int suffix = 1;
+	while (std::any_of(asset.widgets.begin(), asset.widgets.end(), [&progress](const GameGUIWidgetDef& widget)
+	{
+		return widget.name == progress.name;
+	}))
+	{
+		progress.name = "progress_" + std::to_string(++suffix);
+	}
+
+	asset.widgets.push_back(progress);
+	m_selectedWidgetIndex = static_cast<int>(asset.widgets.size() - 1);
+	m_newWidgetName[0] = '\0';
+	m_newWidgetTexture[0] = '\0';
+	gDebug.LogMessage(
+		std::string("Created GameGUI progress bar widget: name='") + progress.name +
+		"', asset='" + asset.name +
+		"', texture='" + progress.texture +
+		"', pos=(" + std::to_string(progress.x) + "," + std::to_string(progress.y) + ")" +
+		", size=(" + std::to_string(progress.width) + "x" + std::to_string(progress.height) + ")");
+}
+
 void GameGUICreator::SaveCurrentAsset()
 {
 	if (m_selectedAssetIndex < 0 || m_selectedAssetIndex >= static_cast<int>(m_assets.size()))
@@ -1252,6 +1420,7 @@ void GameGUICreator::SaveCurrentAsset()
 		json << "      \"action\": \"" << ActionToString(widget.action) << "\",\n";
 		json << "      \"bindEntity\": \"" << widget.bindEntity << "\",\n";
 		json << "      \"bindComponent\": \"" << widget.bindComponent << "\",\n";
+		json << "      \"bindMember\": \"" << widget.bindMember << "\",\n";
 		json << "      \"bindEvent\": \"" << widget.bindEvent << "\"\n";
 		json << "    }" << (i + 1 < asset.widgets.size() ? "," : "") << "\n";
 	}

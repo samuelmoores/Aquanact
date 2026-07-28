@@ -1,12 +1,13 @@
 AquanactProject 12
 level;Default;1
-object;models\\character.fbx;0.000000;0.000000;0.000000;0.000000;3.135369;0.000000;1.000000;1.000000;1.000000
+object;models\\character.fbx;0.000000;0.000000;0.000000;0.000000;-0.006224;0.000000;1.000000;1.000000;1.000000
 object;models\\floor.fbx;0.000000;0.000000;0.000000;0.000000;0.000000;0.000000;1.000000;1.000000;1.000000
 object;models\\griff.fbx;-196.000000;0.000000;-110.899796;0.000000;0.000000;0.000000;1.000000;1.000000;1.000000
 component;models\\character.fbx;playercontroller;50.000000
-component;models\\character.fbx;playerhealth;100;100
+component;models\\character.fbx;playerhealth;75;100
 component;models\\character.fbx;animator;character_idle;2;character_idle;0;character_walk;1;2;character_idle;character_walk;0.250000;1;0.000000;PlayerController;IsMoving;0;0;1.000000;;;character_walk;character_idle;0.250000;1;0.000000;PlayerController;IsMoving;0;0;0.000000;;
 component;models\\griff.fbx;controller;50.000000
+component;models\\griff.fbx;enemy
 component;models\\griff.fbx;animator;griff_idle;2;griff_idle;0;griff_Walking;1;0
 gamecamera;2.099256;349.326385;-620.940918;-0.005661;-0.415489;0.909581
 editorview;1;0

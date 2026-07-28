@@ -27,6 +27,7 @@ private:
 
 	void DrawCreateAssetPopup();
 	void DrawCreateWidgetPopup();
+	void DrawBindingPopup();
 	void DrawTexturePickerPopup();
 	std::filesystem::path AssetPathFor(const GameGUIAsset& asset) const;
 	GameGUIAsset& CurrentAsset();
@@ -35,6 +36,7 @@ private:
 	void AddButtonWidget();
 	void AddTextWidget();
 	void AddImageWidget();
+	void AddProgressBarWidget();
 	void AddGameGUIAsset(const std::string& name);
 	void SaveCurrentAsset();
 	void LoadCurrentAsset();
@@ -47,9 +49,11 @@ private:
 	bool m_initialized = false;
 	bool m_showCreateAssetPopup = false;
 	bool m_showCreateWidgetPopup = false;
+	bool m_showBindingPopup = false;
 	bool m_showTexturePickerPopup = false;
 	bool m_newWidgetIsText = false;
 	bool m_newWidgetIsImage = false;
+	bool m_newWidgetIsProgressBar = false;
 	bool m_lockWidgetSize = false;
 	char m_newAssetName[64] = { 0 };
 	char m_newWidgetName[64] = { 0 };
@@ -59,6 +63,7 @@ private:
 	std::filesystem::path m_texturePickerRootDirectory;
 	std::filesystem::path m_texturePickerCurrentDirectory;
 	std::filesystem::path m_texturePickerSelectedPath;
+	std::string m_bindingWidgetName;
 	float m_lockedWidgetSizeRatio = 1.0f;
 	GameGUIActionType m_newWidgetAction = GameGUIActionType::None;
 	std::vector<GameGUIAsset> m_assets;
