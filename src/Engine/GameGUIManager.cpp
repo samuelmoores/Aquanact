@@ -425,7 +425,7 @@ void GameGUIManager::DrawReturnButton()
 	ImGui::Begin("Engine");
 	if (ImGui::Button("Return"))
 	{
-		gLevelManager.ResetActiveLevelEntitiesToDefaultPosition();
+		gLevelManager.RestoreActiveLevelEditorTransforms();
 		gEngineState.SetMode(EngineMode::Editor);
 		gRenderManager.SetEditorMode();
 		LogAction("Return to editor requested");

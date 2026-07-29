@@ -9,6 +9,7 @@ void LevelManager::Clear()
 {
 	m_levels.clear();
 	m_activeLevel = nullptr;
+	m_editorTransformSnapshots.clear();
 }
 
 LevelManager::~LevelManager() = default;
@@ -91,4 +92,53 @@ void LevelManager::ResetActiveLevelEntitiesToDefaultPosition()
 			object->ResetToDefaultPosition();
 		}
 	}
+}
+
+void LevelManager::CaptureActiveLevelEditorTransforms()
+{
+	m_editorTransformSnapshots.clear();
+	if (!m_activeLevel)
+	{
+		return;
+	}
+
+	for (const auto& object : m_activeLevel->Objects())
+	{
+		if (object)
+		{
+			m_editorTransformSnapshots[object.get()] = {
+				object->Position(),
+				object->Rotation(),
+				object->Scale(),
+			};
+		}
+	}
+}
+
+void LevelManager::RestoreActiveLevelEditorTransforms()
+{
+	if (!m_activeLevel)
+	{
+		return;
+	}
+
+	for (const auto& object : m_activeLevel->Objects())
+	{
+		if (!object)
+		{
+			continue;
+		}
+
+		const auto it = m_editorTransformSnapshots.find(object.get());
+		if (it == m_editorTransformSnapshots.end())
+		{
+			continue;
+		}
+
+		object->SetRotation(it->second.rotation);
+		object->SetScale(it->second.scale);
+		object->Translate(it->second.position - object->Position());
+	}
+
+	m_editorTransformSnapshots.clear();
 }

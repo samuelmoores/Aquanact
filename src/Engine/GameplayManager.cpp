@@ -44,6 +44,7 @@ void GameplayManager::StartGameSession()
 	}
 
 	m_levelManager->startUp();
+	m_levelManager->CaptureActiveLevelEditorTransforms();
 	Level* activeLevel = m_levelManager->ActiveLevel();
 	if (activeLevel)
 	{

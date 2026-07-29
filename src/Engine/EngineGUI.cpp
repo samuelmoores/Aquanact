@@ -852,6 +852,22 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 								DrawAnimatorStateMachinePopup(*animator);
 							}
 						}
+						else if (PlayerController* playerController = dynamic_cast<PlayerController*>(component))
+						{
+							float moveSpeed = playerController->MoveSpeed();
+							ImGui::SetNextItemWidth(140.0f);
+							if (ImGui::InputFloat("Move Speed", &moveSpeed, 0.0f, 0.0f, "%.1f"))
+							{
+								playerController->SetMoveSpeed(moveSpeed);
+							}
+
+							float turnSpeed = playerController->TurnSpeed();
+							ImGui::SetNextItemWidth(140.0f);
+							if (ImGui::InputFloat("Turn Speed", &turnSpeed, 0.0f, 0.0f, "%.2f"))
+							{
+								playerController->SetTurnSpeed(turnSpeed);
+							}
+						}
 						else if (Controller* controller = dynamic_cast<Controller*>(component))
 						{
 							float moveSpeed = controller->MoveSpeed();
