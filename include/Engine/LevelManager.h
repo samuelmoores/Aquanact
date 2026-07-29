@@ -21,6 +21,10 @@ public:
 	Level* CreateLevel(std::string name);
 	Level* FindLevel(const std::string& name) const;
 	bool SetActiveLevel(const std::string& name);
+	void SetStartupLevelName(std::string name);
+	const std::string& StartupLevelName() const;
+	void AppendProjectState(std::string& contents) const;
+	void ApplyProjectState(const std::string& startupLevelName);
 	Level* ActiveLevel();
 	const Level* ActiveLevel() const;
 	void ResetActiveLevelEntitiesToDefaultPosition();
@@ -39,4 +43,5 @@ private:
 	std::vector<std::unique_ptr<Level>> m_levels;
 	Level* m_activeLevel = nullptr;
 	std::unordered_map<Entity*, EditorTransformSnapshot> m_editorTransformSnapshots;
+	std::string m_startupLevelName;
 };

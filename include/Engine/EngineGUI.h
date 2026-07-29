@@ -27,14 +27,12 @@ public:
 	bool ShowEntityWindow() const;
 	bool ShowLightingWindow() const;
 	bool ShowFileExplorer() const;
-	bool ShowGameGUIWindow() const;
 	void SetShowAxis(bool showAxis);
 	void SetShowGrid(bool showGrid);
 	void SetShowLevelWindow(bool showLevelWindow);
 	void SetShowEntityWindow(bool showEntityWindow);
 	void SetShowLightingWindow(bool showLightingWindow);
 	void SetShowFileExplorer(bool showFileExplorer);
-	void SetShowGameGUIWindow(bool showGameGUIWindow);
 
 private:
 	struct AnimatorStateMachineUiState {
@@ -71,7 +69,6 @@ private:
 	bool m_showEntityWindow = false;
 	bool m_showLightingWindow = false;
 	bool m_showFileExplorer = false;
-	bool m_showGameGUIWindow = false;
 	bool m_buildGamePopupRequested = false;
 	bool m_addCodeFilePopupRequested = false;
 	bool m_newLevelPopupRequested = false;

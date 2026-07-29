@@ -54,6 +54,7 @@ set(SOURCES
     "include/Engine/Level.h" "src/Engine/Level.cpp"
     "include/Engine/LevelManager.h" "src/Engine/LevelManager.cpp"
     "include/Engine/ProjectManager.h" "src/Engine/ProjectManager.cpp"
+    "include/Engine/ProjectStateSerializer.h" "src/Engine/ProjectStateSerializer.cpp"
     "include/Engine/Animation.h" "src/Engine/Animation.cpp"
     "include/Engine/Animator.h" "src/Engine/Animator.cpp"
     "include/Engine/AnimatorComponent.h" "src/Engine/AnimatorComponent.cpp"

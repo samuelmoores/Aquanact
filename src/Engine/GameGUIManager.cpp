@@ -468,6 +468,33 @@ void GameGUIManager::RecordClick(const std::string& message)
 	LogAction(message);
 }
 
+void GameGUIManager::AppendProjectState(std::string& contents) const
+{
+	for (const auto& assetName : m_sceneAssets)
+	{
+		contents += "gameguiasset;";
+		contents += assetName;
+		contents += "\n";
+	}
+
+	const std::string activeGameGUIAsset = ActiveAssetName();
+	if (!activeGameGUIAsset.empty())
+	{
+		contents += "gameguiactive;";
+		contents += activeGameGUIAsset;
+		contents += "\n";
+	}
+}
+
+void GameGUIManager::ApplyProjectState(const std::vector<std::string>& sceneAssets, const std::string& activeAssetName)
+{
+	SetSceneAssets(sceneAssets);
+	if (!activeAssetName.empty())
+	{
+		ActivateAsset(activeAssetName);
+	}
+}
+
 void GameGUIManager::UnloadUIAsset(const std::string& name)
 {
 	auto existing = std::find_if(m_assets.begin(), m_assets.end(), [&name](const GameGUIAsset& asset)

@@ -36,6 +36,8 @@ public:
 	void SetShowEditorWindow(bool showEditorWindow);
 	void LogAction(const std::string& message);
 	void RecordClick(const std::string& message);
+	void AppendProjectState(std::string& contents) const;
+	void ApplyProjectState(const std::vector<std::string>& sceneAssets, const std::string& activeAssetName);
 	void ClearUI();
 	std::size_t LoadedAssetCount() const;
 	std::size_t PlacedAssetCount() const;

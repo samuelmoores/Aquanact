@@ -10,6 +10,7 @@ void LevelManager::Clear()
 	m_levels.clear();
 	m_activeLevel = nullptr;
 	m_editorTransformSnapshots.clear();
+	m_startupLevelName.clear();
 }
 
 LevelManager::~LevelManager() = default;
@@ -18,7 +19,11 @@ Level* LevelManager::startUp()
 {
 	if (!m_activeLevel)
 	{
-		if (!m_levels.empty())
+		if (!m_startupLevelName.empty())
+		{
+			m_activeLevel = FindLevel(m_startupLevelName);
+		}
+		if (!m_activeLevel && !m_levels.empty())
 		{
 			m_activeLevel = m_levels.front().get();
 		}
@@ -66,6 +71,33 @@ bool LevelManager::SetActiveLevel(const std::string& name)
 
 	m_activeLevel = level;
 	return true;
+}
+
+void LevelManager::SetStartupLevelName(std::string name)
+{
+	m_startupLevelName = std::move(name);
+}
+
+const std::string& LevelManager::StartupLevelName() const
+{
+	return m_startupLevelName;
+}
+
+void LevelManager::AppendProjectState(std::string& contents) const
+{
+	if (m_startupLevelName.empty())
+	{
+		return;
+	}
+
+	contents += "startuplevel;";
+	contents += m_startupLevelName;
+	contents += "\n";
+}
+
+void LevelManager::ApplyProjectState(const std::string& startupLevelName)
+{
+	m_startupLevelName = startupLevelName;
 }
 
 Level* LevelManager::ActiveLevel()

@@ -138,42 +138,6 @@ namespace {
 		}
 	}
 
-	std::filesystem::path GameGUIAssetDirectory()
-	{
-#ifdef AQUANACT_GAME
-		return gFileSystem.ExecutableDirectory() / "assets" / "gameGUI";
-#else
-#ifdef AQUANACT_SOURCE_ROOT
-		return std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets" / "gameGUI";
-#else
-		return std::filesystem::current_path() / "assets" / "gameGUI";
-#endif
-#endif
-	}
-
-	bool CreateEmptyGameGUIAssetFile(const std::string& name)
-	{
-		if (name.empty())
-		{
-			return false;
-		}
-
-		GameGUIAsset asset;
-		asset.name = name;
-		asset.widgets.clear();
-
-		const std::filesystem::path assetPath = GameGUIAssetDirectory() / (name + ".json");
-		std::error_code ec;
-		std::filesystem::create_directories(assetPath.parent_path(), ec);
-
-		std::ostringstream json;
-		json << "{\n";
-		json << "  \"name\": \"" << asset.name << "\",\n";
-		json << "  \"widgets\": []\n";
-		json << "}\n";
-		return gFileSystem.WriteTextFile(assetPath, json.str());
-	}
-
 	void DrawAnimatorOperandEditor(
 		const char* label,
 		AnimatorComponent::Operand& operand,
@@ -529,39 +493,6 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 		if (ImGui::BeginMenu("Level"))
 		{
 			ImGui::MenuItem("Show Level Window", nullptr, &m_showLevelWindow);
-			if (ImGui::MenuItem("Create Main Menu"))
-			{
-				const std::string levelName = "MainMenu";
-				if (gLevelManager.FindLevel(levelName))
-				{
-					m_newLevelStatusMessage = "Main Menu level already exists.";
-				}
-				else if (!CreateEmptyGameGUIAssetFile(levelName))
-				{
-					m_newLevelStatusMessage = "Failed to create Main Menu GameGUI asset.";
-				}
-				else
-				{
-					Level* level = gLevelManager.CreateLevel(levelName);
-					if (level)
-					{
-						gLevelManager.SetActiveLevel(levelName);
-						gProjectManager.SetStartupLevelName(levelName);
-
-						GameGUIAsset asset;
-						asset.name = levelName;
-						gFrontEndManager.RuntimeGUI().LoadUIAsset(asset);
-						gFrontEndManager.RuntimeGUI().SetSceneAssets({ levelName });
-						gFrontEndManager.RuntimeGUI().ActivateAsset(levelName);
-
-						m_newLevelStatusMessage = "Created Main Menu level.";
-					}
-					else
-					{
-						m_newLevelStatusMessage = "Failed to create Main Menu level.";
-					}
-				}
-			}
 			if (ImGui::BeginMenu("Levels"))
 			{
 				const auto& levels = levelManager.Levels();
@@ -600,12 +531,6 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 		}
 		if (ImGui::BeginMenu("UI"))
 		{
-			bool showGameGUIWindow = gFrontEndManager.RuntimeGUI().ShowEditorWindow();
-			if (ImGui::MenuItem("Show GameGUI Window", nullptr, &showGameGUIWindow))
-			{
-				gFrontEndManager.RuntimeGUI().SetShowEditorWindow(showGameGUIWindow);
-				m_showGameGUIWindow = showGameGUIWindow;
-			}
 			if (ImGui::MenuItem("GameGUI Creator"))
 			{
 				gFrontEndManager.OpenGameGUICreator();
@@ -626,7 +551,6 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 	DrawAddCodeFilePopup();
 	DrawNewLevelPopup();
 
-	m_showGameGUIWindow = gFrontEndManager.RuntimeGUI().ShowEditorWindow();
 	if (m_showFileExplorer)
 	{
 		bool open = m_showFileExplorer;
@@ -1054,10 +978,6 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 		m_showLightingWindow = open;
 	}
 
-	if (m_showGameGUIWindow)
-	{
-		gFrontEndManager.RuntimeGUI().DrawEditorWindow();
-	}
 }
 
 void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
@@ -1466,11 +1386,6 @@ bool EngineGUI::ShowFileExplorer() const
 	return m_showFileExplorer;
 }
 
-bool EngineGUI::ShowGameGUIWindow() const
-{
-	return m_showGameGUIWindow;
-}
-
 void EngineGUI::SetShowAxis(bool showAxis)
 {
 	m_showAxis = showAxis;
@@ -1499,11 +1414,6 @@ void EngineGUI::SetShowLightingWindow(bool showLightingWindow)
 void EngineGUI::SetShowFileExplorer(bool showFileExplorer)
 {
 	m_showFileExplorer = showFileExplorer;
-}
-
-void EngineGUI::SetShowGameGUIWindow(bool showGameGUIWindow)
-{
-	m_showGameGUIWindow = showGameGUIWindow;
 }
 
 void EngineGUI::DrawNewLevelPopup()
