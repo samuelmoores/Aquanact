@@ -1,0 +1,98 @@
+Report: Menu and UI Screen Architecture
+
+Current direction:
+- `Level` should remain the gameplay/world container.
+- Menus should become their own UI-only concept, not fake levels.
+- `GameGUIAsset` should stay the visual/layout layer underneath both menus and in-game UI.
+- The long-term UI system should support multiple screen types:
+  - `Menu`
+  - `HUD`
+  - `Overlay`
+
+Why this matters:
+- It removes level-only systems from menu screens.
+- It avoids special-casing 3D engine concerns for UI-only content.
+- It makes HUD, inventory, crafting, pause, and dialogue easier to add later.
+- It keeps the engine/editor model aligned with how the game actually behaves.
+
+Recommended design:
+- `Level` = gameplay world, entities, lighting, camera, physics, etc.
+- `Menu` = UI-only screen that owns one `GameGUIAsset`
+- `UIScreen` or `UIState` = runtime wrapper for menus, HUD, overlays
+- `GameGUIAsset` = widget layout and bindings only
+
+Best evolution path:
+1. Add a `Menu` type separate from `Level`.
+2. Keep `GameGUIAsset` as the asset menu screens reference.
+3. Add a screen/state layer that can manage:
+   - startup menu
+   - HUD
+   - inventory overlay
+   - pause menu
+4. Use a stack or layered model so HUD can stay visible while overlays open.
+
+Implementation implications:
+- Startup can target either a `Level` or a `Menu`.
+- A menu can be the first thing shown at launch.
+- In-game UI can be layered on top of gameplay without changing the world model.
+- Inventory/crafting can be implemented as overlay screens bound to gameplay components.
+
+Risks / design decisions to settle:
+- Whether menus are project assets or runtime definitions.
+- Whether HUD is one global screen or one per level.
+- Whether overlays pause gameplay or just block input.
+- How much of the current `GameGUIManager` should be reused versus split into `UIManager`.
+
+Daytime Plan:
+
+1. Morning: lock the architecture
+- Decide on the final terminology:
+  - `Menu`, `HUD`, `Overlay`, or a different naming set.
+- Decide whether menus live alongside levels in project save/load.
+- Decide how startup selection works:
+  - startup level
+  - startup menu
+  - or both via a common startup target
+
+2. Late morning: refactor the data model
+- Add a UI-only screen type or menu type.
+- Separate gameplay-world ownership from UI-only ownership.
+- Keep `GameGUIAsset` unchanged unless the screen model requires extra metadata.
+
+3. Early afternoon: project persistence
+- Extend save/load to support menus/screens.
+- Persist:
+  - name
+  - type
+  - startup flag
+  - associated `GameGUIAsset`
+- Keep backward compatibility with existing projects if possible.
+
+4. Mid-afternoon: runtime routing
+- Add a screen manager or expand `GameGUIManager`.
+- Support:
+  - activate screen
+  - deactivate screen
+  - push overlay
+  - pop overlay
+- Make input routing depend on the active screen state.
+
+5. Late afternoon: editor integration
+- Add top-menu actions for:
+  - Create Main Menu
+  - Create Pause Menu
+  - Create HUD
+- Hide irrelevant 3D windows when editing UI-only screens.
+- Keep level editing behavior unchanged for gameplay levels.
+
+6. Evening: validation
+- Build the editor and game.
+- Open a project containing:
+  - one gameplay level
+  - one main menu
+  - one HUD asset
+- Verify startup behavior.
+- Verify menus do not require 3D editor systems.
+
+If needed next:
+- Turn this into a concrete implementation checklist with file-by-file tasks.

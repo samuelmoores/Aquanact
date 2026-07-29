@@ -19,35 +19,42 @@ public:
 	void EndFrame();
 
 private:
+	enum class GUIRole {
+		MainMenu = 0,
+		HUD = 1,
+		PauseMenu = 2,
+		PlayerUI = 3,
+		Count = 4
+	};
+
 	enum class TexturePickerTarget {
 		None,
 		NewWidgetTexture,
 		SelectedWidgetTexture
 	};
 
-	void DrawCreateAssetPopup();
 	void DrawCreateWidgetPopup();
 	void DrawBindingPopup();
 	void DrawTexturePickerPopup();
-	std::filesystem::path AssetPathFor(const GameGUIAsset& asset) const;
-	GameGUIAsset& CurrentAsset();
-	const GameGUIAsset& CurrentAsset() const;
+	static std::size_t GUIIndex(GUIRole role);
+	static const char* GUIName(GUIRole role);
+	std::filesystem::path GUIPathFor(const GameGUIAsset& asset) const;
+	GameGUIAsset& CurrentRoleGUI();
+	const GameGUIAsset& CurrentRoleGUI() const;
+	GameGUIAsset& GUIFor(GUIRole role);
+	const GameGUIAsset& GUIFor(GUIRole role) const;
 	void OpenTexturePicker(TexturePickerTarget target);
 	void AddButtonWidget();
 	void AddTextWidget();
 	void AddImageWidget();
 	void AddProgressBarWidget();
-	void AddGameGUIAsset(const std::string& name);
-	void SaveCurrentAsset();
-	void LoadCurrentAsset();
+	void SaveSelectedRoleGUI();
+	void LoadSelectedRoleGUI();
 	void DeleteSelectedWidget();
-	void DeleteSelectedAsset();
 	void SyncRuntimePreview();
-	bool IsCurrentAssetStoredOnDisk() const;
 
 	Window* m_window = nullptr;
 	bool m_initialized = false;
-	bool m_showCreateAssetPopup = false;
 	bool m_showCreateWidgetPopup = false;
 	bool m_showBindingPopup = false;
 	bool m_pendingProgressBarCreation = false;
@@ -57,7 +64,6 @@ private:
 	bool m_newWidgetIsImage = false;
 	bool m_newWidgetIsProgressBar = false;
 	bool m_lockWidgetSize = false;
-	char m_newAssetName[64] = { 0 };
 	char m_newWidgetName[64] = { 0 };
 	char m_newWidgetText[128] = { 0 };
 	char m_newWidgetTexture[256] = { 0 };
@@ -70,7 +76,7 @@ private:
 	GameGUIActionType m_newWidgetAction = GameGUIActionType::None;
 	GameGUIWidgetDef m_pendingProgressBarWidget;
 	std::vector<GameGUIAsset> m_assets;
-	int m_selectedAssetIndex = -1;
+	GUIRole m_selectedGUI = GUIRole::MainMenu;
 	int m_selectedWidgetIndex = -1;
 };
 

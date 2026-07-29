@@ -254,6 +254,16 @@ ProjectManager::ProjectManager(FileSystem& fileSystem)
 {
 }
 
+void ProjectManager::SetStartupLevelName(std::string name)
+{
+	m_startupLevelName = std::move(name);
+}
+
+const std::string& ProjectManager::StartupLevelName() const
+{
+	return m_startupLevelName;
+}
+
 bool ProjectManager::SaveProject(const std::filesystem::path& path, const LevelManager& levelManager) const
 {
 	if (!m_fileSystem)
@@ -261,7 +271,7 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const LevelM
 		return false;
 	}
 
-	std::string contents = "AquanactProject 12\n";
+	std::string contents = "AquanactProject 13\n";
 	const auto& levels = levelManager.Levels();
 	if (levels.empty())
 	{
@@ -432,6 +442,13 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const LevelM
 		contents += "\n";
 	}
 
+	if (!m_startupLevelName.empty())
+	{
+		contents += "startuplevel;";
+		contents += EscapeField(m_startupLevelName);
+		contents += "\n";
+	}
+
 	// Keep track of which GameGUI asset was active when the project was saved.
 	const std::string activeGameGUIAsset = gFrontEndManager.RuntimeGUI().ActiveAssetName();
 	if (!activeGameGUIAsset.empty())
@@ -479,6 +496,10 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 	else if (header == "AquanactProject 12")
 	{
 		projectVersion = 12;
+	}
+	else if (header == "AquanactProject 13")
+	{
+		projectVersion = 13;
 	}
 	else
 	{
@@ -534,6 +555,7 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 	// here, then hand them back to the runtime GUI after the level finishes loading.
 	std::vector<std::string> pendingGameGUIAssets;
 	std::string pendingActiveGameGUIAsset;
+	std::string pendingStartupLevelName;
 	std::string pendingImguiLayout;
 	gRenderManager.Lights().PointLights().clear();
 	std::string line;
@@ -650,6 +672,12 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 		if (fields.size() == 2 && fields[0] == "gameguiactive")
 		{
 			pendingActiveGameGUIAsset = UnescapeField(fields[1]);
+			continue;
+		}
+
+		if (fields.size() == 2 && fields[0] == "startuplevel")
+		{
+			pendingStartupLevelName = UnescapeField(fields[1]);
 			continue;
 		}
 
@@ -925,11 +953,21 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 		}
 	}
 
+	if (!pendingStartupLevelName.empty())
+	{
+		Level* startupLevel = levelManager.FindLevel(pendingStartupLevelName);
+		if (startupLevel)
+		{
+			activeLevel = startupLevel;
+		}
+	}
+
 	if (!activeLevel)
 	{
 		activeLevel = levelManager.Levels().front().get();
 	}
 	levelManager.SetActiveLevel(activeLevel->Name());
+	m_startupLevelName = pendingStartupLevelName;
 
 	for (const auto& pendingController : pendingControllers)
 	{
@@ -1057,6 +1095,10 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 	if (!pendingActiveGameGUIAsset.empty())
 	{
 		gFrontEndManager.RuntimeGUI().ActivateAsset(pendingActiveGameGUIAsset);
+	}
+	else if (!pendingStartupLevelName.empty())
+	{
+		gFrontEndManager.RuntimeGUI().ActivateAsset(pendingStartupLevelName);
 	}
 
 	if (!pendingImguiLayout.empty())

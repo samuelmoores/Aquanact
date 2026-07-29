@@ -1,18 +1,5 @@
 {
-  "name": "mainmenu",
+  "name": "MainMenu",
   "widgets": [
-    {
-      "type": "Button",
-      "name": "button",
-      "skin": "ButtonSkin",
-      "text": "Test Button",
-      "layer": "Main",
-      "x": 221,
-      "y": 505,
-      "width": 320,
-      "height": 90,
-      "visible": true,
-      "alpha": 1
-    }
   ]
 }

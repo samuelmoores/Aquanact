@@ -14,6 +14,7 @@
 #include <fstream>
 #include <sstream>
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cmath>
 #include <cstdio>
@@ -44,6 +45,18 @@ namespace {
 #else
 		return std::filesystem::current_path();
 #endif
+	}
+
+	const char* GUIName(std::size_t index)
+	{
+		static constexpr const char* names[] = { "Main Menu", "HUD", "Pause Menu", "Player UI" };
+		return index < std::size(names) ? names[index] : "Unknown";
+	}
+
+	const char* GUIAssetName(std::size_t index)
+	{
+		static constexpr const char* names[] = { "MainMenu", "HUD", "PauseMenu", "PlayerUI" };
+		return index < std::size(names) ? names[index] : "Unknown";
 	}
 
 	const char* ActionLabel(GameGUIActionType action)
@@ -246,6 +259,14 @@ namespace {
 
 		return asset;
 	}
+
+	GameGUIAsset MakeEmptyAsset(const char* name)
+	{
+		GameGUIAsset asset;
+		asset.name = name;
+		asset.savedOnDisk = false;
+		return asset;
+	}
 }
 
 void GameGUICreator::startUp(Window& window)
@@ -257,26 +278,21 @@ void GameGUICreator::startUp(Window& window)
 
 	m_window = &window;
 	m_assets.clear();
-	const std::filesystem::path assetDirectory = AssetDirectory();
-	std::error_code ec;
-	if (std::filesystem::exists(assetDirectory, ec) && !ec)
+	m_assets.resize(GUIIndex(GUIRole::Count));
+	for (std::size_t i = 0; i < m_assets.size(); ++i)
 	{
-		for (const auto& entry : std::filesystem::directory_iterator(assetDirectory, ec))
+		const std::filesystem::path assetPath = AssetDirectory() / (std::string(GUIAssetName(i)) + ".json");
+		if (std::filesystem::exists(assetPath))
 		{
-			if (ec)
-			{
-				break;
-			}
-			if (!entry.is_regular_file() || entry.path().extension() != ".json")
-			{
-				continue;
-			}
-			m_assets.push_back(LoadAssetFile(entry.path()));
+			m_assets[i] = LoadAssetFile(assetPath);
+		}
+		else
+		{
+			m_assets[i] = MakeEmptyAsset(GUIAssetName(i));
 		}
 	}
-	m_selectedAssetIndex = -1;
+	m_selectedGUI = GUIRole::MainMenu;
 	m_selectedWidgetIndex = -1;
-	m_newAssetName[0] = '\0';
 	m_newWidgetName[0] = '\0';
 	m_newWidgetText[0] = '\0';
 	m_newWidgetTexture[0] = '\0';
@@ -295,11 +311,7 @@ void GameGUICreator::startUp(Window& window)
 	m_bindingWidgetName.clear();
 	m_lockedWidgetSizeRatio = 1.0f;
 	m_initialized = true;
-	if (!m_assets.empty())
-	{
-		m_selectedAssetIndex = 0;
-		m_selectedWidgetIndex = m_assets.front().widgets.empty() ? -1 : 0;
-	}
+	m_selectedWidgetIndex = m_assets[GUIIndex(m_selectedGUI)].widgets.empty() ? -1 : 0;
 	SyncRuntimePreview();
 }
 
@@ -307,8 +319,6 @@ void GameGUICreator::shutDown()
 {
 	m_window = nullptr;
 	m_initialized = false;
-	m_showCreateAssetPopup = false;
-	m_newAssetName[0] = '\0';
 	m_newWidgetName[0] = '\0';
 	m_newWidgetText[0] = '\0';
 	m_newWidgetTexture[0] = '\0';
@@ -327,7 +337,7 @@ void GameGUICreator::shutDown()
 	m_bindingWidgetName.clear();
 	m_lockedWidgetSizeRatio = 1.0f;
 	m_assets.clear();
-	m_selectedAssetIndex = -1;
+	m_selectedGUI = GUIRole::MainMenu;
 	m_selectedWidgetIndex = -1;
 }
 
@@ -335,19 +345,39 @@ void GameGUICreator::BeginFrame()
 {
 }
 
-GameGUIAsset& GameGUICreator::CurrentAsset()
+GameGUIAsset& GameGUICreator::CurrentRoleGUI()
 {
-	return m_assets[static_cast<std::size_t>(m_selectedAssetIndex)];
+	return m_assets[GUIIndex(m_selectedGUI)];
 }
 
-const GameGUIAsset& GameGUICreator::CurrentAsset() const
+const GameGUIAsset& GameGUICreator::CurrentRoleGUI() const
 {
-	return m_assets[static_cast<std::size_t>(m_selectedAssetIndex)];
+	return m_assets[GUIIndex(m_selectedGUI)];
 }
 
-std::filesystem::path GameGUICreator::AssetPathFor(const GameGUIAsset& asset) const
+GameGUIAsset& GameGUICreator::GUIFor(GUIRole role)
+{
+	return m_assets[GUIIndex(role)];
+}
+
+const GameGUIAsset& GameGUICreator::GUIFor(GUIRole role) const
+{
+	return m_assets[GUIIndex(role)];
+}
+
+std::filesystem::path GameGUICreator::GUIPathFor(const GameGUIAsset& asset) const
 {
 	return AssetDirectory() / (asset.name + ".json");
+}
+
+std::size_t GameGUICreator::GUIIndex(GUIRole role)
+{
+	return static_cast<std::size_t>(role);
+}
+
+const char* GameGUICreator::GUIName(GUIRole role)
+{
+	return ::GUIName(GUIIndex(role));
 }
 
 void GameGUICreator::Draw(const Camera&)
@@ -357,35 +387,30 @@ void GameGUICreator::Draw(const Camera&)
 		return;
 	}
 
-	if (m_selectedAssetIndex < 0 || m_selectedAssetIndex >= static_cast<int>(m_assets.size()))
-	{
-		m_selectedAssetIndex = m_assets.empty() ? -1 : 0;
-	}
-
 	if (ImGui::BeginMainMenuBar())
 	{
 		if (ImGui::BeginMenu("UI"))
 		{
-			if (ImGui::MenuItem("Leave GameGUI Creator"))
+			if (ImGui::MenuItem("Leave Creator"))
 			{
 				gFrontEndManager.ReturnToEngineGUIEditor();
 				gRenderManager.SetActiveCamera(gRenderManager.GetEngineCamera());
-				gDebug.LogMessage("Leave GameGUI Creator requested");
+				gDebug.LogMessage("Leave Creator requested");
 			}
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("File"))
 		{
-			if (ImGui::MenuItem("Save UI", nullptr, false, m_selectedAssetIndex >= 0))
+			if (ImGui::MenuItem("Save Current GUI"))
 			{
-				SaveCurrentAsset();
-				gDebug.LogMessage("Save UI requested");
+				SaveSelectedRoleGUI();
+				gDebug.LogMessage("Save Current GUI requested");
 			}
-			if (ImGui::MenuItem("Load UI", nullptr, false, m_selectedAssetIndex >= 0))
+			if (ImGui::MenuItem("Load Current GUI"))
 			{
-				LoadCurrentAsset();
+				LoadSelectedRoleGUI();
 				SyncRuntimePreview();
-				gDebug.LogMessage("Load UI requested");
+				gDebug.LogMessage("Load Current GUI requested");
 			}
 			ImGui::EndMenu();
 		}
@@ -409,13 +434,7 @@ void GameGUICreator::Draw(const Camera&)
 		}
 		if (ImGui::BeginMenu("Create"))
 		{
-			if (ImGui::MenuItem("Create GameGUI Asset"))
-			{
-				m_showCreateAssetPopup = true;
-				m_newAssetName[0] = '\0';
-			}
-			ImGui::Separator();
-			if (ImGui::MenuItem("Create Button", nullptr, false, m_selectedAssetIndex >= 0))
+			if (ImGui::MenuItem("Create Button"))
 			{
 				m_showCreateWidgetPopup = true;
 				m_newWidgetIsText = false;
@@ -425,7 +444,7 @@ void GameGUICreator::Draw(const Camera&)
 				m_newWidgetText[0] = '\0';
 				m_newWidgetTexture[0] = '\0';
 			}
-			if (ImGui::MenuItem("Create Text", nullptr, false, m_selectedAssetIndex >= 0))
+			if (ImGui::MenuItem("Create Text"))
 			{
 				m_showCreateWidgetPopup = true;
 				m_newWidgetIsText = true;
@@ -435,7 +454,7 @@ void GameGUICreator::Draw(const Camera&)
 				std::snprintf(m_newWidgetText, sizeof(m_newWidgetText), "New Text");
 				m_newWidgetTexture[0] = '\0';
 			}
-			if (ImGui::MenuItem("Create Image", nullptr, false, m_selectedAssetIndex >= 0))
+			if (ImGui::MenuItem("Create Image"))
 			{
 				m_showCreateWidgetPopup = true;
 				m_newWidgetIsText = false;
@@ -445,7 +464,7 @@ void GameGUICreator::Draw(const Camera&)
 				m_newWidgetText[0] = '\0';
 				std::snprintf(m_newWidgetTexture, sizeof(m_newWidgetTexture), "textures/example.png");
 			}
-			if (ImGui::MenuItem("Create Progress Bar", nullptr, false, m_selectedAssetIndex >= 0))
+			if (ImGui::MenuItem("Create Progress Bar"))
 			{
 				m_showCreateWidgetPopup = true;
 				m_newWidgetIsText = false;
@@ -460,40 +479,27 @@ void GameGUICreator::Draw(const Camera&)
 		ImGui::EndMainMenuBar();
 	}
 
-	DrawCreateAssetPopup();
 	DrawCreateWidgetPopup();
 	DrawBindingPopup();
 	DrawTexturePickerPopup();
 
-	ImGui::Begin("GameGUI Assets");
+	ImGui::Begin("GameGUIs");
 	for (std::size_t i = 0; i < m_assets.size(); ++i)
 	{
-		const GameGUIAsset& asset = m_assets[i];
-		const bool selected = m_selectedAssetIndex == static_cast<int>(i);
-		if (ImGui::Selectable(asset.name.c_str(), selected))
+		const bool selected = GUIIndex(m_selectedGUI) == i;
+		if (ImGui::Selectable(GUIName(static_cast<GUIRole>(i)), selected))
 		{
-			m_selectedAssetIndex = static_cast<int>(i);
-			m_selectedWidgetIndex = asset.widgets.empty() ? -1 : 0;
+			m_selectedGUI = static_cast<GUIRole>(i);
+			m_selectedWidgetIndex = m_assets[i].widgets.empty() ? -1 : 0;
 			SyncRuntimePreview();
-		}
-	}
-	if (m_selectedAssetIndex >= 0 && m_selectedAssetIndex < static_cast<int>(m_assets.size()))
-	{
-		const GameGUIAsset& asset = CurrentAsset();
-		ImGui::Separator();
-		ImGui::Text("Asset: %s", asset.name.c_str());
-		ImGui::Text("Saved on disk: %s", asset.savedOnDisk ? "yes" : "no");
-		if (ImGui::Button("Delete Asset"))
-		{
-			DeleteSelectedAsset();
 		}
 	}
 	ImGui::End();
 
-	ImGui::Begin("Widgets");
-	if (m_selectedAssetIndex >= 0 && m_selectedAssetIndex < static_cast<int>(m_assets.size()))
+	ImGui::Begin("Widget List");
+	if (!CurrentRoleGUI().widgets.empty())
 	{
-		GameGUIAsset& asset = CurrentAsset();
+		GameGUIAsset& asset = CurrentRoleGUI();
 		const auto hasChildren = [&asset](const GameGUIWidgetDef& widget)
 		{
 			return std::any_of(asset.widgets.begin(), asset.widgets.end(), [&widget](const GameGUIWidgetDef& child)
@@ -544,18 +550,18 @@ void GameGUICreator::Draw(const Camera&)
 	}
 	else
 	{
-		ImGui::TextUnformatted("No asset selected.");
+		ImGui::TextUnformatted("No widgets.");
 	}
 	ImGui::End();
 
-	ImGui::Begin("Details");
-	if (m_selectedAssetIndex < 0 || m_selectedAssetIndex >= static_cast<int>(m_assets.size()))
+	ImGui::Begin("Widget Details");
+	if (CurrentRoleGUI().widgets.empty())
 	{
-		ImGui::TextUnformatted("No asset selected.");
+		ImGui::TextUnformatted("No widget selected.");
 	}
 	else
 	{
-		GameGUIAsset& asset = CurrentAsset();
+		GameGUIAsset& asset = CurrentRoleGUI();
 		if (m_selectedWidgetIndex < 0 || m_selectedWidgetIndex >= static_cast<int>(asset.widgets.size()))
 		{
 			ImGui::TextUnformatted("No widget selected.");
@@ -727,45 +733,9 @@ void GameGUICreator::Draw(const Camera&)
 	}
 	ImGui::End();
 }
+
 void GameGUICreator::EndFrame()
 {
-}
-
-void GameGUICreator::DrawCreateAssetPopup()
-{
-	if (m_showCreateAssetPopup)
-	{
-		ImGui::OpenPopup("Create GameGUI Asset");
-		m_showCreateAssetPopup = false;
-	}
-
-	if (ImGui::BeginPopupModal("Create GameGUI Asset", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
-	{
-		ImGui::TextUnformatted("Enter a UI asset name:");
-		ImGui::InputText("Name", m_newAssetName, sizeof(m_newAssetName));
-		if (ImGui::Button("Create"))
-		{
-			std::string name = m_newAssetName;
-			if (name.empty())
-			{
-				// Empty names used to auto-fill a default asset, but that created
-				// unwanted files. Now we treat it as a cancel operation instead.
-				gDebug.LogMessage("Create GameGUI Asset cancelled: name is empty");
-				ImGui::CloseCurrentPopup();
-				return;
-			}
-			AddGameGUIAsset(name);
-			SaveCurrentAsset();
-			SyncRuntimePreview();
-			ImGui::CloseCurrentPopup();
-		}
-		ImGui::SameLine();
-		if (ImGui::Button("Cancel"))
-		{
-			ImGui::CloseCurrentPopup();
-		}
-		ImGui::EndPopup();
-	}
 }
 
 void GameGUICreator::DrawCreateWidgetPopup()
@@ -880,7 +850,7 @@ void GameGUICreator::DrawBindingPopup()
 		return;
 	}
 
-	GameGUIAsset& asset = CurrentAsset();
+		GameGUIAsset& asset = CurrentRoleGUI();
 	GameGUIWidgetDef* widget = nullptr;
 	GameGUIWidgetDef* draft = m_pendingProgressBarCreation ? &m_pendingProgressBarWidget : nullptr;
 	if (draft)
@@ -1200,9 +1170,9 @@ void GameGUICreator::DrawTexturePickerPopup()
 			}
 		}
 		else if (target == TexturePickerTarget::SelectedWidgetTexture &&
-			m_selectedAssetIndex >= 0 && m_selectedAssetIndex < static_cast<int>(m_assets.size()))
+			true)
 		{
-			GameGUIAsset& asset = CurrentAsset();
+			GameGUIAsset& asset = CurrentRoleGUI();
 			if (m_selectedWidgetIndex >= 0 && m_selectedWidgetIndex < static_cast<int>(asset.widgets.size()))
 			{
 				asset.widgets[static_cast<std::size_t>(m_selectedWidgetIndex)].texture = portablePath;
@@ -1243,29 +1213,11 @@ void GameGUICreator::OpenTexturePicker(TexturePickerTarget target)
 	m_showTexturePickerPopup = true;
 }
 
-void GameGUICreator::AddGameGUIAsset(const std::string& name)
-{
-	GameGUIAsset asset;
-	asset.name = name;
-	int suffix = 1;
-	while (std::any_of(m_assets.begin(), m_assets.end(), [&asset](const GameGUIAsset& existing)
-	{
-		return existing.name == asset.name;
-	}))
-	{
-		asset.name = name + "_" + std::to_string(++suffix);
-	}
-
-	m_assets.push_back(asset);
-	m_selectedAssetIndex = static_cast<int>(m_assets.size() - 1);
-	m_selectedWidgetIndex = -1;
-}
-
 void GameGUICreator::AddButtonWidget()
 {
-	if (m_selectedAssetIndex < 0 || m_selectedAssetIndex >= static_cast<int>(m_assets.size()))
+	if (GUIIndex(m_selectedGUI) >= m_assets.size())
 	{
-		gDebug.LogMessage("AddButtonWidget skipped: no active GameGUI asset");
+		gDebug.LogMessage("Add button widget skipped: no active GUI");
 		return;
 	}
 
@@ -1288,7 +1240,7 @@ void GameGUICreator::AddButtonWidget()
 	button.x = std::max(0, (framebufferWidth - button.width) / 2);
 	button.y = std::max(0, (framebufferHeight - button.height) / 2);
 
-	GameGUIAsset& asset = CurrentAsset();
+		GameGUIAsset& asset = CurrentRoleGUI();
 	int suffix = 1;
 	while (std::any_of(asset.widgets.begin(), asset.widgets.end(), [&button](const GameGUIWidgetDef& widget)
 	{
@@ -1303,17 +1255,17 @@ void GameGUICreator::AddButtonWidget()
 	m_newWidgetName[0] = '\0';
 	m_newWidgetAction = GameGUIActionType::None;
 	gDebug.LogMessage(
-		std::string("Created GameGUI button widget: name='") + button.name +
-		"', asset='" + asset.name +
+		std::string("Created button widget in ") + GUIName(m_selectedGUI) + ": name='" + button.name +
+		"', gui='" + asset.name +
 		"', pos=(" + std::to_string(button.x) + "," + std::to_string(button.y) + ")" +
 		", size=(" + std::to_string(button.width) + "x" + std::to_string(button.height) + ")");
 }
 
 void GameGUICreator::AddTextWidget()
 {
-	if (m_selectedAssetIndex < 0 || m_selectedAssetIndex >= static_cast<int>(m_assets.size()))
+	if (GUIIndex(m_selectedGUI) >= m_assets.size())
 	{
-		gDebug.LogMessage("AddTextWidget skipped: no active GameGUI asset");
+		gDebug.LogMessage("Add text widget skipped: no active GUI");
 		return;
 	}
 
@@ -1337,7 +1289,7 @@ void GameGUICreator::AddTextWidget()
 	text.x = std::max(0, (framebufferWidth - text.width) / 2);
 	text.y = std::max(0, (framebufferHeight - text.height) / 2);
 
-	GameGUIAsset& asset = CurrentAsset();
+		GameGUIAsset& asset = CurrentRoleGUI();
 	int suffix = 1;
 	while (std::any_of(asset.widgets.begin(), asset.widgets.end(), [&text](const GameGUIWidgetDef& widget)
 	{
@@ -1352,17 +1304,17 @@ void GameGUICreator::AddTextWidget()
 	m_newWidgetName[0] = '\0';
 	m_newWidgetText[0] = '\0';
 	gDebug.LogMessage(
-		std::string("Created GameGUI text widget: name='") + text.name +
-		"', asset='" + asset.name +
+		std::string("Created text widget in ") + GUIName(m_selectedGUI) + ": name='" + text.name +
+		"', gui='" + asset.name +
 		"', pos=(" + std::to_string(text.x) + "," + std::to_string(text.y) + ")" +
 		", size=(" + std::to_string(text.width) + "x" + std::to_string(text.height) + ")");
 }
 
 void GameGUICreator::AddImageWidget()
 {
-	if (m_selectedAssetIndex < 0 || m_selectedAssetIndex >= static_cast<int>(m_assets.size()))
+	if (GUIIndex(m_selectedGUI) >= m_assets.size())
 	{
-		gDebug.LogMessage("AddImageWidget skipped: no active GameGUI asset");
+		gDebug.LogMessage("Add image widget skipped: no active GUI");
 		return;
 	}
 
@@ -1386,7 +1338,7 @@ void GameGUICreator::AddImageWidget()
 	image.x = std::max(0, (framebufferWidth - image.width) / 2);
 	image.y = std::max(0, (framebufferHeight - image.height) / 2);
 
-	GameGUIAsset& asset = CurrentAsset();
+		GameGUIAsset& asset = CurrentRoleGUI();
 	int suffix = 1;
 	while (std::any_of(asset.widgets.begin(), asset.widgets.end(), [&image](const GameGUIWidgetDef& widget)
 	{
@@ -1401,8 +1353,8 @@ void GameGUICreator::AddImageWidget()
 	m_newWidgetName[0] = '\0';
 	m_newWidgetTexture[0] = '\0';
 	gDebug.LogMessage(
-		std::string("Created GameGUI image widget: name='") + image.name +
-		"', asset='" + asset.name +
+		std::string("Created image widget in ") + GUIName(m_selectedGUI) + ": name='" + image.name +
+		"', gui='" + asset.name +
 		"', texture='" + image.texture +
 		"', pos=(" + std::to_string(image.x) + "," + std::to_string(image.y) + ")" +
 		", size=(" + std::to_string(image.width) + "x" + std::to_string(image.height) + ")");
@@ -1410,9 +1362,9 @@ void GameGUICreator::AddImageWidget()
 
 void GameGUICreator::AddProgressBarWidget()
 {
-	if (m_selectedAssetIndex < 0 || m_selectedAssetIndex >= static_cast<int>(m_assets.size()))
+	if (GUIIndex(m_selectedGUI) >= m_assets.size())
 	{
-		gDebug.LogMessage("AddProgressBarWidget skipped: no active GameGUI asset");
+		gDebug.LogMessage("Add progress bar widget skipped: no active GUI");
 		return;
 	}
 
@@ -1447,7 +1399,7 @@ void GameGUICreator::AddProgressBarWidget()
 	progress.x = std::max(0, (framebufferWidth - progress.width) / 2);
 	progress.y = std::max(0, (framebufferHeight - progress.height) / 2);
 
-	GameGUIAsset& asset = CurrentAsset();
+		GameGUIAsset& asset = CurrentRoleGUI();
 	int suffix = 1;
 	while (std::any_of(asset.widgets.begin(), asset.widgets.end(), [&progress](const GameGUIWidgetDef& widget)
 	{
@@ -1463,22 +1415,17 @@ void GameGUICreator::AddProgressBarWidget()
 	m_newWidgetTexture[0] = '\0';
 	m_pendingProgressBarWidget = {};
 	gDebug.LogMessage(
-		std::string("Created GameGUI progress bar widget: name='") + progress.name +
-		"', asset='" + asset.name +
+		std::string("Created progress bar widget in ") + GUIName(m_selectedGUI) + ": name='" + progress.name +
+		"', gui='" + asset.name +
 		"', texture='" + progress.texture +
 		"', pos=(" + std::to_string(progress.x) + "," + std::to_string(progress.y) + ")" +
 		", size=(" + std::to_string(progress.width) + "x" + std::to_string(progress.height) + ")");
 }
 
-void GameGUICreator::SaveCurrentAsset()
+void GameGUICreator::SaveSelectedRoleGUI()
 {
-	if (m_selectedAssetIndex < 0 || m_selectedAssetIndex >= static_cast<int>(m_assets.size()))
-	{
-		return;
-	}
-
-	GameGUIAsset& asset = CurrentAsset();
-	const std::filesystem::path assetPath = AssetPathFor(asset);
+		GameGUIAsset& asset = CurrentRoleGUI();
+	const std::filesystem::path assetPath = GUIPathFor(asset);
 	const std::filesystem::path directory = assetPath.parent_path();
 	std::error_code ec;
 	std::filesystem::create_directories(directory, ec);
@@ -1520,25 +1467,20 @@ void GameGUICreator::SaveCurrentAsset()
 	std::ofstream file(assetPath, std::ios::trunc);
 	if (!file.is_open())
 	{
-		gDebug.LogMessage("Failed to save UI asset: " + assetPath.string());
+		gDebug.LogMessage("Failed to save GUI asset: " + assetPath.string());
 		return;
 	}
 
 	file << json.str();
 	asset.savedOnDisk = true;
-	gDebug.LogMessage("Saved UI asset: " + assetPath.string());
+	gDebug.LogMessage("Saved GUI asset: " + assetPath.string());
 }
 
-void GameGUICreator::LoadCurrentAsset()
+void GameGUICreator::LoadSelectedRoleGUI()
 {
-	if (m_selectedAssetIndex < 0 || m_selectedAssetIndex >= static_cast<int>(m_assets.size()))
-	{
-		return;
-	}
-
-	GameGUIAsset& asset = CurrentAsset();
+	GameGUIAsset& asset = CurrentRoleGUI();
 	asset.widgets.clear();
-	const std::filesystem::path assetPath = AssetPathFor(asset);
+	const std::filesystem::path assetPath = GUIPathFor(asset);
 	std::ifstream file(assetPath);
 	if (!file.is_open())
 	{
@@ -1553,12 +1495,12 @@ void GameGUICreator::LoadCurrentAsset()
 
 void GameGUICreator::DeleteSelectedWidget()
 {
-	if (m_selectedAssetIndex < 0 || m_selectedAssetIndex >= static_cast<int>(m_assets.size()))
+	if (GUIIndex(m_selectedGUI) >= m_assets.size())
 	{
 		return;
 	}
 
-	GameGUIAsset& asset = CurrentAsset();
+	GameGUIAsset& asset = CurrentRoleGUI();
 	if (m_selectedWidgetIndex < 0 || m_selectedWidgetIndex >= static_cast<int>(asset.widgets.size()))
 	{
 		return;
@@ -1585,62 +1527,9 @@ void GameGUICreator::DeleteSelectedWidget()
 	SyncRuntimePreview();
 }
 
-void GameGUICreator::DeleteSelectedAsset()
-{
-	if (m_selectedAssetIndex < 0 || m_selectedAssetIndex >= static_cast<int>(m_assets.size()))
-	{
-		return;
-	}
-
-	const GameGUIAsset asset = CurrentAsset();
-	const std::filesystem::path assetPath = AssetPathFor(asset);
-	if (std::filesystem::exists(assetPath))
-	{
-		std::error_code ec;
-		std::filesystem::remove(assetPath, ec);
-		if (ec)
-		{
-			gDebug.LogMessage("Failed to delete UI asset: " + assetPath.string());
-			return;
-		}
-	}
-
-	m_assets.erase(m_assets.begin() + m_selectedAssetIndex);
-	if (m_assets.empty())
-	{
-		m_selectedAssetIndex = -1;
-		m_selectedWidgetIndex = -1;
-		gFrontEndManager.RuntimeGUI().ClearUI();
-		return;
-	}
-
-	if (m_selectedAssetIndex >= static_cast<int>(m_assets.size()))
-	{
-		m_selectedAssetIndex = static_cast<int>(m_assets.size() - 1);
-	}
-	m_selectedWidgetIndex = m_assets[static_cast<std::size_t>(m_selectedAssetIndex)].widgets.empty() ? -1 : 0;
-	SyncRuntimePreview();
-}
-
 void GameGUICreator::SyncRuntimePreview()
 {
-	if (m_selectedAssetIndex < 0 || m_selectedAssetIndex >= static_cast<int>(m_assets.size()))
-	{
-		gFrontEndManager.RuntimeGUI().ClearUI();
-		return;
-	}
-
-	gFrontEndManager.RuntimeGUI().LoadUIAsset(CurrentAsset());
-}
-
-bool GameGUICreator::IsCurrentAssetStoredOnDisk() const
-{
-	if (m_selectedAssetIndex < 0 || m_selectedAssetIndex >= static_cast<int>(m_assets.size()))
-	{
-		return false;
-	}
-
-	return std::filesystem::exists(AssetPathFor(CurrentAsset()));
+	gFrontEndManager.RuntimeGUI().LoadUIAsset(CurrentRoleGUI());
 }
 
 
