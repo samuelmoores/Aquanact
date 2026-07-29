@@ -30,6 +30,8 @@ struct GameGUIWidgetDef
 	int fontSize = 0;
 	bool visible = true;
 	float alpha = 1.0f;
+	std::string highlightColor;
+	std::string clickedColor;
 	GameGUIActionType action = GameGUIActionType::None;
 	std::string bindEntity;
 	std::string bindComponent;

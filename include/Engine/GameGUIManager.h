@@ -52,6 +52,7 @@ public:
 	void HideAll();
 	void LogAction(const std::string& message);
 	void RecordClick(const std::string& message);
+	void RecordButtonClick(const std::string& assetName, const std::string& widgetName, GameGUIActionType action);
 	void AppendProjectState(std::string& contents) const;
 	void ApplyProjectState(const std::vector<std::string>& sceneAssets, const std::string& activeAssetName);
 	void ClearUI();
@@ -70,6 +71,10 @@ private:
 	std::vector<std::string> m_sceneAssets;
 	std::vector<std::string> m_actionLog;
 	std::string m_lastClickMessage;
+	std::string m_lastButtonAssetName;
+	std::string m_lastButtonWidgetName;
+	std::string m_lastButtonActionName;
+	std::size_t m_buttonClickCount = 0;
 	int m_activeAssetIndex = -1;
 	bool m_showEditorWindow = false;
 	UIMode m_mode = UIMode::MainMenu;

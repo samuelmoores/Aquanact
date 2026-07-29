@@ -33,6 +33,17 @@ namespace {
 		}
 	}
 
+	const char* ActionLabel(GameGUIActionType action)
+	{
+		switch (action)
+		{
+		case GameGUIActionType::NewGame:
+			return "New Game";
+		default:
+			return "None";
+		}
+	}
+
 	int ReadIntField(const std::string& value, int fallback = 0)
 	{
 		if (value.empty())
@@ -408,6 +419,10 @@ void GameGUIManager::DrawDiagnosticsWindow()
 	ImGui::Text("Active asset index: %d", m_activeAssetIndex);
 	ImGui::Text("Active asset name: %s", ActiveAssetName().empty() ? "<none>" : ActiveAssetName().c_str());
 	ImGui::Text("Last click: %s", m_lastClickMessage.empty() ? "<none>" : m_lastClickMessage.c_str());
+	ImGui::Text("Button clicks: %zu", m_buttonClickCount);
+	ImGui::Text("Last button asset: %s", m_lastButtonAssetName.empty() ? "<none>" : m_lastButtonAssetName.c_str());
+	ImGui::Text("Last button widget: %s", m_lastButtonWidgetName.empty() ? "<none>" : m_lastButtonWidgetName.c_str());
+	ImGui::Text("Last button action: %s", m_lastButtonActionName.empty() ? "<none>" : m_lastButtonActionName.c_str());
 	ImGui::Separator();
 	ImGui::TextUnformatted("Action log:");
 	if (m_actionLog.empty())
@@ -429,6 +444,30 @@ void GameGUIManager::DrawDiagnosticsWindow()
 	for (const auto& name : m_sceneAssets)
 	{
 		ImGui::BulletText("%s", name.c_str());
+	}
+	ImGui::Separator();
+	ImGui::TextUnformatted("Button diagnostics:");
+	bool foundButton = false;
+	for (const auto& asset : m_assets)
+	{
+		for (const auto& widget : asset.widgets)
+		{
+			if (widget.type != "Button")
+			{
+				continue;
+			}
+
+			foundButton = true;
+			ImGui::BulletText(
+				"%s / %s -> %s",
+				asset.name.c_str(),
+				widget.name.c_str(),
+				ActionLabel(widget.action));
+		}
+	}
+	if (!foundButton)
+	{
+		ImGui::BulletText("<no buttons loaded>");
 	}
 	ImGui::End();
 }
@@ -551,6 +590,17 @@ void GameGUIManager::RecordClick(const std::string& message)
 	LogAction(message);
 }
 
+void GameGUIManager::RecordButtonClick(const std::string& assetName, const std::string& widgetName, GameGUIActionType action)
+{
+	++m_buttonClickCount;
+	m_lastButtonAssetName = assetName;
+	m_lastButtonWidgetName = widgetName;
+	m_lastButtonActionName = ActionLabel(action);
+	LogAction(
+		std::string("Button click: ") +
+		assetName + " / " + widgetName + " -> " + m_lastButtonActionName);
+}
+
 void GameGUIManager::AppendProjectState(std::string& contents) const
 {
 	for (const auto& assetName : m_sceneAssets)
@@ -616,6 +666,10 @@ void GameGUIManager::ClearUI()
 	m_sceneAssets.clear();
 	m_actionLog.clear();
 	m_lastClickMessage.clear();
+	m_lastButtonAssetName.clear();
+	m_lastButtonWidgetName.clear();
+	m_lastButtonActionName.clear();
+	m_buttonClickCount = 0;
 	m_activeAssetIndex = -1;
 	if (m_runtime)
 	{

@@ -15,6 +15,7 @@
 #include "Engine/LevelManager.h"
 
 #include <MYGUI/MyGUI_Button.h>
+#include <MYGUI/MyGUI_Colour.h>
 #include <MYGUI/MyGUI_Gui.h>
 #include <MYGUI/MyGUI_ImageBox.h>
 #include <MYGUI/MyGUI_TextBox.h>
@@ -125,6 +126,22 @@ namespace {
 			}
 		}
 		return nullptr;
+	}
+
+	MyGUI::Colour ParseColour(const std::string& value, const MyGUI::Colour& fallback)
+	{
+		try
+		{
+			if (value.empty())
+			{
+				return fallback;
+			}
+			return MyGUI::Colour(value);
+		}
+		catch (...)
+		{
+			return fallback;
+		}
 	}
 }
 
@@ -427,9 +444,27 @@ MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::
 			m_gui->createWidget<MyGUI::Button>(def.skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.layer, def.name);
 		if (button)
 		{
-			button->setCaption(def.text);
+			button->setCaption("");
 			button->setVisible(def.visible);
 			button->setAlpha(def.alpha);
+			button->setColour(ParseColour(def.highlightColor, MyGUI::Colour::White));
+			button->setStateSelected(false);
+			MyGUI::TextBox* label = button->createWidget<MyGUI::TextBox>("TextBox", 0, 0, def.width, def.height, MyGUI::Align::Default, def.name + "_label");
+			if (label)
+			{
+				label->setCaption(def.text);
+				if (def.fontSize > 0)
+				{
+					label->setFontHeight(def.fontSize);
+				}
+				label->setNeedMouseFocus(false);
+				label->setNeedKeyFocus(false);
+				label->setInheritsPick(false);
+				label->setTextAlign(MyGUI::Align::Center);
+				label->setTextColour(MyGUI::Colour::Black);
+				label->setVisible(def.visible);
+				label->setAlpha(def.alpha);
+			}
 			// Button clicks are routed back into GameGUI so we can attach small
 			// built-in behaviors without hardcoding them into the widget assets.
 			button->eventMouseButtonClick += MyGUI::newDelegate(this, &GameGUI::OnWidgetClicked);
@@ -586,9 +621,16 @@ void GameGUI::OnWidgetClicked(MyGUI::Widget* sender)
 	const GameGUIActionType action = def ? def->action : GameGUIActionType::None;
 	gDebug.LogMessage(std::string("GameGUI click received for widget: ") + (name.empty() ? "<unnamed>" : name));
 	gFrontEndManager.RuntimeGUI().RecordClick("Clicked widget: " + (name.empty() ? std::string("<unnamed>") : name));
+	gFrontEndManager.RuntimeGUI().RecordButtonClick(m_loadedAsset.name, name, action);
 	switch (action)
 	{
 	case GameGUIActionType::NewGame:
+		if (auto* button = dynamic_cast<MyGUI::Button*>(sender))
+		{
+			const GameGUIWidgetDef* buttonDef = FindWidgetDef(m_loadedAsset, name);
+			button->setColour(ParseColour(buttonDef ? buttonDef->clickedColor : std::string{}, MyGUI::Colour::White));
+			button->setStateSelected(true);
+		}
 		gFrontEndManager.RuntimeGUI().RecordClick("New Game action requested");
 		gDebug.LogMessage("GameGUI NewGame action requested");
 		if (gProjectManager.CurrentProjectPath().empty())
@@ -596,6 +638,7 @@ void GameGUI::OnWidgetClicked(MyGUI::Widget* sender)
 			gDebug.LogMessage("GameGUI NewGame failed: no project is currently loaded.");
 			break;
 		}
+		gFrontEndManager.RuntimeGUI().HideAll();
 		if (!gProjectManager.LoadProject(gProjectManager.CurrentProjectPath(), gLevelManager))
 		{
 			gDebug.LogMessage("GameGUI NewGame failed: could not reload the current project.");

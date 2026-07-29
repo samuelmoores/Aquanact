@@ -10,6 +10,7 @@
 #include "Engine/Level.h"
 #include "Engine/LevelManager.h"
 
+#include <MYGUI/MyGUI_Colour.h>
 #include <imgui.h>
 #include <fstream>
 #include <sstream>
@@ -78,6 +79,22 @@ namespace {
 			return "NewGame";
 		default:
 			return "None";
+		}
+	}
+
+	MyGUI::Colour ParseColour(const std::string& value, const MyGUI::Colour& fallback)
+	{
+		try
+		{
+			if (value.empty())
+			{
+				return fallback;
+			}
+			return MyGUI::Colour(value);
+		}
+		catch (...)
+		{
+			return fallback;
 		}
 	}
 
@@ -240,6 +257,8 @@ namespace {
 			widget.fontSize = ReadIntField(readField("\"fontSize\":", widgetPos), 0);
 			widget.visible = readField("\"visible\":", widgetPos).find("true") != std::string::npos;
 			widget.alpha = std::stof(readField("\"alpha\":", widgetPos));
+			widget.highlightColor = readField("\"highlightColor\":", widgetPos);
+			widget.clickedColor = readField("\"clickedColor\":", widgetPos);
 			widget.action = StringToAction(readField("\"action\":", widgetPos));
 			widget.bindEntity = readField("\"bindEntity\":", widgetPos);
 			widget.bindComponent = readField("\"bindComponent\":", widgetPos);
@@ -561,6 +580,13 @@ void GameGUICreator::Draw(const Camera&)
 			GameGUIWidgetDef& widget = asset.widgets[static_cast<std::size_t>(m_selectedWidgetIndex)];
 			ImGui::Text("Name: %s", widget.name.c_str());
 			ImGui::Text("Type: %s", widget.type.c_str());
+			char textBuffer[256] = { 0 };
+			std::snprintf(textBuffer, sizeof(textBuffer), "%s", widget.text.c_str());
+			if (ImGui::InputText("Text", textBuffer, sizeof(textBuffer)))
+			{
+				widget.text = textBuffer;
+				SyncRuntimePreview();
+			}
 			const char* parentLabel = widget.parentName.empty() ? "<None>" : widget.parentName.c_str();
 			if (ImGui::BeginCombo("Parent", parentLabel))
 			{
@@ -683,6 +709,37 @@ void GameGUICreator::Draw(const Camera&)
 				{
 					widget.textureWidth = widget.defaultTextureWidth;
 					widget.textureHeight = widget.defaultTextureHeight;
+					SyncRuntimePreview();
+				}
+			}
+
+			if (widget.type == "Button")
+			{
+				int fontSize = widget.fontSize;
+				if (ImGui::DragInt("Text Size", &fontSize, 1.0f, 0, 200))
+				{
+					widget.fontSize = std::max(0, fontSize);
+					SyncRuntimePreview();
+				}
+				ImGui::SameLine();
+				if (ImGui::SmallButton("Reset##TextSize"))
+				{
+					widget.fontSize = 0;
+					SyncRuntimePreview();
+				}
+
+				char highlightColor[64] = { 0 };
+				char clickedColor[64] = { 0 };
+				std::snprintf(highlightColor, sizeof(highlightColor), "%s", widget.highlightColor.empty() ? "1,1,1,1" : widget.highlightColor.c_str());
+				std::snprintf(clickedColor, sizeof(clickedColor), "%s", widget.clickedColor.empty() ? "0.75,0.75,0.75,1" : widget.clickedColor.c_str());
+				if (ImGui::InputText("Highlight Color", highlightColor, sizeof(highlightColor)))
+				{
+					widget.highlightColor = highlightColor;
+					SyncRuntimePreview();
+				}
+				if (ImGui::InputText("Clicked Color", clickedColor, sizeof(clickedColor)))
+				{
+					widget.clickedColor = clickedColor;
 					SyncRuntimePreview();
 				}
 			}
