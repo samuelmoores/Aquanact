@@ -50,6 +50,8 @@ private:
 	bool m_showCreateAssetPopup = false;
 	bool m_showCreateWidgetPopup = false;
 	bool m_showBindingPopup = false;
+	bool m_pendingProgressBarCreation = false;
+	bool m_pendingProgressBarBindingComplete = false;
 	bool m_showTexturePickerPopup = false;
 	bool m_newWidgetIsText = false;
 	bool m_newWidgetIsImage = false;
@@ -66,6 +68,7 @@ private:
 	std::string m_bindingWidgetName;
 	float m_lockedWidgetSizeRatio = 1.0f;
 	GameGUIActionType m_newWidgetAction = GameGUIActionType::None;
+	GameGUIWidgetDef m_pendingProgressBarWidget;
 	std::vector<GameGUIAsset> m_assets;
 	int m_selectedAssetIndex = -1;
 	int m_selectedWidgetIndex = -1;

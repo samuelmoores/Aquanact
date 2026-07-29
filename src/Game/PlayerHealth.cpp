@@ -70,7 +70,7 @@ void PlayerHealth::SubscribeToDamage()
 {
 	gEventManager.GetEvent("Damage").Subscribe(this, [this]()
 	{
-		SetHealth(m_health - 25);
+		SetHealth(m_health - 90);
 		std::cout << "PlayerHealth received Damage and now has " << m_health << " health\n";
 	});
 }

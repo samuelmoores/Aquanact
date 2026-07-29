@@ -230,6 +230,8 @@ namespace {
 			widget.y = ReadIntField(readField("\"y\":", widgetPos));
 			widget.width = ReadIntField(readField("\"width\":", widgetPos), 100);
 			widget.height = ReadIntField(readField("\"height\":", widgetPos), 30);
+			widget.defaultTextureWidth = widget.textureWidth;
+			widget.defaultTextureHeight = widget.textureHeight;
 			widget.fontSize = ReadIntField(readField("\"fontSize\":", widgetPos), 0);
 			widget.visible = readField("\"visible\":", widgetPos).find("true") != std::string::npos;
 			widget.alpha = std::stof(readField("\"alpha\":", widgetPos));
@@ -284,6 +286,8 @@ void GameGUICreator::startUp(Window& window)
 	m_newWidgetAction = GameGUIActionType::None;
 	m_showTexturePickerPopup = false;
 	m_showBindingPopup = false;
+	m_pendingProgressBarCreation = false;
+	m_pendingProgressBarBindingComplete = false;
 	m_texturePickerTarget = TexturePickerTarget::None;
 	m_texturePickerRootDirectory.clear();
 	m_texturePickerCurrentDirectory.clear();
@@ -312,6 +316,8 @@ void GameGUICreator::shutDown()
 	m_newWidgetIsImage = false;
 	m_lockWidgetSize = false;
 	m_showTexturePickerPopup = false;
+	m_pendingProgressBarCreation = false;
+	m_pendingProgressBarBindingComplete = false;
 	m_newWidgetAction = GameGUIActionType::None;
 	m_texturePickerTarget = TexturePickerTarget::None;
 	m_texturePickerRootDirectory.clear();
@@ -643,8 +649,16 @@ void GameGUICreator::Draw(const Camera&)
 				ImGui::SameLine();
 				if (ImGui::SmallButton("Reset##Size"))
 				{
-					widget.width = 100;
-					widget.height = 30;
+					if (widget.type == "ProgressBar")
+					{
+						widget.width = widget.textureWidth;
+						widget.height = widget.defaultTextureHeight;
+					}
+					else
+					{
+						widget.width = 100;
+						widget.height = 30;
+					}
 					SyncRuntimePreview();
 				}
 			}
@@ -656,6 +670,24 @@ void GameGUICreator::Draw(const Camera&)
 				if (ImGui::Button("Browse...##SelectedWidgetTexture"))
 				{
 					OpenTexturePicker(TexturePickerTarget::SelectedWidgetTexture);
+				}
+			}
+
+			if (widget.type == "ProgressBar")
+			{
+				int fillSize[2] = { widget.textureWidth, widget.textureHeight };
+				if (ImGui::DragInt2("Fill Size", fillSize, 1.0f))
+				{
+					widget.textureWidth = std::max(1, fillSize[0]);
+					widget.textureHeight = std::max(1, fillSize[1]);
+					SyncRuntimePreview();
+				}
+				ImGui::SameLine();
+				if (ImGui::SmallButton("Reset##FillSize"))
+				{
+					widget.textureWidth = widget.defaultTextureWidth;
+					widget.textureHeight = widget.defaultTextureHeight;
+					SyncRuntimePreview();
 				}
 			}
 
@@ -746,6 +778,7 @@ void GameGUICreator::DrawCreateWidgetPopup()
 
 	if (ImGui::BeginPopupModal("Create Widget", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 	{
+		bool openBindingAfterClose = false;
 		const char* widgetKind = m_newWidgetIsProgressBar ? "Create a progress bar widget:" : (m_newWidgetIsImage ? "Create an image widget:" : (m_newWidgetIsText ? "Create a text widget:" : "Create a button widget:"));
 		ImGui::TextUnformatted(widgetKind);
 		ImGui::InputText("Name", m_newWidgetName, sizeof(m_newWidgetName));
@@ -792,7 +825,22 @@ void GameGUICreator::DrawCreateWidgetPopup()
 			}
 			else if (m_newWidgetIsProgressBar)
 			{
-				AddProgressBarWidget();
+				m_pendingProgressBarWidget = {};
+				m_pendingProgressBarWidget.type = "ProgressBar";
+				m_pendingProgressBarWidget.name = m_newWidgetName[0] != '\0' ? m_newWidgetName : "progress";
+				m_pendingProgressBarWidget.texture = m_newWidgetTexture[0] != '\0' ? m_newWidgetTexture : "textures/example.png";
+				m_pendingProgressBarWidget.layer = "Main";
+				m_pendingProgressBarWidget.width = 256;
+				m_pendingProgressBarWidget.height = 32;
+				m_pendingProgressBarWidget.textureWidth = 256;
+				m_pendingProgressBarWidget.textureHeight = 32;
+				m_pendingProgressBarWidget.defaultTextureWidth = 256;
+				m_pendingProgressBarWidget.defaultTextureHeight = 32;
+				m_pendingProgressBarCreation = true;
+				m_pendingProgressBarBindingComplete = false;
+				m_bindingWidgetName = m_pendingProgressBarWidget.name;
+				openBindingAfterClose = true;
+				ImGui::CloseCurrentPopup();
 			}
 			else if (m_newWidgetIsImage)
 			{
@@ -812,6 +860,10 @@ void GameGUICreator::DrawCreateWidgetPopup()
 			ImGui::CloseCurrentPopup();
 		}
 		ImGui::EndPopup();
+		if (openBindingAfterClose)
+		{
+			m_showBindingPopup = true;
+		}
 	}
 }
 
@@ -830,12 +882,20 @@ void GameGUICreator::DrawBindingPopup()
 
 	GameGUIAsset& asset = CurrentAsset();
 	GameGUIWidgetDef* widget = nullptr;
-	for (GameGUIWidgetDef& candidate : asset.widgets)
+	GameGUIWidgetDef* draft = m_pendingProgressBarCreation ? &m_pendingProgressBarWidget : nullptr;
+	if (draft)
 	{
-		if (candidate.name == m_bindingWidgetName)
+		widget = draft;
+	}
+	else
+	{
+		for (GameGUIWidgetDef& candidate : asset.widgets)
 		{
-			widget = &candidate;
-			break;
+			if (candidate.name == m_bindingWidgetName)
+			{
+				widget = &candidate;
+				break;
+			}
 		}
 	}
 
@@ -1007,6 +1067,11 @@ void GameGUICreator::DrawBindingPopup()
 
 	if (ImGui::Button("Close"))
 	{
+		if (m_pendingProgressBarCreation)
+		{
+			m_pendingProgressBarBindingComplete = true;
+			m_showTexturePickerPopup = true;
+		}
 		m_bindingWidgetName.clear();
 		ImGui::CloseCurrentPopup();
 	}
@@ -1121,7 +1186,18 @@ void GameGUICreator::DrawTexturePickerPopup()
 		const std::string portablePath = MakePortableTexturePath(m_texturePickerSelectedPath);
 		if (target == TexturePickerTarget::NewWidgetTexture)
 		{
-			std::snprintf(m_newWidgetTexture, sizeof(m_newWidgetTexture), "%s", portablePath.c_str());
+			if (m_pendingProgressBarCreation)
+			{
+				m_pendingProgressBarWidget.texture = portablePath;
+				AddProgressBarWidget();
+				m_pendingProgressBarCreation = false;
+				m_pendingProgressBarBindingComplete = false;
+				SyncRuntimePreview();
+			}
+			else
+			{
+				std::snprintf(m_newWidgetTexture, sizeof(m_newWidgetTexture), "%s", portablePath.c_str());
+			}
 		}
 		else if (target == TexturePickerTarget::SelectedWidgetTexture &&
 			m_selectedAssetIndex >= 0 && m_selectedAssetIndex < static_cast<int>(m_assets.size()))
@@ -1341,15 +1417,26 @@ void GameGUICreator::AddProgressBarWidget()
 	}
 
 	GameGUIWidgetDef progress;
-	progress.type = "ProgressBar";
-	progress.name = m_newWidgetName[0] != '\0' ? m_newWidgetName : "progress";
-	progress.skin = "ImageBox";
-	progress.texture = m_newWidgetTexture[0] != '\0' ? m_newWidgetTexture : "textures/example.png";
-	progress.layer = "Main";
-	progress.width = 256;
-	progress.height = 32;
-	progress.fontSize = 0;
-	progress.action = GameGUIActionType::None;
+	if (m_pendingProgressBarCreation)
+	{
+		progress = m_pendingProgressBarWidget;
+	}
+	else
+	{
+		progress.type = "ProgressBar";
+		progress.name = m_newWidgetName[0] != '\0' ? m_newWidgetName : "progress";
+		progress.skin = "ImageBox";
+		progress.texture = m_newWidgetTexture[0] != '\0' ? m_newWidgetTexture : "textures/example.png";
+		progress.layer = "Main";
+		progress.width = 256;
+		progress.height = 32;
+		progress.textureWidth = progress.width;
+		progress.textureHeight = progress.height;
+		progress.defaultTextureWidth = progress.textureWidth;
+		progress.defaultTextureHeight = progress.textureHeight;
+		progress.fontSize = 0;
+		progress.action = GameGUIActionType::None;
+	}
 
 	int framebufferWidth = 0;
 	int framebufferHeight = 0;
@@ -1374,6 +1461,7 @@ void GameGUICreator::AddProgressBarWidget()
 	m_selectedWidgetIndex = static_cast<int>(asset.widgets.size() - 1);
 	m_newWidgetName[0] = '\0';
 	m_newWidgetTexture[0] = '\0';
+	m_pendingProgressBarWidget = {};
 	gDebug.LogMessage(
 		std::string("Created GameGUI progress bar widget: name='") + progress.name +
 		"', asset='" + asset.name +
@@ -1414,6 +1502,8 @@ void GameGUICreator::SaveCurrentAsset()
 		json << "      \"y\": " << widget.y << ",\n";
 		json << "      \"width\": " << widget.width << ",\n";
 		json << "      \"height\": " << widget.height << ",\n";
+		json << "      \"textureWidth\": " << widget.textureWidth << ",\n";
+		json << "      \"textureHeight\": " << widget.textureHeight << ",\n";
 		json << "      \"fontSize\": " << widget.fontSize << ",\n";
 		json << "      \"visible\": " << (widget.visible ? "true" : "false") << ",\n";
 		json << "      \"alpha\": " << widget.alpha << ",\n";

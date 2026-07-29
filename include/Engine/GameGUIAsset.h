@@ -24,6 +24,10 @@ struct GameGUIWidgetDef
 	int y = 0;
 	int width = 100;
 	int height = 30;
+	int textureWidth = 100;
+	int textureHeight = 30;
+	int defaultTextureWidth = 100;
+	int defaultTextureHeight = 30;
 	int fontSize = 0;
 	bool visible = true;
 	float alpha = 1.0f;

@@ -16,7 +16,6 @@
 #include <MYGUI/MyGUI_Button.h>
 #include <MYGUI/MyGUI_Gui.h>
 #include <MYGUI/MyGUI_ImageBox.h>
-#include <MYGUI/MyGUI_ProgressBar.h>
 #include <MYGUI/MyGUI_TextBox.h>
 #include <MYGUI/MyGUI_OpenGLDataManager.h>
 #include <MYGUI/MyGUI_OpenGLPlatform.h>
@@ -277,15 +276,17 @@ void GameGUI::Draw()
 			continue;
 		}
 
-		auto* progressBar = dynamic_cast<MyGUI::ProgressBar*>(it->second);
-		if (!progressBar)
+		auto* fillImage = dynamic_cast<MyGUI::ImageBox*>(it->second);
+		if (!fillImage)
 		{
 			continue;
 		}
 
 		const float percent = ReadProgressPercent(widget);
-		progressBar->setProgressRange(100);
-		progressBar->setProgressPosition(static_cast<std::size_t>(std::lround(percent * 100.0f)));
+		const int filledWidth = percent <= 0.0f
+			? 0
+			: std::max(1, static_cast<int>(std::lround(static_cast<float>(widget.width) * percent)));
+		fillImage->setSize(MyGUI::IntSize(filledWidth, widget.height));
 	}
 
 	// MyGUI needs a per-frame tick so internal widget state and input-driven updates
@@ -499,14 +500,15 @@ MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::
 	}
 	else if (def.type == "ProgressBar")
 	{
-		const std::string skin = def.skin.empty() ? "ProgressBar" : def.skin;
-		MyGUI::ProgressBar* progress = parent ?
-			parent->createWidget<MyGUI::ProgressBar>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.name) :
-			m_gui->createWidget<MyGUI::ProgressBar>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.layer, def.name);
+		MyGUI::ImageBox* progress = parent ?
+			parent->createWidget<MyGUI::ImageBox>("ImageBox", def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.name) :
+			m_gui->createWidget<MyGUI::ImageBox>("ImageBox", def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.layer, def.name);
 		if (progress)
 		{
-			progress->setProgressRange(100);
-			progress->setProgressPosition(0);
+			if (!def.texture.empty())
+			{
+				progress->setImageTexture(def.texture);
+			}
 			progress->setVisible(def.visible);
 			progress->setAlpha(def.alpha);
 			if (!parent)
