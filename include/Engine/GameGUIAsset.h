@@ -7,8 +7,7 @@
 enum class GameGUIActionType
 {
 	None,
-	QuitGame,
-	PauseGame,
+	NewGame,
 };
 
 struct GameGUIWidgetDef

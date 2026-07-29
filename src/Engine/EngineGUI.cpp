@@ -478,7 +478,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 					gDebug.LogMessage("Play Game aborted because project autosave failed.");
 				}
 			}
-			if (ImGui::MenuItem("Play Level"))
+			if (ImGui::MenuItem("Play Level")) 
 			{
 				if (projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", levelManager))
 				{

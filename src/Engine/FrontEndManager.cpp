@@ -137,11 +137,21 @@ FrontEndMode FrontEndManager::FrontEndModeValue() const
 
 void FrontEndManager::OpenGameGUICreator()
 {
+	if (m_engineGUI && m_uiCreator)
+	{
+		m_uiCreator->CaptureEditorViewState(m_engineGUI->ShowAxis(), m_engineGUI->ShowGrid());
+		m_engineGUI->SetShowAxis(false);
+		m_engineGUI->SetShowGrid(false);
+	}
 	m_mode = FrontEndMode::GameGUICreator;
 }
 
 void FrontEndManager::ReturnToEngineGUIEditor()
 {
+	if (m_uiCreator)
+	{
+		m_uiCreator->RestoreEditorViewState();
+	}
 	m_mode = FrontEndMode::EngineEditor;
 }
 

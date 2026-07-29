@@ -63,10 +63,8 @@ namespace {
 	{
 		switch (action)
 		{
-		case GameGUIActionType::QuitGame:
-			return "Quit Game";
-		case GameGUIActionType::PauseGame:
-			return "Pause Game";
+		case GameGUIActionType::NewGame:
+			return "New Game";
 		default:
 			return "None";
 		}
@@ -76,10 +74,8 @@ namespace {
 	{
 		switch (action)
 		{
-		case GameGUIActionType::QuitGame:
-			return "QuitGame";
-		case GameGUIActionType::PauseGame:
-			return "PauseGame";
+		case GameGUIActionType::NewGame:
+			return "NewGame";
 		default:
 			return "None";
 		}
@@ -87,13 +83,9 @@ namespace {
 
 	GameGUIActionType StringToAction(const std::string& value)
 	{
-		if (value == "QuitGame")
+		if (value == "NewGame")
 		{
-			return GameGUIActionType::QuitGame;
-		}
-		if (value == "PauseGame")
-		{
-			return GameGUIActionType::PauseGame;
+			return GameGUIActionType::NewGame;
 		}
 		return GameGUIActionType::None;
 	}
@@ -310,6 +302,9 @@ void GameGUICreator::startUp(Window& window)
 	m_texturePickerSelectedPath.clear();
 	m_bindingWidgetName.clear();
 	m_lockedWidgetSizeRatio = 1.0f;
+	m_previousShowAxis = true;
+	m_previousShowGrid = true;
+	m_previousViewStateCaptured = false;
 	m_initialized = true;
 	m_selectedWidgetIndex = m_assets[GUIIndex(m_selectedGUI)].widgets.empty() ? -1 : 0;
 	SyncRuntimePreview();
@@ -336,6 +331,7 @@ void GameGUICreator::shutDown()
 	m_showBindingPopup = false;
 	m_bindingWidgetName.clear();
 	m_lockedWidgetSizeRatio = 1.0f;
+	RestoreEditorViewState();
 	m_assets.clear();
 	m_selectedGUI = GUIRole::MainMenu;
 	m_selectedWidgetIndex = -1;
@@ -343,6 +339,18 @@ void GameGUICreator::shutDown()
 
 void GameGUICreator::BeginFrame()
 {
+}
+
+void GameGUICreator::CaptureEditorViewState(bool showAxis, bool showGrid)
+{
+	m_previousShowAxis = showAxis;
+	m_previousShowGrid = showGrid;
+	m_previousViewStateCaptured = true;
+}
+
+bool GameGUICreator::IsMainMenuSelected() const
+{
+	return m_selectedGUI == GUIRole::MainMenu;
 }
 
 GameGUIAsset& GameGUICreator::CurrentRoleGUI()
@@ -411,24 +419,6 @@ void GameGUICreator::Draw(const Camera&)
 				LoadSelectedRoleGUI();
 				SyncRuntimePreview();
 				gDebug.LogMessage("Load Current GUI requested");
-			}
-			ImGui::EndMenu();
-		}
-		if (ImGui::BeginMenu("View"))
-		{
-			EngineGUI& engineGUI = gFrontEndManager.EditorGUI();
-			bool showAxis = engineGUI.ShowAxis();
-			bool showGrid = engineGUI.ShowGrid();
-			ImGui::MenuItem("Axis", nullptr, &showAxis);
-			if (showAxis != engineGUI.ShowAxis())
-			{
-				engineGUI.SetShowAxis(showAxis);
-			}
-			ImGui::Separator();
-			ImGui::MenuItem("Show Grid", nullptr, &showGrid);
-			if (showGrid != engineGUI.ShowGrid())
-			{
-				engineGUI.SetShowGrid(showGrid);
 			}
 			ImGui::EndMenu();
 		}
@@ -770,7 +760,7 @@ void GameGUICreator::DrawCreateWidgetPopup()
 			GameGUIActionType action = m_newWidgetAction;
 			if (ImGui::BeginCombo("Action", ActionLabel(action)))
 			{
-				const GameGUIActionType options[] = { GameGUIActionType::None, GameGUIActionType::QuitGame, GameGUIActionType::PauseGame };
+				const GameGUIActionType options[] = { GameGUIActionType::None, GameGUIActionType::NewGame };
 				for (GameGUIActionType option : options)
 				{
 					const bool selected = option == action;
@@ -1530,6 +1520,19 @@ void GameGUICreator::DeleteSelectedWidget()
 void GameGUICreator::SyncRuntimePreview()
 {
 	gFrontEndManager.RuntimeGUI().LoadUIAsset(CurrentRoleGUI());
+}
+
+void GameGUICreator::RestoreEditorViewState()
+{
+	if (!m_previousViewStateCaptured)
+	{
+		return;
+	}
+
+	EngineGUI& engineGUI = gFrontEndManager.EditorGUI();
+	engineGUI.SetShowAxis(m_previousShowAxis);
+	engineGUI.SetShowGrid(m_previousShowGrid);
+	m_previousViewStateCaptured = false;
 }
 
 

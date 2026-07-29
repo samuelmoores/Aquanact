@@ -178,24 +178,32 @@ void RenderManager::Loop()
 	m_device.Clear(0.0f, 0.0f, 0.0f, 0.0f);
 	m_device.BeginFrame();
 
-	// Build render commands from the current level.
-	const Level* activeLevel = gLevelManager.ActiveLevel();
-	static const std::vector<std::unique_ptr<Entity>> emptyObjects;
-	const auto& objects = activeLevel ? activeLevel->Objects() : emptyObjects;
-	for (const auto& object : objects)
-	{
-		if (!object || !object->GetMesh() || !object->GetShader())
-		{
-			++m_lastFrameSkippedObjects;
-			continue;
-		}
+	const bool previewMainMenu =
+		gEngineState.IsEditorMode() &&
+		gFrontEndManager.FrontEndModeValue() == FrontEndMode::GameGUICreator &&
+		gFrontEndManager.Creator().IsMainMenuSelected();
 
-		Submit(RenderCommand{
-			object->GetMesh(),
-			object->GetShader(),
-			object->BuildModelMatrix(),
-			object->skinned()
-		});
+	if (!previewMainMenu)
+	{
+		// Build render commands from the current level.
+		const Level* activeLevel = gLevelManager.ActiveLevel();
+		static const std::vector<std::unique_ptr<Entity>> emptyObjects;
+		const auto& objects = activeLevel ? activeLevel->Objects() : emptyObjects;
+		for (const auto& object : objects)
+		{
+			if (!object || !object->GetMesh() || !object->GetShader())
+			{
+				++m_lastFrameSkippedObjects;
+				continue;
+			}
+
+			Submit(RenderCommand{
+				object->GetMesh(),
+				object->GetShader(),
+				object->BuildModelMatrix(),
+				object->skinned()
+			});
+		}
 	}
 	const auto buildEnd = std::chrono::high_resolution_clock::now();
 	m_lastFrameBuildTime = buildEnd - buildStart;

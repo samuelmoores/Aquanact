@@ -17,6 +17,9 @@ public:
 	void BeginFrame();
 	void Draw(const Camera& camera);
 	void EndFrame();
+	void CaptureEditorViewState(bool showAxis, bool showGrid);
+	bool IsMainMenuSelected() const;
+	void RestoreEditorViewState();
 
 private:
 	enum class GUIRole {
@@ -78,5 +81,8 @@ private:
 	std::vector<GameGUIAsset> m_assets;
 	GUIRole m_selectedGUI = GUIRole::MainMenu;
 	int m_selectedWidgetIndex = -1;
+	bool m_previousShowAxis = true;
+	bool m_previousShowGrid = true;
+	bool m_previousViewStateCaptured = false;
 };
 

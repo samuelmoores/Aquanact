@@ -5,6 +5,7 @@
 #include "Engine/EventManager.h"
 #include "Engine/Globals.h"
 #include "Engine/GameplayManager.h"
+#include "Engine/ProjectManager.h"
 #include "Engine/Window.h"
 #include "Engine/StbImage.h"
 #include "Engine/GLHeaders.h"
@@ -587,21 +588,21 @@ void GameGUI::OnWidgetClicked(MyGUI::Widget* sender)
 	gFrontEndManager.RuntimeGUI().RecordClick("Clicked widget: " + (name.empty() ? std::string("<unnamed>") : name));
 	switch (action)
 	{
-	case GameGUIActionType::QuitGame:
-		gFrontEndManager.RuntimeGUI().RecordClick("Quit action requested");
-		gDebug.LogMessage("GameGUI Quit action requested");
-		if (m_window && m_window->GLFW())
+	case GameGUIActionType::NewGame:
+		gFrontEndManager.RuntimeGUI().RecordClick("New Game action requested");
+		gDebug.LogMessage("GameGUI NewGame action requested");
+		if (gProjectManager.CurrentProjectPath().empty())
 		{
-			gDebug.LogMessage("GameGUI requested window close via Quit button");
-			gFrontEndManager.RuntimeGUI().RecordClick("Window close requested");
-			glfwSetWindowShouldClose(m_window->GLFW(), GLFW_TRUE);
+			gDebug.LogMessage("GameGUI NewGame failed: no project is currently loaded.");
+			break;
 		}
-		break;
-	case GameGUIActionType::PauseGame:
-		gFrontEndManager.RuntimeGUI().RecordClick("Pause Game action requested");
-		gDebug.LogMessage("GameGUI PauseGame action requested");
-		gGameplayManager.TogglePaused();
-		gFrontEndManager.RuntimeGUI().RecordClick(gGameplayManager.IsPaused() ? "Gameplay paused" : "Gameplay resumed");
+		if (!gProjectManager.LoadProject(gProjectManager.CurrentProjectPath(), gLevelManager))
+		{
+			gDebug.LogMessage("GameGUI NewGame failed: could not reload the current project.");
+			break;
+		}
+		gGameplayManager.StartGameSession();
+		gFrontEndManager.RuntimeGUI().RecordClick("New Game started");
 		break;
 	case GameGUIActionType::None:
 	default:

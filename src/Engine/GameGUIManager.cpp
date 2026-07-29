@@ -69,13 +69,9 @@ namespace {
 
 	GameGUIActionType StringToAction(const std::string& value)
 	{
-		if (value == "QuitGame")
+		if (value == "NewGame")
 		{
-			return GameGUIActionType::QuitGame;
-		}
-		if (value == "PauseGame")
-		{
-			return GameGUIActionType::PauseGame;
+			return GameGUIActionType::NewGame;
 		}
 		return GameGUIActionType::None;
 	}
