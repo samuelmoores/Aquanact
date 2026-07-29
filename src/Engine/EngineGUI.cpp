@@ -465,7 +465,20 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 		}
 		if (ImGui::BeginMenu("Game"))
 		{
-			if (ImGui::MenuItem("Play"))
+			if (ImGui::MenuItem("Play Game"))
+			{
+				if (projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", levelManager))
+				{
+					gEngineState.SetMode(EngineMode::Game);
+					gRenderManager.SetGameMode();
+					gGameplayManager.BootMainMenu();
+				}
+				else
+				{
+					gDebug.LogMessage("Play Game aborted because project autosave failed.");
+				}
+			}
+			if (ImGui::MenuItem("Play Level"))
 			{
 				if (projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", levelManager))
 				{
@@ -475,7 +488,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 				}
 				else
 				{
-					gDebug.LogMessage("Play aborted because project autosave failed.");
+					gDebug.LogMessage("Play Level aborted because project autosave failed.");
 				}
 			}
 			if (ImGui::MenuItem("Set Game Camera"))

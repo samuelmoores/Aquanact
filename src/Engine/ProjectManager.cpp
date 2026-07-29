@@ -18,7 +18,12 @@ ProjectManager::ProjectManager(FileSystem& fileSystem)
 {
 }
 
-bool ProjectManager::SaveProject(const std::filesystem::path& path, const LevelManager& levelManager) const
+const std::filesystem::path& ProjectManager::CurrentProjectPath() const
+{
+	return m_currentProjectPath;
+}
+
+bool ProjectManager::SaveProject(const std::filesystem::path& path, const LevelManager& levelManager)
 {
 	if (!m_fileSystem)
 	{
@@ -47,10 +52,15 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const LevelM
 		contents += "\n";
 	}
 
-	return m_fileSystem->WriteTextFile(path, contents);
+	const bool written = m_fileSystem->WriteTextFile(path, contents);
+	if (written)
+	{
+		m_currentProjectPath = path;
+	}
+	return written;
 }
 
-bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager& levelManager) const
+bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager& levelManager)
 {
 	if (!m_fileSystem)
 	{
@@ -91,7 +101,12 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 	std::string pendingActiveGameGUIAsset;
 	std::string pendingImguiLayout;
 	gRenderManager.Lights().PointLights().clear();
-	return ProjectStateSerializer::LoadLevelState(path, file, projectVersion, levelManager, gFrontEndManager, gRenderManager, pendingGameGUIAssets, pendingActiveGameGUIAsset, pendingImguiLayout);
+	const bool loaded = ProjectStateSerializer::LoadLevelState(path, file, projectVersion, levelManager, gFrontEndManager, gRenderManager, pendingGameGUIAssets, pendingActiveGameGUIAsset, pendingImguiLayout);
+	if (loaded)
+	{
+		m_currentProjectPath = path;
+	}
+	return loaded;
 }
 
 

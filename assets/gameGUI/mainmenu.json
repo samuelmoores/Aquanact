@@ -1,5 +1,28 @@
 {
   "name": "MainMenu",
   "widgets": [
+    {
+      "type": "Button",
+      "name": "Pause",
+      "parent": "",
+      "skin": "ButtonSkin",
+      "text": "Test Button",
+      "texture": "",
+      "layer": "Main",
+      "x": 480,
+      "y": 315,
+      "width": 320,
+      "height": 90,
+      "textureWidth": 100,
+      "textureHeight": 30,
+      "fontSize": 0,
+      "visible": true,
+      "alpha": 1,
+      "action": "PauseGame",
+      "bindEntity": "",
+      "bindComponent": "",
+      "bindMember": "",
+      "bindEvent": ""
+    }
   ]
 }

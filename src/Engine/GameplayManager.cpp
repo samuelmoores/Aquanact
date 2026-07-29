@@ -3,6 +3,7 @@
 #include "Engine/Controller.h"
 #include "Engine/AnimatorComponent.h"
 #include "Engine/Debug.h"
+#include "Engine/FrontEndManager.h"
 #include "Engine/Globals.h"
 #include "Engine/Level.h"
 
@@ -11,20 +12,71 @@ GameplayManager::~GameplayManager() = default;
 void GameplayManager::startUp(LevelManager& levelManager)
 {
 	m_levelManager = &levelManager;
-	m_paused = false;
+	m_state = FlowState::MainMenu;
 	if (m_levelManager)
 	{
-		m_levelManager->startUp();
+		if (gFrontEndManager.RuntimeGUI().HasRuntime())
+		{
+			gFrontEndManager.RuntimeGUI().ShowMainMenu();
+		}
 	}
 }
 
 void GameplayManager::shutDown()
 {
 	m_levelManager = nullptr;
-	m_paused = false;
+	m_state = FlowState::MainMenu;
+}
+
+void GameplayManager::BootMainMenu()
+{
+	if (!m_levelManager)
+	{
+		return;
+	}
+
+	m_levelManager->Clear();
+	m_state = FlowState::MainMenu;
+	if (gFrontEndManager.RuntimeGUI().HasRuntime())
+	{
+		gFrontEndManager.RuntimeGUI().ShowMainMenu();
+	}
 }
 
 void GameplayManager::StartGameSession()
+{
+	if (!m_levelManager || !gEngineState.IsGameMode())
+	{
+		return;
+	}
+
+	if (!m_levelManager->ActiveLevel())
+	{
+		if (!m_levelManager->Levels().empty())
+		{
+			m_levelManager->SetActiveLevel(m_levelManager->Levels().front()->Name());
+		}
+		else
+		{
+			m_levelManager->CreateLevel("Default");
+		}
+	}
+
+	m_levelManager->startUp();
+	m_levelManager->CaptureActiveLevelEditorTransforms();
+	Level* activeLevel = m_levelManager->ActiveLevel();
+	if (activeLevel)
+	{
+		activeLevel->FirstFrame();
+	}
+	m_state = FlowState::Playing;
+	if (gFrontEndManager.RuntimeGUI().HasRuntime())
+	{
+		gFrontEndManager.RuntimeGUI().ShowGameplayHUD();
+	}
+}
+
+void GameplayManager::StartLevelPreview()
 {
 	if (!m_levelManager)
 	{
@@ -50,6 +102,7 @@ void GameplayManager::StartGameSession()
 	{
 		activeLevel->FirstFrame();
 	}
+	m_state = FlowState::Preview;
 }
 
 std::size_t GameplayManager::ControllerCount() const
@@ -73,7 +126,7 @@ std::size_t GameplayManager::ControllerCount() const
 
 void GameplayManager::Update(float dt)
 {
-	if (m_paused)
+	if (m_state != FlowState::Playing && m_state != FlowState::Preview)
 	{
 		return;
 	}
@@ -126,17 +179,53 @@ void GameplayManager::Update(float dt)
 
 void GameplayManager::SetPaused(bool paused)
 {
-	m_paused = paused;
+	if (paused)
+	{
+		if (m_state == FlowState::Playing)
+		{
+			m_state = FlowState::Paused;
+		}
+	}
+	else if (m_state == FlowState::Paused)
+	{
+		m_state = FlowState::Playing;
+	}
+
+	if (gFrontEndManager.RuntimeGUI().HasRuntime())
+	{
+		if (m_state == FlowState::Paused)
+		{
+			gFrontEndManager.RuntimeGUI().ShowPauseMenu();
+		}
+		else if (m_state == FlowState::Playing)
+		{
+			gFrontEndManager.RuntimeGUI().ShowGameplayHUD();
+		}
+		else if (m_state == FlowState::MainMenu)
+		{
+			gFrontEndManager.RuntimeGUI().ShowMainMenu();
+		}
+	}
 }
 
 void GameplayManager::TogglePaused()
 {
-	m_paused = !m_paused;
+	SetPaused(m_state != FlowState::Paused);
 }
 
 bool GameplayManager::IsPaused() const
 {
-	return m_paused;
+	return m_state == FlowState::Paused;
+}
+
+GameplayManager::FlowState GameplayManager::State() const
+{
+	return m_state;
+}
+
+bool GameplayManager::ShouldUpdateInEditor() const
+{
+	return m_state == FlowState::Preview;
 }
 
 

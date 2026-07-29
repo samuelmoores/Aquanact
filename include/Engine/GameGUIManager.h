@@ -12,6 +12,15 @@ class GameGUI;
 
 class GameGUIManager {
 public:
+	enum class UIMode
+	{
+		MainMenu,
+		GameplayHUD,
+		PauseMenu,
+		PlayerUI,
+		Custom
+	};
+
 	GameGUIManager();
 	~GameGUIManager();
 
@@ -34,6 +43,13 @@ public:
 	void DrawReturnButton();
 	bool ShowEditorWindow() const;
 	void SetShowEditorWindow(bool showEditorWindow);
+	void SetUIMode(UIMode mode);
+	UIMode Mode() const;
+	void ShowMainMenu();
+	void ShowGameplayHUD();
+	void ShowPauseMenu();
+	void ShowPlayerUI();
+	void HideAll();
 	void LogAction(const std::string& message);
 	void RecordClick(const std::string& message);
 	void AppendProjectState(std::string& contents) const;
@@ -46,6 +62,8 @@ public:
 
 private:
 	void ApplyActiveAsset();
+	void ApplyMode();
+	static const char* AssetNameForMode(UIMode mode);
 
 	std::unique_ptr<GameGUI> m_runtime;
 	std::vector<GameGUIAsset> m_assets;
@@ -54,5 +72,6 @@ private:
 	std::string m_lastClickMessage;
 	int m_activeAssetIndex = -1;
 	bool m_showEditorWindow = false;
+	UIMode m_mode = UIMode::MainMenu;
 };
 

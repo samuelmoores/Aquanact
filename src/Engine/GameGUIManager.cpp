@@ -2,6 +2,8 @@
 
 #include "Engine/GameGUI.h"
 #include "Engine/Globals.h"
+#include "Engine/Debug.h"
+#include "Engine/ProjectManager.h"
 #include "Engine/RenderManager.h"
 #include "Engine/Input.h"
 #include "Engine/LevelManager.h"
@@ -14,6 +16,23 @@
 #include <sstream>
 
 namespace {
+	const char* AssetNameForMode(GameGUIManager::UIMode mode)
+	{
+		switch (mode)
+		{
+		case GameGUIManager::UIMode::MainMenu:
+			return "MainMenu";
+		case GameGUIManager::UIMode::GameplayHUD:
+			return "HUD";
+		case GameGUIManager::UIMode::PauseMenu:
+			return "PauseMenu";
+		case GameGUIManager::UIMode::PlayerUI:
+			return "PlayerUI";
+		default:
+			return nullptr;
+		}
+	}
+
 	int ReadIntField(const std::string& value, int fallback = 0)
 	{
 		if (value.empty())
@@ -189,6 +208,8 @@ void GameGUIManager::startUp(Window& window)
 			m_assets.push_back(LoadAssetFile(entry.path()));
 		}
 	}
+	m_mode = UIMode::MainMenu;
+	ApplyMode();
 }
 
 void GameGUIManager::shutDown()
@@ -199,6 +220,7 @@ void GameGUIManager::shutDown()
 	}
 	m_assets.clear();
 	m_activeAssetIndex = -1;
+	m_mode = UIMode::MainMenu;
 }
 
 void GameGUIManager::BeginFrame()
@@ -426,6 +448,14 @@ void GameGUIManager::DrawReturnButton()
 	if (ImGui::Button("Return"))
 	{
 		gLevelManager.RestoreActiveLevelEditorTransforms();
+		if (gProjectManager.CurrentProjectPath().empty())
+		{
+			gDebug.LogMessage("Return to editor requested, but no project is currently loaded.");
+		}
+		else if (!gProjectManager.LoadProject(gProjectManager.CurrentProjectPath(), gLevelManager))
+		{
+			gDebug.LogMessage("Failed to reload the current project while returning to the editor.");
+		}
 		gEngineState.SetMode(EngineMode::Editor);
 		gRenderManager.SetEditorMode();
 		LogAction("Return to editor requested");
@@ -441,6 +471,63 @@ bool GameGUIManager::ShowEditorWindow() const
 void GameGUIManager::SetShowEditorWindow(bool showEditorWindow)
 {
 	m_showEditorWindow = showEditorWindow;
+}
+
+const char* GameGUIManager::AssetNameForMode(UIMode mode)
+{
+	switch (mode)
+	{
+	case UIMode::MainMenu:
+		return "MainMenu";
+	case UIMode::GameplayHUD:
+		return "HUD";
+	case UIMode::PauseMenu:
+		return "PauseMenu";
+	case UIMode::PlayerUI:
+		return "PlayerUI";
+	default:
+		return nullptr;
+	}
+}
+
+void GameGUIManager::SetUIMode(UIMode mode)
+{
+	m_mode = mode;
+	ApplyMode();
+}
+
+GameGUIManager::UIMode GameGUIManager::Mode() const
+{
+	return m_mode;
+}
+
+void GameGUIManager::ShowMainMenu()
+{
+	SetUIMode(UIMode::MainMenu);
+}
+
+void GameGUIManager::ShowGameplayHUD()
+{
+	SetUIMode(UIMode::GameplayHUD);
+}
+
+void GameGUIManager::ShowPauseMenu()
+{
+	SetUIMode(UIMode::PauseMenu);
+}
+
+void GameGUIManager::ShowPlayerUI()
+{
+	SetUIMode(UIMode::PlayerUI);
+}
+
+void GameGUIManager::HideAll()
+{
+	m_mode = UIMode::Custom;
+	if (m_runtime)
+	{
+		m_runtime->ClearUI();
+	}
 }
 
 void GameGUIManager::LogAction(const std::string& message)
@@ -576,6 +663,17 @@ void GameGUIManager::ApplyActiveAsset()
 		return;
 	}
 	m_runtime->LoadUIAsset(m_assets[static_cast<std::size_t>(m_activeAssetIndex)]);
+}
+
+void GameGUIManager::ApplyMode()
+{
+	const char* assetName = AssetNameForMode(m_mode);
+	if (!assetName)
+	{
+		return;
+	}
+
+	ActivateAsset(assetName);
 }
 
 

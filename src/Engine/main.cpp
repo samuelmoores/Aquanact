@@ -34,7 +34,7 @@ EngineState gEngineState;
 static void mainLoop()
 {
     gInput.Update();
-    if (gEngineState.IsGameMode())
+    if (gEngineState.IsGameMode() || gGameplayManager.ShouldUpdateInEditor())
     {
         gGameplayManager.Update(gInput.DeltaTime());
     }
@@ -116,10 +116,6 @@ static int RunApplication(int argc, char** argv)
     gFileManager.startUp();
     gProjectManager.LoadProject(launchConfig.projectPath, gLevelManager);
     gGameplayManager.startUp(gLevelManager);
-    if (gEngineState.IsGameMode())
-    {
-        gGameplayManager.StartGameSession();
-    }
 
     while (!gWindow.ShouldClose())
         mainLoop();
