@@ -20,6 +20,16 @@
 #include <sstream>
 
 namespace ProjectStateSerializer {
+	namespace {
+		void AppendComponentLine(std::string& contents, const std::filesystem::path& projectPath, const Entity* object, const char* componentType)
+		{
+			contents += "component;";
+			contents += EscapeField(MakePortableSourcePath(projectPath, object->SourcePath()).string());
+			contents += ";";
+			contents += componentType;
+		}
+	}
+
 	std::string EscapeField(const std::string& value)
 	{
 		std::string escaped;
@@ -284,42 +294,37 @@ namespace ProjectStateSerializer {
 
 				if (const PlayerController* playerController = object->GetComponent<PlayerController>())
 				{
-					contents += "component;";
-					contents += EscapeField(MakePortableSourcePath(projectPath, object->SourcePath()).string());
-					contents += ";playercontroller;";
+					AppendComponentLine(contents, projectPath, object.get(), "playercontroller");
+					contents += ";";
 					contents += std::to_string(playerController->MoveSpeed());
 					contents += "\n";
 				}
 				else if (Controller* controller = object->GetController())
 				{
-					contents += "component;";
-					contents += EscapeField(MakePortableSourcePath(projectPath, object->SourcePath()).string());
-					contents += ";controller;";
+					AppendComponentLine(contents, projectPath, object.get(), "controller");
+					contents += ";";
 					contents += std::to_string(controller->MoveSpeed());
 					contents += "\n";
 				}
 
 				if (const PlayerHealth* playerHealth = object->GetComponent<PlayerHealth>())
 				{
-					contents += "component;";
-					contents += EscapeField(MakePortableSourcePath(projectPath, object->SourcePath()).string());
-					contents += ";playerhealth;";
+					AppendComponentLine(contents, projectPath, object.get(), "playerhealth");
+					contents += ";";
 					contents += std::to_string(playerHealth->Health()) + ";" + std::to_string(playerHealth->MaxHealth());
 					contents += "\n";
 				}
 
 				if (object->GetComponent<Enemy>())
 				{
-					contents += "component;";
-					contents += EscapeField(MakePortableSourcePath(projectPath, object->SourcePath()).string());
-					contents += ";enemy\n";
+					AppendComponentLine(contents, projectPath, object.get(), "enemy");
+					contents += "\n";
 				}
 
 				if (const AnimatorComponent* animator = object->GetComponent<AnimatorComponent>())
 				{
-					contents += "component;";
-					contents += EscapeField(MakePortableSourcePath(projectPath, object->SourcePath()).string());
-					contents += ";animator;";
+					AppendComponentLine(contents, projectPath, object.get(), "animator");
+					contents += ";";
 					contents += EscapeField(animator->InitialState());
 					contents += ";";
 					contents += std::to_string(animator->States().size());
@@ -475,6 +480,99 @@ namespace ProjectStateSerializer {
 			if (!level) continue;
 			if (pendingLevel.active) activeLevel = level;
 			for (auto& object : pendingLevel.objects) level->AddObject(std::move(object));
+		}
+		for (const auto& pendingComponent : pendingComponents)
+		{
+			Level* level = levelManager.FindLevel(pendingComponent.levelName);
+			if (!level)
+			{
+				continue;
+			}
+
+			for (const auto& object : level->Objects())
+			{
+				if (!object || object->SourcePath() != pendingComponent.sourcePath.string())
+				{
+					continue;
+				}
+
+				if (pendingComponent.type == "playercontroller")
+				{
+					if (!object->GetComponent<PlayerController>())
+					{
+						object->AddComponent<PlayerController>();
+					}
+					if (PlayerController* playerController = object->GetComponent<PlayerController>())
+					{
+						playerController->SetMoveSpeed(pendingComponent.value1);
+					}
+				}
+				else if (pendingComponent.type == "controller")
+				{
+					if (!object->GetController())
+					{
+						object->AddComponent<Controller>();
+					}
+					if (Controller* controller = object->GetController())
+					{
+						controller->SetMoveSpeed(pendingComponent.value1);
+					}
+				}
+				else if (pendingComponent.type == "playerhealth")
+				{
+					if (!object->GetComponent<PlayerHealth>())
+					{
+						object->AddComponent<PlayerHealth>();
+					}
+					if (PlayerHealth* playerHealth = object->GetComponent<PlayerHealth>())
+					{
+						if (pendingComponent.hasValue1)
+						{
+							playerHealth->SetHealth(pendingComponent.value1);
+						}
+						if (pendingComponent.hasValue2)
+						{
+							playerHealth->SetMaxHealth(pendingComponent.value2);
+						}
+					}
+				}
+				else if (pendingComponent.type == "enemy")
+				{
+					if (!object->GetComponent<Enemy>())
+					{
+						object->AddComponent<Enemy>();
+					}
+				}
+				else if (pendingComponent.type == "animator")
+				{
+					if (!object->GetComponent<AnimatorComponent>())
+					{
+						object->AddComponent<AnimatorComponent>(object->GetMesh());
+					}
+					if (AnimatorComponent* animator = object->GetComponent<AnimatorComponent>())
+					{
+						animator->SetInitialState(pendingComponent.initialState);
+						for (const auto& state : pendingComponent.animatorStates)
+						{
+							animator->AddState(state.name, state.clipIndex);
+						}
+						for (const auto& transition : pendingComponent.animatorTransitions)
+						{
+							AnimatorComponent::Condition condition;
+							condition.left.type = static_cast<AnimatorComponent::OperandType>(transition.left.type);
+							condition.left.constantValue = transition.left.constantValue;
+							condition.left.componentName = transition.left.componentName;
+							condition.left.memberName = transition.left.memberName;
+							condition.comparator = static_cast<AnimatorComponent::Comparator>(transition.comparator);
+							condition.right.type = static_cast<AnimatorComponent::OperandType>(transition.right.type);
+							condition.right.constantValue = transition.right.constantValue;
+							condition.right.componentName = transition.right.componentName;
+							condition.right.memberName = transition.right.memberName;
+							animator->AddTransition(transition.from, transition.to, transition.blendSeconds, condition);
+						}
+					}
+				}
+			}
 		}
 		if (!activeLevel) activeLevel = levelManager.Levels().front().get();
 		levelManager.SetActiveLevel(activeLevel->Name());

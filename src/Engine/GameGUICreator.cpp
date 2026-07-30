@@ -795,7 +795,6 @@ void GameGUICreator::DrawCreateWidgetPopup()
 
 	if (ImGui::BeginPopupModal("Create Widget", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 	{
-		bool openBindingAfterClose = false;
 		const char* widgetKind = m_newWidgetIsProgressBar ? "Create a progress bar widget:" : (m_newWidgetIsImage ? "Create an image widget:" : (m_newWidgetIsText ? "Create a text widget:" : "Create a button widget:"));
 		ImGui::TextUnformatted(widgetKind);
 		ImGui::InputText("Name", m_newWidgetName, sizeof(m_newWidgetName));
@@ -811,6 +810,100 @@ void GameGUICreator::DrawCreateWidgetPopup()
 			{
 				OpenTexturePicker(TexturePickerTarget::NewWidgetTexture);
 			}
+		}
+		if (m_newWidgetIsProgressBar)
+		{
+			Level* activeLevel = gLevelManager.ActiveLevel();
+			ImGui::Separator();
+			ImGui::TextUnformatted("Binding");
+
+			GameGUIWidgetDef preview = m_pendingProgressBarWidget;
+			preview.name = m_newWidgetName[0] != '\0' ? m_newWidgetName : "progress";
+			preview.texture = m_newWidgetTexture[0] != '\0' ? m_newWidgetTexture : "textures/example.png";
+
+			const char* entityLabel = preview.bindEntity.empty() ? "<Select Entity>" : preview.bindEntity.c_str();
+			if (ImGui::BeginCombo("Entity", entityLabel))
+			{
+				if (activeLevel)
+				{
+					for (const auto& entity : activeLevel->Entities())
+					{
+						if (!entity)
+						{
+							continue;
+						}
+
+						const bool selected = preview.bindEntity == entity->Name();
+						if (ImGui::Selectable(entity->Name().c_str(), selected))
+						{
+							preview.bindEntity = entity->Name();
+							preview.bindComponent.clear();
+							preview.bindMember.clear();
+							preview.bindEvent.clear();
+						}
+						if (selected)
+						{
+							ImGui::SetItemDefaultFocus();
+						}
+					}
+				}
+				ImGui::EndCombo();
+			}
+
+			Entity* boundEntity = activeLevel ? FindEntity(activeLevel, preview.bindEntity) : nullptr;
+			ImGui::BeginDisabled(!boundEntity);
+			const char* componentLabel = preview.bindComponent.empty() ? "<Select Component>" : preview.bindComponent.c_str();
+			if (ImGui::BeginCombo("Component", componentLabel))
+			{
+				for (Component* component : boundEntity ? boundEntity->Components() : std::vector<Component*>{})
+				{
+					if (!component || component->GetBindableMembers().empty())
+					{
+						continue;
+					}
+
+					const bool selected = preview.bindComponent == component->Name();
+					if (ImGui::Selectable(component->Name(), selected))
+					{
+						preview.bindComponent = component->Name();
+						preview.bindMember.clear();
+					}
+					if (selected)
+					{
+						ImGui::SetItemDefaultFocus();
+					}
+				}
+				ImGui::EndCombo();
+			}
+			ImGui::EndDisabled();
+
+			Component* boundComponent = boundEntity ? boundEntity->GetComponentByName(preview.bindComponent) : nullptr;
+			ImGui::BeginDisabled(!boundComponent);
+			const char* memberLabel = preview.bindMember.empty() ? "<Select Value>" : preview.bindMember.c_str();
+			std::vector<BindableMember> bindableMembers = boundComponent ? boundComponent->GetBindableMembers() : std::vector<BindableMember>{};
+			if (ImGui::BeginCombo("Value", memberLabel))
+			{
+				for (const BindableMember& member : bindableMembers)
+				{
+					if (member.typeName != "int" && member.typeName != "float")
+					{
+						continue;
+					}
+
+					const bool selected = preview.bindMember == member.name;
+					const char* label = member.displayName.empty() ? member.name.c_str() : member.displayName.c_str();
+					if (ImGui::Selectable(label, selected))
+					{
+						preview.bindMember = member.name;
+					}
+					if (selected)
+					{
+						ImGui::SetItemDefaultFocus();
+					}
+				}
+				ImGui::EndCombo();
+			}
+			ImGui::EndDisabled();
 		}
 		else
 		{
@@ -853,11 +946,16 @@ void GameGUICreator::DrawCreateWidgetPopup()
 				m_pendingProgressBarWidget.textureHeight = 32;
 				m_pendingProgressBarWidget.defaultTextureWidth = 256;
 				m_pendingProgressBarWidget.defaultTextureHeight = 32;
+				m_pendingProgressBarWidget.bindEntity = m_pendingProgressBarWidget.bindEntity;
+				m_pendingProgressBarWidget.bindComponent = m_pendingProgressBarWidget.bindComponent;
+				m_pendingProgressBarWidget.bindMember = m_pendingProgressBarWidget.bindMember;
 				m_pendingProgressBarCreation = true;
-				m_pendingProgressBarBindingComplete = false;
+				m_pendingProgressBarBindingComplete = true;
 				m_bindingWidgetName = m_pendingProgressBarWidget.name;
-				openBindingAfterClose = true;
-				ImGui::CloseCurrentPopup();
+				AddProgressBarWidget();
+				m_pendingProgressBarCreation = false;
+				m_pendingProgressBarBindingComplete = false;
+				m_bindingWidgetName.clear();
 			}
 			else if (m_newWidgetIsImage)
 			{
@@ -877,10 +975,6 @@ void GameGUICreator::DrawCreateWidgetPopup()
 			ImGui::CloseCurrentPopup();
 		}
 		ImGui::EndPopup();
-		if (openBindingAfterClose)
-		{
-			m_showBindingPopup = true;
-		}
 	}
 }
 
@@ -927,6 +1021,25 @@ void GameGUICreator::DrawBindingPopup()
 		ImGui::EndPopup();
 		return;
 	}
+
+	ImGui::TextUnformatted("Binding target");
+	ImGui::Text("Name: %s", widget->name.empty() ? "<Unnamed>" : widget->name.c_str());
+	ImGui::Text("Type: %s", widget->type.empty() ? "<Unknown>" : widget->type.c_str());
+	if (widget->type == "ProgressBar")
+	{
+		ImGui::Text("Texture: %s", widget->texture.empty() ? "<No Texture>" : widget->texture.c_str());
+		const ImVec2 previewSize(180.0f, 24.0f);
+		ImVec2 cursor = ImGui::GetCursorScreenPos();
+		ImDrawList* drawList = ImGui::GetWindowDrawList();
+		const ImU32 background = IM_COL32(45, 45, 50, 255);
+		const ImU32 fill = IM_COL32(90, 160, 255, 255);
+		drawList->AddRectFilled(cursor, ImVec2(cursor.x + previewSize.x, cursor.y + previewSize.y), background, 4.0f);
+		const float fillWidth = previewSize.x * 0.65f;
+		drawList->AddRectFilled(cursor, ImVec2(cursor.x + fillWidth, cursor.y + previewSize.y), fill, 4.0f);
+		drawList->AddRect(cursor, ImVec2(cursor.x + previewSize.x, cursor.y + previewSize.y), IM_COL32(0, 0, 0, 255), 4.0f, 0, 1.0f);
+		ImGui::Dummy(ImVec2(previewSize.x, previewSize.y));
+	}
+	ImGui::Separator();
 
 	Level* activeLevel = gLevelManager.ActiveLevel();
 	if (!activeLevel)

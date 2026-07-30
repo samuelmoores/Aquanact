@@ -131,6 +131,11 @@ void GameplayManager::Update(float dt)
 		return;
 	}
 
+	if (m_state == FlowState::Playing && gFrontEndManager.RuntimeGUI().HasRuntime())
+	{
+		gFrontEndManager.RuntimeGUI().ShowGameplayHUD();
+	}
+
 	Level* activeLevel = m_levelManager ? m_levelManager->ActiveLevel() : nullptr;
 	if (!activeLevel)
 	{
