@@ -467,6 +467,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 		{
 			if (ImGui::MenuItem("Play Game"))
 			{
+				gFrontEndManager.Creator().SaveAllRoleGUIs();
 				if (projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", levelManager))
 				{
 					gEngineState.SetMode(EngineMode::Game);
@@ -480,6 +481,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 			}
 			if (ImGui::MenuItem("Play Level")) 
 			{
+				gFrontEndManager.Creator().SaveAllRoleGUIs();
 				if (projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", levelManager))
 				{
 					gEngineState.SetMode(EngineMode::Game);

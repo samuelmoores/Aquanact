@@ -8,6 +8,8 @@
 #include "Engine/Input.h"
 #include "Engine/Globals.h"
 #include "Engine/GameplayManager.h"
+#include "Engine/FrontEndManager.h"
+#include "Engine/GameGUIManager.h"
 #include "Engine/RenderManager.h"
 #include "Engine/LightingManager.h"
 #include "Engine/FrameAllocator.h"
@@ -199,9 +201,9 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 	if (m_showLogWindow)
 	{
 		ImGui::Begin("Debug Log", &m_showLogWindow);
-		if (ImGui::Button("Clear"))
+		if (ImGui::Button("Clear Logs"))
 		{
-			m_logMessages.clear();
+			ClearLogs();
 		}
 		ImGui::Separator();
 		for (const std::string& message : m_logMessages)
@@ -244,6 +246,17 @@ void Debug::drawGameModeInput(const Input& input)
 	ImGui::Text("Look active: %s", input.LookActive() ? "yes" : "no");
 	ImGui::Text("Look became active: %s", input.LookBecameActive() ? "yes" : "no");
 	ImGui::Text("Engine mode: %s", gEngineState.IsGameMode() ? "Game" : "Editor");
+	ImGui::Text("Gameplay flow: %s",
+		gGameplayManager.State() == GameplayManager::FlowState::MainMenu ? "MainMenu" :
+		gGameplayManager.State() == GameplayManager::FlowState::Playing ? "Playing" :
+		gGameplayManager.State() == GameplayManager::FlowState::Paused ? "Paused" :
+		gGameplayManager.State() == GameplayManager::FlowState::Preview ? "Preview" : "Unknown");
+	ImGui::Text("Runtime UI mode: %s",
+		gFrontEndManager.RuntimeGUI().Mode() == GameGUIManager::UIMode::MainMenu ? "MainMenu" :
+		gFrontEndManager.RuntimeGUI().Mode() == GameGUIManager::UIMode::GameplayHUD ? "GameplayHUD" :
+		gFrontEndManager.RuntimeGUI().Mode() == GameGUIManager::UIMode::PauseMenu ? "PauseMenu" :
+		gFrontEndManager.RuntimeGUI().Mode() == GameGUIManager::UIMode::PlayerUI ? "PlayerUI" :
+		gFrontEndManager.RuntimeGUI().Mode() == GameGUIManager::UIMode::Custom ? "Custom" : "Unknown");
 	const Level* activeLevel = gLevelManager.ActiveLevel();
 	ImGui::Text("Active level: %s", activeLevel ? activeLevel->Name().c_str() : "<none>");
 	ImGui::Text("Active level objects: %zu", activeLevel ? activeLevel->Objects().size() : 0);
@@ -254,6 +267,14 @@ void Debug::drawGameModeInput(const Input& input)
 	ImGui::Text("Move input: %.2f, %.2f", move.x, move.z);
 	ImGui::Text("Mouse delta: %.2f, %.2f", mouse.x, mouse.y);
 	ImGui::Text("Delta time: %.4f", input.DeltaTime());
+	ImGui::Separator();
+	ImGui::TextUnformatted("Recent logs:");
+	const std::size_t logCount = m_logMessages.size();
+	const std::size_t startIndex = logCount > 5 ? logCount - 5 : 0;
+	for (std::size_t i = startIndex; i < logCount; ++i)
+	{
+		ImGui::BulletText("%s", m_logMessages[i].c_str());
+	}
 	ImGui::End();
 
 	ImGui::Begin("Gameplay Diagnostics");
@@ -391,6 +412,12 @@ void Debug::LogOnce(const std::string& key, const std::string& message)
 
 	m_logOnceKeys.push_back(key);
 	LogMessage(message);
+}
+
+void Debug::ClearLogs()
+{
+	m_logMessages.clear();
+	m_logOnceKeys.clear();
 }
 
 void Debug::LogException(const std::string& context, const std::exception& ex)

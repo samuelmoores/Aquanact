@@ -35,6 +35,7 @@ void GameplayManager::BootMainMenu()
 		return;
 	}
 
+	gDebug.LogMessage("GameplayManager::BootMainMenu()");
 	m_levelManager->Clear();
 	m_state = FlowState::MainMenu;
 	if (gFrontEndManager.RuntimeGUI().HasRuntime())
@@ -47,9 +48,11 @@ void GameplayManager::StartGameSession()
 {
 	if (!m_levelManager || !gEngineState.IsGameMode())
 	{
+		gDebug.LogMessage("GameplayManager::StartGameSession() skipped: no level manager or not in game mode.");
 		return;
 	}
 
+	gDebug.LogMessage("GameplayManager::StartGameSession() begin");
 	if (!m_levelManager->ActiveLevel())
 	{
 		if (!m_levelManager->Levels().empty())
@@ -70,6 +73,7 @@ void GameplayManager::StartGameSession()
 		activeLevel->FirstFrame();
 	}
 	m_state = FlowState::Playing;
+	gDebug.LogMessage("GameplayManager::StartGameSession() state=Playing");
 	if (gFrontEndManager.RuntimeGUI().HasRuntime())
 	{
 		gFrontEndManager.RuntimeGUI().ShowGameplayHUD();
@@ -83,6 +87,7 @@ void GameplayManager::StartLevelPreview()
 		return;
 	}
 
+	gDebug.LogMessage("GameplayManager::StartLevelPreview()");
 	if (!m_levelManager->ActiveLevel())
 	{
 		if (!m_levelManager->Levels().empty())
@@ -189,11 +194,13 @@ void GameplayManager::SetPaused(bool paused)
 		if (m_state == FlowState::Playing)
 		{
 			m_state = FlowState::Paused;
+			gDebug.LogMessage("GameplayManager state=Paused");
 		}
 	}
 	else if (m_state == FlowState::Paused)
 	{
 		m_state = FlowState::Playing;
+		gDebug.LogMessage("GameplayManager state=Playing");
 	}
 
 	if (gFrontEndManager.RuntimeGUI().HasRuntime())

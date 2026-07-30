@@ -47,6 +47,7 @@ public:
 	void LogTagged(Severity severity, const std::string& tag, const std::string& message);
 	// One-shot logging avoids repeated spam from conditions that only matter once.
 	void LogOnce(const std::string& key, const std::string& message);
+	void ClearLogs();
 	// Standard wrapper for exceptions caught at subsystem boundaries.
 	void LogException(const std::string& context, const std::exception& ex);
 	// Convenience helper for "if this is false, log an error and continue".

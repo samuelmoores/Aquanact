@@ -20,6 +20,7 @@ public:
 	void CaptureEditorViewState(bool showAxis, bool showGrid);
 	bool IsMainMenuSelected() const;
 	void RestoreEditorViewState();
+	void SaveAllRoleGUIs();
 
 private:
 	enum class GUIRole {

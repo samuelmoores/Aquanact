@@ -580,47 +580,6 @@ void GameGUICreator::Draw(const Camera&)
 			GameGUIWidgetDef& widget = asset.widgets[static_cast<std::size_t>(m_selectedWidgetIndex)];
 			ImGui::Text("Name: %s", widget.name.c_str());
 			ImGui::Text("Type: %s", widget.type.c_str());
-			char textBuffer[256] = { 0 };
-			std::snprintf(textBuffer, sizeof(textBuffer), "%s", widget.text.c_str());
-			if (ImGui::InputText("Text", textBuffer, sizeof(textBuffer)))
-			{
-				widget.text = textBuffer;
-				SyncRuntimePreview();
-			}
-			const char* parentLabel = widget.parentName.empty() ? "<None>" : widget.parentName.c_str();
-			if (ImGui::BeginCombo("Parent", parentLabel))
-			{
-				const bool noneSelected = widget.parentName.empty();
-				if (ImGui::Selectable("<None>", noneSelected))
-				{
-					widget.parentName.clear();
-					SyncRuntimePreview();
-				}
-				if (noneSelected)
-				{
-					ImGui::SetItemDefaultFocus();
-				}
-
-				for (const GameGUIWidgetDef& parentCandidate : asset.widgets)
-				{
-					if (parentCandidate.name == widget.name || WouldCreateParentCycle(asset, widget.name, parentCandidate.name))
-					{
-						continue;
-					}
-
-					const bool selected = widget.parentName == parentCandidate.name;
-					if (ImGui::Selectable(parentCandidate.name.c_str(), selected))
-					{
-						widget.parentName = parentCandidate.name;
-						SyncRuntimePreview();
-					}
-					if (selected)
-					{
-						ImGui::SetItemDefaultFocus();
-					}
-				}
-				ImGui::EndCombo();
-			}
 			int position[2] = { widget.x, widget.y };
 			if (ImGui::DragInt2("Position", position, 1.0f))
 			{
@@ -695,58 +654,9 @@ void GameGUICreator::Draw(const Camera&)
 				}
 			}
 
-			if (widget.type == "ProgressBar")
-			{
-				int fillSize[2] = { widget.textureWidth, widget.textureHeight };
-				if (ImGui::DragInt2("Fill Size", fillSize, 1.0f))
-				{
-					widget.textureWidth = std::max(1, fillSize[0]);
-					widget.textureHeight = std::max(1, fillSize[1]);
-					SyncRuntimePreview();
-				}
-				ImGui::SameLine();
-				if (ImGui::SmallButton("Reset##FillSize"))
-				{
-					widget.textureWidth = widget.defaultTextureWidth;
-					widget.textureHeight = widget.defaultTextureHeight;
-					SyncRuntimePreview();
-				}
-			}
-
-			if (widget.type == "Button")
-			{
-				int fontSize = widget.fontSize;
-				if (ImGui::DragInt("Text Size", &fontSize, 1.0f, 0, 200))
-				{
-					widget.fontSize = std::max(0, fontSize);
-					SyncRuntimePreview();
-				}
-				ImGui::SameLine();
-				if (ImGui::SmallButton("Reset##TextSize"))
-				{
-					widget.fontSize = 0;
-					SyncRuntimePreview();
-				}
-
-				char highlightColor[64] = { 0 };
-				char clickedColor[64] = { 0 };
-				std::snprintf(highlightColor, sizeof(highlightColor), "%s", widget.highlightColor.empty() ? "1,1,1,1" : widget.highlightColor.c_str());
-				std::snprintf(clickedColor, sizeof(clickedColor), "%s", widget.clickedColor.empty() ? "0.75,0.75,0.75,1" : widget.clickedColor.c_str());
-				if (ImGui::InputText("Highlight Color", highlightColor, sizeof(highlightColor)))
-				{
-					widget.highlightColor = highlightColor;
-					SyncRuntimePreview();
-				}
-				if (ImGui::InputText("Clicked Color", clickedColor, sizeof(clickedColor)))
-				{
-					widget.clickedColor = clickedColor;
-					SyncRuntimePreview();
-				}
-			}
-
 			ImGui::Separator();
 			ImGui::TextUnformatted("Bindings");
-			if (ImGui::Button("Add Binding"))
+			if (ImGui::Button(widget.type == "ProgressBar" ? "Edit Binding" : "Add Binding"))
 			{
 				m_bindingWidgetName = widget.name;
 				m_showBindingPopup = true;
@@ -757,7 +667,7 @@ void GameGUICreator::Draw(const Camera&)
 				ImGui::Text("Component: %s", widget.bindComponent.empty() ? "<None>" : widget.bindComponent.c_str());
 				if (widget.type == "ProgressBar")
 				{
-					ImGui::Text("Member: %s", widget.bindMember.empty() ? "<None>" : widget.bindMember.c_str());
+					ImGui::Text("Value: %s", widget.bindMember.empty() ? "<None>" : widget.bindMember.c_str());
 				}
 				else
 				{
@@ -817,9 +727,20 @@ void GameGUICreator::DrawCreateWidgetPopup()
 			ImGui::Separator();
 			ImGui::TextUnformatted("Binding");
 
-			GameGUIWidgetDef preview = m_pendingProgressBarWidget;
-			preview.name = m_newWidgetName[0] != '\0' ? m_newWidgetName : "progress";
+			GameGUIWidgetDef& preview = m_pendingProgressBarWidget;
+			if (preview.name.empty())
+			{
+				preview.name = m_newWidgetName[0] != '\0' ? m_newWidgetName : "progress";
+			}
 			preview.texture = m_newWidgetTexture[0] != '\0' ? m_newWidgetTexture : "textures/example.png";
+			preview.type = "ProgressBar";
+			preview.layer = "Main";
+			preview.width = 256;
+			preview.height = 32;
+			preview.textureWidth = 256;
+			preview.textureHeight = 32;
+			preview.defaultTextureWidth = 256;
+			preview.defaultTextureHeight = 32;
 
 			const char* entityLabel = preview.bindEntity.empty() ? "<Select Entity>" : preview.bindEntity.c_str();
 			if (ImGui::BeginCombo("Entity", entityLabel))
@@ -927,39 +848,24 @@ void GameGUICreator::DrawCreateWidgetPopup()
 			}
 			m_newWidgetAction = action;
 		}
-		if (ImGui::Button("Create"))
-		{
-			if (m_newWidgetIsText)
+			if (ImGui::Button("Create"))
 			{
-				AddTextWidget();
-			}
-			else if (m_newWidgetIsProgressBar)
-			{
-				m_pendingProgressBarWidget = {};
-				m_pendingProgressBarWidget.type = "ProgressBar";
-				m_pendingProgressBarWidget.name = m_newWidgetName[0] != '\0' ? m_newWidgetName : "progress";
-				m_pendingProgressBarWidget.texture = m_newWidgetTexture[0] != '\0' ? m_newWidgetTexture : "textures/example.png";
-				m_pendingProgressBarWidget.layer = "Main";
-				m_pendingProgressBarWidget.width = 256;
-				m_pendingProgressBarWidget.height = 32;
-				m_pendingProgressBarWidget.textureWidth = 256;
-				m_pendingProgressBarWidget.textureHeight = 32;
-				m_pendingProgressBarWidget.defaultTextureWidth = 256;
-				m_pendingProgressBarWidget.defaultTextureHeight = 32;
-				m_pendingProgressBarWidget.bindEntity = m_pendingProgressBarWidget.bindEntity;
-				m_pendingProgressBarWidget.bindComponent = m_pendingProgressBarWidget.bindComponent;
-				m_pendingProgressBarWidget.bindMember = m_pendingProgressBarWidget.bindMember;
-				m_pendingProgressBarCreation = true;
-				m_pendingProgressBarBindingComplete = true;
-				m_bindingWidgetName = m_pendingProgressBarWidget.name;
-				AddProgressBarWidget();
-				m_pendingProgressBarCreation = false;
-				m_pendingProgressBarBindingComplete = false;
-				m_bindingWidgetName.clear();
-			}
-			else if (m_newWidgetIsImage)
-			{
-				AddImageWidget();
+				if (m_newWidgetIsText)
+				{
+					AddTextWidget();
+				}
+				else if (m_newWidgetIsProgressBar)
+				{
+					if (m_pendingProgressBarWidget.name.empty())
+					{
+						m_pendingProgressBarWidget.name = m_newWidgetName[0] != '\0' ? m_newWidgetName : "progress";
+					}
+					AddProgressBarWidget();
+					m_pendingProgressBarWidget = {};
+				}
+				else if (m_newWidgetIsImage)
+				{
+					AddImageWidget();
 			}
 			else
 			{
@@ -1580,6 +1486,15 @@ void GameGUICreator::AddProgressBarWidget()
 		"', texture='" + progress.texture +
 		"', pos=(" + std::to_string(progress.x) + "," + std::to_string(progress.y) + ")" +
 		", size=(" + std::to_string(progress.width) + "x" + std::to_string(progress.height) + ")");
+}
+
+void GameGUICreator::SaveAllRoleGUIs()
+{
+	for (std::size_t i = 0; i < m_assets.size(); ++i)
+	{
+		m_selectedGUI = static_cast<GUIRole>(i);
+		SaveSelectedRoleGUI();
+	}
 }
 
 void GameGUICreator::SaveSelectedRoleGUI()

@@ -16,6 +16,25 @@
 #include <sstream>
 
 namespace {
+	bool EqualsIgnoreCase(const std::string& a, const std::string& b)
+	{
+		if (a.size() != b.size())
+		{
+			return false;
+		}
+
+		for (std::size_t i = 0; i < a.size(); ++i)
+		{
+			const unsigned char lhs = static_cast<unsigned char>(a[i]);
+			const unsigned char rhs = static_cast<unsigned char>(b[i]);
+			if (std::tolower(lhs) != std::tolower(rhs))
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
 	const char* AssetNameForMode(GameGUIManager::UIMode mode)
 	{
 		switch (mode)
@@ -345,7 +364,7 @@ bool GameGUIManager::ActivateAsset(const std::string& name)
 {
 	auto existing = std::find_if(m_assets.begin(), m_assets.end(), [&name](const GameGUIAsset& asset)
 	{
-		return asset.name == name;
+		return EqualsIgnoreCase(asset.name, name);
 	});
 	if (existing == m_assets.end())
 	{
@@ -527,7 +546,13 @@ const char* GameGUIManager::AssetNameForMode(UIMode mode)
 
 void GameGUIManager::SetUIMode(UIMode mode)
 {
+	if (m_mode == mode)
+	{
+		return;
+	}
+
 	m_mode = mode;
+	LogAction(std::string("SetUIMode -> ") + (AssetNameForMode(mode) ? AssetNameForMode(mode) : "Custom"));
 	ApplyMode();
 }
 
@@ -720,10 +745,18 @@ void GameGUIManager::ApplyMode()
 	const char* assetName = AssetNameForMode(m_mode);
 	if (!assetName)
 	{
+		LogAction("ApplyMode skipped: no asset mapped for current UI mode");
 		return;
 	}
 
-	ActivateAsset(assetName);
+	if (!ActivateAsset(assetName))
+	{
+		LogAction(std::string("ApplyMode failed: asset not loaded -> ") + assetName);
+	}
+	else
+	{
+		LogAction(std::string("ApplyMode activated -> ") + assetName);
+	}
 }
 
 
