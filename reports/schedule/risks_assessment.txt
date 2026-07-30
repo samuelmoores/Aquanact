@@ -1,0 +1,92 @@
+Aquanact Runtime Architecture Risks Assessment
+=============================================
+
+Scope
+-----
+
+This note captures the main architecture risks currently visible in the engine
+runtime and application entry layers, with a Gregory-style lens on subsystem
+boundaries, ownership, and mode handling.
+
+Risks
+-----
+
+1. Heavy global manager coupling through `Globals.h`
+- `Globals.h` makes core engine services globally reachable.
+- This hides dependencies and encourages indirect coupling.
+- The runtime graph is easy to use but harder to reason about or test.
+
+2. Too much orchestration in `main`
+- `main.cpp` still performs startup composition, mode setup, project loading,
+  simulation launch, and shutdown sequencing.
+- That makes the application root a coordination hotspot.
+- The file is usable, but it is carrying more policy than it ideally should.
+
+3. Simulation boundary unclear between gameplay and orchestration
+- `SimulationManager` owns the loop, but `GameplayManager` still owns flow
+  state and several runtime transitions.
+- The boundary between loop policy and gameplay policy is not fully sharp.
+- Future features could duplicate responsibility or blur ownership further.
+
+4. Editor boundary unclear between game systems and editor systems
+- The editor and game runtime share many of the same systems and globals.
+- That is practical, but the boundary is soft.
+- Risk: editor behavior can leak into runtime paths, or runtime assumptions
+  can become embedded in editor code.
+
+5. Preview/editor boundary unclear
+- Preview is the main overlap point between editor and gameplay execution.
+- It is useful, but it is also the easiest place for policy confusion.
+- Risk: preview becomes a special case with unclear ownership of update timing,
+  UI mode, and gameplay transition behavior.
+
+6. Managers doing both orchestration and state management
+- Some managers decide what should happen and also hold the state that makes it
+  happen.
+- That increases breadth and makes responsibilities harder to separate.
+- A cleaner split would be orchestration, state ownership, and subsystem
+  execution as distinct concerns.
+
+7. `FrontEndManager` and `GameGUIManager` overlap
+- `FrontEndManager` coordinates editor UI, runtime UI, and creator UI.
+- `GameGUIManager` handles runtime UI assets, active UI mode, logs,
+  diagnostics, and project-state helpers.
+- Risk: both layers can drift into partial ownership of UI policy.
+
+8. Coordination burden inside `FrontEndManager`
+- `FrontEndManager` is acting as a UI router, not just a thin container.
+- It coordinates editor, runtime, and creator surfaces.
+- Risk: mode logic, view switching, and UI lifecycle all converge in one place.
+
+9. `GameGUIManager` scope is broad
+- It currently touches asset loading, runtime UI state, logs, diagnostics, and
+  project serialization helpers.
+- That makes it more than a simple runtime UI manager.
+- Risk: the class becomes difficult to evolve cleanly because multiple concerns
+  are packed into one subsystem.
+
+10. Repeated mode checks across gameplay and UI systems
+- `EngineState` is queried in multiple places.
+- Mode policy is distributed rather than centralized.
+- Risk: mode behavior can diverge subtly over time across gameplay, UI, and
+  rendering code.
+
+Priority Order
+--------------
+
+1. Risk 1, Heavy global coupling through `Globals.h`
+2. Risk 2, Too much orchestration in `main`
+3. Risk 10, Repeated mode checks across systems
+4. Risk 9, `GameGUIManager` scope is broad
+5. Risk 7-8, `FrontEndManager` and UI coordination overlap
+6. Risk 3, Simulation boundary clarity
+7. Risk 5, Preview/editor boundary clarity
+8. Risk 4, Editor/runtime boundary clarity
+9. Risk 6, Managers doing orchestration plus state
+10. Risk 7-9, Coordination complexity across UI layers
+
+Summary
+-------
+
+The main risks are hidden coupling, overlapping manager responsibilities, and
+unclear boundaries between editor, game, and preview behavior.

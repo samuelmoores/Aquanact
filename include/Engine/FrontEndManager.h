@@ -1,6 +1,9 @@
 #pragma once
 
+#include "Engine/ProjectStateData.h"
 #include <memory>
+#include <string>
+#include <vector>
 #include "Engine/Globals.h"
 
 class Window;
@@ -28,6 +31,12 @@ public:
 	void BeginFrame();
 	void Draw(const Camera& camera, FileManager& fileManager, LevelManager& levelManager, ProjectManager& projectManager);
 	void EndFrame();
+	void ApplyProjectState(
+		bool editorShowAxis,
+		bool editorShowGrid,
+		const std::vector<std::string>& sceneAssets,
+		const std::string& activeAssetName,
+		const std::string& imguiLayout);
 
 	// FrontEndMode only controls which editor surface is visible; EngineState
 	// controls whether the program is in editor or gameplay execution.

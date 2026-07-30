@@ -9,6 +9,7 @@
 #include "Engine/Input.h"
 #include "Engine/Level.h"
 #include "Engine/LevelManager.h"
+#include "Engine/ProjectStateData.h"
 
 #include <chrono>
 #include <iomanip>
@@ -98,6 +99,29 @@ void RenderManager::shutDown()
 	m_commandCapacity = 0;
 	m_commandCount = 0;
 	m_frameAllocator.Reset();
+}
+
+void RenderManager::ApplyProjectState(const ProjectStateData::RenderStateData& renderState)
+{
+	m_gameCamera->SetPose(renderState.gameCameraPosition, renderState.gameCameraFacing);
+	m_lightingManager->SunLight().direction = renderState.sunLight.direction;
+	m_lightingManager->SunLight().color = renderState.sunLight.color;
+	m_lightingManager->SunLight().intensity = renderState.sunLight.intensity;
+	m_lightingManager->SunLight().ambient = renderState.sunLight.ambient;
+	m_lightingManager->PointLights().clear();
+	for (const auto& pointLightData : renderState.pointLights)
+	{
+		PointLight& pointLight = m_lightingManager->AddPointLight();
+		pointLight.position = pointLightData.position;
+		pointLight.color = pointLightData.color;
+		pointLight.intensity = pointLightData.intensity;
+		pointLight.ambient = pointLightData.ambient;
+		pointLight.SetRadius(pointLightData.radius);
+		pointLight.radiusFade = pointLightData.radiusFade;
+		pointLight.constant = pointLightData.constant;
+		pointLight.linear = pointLightData.linear;
+		pointLight.quadratic = pointLightData.quadratic;
+	}
 }
 
 void RenderManager::Submit(const RenderCommand& command)

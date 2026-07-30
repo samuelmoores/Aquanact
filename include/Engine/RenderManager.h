@@ -12,6 +12,7 @@
 #include "Engine/RenderCommand.h"
 #include "Engine/OpenGLGraphicsDevice.h"
 #include "Engine/LightingManager.h"
+#include "Engine/ProjectStateData.h"
 
 class Window;
 class LevelManager;
@@ -35,6 +36,7 @@ public:
 	const Camera& ActiveCamera() const { return m_cameraManager.ActiveCamera(); }
 	LightingManager& Lights() { return *m_lightingManager; }
 	const LightingManager& Lights() const { return *m_lightingManager; }
+	void ApplyProjectState(const ProjectStateData::RenderStateData& renderState);
 	void Submit(const RenderCommand& command);
 	void Flush(const Camera& camera);
 	void Loop();

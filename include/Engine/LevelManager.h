@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Engine/Level.h"
+#include "Engine/ProjectStateData.h"
 
 #include <glm/glm.hpp>
 #include <memory>
@@ -25,6 +26,10 @@ public:
 	const std::string& StartupLevelName() const;
 	void AppendProjectState(std::string& contents) const;
 	void ApplyProjectState(const std::string& startupLevelName);
+	void ApplyProjectState(
+		const std::vector<ProjectStateData::PendingLevel>& pendingLevels,
+		const std::vector<ProjectStateData::PendingController>& pendingControllers,
+		const std::vector<ProjectStateData::PendingComponent>& pendingComponents);
 	Level* ActiveLevel();
 	const Level* ActiveLevel() const;
 	void ResetActiveLevelEntitiesToDefaultPosition();

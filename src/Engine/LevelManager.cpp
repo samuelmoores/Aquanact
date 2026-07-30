@@ -1,7 +1,12 @@
 #include "Engine/LevelManager.h"
 
-#include "Engine/Level.h"
+#include "Engine/AnimatorComponent.h"
+#include "Engine/Controller.h"
 #include "Engine/Entity.h"
+#include "Engine/PlayerController.h"
+#include "Engine/ProjectStateData.h"
+#include "Game/Enemy.h"
+#include "Game/PlayerHealth.h"
 
 #include <algorithm>
 
@@ -98,6 +103,151 @@ void LevelManager::AppendProjectState(std::string& contents) const
 void LevelManager::ApplyProjectState(const std::string& startupLevelName)
 {
 	m_startupLevelName = startupLevelName;
+}
+
+void LevelManager::ApplyProjectState(
+	const std::vector<ProjectStateData::PendingLevel>& pendingLevels,
+	const std::vector<ProjectStateData::PendingController>& pendingControllers,
+	const std::vector<ProjectStateData::PendingComponent>& pendingComponents)
+{
+	auto findOrCreateLevel = [this](const std::string& levelName) -> Level*
+	{
+		if (Level* level = FindLevel(levelName))
+		{
+			return level;
+		}
+		return CreateLevel(levelName);
+	};
+
+	for (const auto& pendingController : pendingControllers)
+	{
+		Level* level = findOrCreateLevel(pendingController.levelName);
+		if (!level)
+		{
+			continue;
+		}
+
+		for (const auto& object : level->Objects())
+		{
+			if (!object || object->SourcePath() != pendingController.sourcePath.string())
+			{
+				continue;
+			}
+
+			if (pendingController.playerControlled)
+			{
+				if (!object->GetComponent<PlayerController>())
+				{
+					object->AddComponent<PlayerController>();
+				}
+				if (PlayerController* playerController = object->GetComponent<PlayerController>())
+				{
+					playerController->SetMoveSpeed(pendingController.moveSpeed);
+				}
+			}
+			else
+			{
+				if (!object->GetController())
+				{
+					object->AddComponent<Controller>();
+				}
+				if (Controller* controller = object->GetController())
+				{
+					controller->SetMoveSpeed(pendingController.moveSpeed);
+				}
+			}
+		}
+	}
+
+	for (const auto& pendingComponent : pendingComponents)
+	{
+		Level* level = findOrCreateLevel(pendingComponent.levelName);
+		if (!level)
+		{
+			continue;
+		}
+
+		for (const auto& object : level->Objects())
+		{
+			if (!object || object->SourcePath() != pendingComponent.sourcePath.string())
+			{
+				continue;
+			}
+
+			if (pendingComponent.type == "playerhealth")
+			{
+				if (!object->GetComponent<PlayerHealth>())
+				{
+					object->AddComponent<PlayerHealth>();
+				}
+				if (PlayerHealth* playerHealth = object->GetComponent<PlayerHealth>())
+				{
+					if (pendingComponent.hasValue1)
+					{
+						playerHealth->SetHealth(pendingComponent.value1);
+					}
+					if (pendingComponent.hasValue2)
+					{
+						playerHealth->SetMaxHealth(pendingComponent.value2);
+					}
+				}
+			}
+			else if (pendingComponent.type == "enemy")
+			{
+				if (!object->GetComponent<Enemy>())
+				{
+					object->AddComponent<Enemy>();
+				}
+			}
+			else if (pendingComponent.type == "animator")
+			{
+				if (!object->GetComponent<AnimatorComponent>())
+				{
+					object->AddComponent<AnimatorComponent>(object->GetMesh());
+				}
+				if (AnimatorComponent* animator = object->GetComponent<AnimatorComponent>())
+				{
+					animator->SetInitialState(pendingComponent.initialState);
+					for (const auto& state : pendingComponent.animatorStates)
+					{
+						animator->AddState(state.name, state.clipIndex);
+					}
+					for (const auto& transition : pendingComponent.animatorTransitions)
+					{
+						AnimatorComponent::Condition condition;
+						condition.left.type = static_cast<AnimatorComponent::OperandType>(transition.left.type);
+						condition.left.constantValue = transition.left.constantValue;
+						condition.left.componentName = transition.left.componentName;
+						condition.left.memberName = transition.left.memberName;
+						condition.comparator = static_cast<AnimatorComponent::Comparator>(transition.comparator);
+						condition.right.type = static_cast<AnimatorComponent::OperandType>(transition.right.type);
+						condition.right.constantValue = transition.right.constantValue;
+						condition.right.componentName = transition.right.componentName;
+						condition.right.memberName = transition.right.memberName;
+						animator->AddTransition(transition.from, transition.to, transition.blendSeconds, condition);
+					}
+				}
+			}
+		}
+	}
+
+	if (!pendingLevels.empty())
+	{
+		const Level* activeLevel = nullptr;
+		for (const auto& pendingLevel : pendingLevels)
+		{
+			if (pendingLevel.active)
+			{
+				activeLevel = FindLevel(pendingLevel.name);
+				break;
+			}
+		}
+		if (!activeLevel)
+		{
+			activeLevel = m_levels.front().get();
+		}
+		SetActiveLevel(activeLevel->Name());
+	}
 }
 
 Level* LevelManager::ActiveLevel()

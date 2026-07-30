@@ -1,0 +1,165 @@
+Aquanact Runtime Architecture Check
+===================================
+
+Scope
+-----
+
+This document summarizes the current runtime architecture of the engine and
+cross-references the numbered risks in `risks_assessment.txt`.
+
+1. Application Shell
+--------------------
+
+Source focus: `src/Engine/main.cpp`
+
+The application shell owns startup composition, the main loop handoff, and
+shutdown sequencing. It creates and starts the core engine services, loads the
+project, starts gameplay, and then hands execution to `SimulationManager`.
+
+Related risks: Risk 2, Risk 6
+
+2. Core Engine State
+--------------------
+
+Source focus: `include/Engine/Globals.h`
+
+`EngineState` tracks editor versus game mode. The global manager declarations
+provide shared access to engine services from the runtime layers. This is the
+main shared state surface used across the engine.
+
+Related risks: Risk 1, Risk 10
+
+3. Platform, Window, and Input
+------------------------------
+
+Source focus: `src/Engine/Window.cpp`, `src/Engine/Input.cpp`
+
+`Window` creates the platform window and graphics context. `Input` attaches to
+the window, samples device state, and exposes per-frame input timing and
+cursor/button state to the rest of the engine.
+
+Related risks: Risk 4, Risk 10
+
+4. Simulation Loop
+------------------
+
+Source focus: `src/Engine/SimulationManager.cpp`
+
+`SimulationManager` owns the active runtime loop. It updates input, decides
+whether gameplay should tick, and then calls render. It is the main frame-level
+orchestration layer between application startup and the runtime subsystems.
+
+Related risks: Risk 3, Risk 6
+
+5. Gameplay Layer
+-----------------
+
+Source focus: `src/Engine/GameplayManager.cpp`
+
+`GameplayManager` manages gameplay flow state, level startup, preview mode,
+pause handling, and runtime UI state changes. It is a gameplay-state manager
+that also participates in some orchestration decisions.
+
+Related risks: Risk 3, Risk 5, Risk 6, Risk 10
+
+6. Render Layer
+---------------
+
+Source focus: `src/Engine/RenderManager.cpp`, `src/Engine/OpenGLGraphics.cpp`, `src/Engine/OpenGLGraphicsDevice.cpp`
+
+The render layer owns cameras, frame submission, graphics device startup, and
+frame presentation. It is separated from gameplay and input, which is aligned
+with the engine architecture model.
+
+Related risks: Risk 1, Risk 2
+
+7. Front-End Layer
+------------------
+
+Source focus: `src/Engine/FrontEndManager.cpp`
+
+`FrontEndManager` coordinates the editor GUI, runtime GUI, and UI creator
+surfaces. It routes which front-end surface is active based on engine mode and
+UI mode.
+
+Related risks: Risk 7, Risk 8
+
+8. Runtime Game UI
+------------------
+
+Source focus: `src/Engine/GameGUIManager.cpp`, `src/Engine/GameGUI.cpp`
+
+`GameGUIManager` loads runtime UI assets, manages the active UI mode, logs UI
+actions, provides diagnostics, and participates in project state
+serialization. The live MyGUI wrapper is owned here.
+
+Related risks: Risk 7, Risk 9
+
+9. Editor UI and Creator UI
+---------------------------
+
+Source focus: `src/Engine/EngineGUI.cpp`, `src/Engine/GameGUICreator.cpp`
+
+The editor-facing UI and the UI creator are separate surfaces but are
+coordinated through `FrontEndManager`. This is useful for authoring and
+previewing, but it increases the coordination load on the front-end layer.
+
+Related risks: Risk 4, Risk 8, Risk 9
+
+10. Project and Content Layer
+-----------------------------
+
+Source focus: `src/Engine/ProjectManager.cpp`, `src/Engine/ProjectStateSerializer.cpp`, `src/Engine/FileManager.cpp`, `src/Engine/FileSystem.cpp`, `src/Engine/ModelImporter.cpp`, `src/Engine/StbImage.cpp`
+
+This layer loads and saves project state, resolves content paths, imports model
+data, and handles image loading for assets. It is separated from gameplay and
+rendering, which is a strong architectural choice.
+
+Related risks: Risk 1, Risk 2
+
+11. World and Object Model
+--------------------------
+
+Source focus: `src/Engine/LevelManager.cpp`, `src/Engine/Level.cpp`, `src/Engine/Entity.cpp`, `src/Engine/Component.cpp`, `src/Engine/Controller.cpp`
+
+The world model owns levels, entities, and component-based behavior. This is
+the core runtime data model that gameplay and rendering both consume.
+
+Related risks: Risk 1, Risk 3, Risk 6
+
+12. Animation, Physics, and Audio
+---------------------------------
+
+Source focus: `src/Engine/Animator.cpp`, `src/Engine/AnimatorComponent.cpp`, `src/Engine/Physics.cpp`, `src/Engine/Audio.cpp`
+
+These are the simulation-side feature systems. They are separated into their
+own modules, which is consistent with a layered runtime architecture.
+
+Related risks: Risk 1, Risk 6
+
+13. Diagnostics and Debug
+-------------------------
+
+Source focus: `src/Engine/Debug.cpp`
+
+The debug layer provides runtime diagnostics, logging, and editor/game overlay
+state. It touches multiple other systems and is therefore a useful but
+potentially coupling-heavy service.
+
+Related risks: Risk 1, Risk 8, Risk 10
+
+14. Runtime Alignment Summary
+-----------------------------
+
+The current architecture is broadly aligned with a Gregory-style runtime:
+
+- clear application shell
+- separated window/render/input/UI/gameplay/content layers
+- explicit startup and shutdown order
+- centralized loop ownership in `SimulationManager`
+
+The main pressure points are the global service model and the overlapping
+responsibilities between UI coordination, gameplay state, and runtime mode
+policy.
+
+Related risks: Risk 1, Risk 2, Risk 3, Risk 5, Risk 6, Risk 7, Risk 8, Risk 9, Risk 10

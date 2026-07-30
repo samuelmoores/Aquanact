@@ -1,0 +1,213 @@
+Aquanact Serialization Refactor Report
+=====================================
+
+Scope
+-----
+
+This report summarizes the serialization refactor work done around
+`ProjectStateSerializer`, `ProjectStateFormat`, `ProjectManager`, `LevelManager`,
+`RenderManager`, and `FrontEndManager`.
+
+The goal of the refactor was to separate parsing, reconstruction policy, and
+manager-owned state application so the save/load path is easier to reason
+about and closer to a Gregory-style subsystem boundary.
+
+What Changed
+------------
+
+1. Shared project-state data was extracted
+- New shared data types live in `include/Engine/ProjectStateData.h`.
+- The parsed load data is now represented as pending level, controller,
+  component, and render-state structures.
+- This reduced the amount of serializer-specific reconstruction logic.
+
+2. Low-level serialization helpers were separated from the parser
+- The field/path/hex helpers were moved into
+  `include/Engine/ProjectStateFormat.h` and `src/Engine/ProjectStateFormat.cpp`.
+- `ProjectStateSerializer` now forwards to those helpers instead of owning
+  duplicate implementations.
+- This removed the helper duplication that had been split across two files.
+
+3. Path resolution now uses the engine filesystem state
+- `ProjectStateFormat` now uses `gFileSystem` rather than instantiating a local
+  file system object.
+- That keeps path resolution aligned with the engine’s shared runtime services.
+
+4. ProjectManager no longer rebuilds the world directly
+- `ProjectManager::LoadProject()` now orchestrates load steps instead of
+  materializing every object and component inline.
+- Level/object reconstruction was moved into `LevelManager`.
+- Render state application was moved into `RenderManager`.
+- Editor/runtime UI project-state application was moved into
+  `FrontEndManager`.
+
+5. LevelManager now owns level/materialization policy
+- A new `LevelManager::ApplyProjectState(...)` overload applies pending
+  controllers, components, and active-level selection.
+- This keeps gameplay-related object reconstruction closer to the world model.
+
+6. RenderManager now owns render-state restoration
+- `RenderManager::ApplyProjectState(...)` applies:
+  - game camera pose
+  - sun light
+  - point lights
+- This removes direct project-loader mutation of render subsystem state.
+
+7. FrontEndManager now owns UI-state restoration
+- `FrontEndManager::ApplyProjectState(...)` applies:
+  - editor axis/grid visibility
+  - runtime GUI scene assets and active asset
+  - ImGui layout restoration
+- This keeps editor/runtime UI state handling inside the UI coordination layer.
+
+8. ProjectManager save-path logic was simplified
+- Save behavior was broken into snapshot helpers:
+  - current camera state
+  - ImGui layout state
+  - project-state snapshot assembly
+- `SaveProject()` now reads more like orchestration than a mixed serializer.
+
+Resulting Boundaries
+--------------------
+
+1. `ProjectStateSerializer`
+- Parses file contents into pending data.
+- Does not own reconstruction policy.
+
+2. `ProjectStateFormat`
+- Owns low-level field escaping, hex encoding, and path conversion helpers.
+- Does not own policy or reconstruction.
+
+3. `LevelManager`
+- Owns level/object/component reconstruction for gameplay-side state.
+- Applies pending controllers and components.
+
+4. `RenderManager`
+- Owns camera and lighting restoration.
+
+5. `FrontEndManager`
+- Owns editor UI and runtime UI restoration.
+
+6. `ProjectManager`
+- Orchestrates save/load flow and delegates state application to the proper
+  managers.
+
+Build Verification
+------------------
+
+- The build was re-run successfully after each major split.
+- Final verification completed with:
+  - `cmake --build out/build/x64-debug`
+
+Notable Files Touched
+---------------------
+
+- `include/Engine/ProjectStateData.h`
+- `include/Engine/ProjectStateFormat.h`
+- `src/Engine/ProjectStateFormat.cpp`
+- `include/Engine/ProjectStateSerializer.h`
+- `src/Engine/ProjectStateSerializer.cpp`
+- `include/Engine/LevelManager.h`
+- `src/Engine/LevelManager.cpp`
+- `include/Engine/RenderManager.h`
+- `src/Engine/RenderManager.cpp`
+- `include/Engine/FrontEndManager.h`
+- `src/Engine/FrontEndManager.cpp`
+- `src/Engine/ProjectManager.cpp`
+- `CMakeLists.txt`
+
+Open Follow-Ups
+---------------
+
+1. The current `ProjectManager` still coordinates multiple subsystems.
+- It is thinner than before, but it still acts as the central load/save hub.
+
+2. `GameGUIManager` still participates in project state persistence.
+- It remains part of the runtime UI state path and may be a future split
+  candidate if you want even narrower ownership.
+
+3. `LevelManager` now owns more load-policy than before.
+- This is better than leaving the logic in the serializer, but it is worth
+  reviewing whether any of that should become a dedicated project-load
+  assembler in the future.
+
+4. The save-side snapshot path is still orchestrated by `ProjectManager`.
+- It is cleaner now, but not fully decomposed into separate snapshot services.
+
+Review Notes
+------------
+
+The refactor moves the code closer to a cleaner runtime architecture:
+
+- parsing is separate from reconstruction
+- world state is separate from render state
+- UI state is separate from gameplay state
+- the project manager is less of a catch-all
+
+The remaining question is whether `ProjectManager` should stay as the
+orchestrator for all project load/save flow, or whether project loading should
+eventually be split into a dedicated assembly service.
+
+Schedule Review Point
+---------------------
+
+Review this report at the start of the Aug 18 - Aug 20 integration window.
+
+Reason:
+- By then the UI, gameplay, render, and save/load boundaries will have been
+  exercised separately.
+- That makes it the first useful point to judge whether the serialization
+  refactor still fits the wider runtime architecture.
+- If any coupling problems remain, this is the right window to decide whether
+  `ProjectManager`, `LevelManager`, or `GameGUIManager` needs a second split.
+
+Implementation Checklist
+------------------------
+
+1. Verify `ProjectManager` is only orchestration.
+- Confirm it no longer owns reconstruction policy beyond sequencing manager
+  calls.
+- Confirm save/load code paths both delegate to the correct subsystem owners.
+
+2. Review `LevelManager` ownership.
+- Check whether pending controller/component application belongs here or in a
+  dedicated project-load assembler.
+- Confirm the active-level selection behavior still matches editor/runtime
+  expectations.
+
+3. Review `RenderManager` state ownership.
+- Confirm camera and lighting restoration belong in the render layer rather
+  than project loading.
+- Confirm future graphics device changes would only require edits inside the
+  render layer.
+
+4. Review `FrontEndManager` state ownership.
+- Confirm editor axis/grid and runtime UI restoration are correctly centered
+  in the front-end layer.
+- Confirm ImGui layout restore is still the right place for UI state import.
+
+5. Review `GameGUIManager` persistence scope.
+- Identify whether runtime UI asset persistence should remain here or be split
+  into a narrower UI-state service.
+- Confirm diagnostics/logging remain intentionally coupled to runtime UI.
+
+6. Review `ProjectStateSerializer` scope.
+- Confirm it only parses and does not reconstruct runtime state.
+- Confirm the serializer and format helper split stays clean and non-duplicated.
+
+7. Review remaining coupling against Gregory’s model.
+- Check whether globals are still doing more work than necessary.
+- Check whether mode checks are still duplicated in gameplay, render, and UI
+  paths.
+- Check whether the simulation boundary is still as clear as it should be.
+
+8. Rebuild and spot-check load/save behavior.
+- Load a project that includes levels, controllers, animator components,
+  render state, and runtime UI assets.
+- Save the same project and confirm the serialized output still round-trips.
+
+9. Decide the next split candidate.
+- If `ProjectManager` still feels too broad, split a dedicated project-load or
+  project-snapshot service from it next.
+- If `GameGUIManager` still feels too broad, split runtime UI state and
+  diagnostics/logging into separate concerns next.

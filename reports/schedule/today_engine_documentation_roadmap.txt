@@ -43,25 +43,25 @@ Morning Review
 1. Overview x
 2. Engine Modes x
 3. Application Entry x
-4. Startup Order <----
-5. Check runtime architecture against the book's model
-6. Record any subsystem coupling that looks too tight
+4. Startup Order x
+5. Check runtime architecture against the book's model  x
+6. Record any subsystem coupling that looks too tight x
 
-finish at 1:30pm
+finish at 1:30pm 
 
 Midday Review
 -------------
 
-1. Shutdown Order
-2. Window System
-3. Render Manager
-4. Graphics Device
-5. Front-End Manager
-6. Editor UI
-7. Runtime UI
-8. Project Manager
-9. Project Serialization
-10. Compare asset flow to the book's tools and pipeline ideas
+1. Shutdown Order x
+2. Window System x
+3. Render Manager x
+4. Graphics Device x
+5. Front-End Manager x
+6. Editor UI x
+7. Runtime UI x
+8. Project Manager x
+9. Project Serialization x
+10. Compare asset flow to the book's tools and pipeline ideas <----
 11. Check whether data ownership is explicit and stable
 
 finish at 3:30pm

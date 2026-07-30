@@ -100,72 +100,147 @@ Shutdown Order
 Source Files: `src/Engine/main.cpp`, `src/Engine/Window.cpp`, `src/Engine/RenderManager.cpp`, `src/Engine/FrontEndManager.cpp`, `src/Engine/Input.cpp`, `src/Engine/GameplayManager.cpp`
 Book Reference: Chapter 6.1, Subsystem Start-Up and Shut-Down
 Engine Notes:
+	-shutdown was not in reverse order of startup
+	-key dependencies, input-> window, FrontEndManager -> Window, RenderManager -> Window
 Gregory Alignment:
-Deviations / Risks:
+Deviations / Risks: 
+	-ProjectManager still does not hold any sort of state and therefore is not a subsystem yet so it does not shutdown
 
 Window System
 -------------
 Source Files: `src/Engine/Window.cpp`, `include/Engine/Window.h`
 Book Reference: Chapter 6.1, Subsystem Start-Up and Shut-Down; Chapter 9, Human Interface Devices
 Engine Notes:
+	-Window.h creates GLFW window and OpenGL context
+	-owns buffer swapping and event polling
+	-frame buffer size queries
+	-window close state
+	-startUp() init GLFW, creates window, create openGL context, makes it current, sets vsync and default window state
+	-SwapBuffers() presents rendered frame, PollEvents() pumps OS event queue, GetFramebuferSize() gives render code drawable size
+	-RenderManager, Input and FrontEndManager depend on it and is bottom-most app owned runtime service
+
 Gregory Alignment:
+	-classic low level engine service, small, essential and dependency root for higher level services
+
 Deviations / Risks:
+	-coupled with graphics device so not a true window class for vulkan or DX graphics
+	-should only create and manage OS window, own input callbacks or have nearby platform layer with no rendering setup
+	-presentation responsibility, framebuffer size and render target size, renderer assumption about context
 
 Render Manager
 --------------
 Source Files: `src/Engine/RenderManager.cpp`, `include/Engine/RenderManager.h`
 Book Reference: Chapter 8.1, The Rendering Loop; Chapter 11, Rendering; Chapter 12.8, Overlays and User Interfaces
 Engine Notes:
+	-Loop(), per frame render path, build render commands, flushes through active camera, draws UI, presents frame
+	-Submit(RenderCommand&), Queues renderable object for the current frame
+	-Flush(Camera&), sends queued command to the graphics device
+	-main bridge between game/world state and graphics backend
+
 Gregory Alignment:
+	-separated from gameplay and platform
+	-prevents game code from calling graphics functions
+	-centralizes camera and lighting
+
 Deviations / Risks:
+	-carries specific OpenGL functionality
+	-mixes with diagnostics, editor overlay and runtime UI coordination
+	-get rid of backend graphics specifics, UI/debug repsonsibilities
 
 Graphics Device
 ---------------
 Source Files: `src/Engine/OpenGLGraphics.cpp`, `src/Engine/OpenGLGraphicsDevice.cpp`, `src/Engine/ShaderProgram.cpp`, `src/Engine/Mesh.cpp`, `src/Engine/Line.cpp`, `include/Engine/OpenGLGraphics.h`, `include/Engine/OpenGLGraphicsDevice.h`, `include/Engine/ShaderProgram.h`, `include/Engine/Mesh.h`, `include/Engine/Line.h`
 Book Reference: Chapter 11.3, Foundations of 3D Rendering; Chapter 11.4, Programming the 3D Graphics Pipeline
 Engine Notes:
+	-boundary between renderer and graphics backend
+
 Gregory Alignment:
 Deviations / Risks:
+	-still OpenGL flavored
 
 Front-End Manager
 -----------------
 Source Files: `src/Engine/FrontEndManager.cpp`, `include/Engine/FrontEndManager.h`
 Book Reference: Chapter 12.8, Overlays and User Interfaces; Chapter 10, Tools for Debugging and Development
 Engine Notes:
+	-routes between editor, runtime or creator UI
+
 Gregory Alignment:
+	-keeps frontend code away from gameplay and rendering
+	-UI is not a monolith
+
 Deviations / Risks:
+	-too much coordination responsibility, no clear boundary between FrontEndManager and GameGUIManager and gameplay code
 
 Editor UI
 ---------
 Source Files: `src/Engine/EngineGUI.cpp`, `src/Engine/Debug.cpp`, `src/Engine/GameGUICreator.cpp`
 Book Reference: Chapter 10.3, In-Game Menus; Chapter 12.8, Overlays and User Interfaces; Chapter 16.4, The Game World Editor
 Engine Notes:
+	-holds begin and end ImGUI frames
+
 Gregory Alignment:
 Deviations / Risks:
+	-becoming a dumping ground for engine features
+	-depends on multiple subsystems
+	-becoming a manager if it keeps absorbing more engine policy
 
 Runtime UI
 ----------
 Source Files: `src/Engine/GameGUI.cpp`, `src/Engine/GameGUIManager.cpp`, `include/Engine/GameGUI.h`, `include/Engine/GameGUIManager.h`
 Book Reference: Chapter 12.8, Overlays and User Interfaces; Chapter 10.3, In-Game Menus
 Engine Notes:
+	-handles MyGUI runtime widget rendering
+	-holds default assets for MainMenu, HUD, PauseMenu and PlayerUI
+	-responds to UI actions and button clicks
+
 Gregory Alignment:
+	-separated from editor tooling
+
 Deviations / Risks:
+	-too broad, should not handle asset loading, UI mode, logs and diagnostics and project state serialization helpers
+	-can become a mixed content manager without a boundary from the FrontEndManager
+	-could blur boundarys between runtime UI presentation, asset loading, diagnostics and project state
+	-no clear graphics boundary, uses raw openGL calls in Draw() and platform is hardcoded as MyGUI::OpenGLPlatform()
 
 Project Manager
 ---------------
 Source Files: `src/Engine/ProjectManager.cpp`, `include/Engine/ProjectManager.h`
 Book Reference: Chapter 1.6, Tools and the Asset Pipeline; Chapter 7, Resources and the File System
 Engine Notes:
+	-bridge between disk and runtime
+
 Gregory Alignment:
+	-centralized project state
+	-loading and saving separate from gameplay
+	-clear project path
+	-boot time restoration separate from frame loop
+
 Deviations / Risks:
+	-coupled to other systems through globals
+	-handles too much session reconstruction
+	-should not be storing live engine state, just project I/O
+	-can become a catch all for policy in regard to loading, serialization and runtime reconstruction
+	-boundary blurring between gameplay and UI
+	-should look to move stuff into ProjectStateSerializer, LevelManager, GameGUIManager and asset/content loaders
 
 Project Serialization
 ---------------------
 Source Files: `src/Engine/ProjectStateSerializer.cpp`, `include/Engine/ProjectStateSerializer.h`
 Book Reference: Chapter 7.2, The Resource Manager; Chapter 16.3, Data-Driven Game Engines; Chapter 17.3, World Chunk Data Formats
 Engine Notes:
+	-does encoding and decoding for componets, entities, render state, editor UI state, GameGUI and project versions
+	
+
 Gregory Alignment:
+	-data-driven and asset-pipeline driven
+	-keeps project file away from gameplay and rendering
+
 Deviations / Risks:
+	-serializes a broad amount of data
+	-not a true project serializer but a full session-state serializer
+	-should be focused on format parsing, field encoding and version compat
+	-try to move reconstruction policy to ProjectManager, LevelManager, GameGUIManager and RenderManager
 
 Gameplay Manager
 ----------------

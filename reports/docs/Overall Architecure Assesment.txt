@@ -1,0 +1,58 @@
+Overall Architecure Assesment
+
+**Risks** 
+
+-heavy global manager coupling through Globals.h
+-too much orchestration in main
+-simulation boundary unclear between gameplay
+-editor boundary unclear between game
+-preview/editor boundary unclear
+-managers should not do both orchestration and state management
+-FrontEndManager has mixed responsibilities with GameGUIManager
+	-coordnation between editor, runtime and creator UI in FEM
+	-asset loading, runtime UI state, logs, diagnostics, and project serialization in GGM
+-Repeated mode checks across gameplay and UI systems
+
+**Overview**
+
+-Application Shell in main
+	-owns startup, mode selection, loop and shutdown
+
+-Core engine state lives in Globals.h
+
+-Render Layer
+	-RenderManager
+	-OpenGLGraphics
+	-OpenGLGraphicsDevice
+	-CameraManager
+	-LightingManager
+	-ShaderProgram
+	-Mesh
+	-Texture and Image loading
+
+-Front End Layer
+	-FrontEndManager
+	-EngineGUI
+	-GameGUIManager
+	-GameGUICreator
+
+-Content layer
+	-ProjectManager
+	-ProjectStateSerializer
+	-FileSystem
+	-FileManager
+	-ModelImporter
+	-StbImage
+
+Gameplay Layer
+	-GameplayManager
+	-LevelManager
+	-Level
+	-Entity
+	-Component
+	-Controller
+	-Animator /AnimatorComponent
+
+Game-specific layer
+	-src/Game
+	-game-side components built

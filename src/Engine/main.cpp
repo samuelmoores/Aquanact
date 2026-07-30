@@ -73,18 +73,24 @@ static int RunApplication(int argc, char** argv)
     gInput.startUp(gWindow);
     gDebug.startUp();
     gFileManager.startUp();
-    gProjectManager.LoadProject(DefaultProjectPath(), gLevelManager);
+
+    // not a subsystem, no stateful runtime
+    // unless additions are made such as,
+    // cached project load resources, open file handles, pending autosave state, project session state
+    gProjectManager.LoadProject(DefaultProjectPath(), gLevelManager); 
+    //therefore no shutdown yet
+
     gGameplayManager.startUp(gLevelManager);
 
     simulationManager.run(gWindow, gInput, gGameplayManager, gRenderManager, gEngineState);
 
     gDebug.LogMessage("Main loop exiting because the window close flag was set.");
 
-    gDebug.shutDown();
-    gFileManager.shutDown();
-    gFrontEndManager.shutDown();
     gGameplayManager.shutDown();
+    gFileManager.shutDown();
+    gDebug.shutDown();
     gInput.shutDown();
+    gFrontEndManager.shutDown();
     gRenderManager.shutDown();
     gWindow.shutDown();
     return 0;

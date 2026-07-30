@@ -7,6 +7,7 @@
 #include "Engine/LevelManager.h"
 #include "Engine/ProjectManager.h"
 #include "Engine/Globals.h"
+#include <imgui.h>
 
 FrontEndManager::~FrontEndManager()
 {
@@ -144,6 +145,28 @@ void FrontEndManager::OpenGameGUICreator()
 		m_engineGUI->SetShowGrid(false);
 	}
 	m_mode = FrontEndMode::GameGUICreator;
+}
+
+void FrontEndManager::ApplyProjectState(
+	bool editorShowAxis,
+	bool editorShowGrid,
+	const std::vector<std::string>& sceneAssets,
+	const std::string& activeAssetName,
+	const std::string& imguiLayout)
+{
+	if (m_engineGUI)
+	{
+		m_engineGUI->SetShowAxis(editorShowAxis);
+		m_engineGUI->SetShowGrid(editorShowGrid);
+	}
+	if (m_gameGUI)
+	{
+		m_gameGUI->ApplyProjectState(sceneAssets, activeAssetName);
+	}
+	if (!imguiLayout.empty())
+	{
+		ImGui::LoadIniSettingsFromMemory(imguiLayout.c_str(), imguiLayout.size());
+	}
 }
 
 void FrontEndManager::ReturnToEngineGUIEditor()

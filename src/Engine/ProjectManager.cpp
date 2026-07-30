@@ -6,12 +6,94 @@
 #include "Engine/LevelManager.h"
 #include "Engine/ProjectStateSerializer.h"
 #include "Engine/RenderManager.h"
-
 #include <fstream>
 #include <imgui.h>
 #include <cstring>
 #include <sstream>
 #include <vector>
+
+namespace {
+	void AppendCurrentCameraState(std::string& contents)
+	{
+		const glm::vec3 gameCameraPosition = gRenderManager.GetGameCamera().GetPosition();
+		const glm::vec3 gameCameraFacing = gRenderManager.GetGameCamera().GetFacing();
+		contents += "gamecamera;";
+		contents += std::to_string(gameCameraPosition.x) + ";" + std::to_string(gameCameraPosition.y) + ";" + std::to_string(gameCameraPosition.z) + ";";
+		contents += std::to_string(gameCameraFacing.x) + ";" + std::to_string(gameCameraFacing.y) + ";" + std::to_string(gameCameraFacing.z) + "\n";
+	}
+
+	void AppendImguiLayoutState(std::string& contents)
+	{
+		if (const char* imguiIniData = ImGui::SaveIniSettingsToMemory())
+		{
+			contents += "imguilayout;";
+			contents += ProjectStateSerializer::HexEncode(imguiIniData, std::strlen(imguiIniData));
+			contents += "\n";
+		}
+	}
+
+	void AppendProjectStateSnapshot(std::string& contents, const std::filesystem::path& path, const LevelManager& levelManager)
+	{
+		ProjectStateSerializer::AppendLevelState(contents, path, levelManager);
+		AppendCurrentCameraState(contents);
+		ProjectStateSerializer::AppendRenderState(contents, gFrontEndManager, gRenderManager);
+		levelManager.AppendProjectState(contents);
+		gFrontEndManager.RuntimeGUI().AppendProjectState(contents);
+		AppendImguiLayoutState(contents);
+	}
+
+	void MaterializePendingLevels(LevelManager& levelManager, const std::vector<ProjectStateData::PendingLevel>& pendingLevels)
+	{
+		levelManager.Clear();
+		for (const auto& pendingLevel : pendingLevels)
+		{
+			Level* level = levelManager.CreateLevel(pendingLevel.name);
+			if (!level)
+			{
+				continue;
+			}
+
+			for (const auto& pendingObject : pendingLevel.objects)
+			{
+				auto object = std::make_unique<Entity>(pendingObject.sourcePath.string().c_str());
+				object->Translate(pendingObject.position);
+				object->SetRotation(pendingObject.rotation);
+				object->SetScale(pendingObject.scale);
+				object->SetIgnoreCameraCollision(pendingObject.ignoreCameraCollision);
+				object->SetDefaultPosition(object->Position());
+				object->SetDefaultRotation(object->Rotation());
+				level->AddObject(std::move(object));
+			}
+		}
+	}
+
+	void ApplyStartupLevel(LevelManager& levelManager, const std::string& startupLevelName, const std::vector<ProjectStateData::PendingLevel>& pendingLevels)
+	{
+		if (!pendingLevels.empty())
+		{
+			const Level* activeLevel = nullptr;
+			for (const auto& pendingLevel : pendingLevels)
+			{
+				if (pendingLevel.active)
+				{
+					activeLevel = levelManager.FindLevel(pendingLevel.name);
+					break;
+				}
+			}
+			if (!activeLevel)
+			{
+				activeLevel = levelManager.Levels().front().get();
+			}
+			levelManager.SetActiveLevel(activeLevel->Name());
+		}
+
+		if (!startupLevelName.empty())
+		{
+			levelManager.ApplyProjectState(startupLevelName);
+		}
+	}
+
+}
 
 ProjectManager::ProjectManager(FileSystem& fileSystem)
 	: m_fileSystem(&fileSystem)
@@ -31,26 +113,7 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const LevelM
 	}
 
 	std::string contents = "AquanactProject 13\n";
-	ProjectStateSerializer::AppendLevelState(contents, path, levelManager);
-
-	const glm::vec3 gameCameraPosition = gRenderManager.GetGameCamera().GetPosition();
-	const glm::vec3 gameCameraFacing = gRenderManager.GetGameCamera().GetFacing();
-	contents += "gamecamera;";
-	contents += std::to_string(gameCameraPosition.x) + ";" + std::to_string(gameCameraPosition.y) + ";" + std::to_string(gameCameraPosition.z) + ";";
-	contents += std::to_string(gameCameraFacing.x) + ";" + std::to_string(gameCameraFacing.y) + ";" + std::to_string(gameCameraFacing.z) + "\n";
-
-	ProjectStateSerializer::AppendRenderState(contents, gFrontEndManager, gRenderManager);
-
-	levelManager.AppendProjectState(contents);
-
-	gFrontEndManager.RuntimeGUI().AppendProjectState(contents);
-
-	if (const char* imguiIniData = ImGui::SaveIniSettingsToMemory())
-	{
-		contents += "imguilayout;";
-		contents += ProjectStateSerializer::HexEncode(imguiIniData, std::strlen(imguiIniData));
-		contents += "\n";
-	}
+	AppendProjectStateSnapshot(contents, path, levelManager);
 
 	const bool written = m_fileSystem->WriteTextFile(path, contents);
 	if (written)
@@ -97,13 +160,21 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 	{
 		return false;
 	}
+	std::vector<ProjectStateData::PendingLevel> pendingLevels;
+	std::vector<ProjectStateData::PendingController> pendingControllers;
+	std::vector<ProjectStateData::PendingComponent> pendingComponents;
 	std::vector<std::string> pendingGameGUIAssets;
 	std::string pendingActiveGameGUIAsset;
-	std::string pendingImguiLayout;
-	gRenderManager.Lights().PointLights().clear();
-	const bool loaded = ProjectStateSerializer::LoadLevelState(path, file, projectVersion, levelManager, gFrontEndManager, gRenderManager, pendingGameGUIAssets, pendingActiveGameGUIAsset, pendingImguiLayout);
+	ProjectStateData::RenderStateData renderState;
+	std::string startupLevelName;
+	const bool loaded = ProjectStateSerializer::LoadLevelState(path, file, projectVersion, pendingLevels, pendingControllers, pendingComponents, pendingGameGUIAssets, pendingActiveGameGUIAsset, renderState, startupLevelName);
 	if (loaded)
 	{
+		MaterializePendingLevels(levelManager, pendingLevels);
+		levelManager.ApplyProjectState(pendingLevels, pendingControllers, pendingComponents);
+		ApplyStartupLevel(levelManager, startupLevelName, pendingLevels);
+		gRenderManager.ApplyProjectState(renderState);
+		gFrontEndManager.ApplyProjectState(renderState.editorShowAxis, renderState.editorShowGrid, pendingGameGUIAssets, pendingActiveGameGUIAsset, renderState.imguiLayout);
 		m_currentProjectPath = path;
 	}
 	return loaded;
