@@ -1,0 +1,274 @@
+Aquanact Engine
+===============
+
+Overview
+--------
+Source Files: `src/Engine/main.cpp`, `include/Engine/Globals.h`
+Book Reference: Chapter 1, Introduction; Chapter 6, Engine Support Systems
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+Engine Modes
+------------
+Source Files: `src/Engine/main.cpp`
+Book Reference: Chapter 1.5, Runtime Engine Architecture; Chapter 8, The Game Loop and Real-Time Simulation; Chapter 17.10, High-Level Game Flow
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+Application Entry
+-----------------
+Source Files: `src/Engine/main.cpp`
+Book Reference: Chapter 1.5, Runtime Engine Architecture; Chapter 6.1, Subsystem Start-Up and Shut-Down
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+Startup Order
+-------------
+Source Files: `src/Engine/main.cpp`, `src/Engine/Window.cpp`, `src/Engine/RenderManager.cpp`, `src/Engine/FrontEndManager.cpp`, `src/Engine/Input.cpp`, `src/Engine/ProjectManager.cpp`, `src/Engine/GameplayManager.cpp`
+Book Reference: Chapter 6.1, Subsystem Start-Up and Shut-Down; Chapter 8.2, The Game Loop
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+Shutdown Order
+--------------
+Source Files: `src/Engine/main.cpp`, `src/Engine/Window.cpp`, `src/Engine/RenderManager.cpp`, `src/Engine/FrontEndManager.cpp`, `src/Engine/Input.cpp`, `src/Engine/GameplayManager.cpp`
+Book Reference: Chapter 6.1, Subsystem Start-Up and Shut-Down
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+Window System
+-------------
+Source Files: `src/Engine/Window.cpp`, `include/Engine/Window.h`
+Book Reference: Chapter 6.1, Subsystem Start-Up and Shut-Down; Chapter 9, Human Interface Devices
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+Render Manager
+--------------
+Source Files: `src/Engine/RenderManager.cpp`, `include/Engine/RenderManager.h`
+Book Reference: Chapter 8.1, The Rendering Loop; Chapter 11, Rendering; Chapter 12.8, Overlays and User Interfaces
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+Graphics Device
+---------------
+Source Files: `src/Engine/OpenGLGraphics.cpp`, `src/Engine/OpenGLGraphicsDevice.cpp`, `src/Engine/ShaderProgram.cpp`, `src/Engine/Mesh.cpp`, `src/Engine/Line.cpp`, `include/Engine/OpenGLGraphics.h`, `include/Engine/OpenGLGraphicsDevice.h`, `include/Engine/ShaderProgram.h`, `include/Engine/Mesh.h`, `include/Engine/Line.h`
+Book Reference: Chapter 11.3, Foundations of 3D Rendering; Chapter 11.4, Programming the 3D Graphics Pipeline
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+Front-End Manager
+-----------------
+Source Files: `src/Engine/FrontEndManager.cpp`, `include/Engine/FrontEndManager.h`
+Book Reference: Chapter 12.8, Overlays and User Interfaces; Chapter 10, Tools for Debugging and Development
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+Editor UI
+---------
+Source Files: `src/Engine/EngineGUI.cpp`, `src/Engine/Debug.cpp`, `src/Engine/GameGUICreator.cpp`
+Book Reference: Chapter 10.3, In-Game Menus; Chapter 12.8, Overlays and User Interfaces; Chapter 16.4, The Game World Editor
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+Runtime UI
+----------
+Source Files: `src/Engine/GameGUI.cpp`, `src/Engine/GameGUIManager.cpp`, `include/Engine/GameGUI.h`, `include/Engine/GameGUIManager.h`
+Book Reference: Chapter 12.8, Overlays and User Interfaces; Chapter 10.3, In-Game Menus
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+Project Manager
+---------------
+Source Files: `src/Engine/ProjectManager.cpp`, `include/Engine/ProjectManager.h`
+Book Reference: Chapter 1.6, Tools and the Asset Pipeline; Chapter 7, Resources and the File System
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+Project Serialization
+---------------------
+Source Files: `src/Engine/ProjectStateSerializer.cpp`, `include/Engine/ProjectStateSerializer.h`
+Book Reference: Chapter 7.2, The Resource Manager; Chapter 16.3, Data-Driven Game Engines; Chapter 17.3, World Chunk Data Formats
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+Gameplay Manager
+----------------
+Source Files: `src/Engine/GameplayManager.cpp`, `include/Engine/GameplayManager.h`
+Book Reference: Chapter 8.2, The Game Loop; Chapter 17.10, High-Level Game Flow
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+Gameplay Flow States
+--------------------
+Source Files: `src/Engine/GameplayManager.cpp`, `include/Engine/GameplayManager.h`
+Book Reference: Chapter 8.3, Game Loop Architectural Styles; Chapter 17.10, High-Level Game Flow
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+Entity System
+-------------
+Source Files: `src/Engine/Entity.cpp`, `src/Engine/EntityRegistry.cpp`, `include/Engine/Entity.h`, `include/Engine/EntityRegistry.h`
+Book Reference: Chapter 16.2, Implementing Dynamic Elements: Game Objects; Chapter 17.2, Runtime Object Model Architectures
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+Component System
+---------------
+Source Files: `src/Engine/Component.cpp`, `src/Engine/Controller.cpp`, `src/Engine/PlayerController.cpp`, `src/Engine/AnimatorComponent.cpp`, `include/Engine/Component.h`, `include/Engine/Controller.h`, `include/Engine/PlayerController.h`, `include/Engine/AnimatorComponent.h`
+Book Reference: Chapter 17.1, Components of the Gameplay Foundation System
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+Level System
+------------
+Source Files: `src/Engine/Level.cpp`, `src/Engine/LevelManager.cpp`, `include/Engine/Level.h`, `include/Engine/LevelManager.h`
+Book Reference: Chapter 16.1, Anatomy of a Game World; Chapter 17.3, World Chunk Data Formats
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+Animation System
+---------------
+Source Files: `src/Engine/Animation.cpp`, `src/Engine/Animator.cpp`, `src/Engine/AnimatorComponent.cpp`, `include/Engine/Animation.h`, `include/Engine/Animator.h`, `include/Engine/AnimatorComponent.h`
+Book Reference: Chapter 13, Animation Systems
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+Input System
+------------
+Source Files: `src/Engine/Input.cpp`, `include/Engine/Input.h`
+Book Reference: Chapter 9, Human Interface Devices
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+Event System
+------------
+Source Files: `src/Engine/EventManager.cpp`, `include/Engine/EventManager.h`
+Book Reference: Chapter 17.8, Events and Message-Passing
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+File System
+-----------
+Source Files: `src/Engine/FileSystem.cpp`, `src/Engine/FileManager.cpp`, `include/Engine/FileSystem.h`, `include/Engine/FileManager.h`
+Book Reference: Chapter 7.1, File System
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+Asset Loading
+-------------
+Source Files: `src/Engine/ModelImporter.cpp`, `src/Engine/StbImage.cpp`, `src/Engine/GameGUIManager.cpp`, `src/Engine/GameGUICreator.cpp`
+Book Reference: Chapter 1.6, Tools and the Asset Pipeline; Chapter 7, Resources and the File System; Chapter 17.4, Loading and Streaming Game Worlds
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+Physics System
+--------------
+Source Files: `src/Engine/Physics.cpp`, `include/Engine/Physics.h`
+Book Reference: Chapter 14, Collision and Rigid Body Dynamics
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+Audio System
+------------
+Source Files: `src/Engine/Audio.cpp`, `src/Engine/miniaudio_impl.c`, `include/Engine/Audio.h`
+Book Reference: Chapter 15, Audio
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+Camera System
+-------------
+Source Files: `src/Engine/CameraManager.cpp`, `src/Engine/EngineCamera.cpp`, `src/Engine/GameCamera.cpp`, `src/Engine/EditorCameraController.cpp`, `include/Engine/CameraManager.h`, `include/Engine/EngineCamera.h`, `include/Engine/GameCamera.h`, `include/Engine/EditorCameraController.h`, `include/Engine/Camera.h`
+Book Reference: Chapter 11.2, Lights, Camera, Action!; Chapter 10.5, Debug Cameras and Pausing the Game
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+Lighting System
+---------------
+Source Files: `src/Engine/LightingManager.cpp`, `include/Engine/LightingManager.h`
+Book Reference: Chapter 12, Lighting and Post-Processing
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+Debug and Diagnostics
+---------------------
+Source Files: `src/Engine/Debug.cpp`, `include/Engine/Debug.h`, `src/Engine/Axis.cpp`, `src/Engine/Grid.cpp`, `src/Engine/Line.cpp`
+Book Reference: Chapter 10, Tools for Debugging and Development
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+Frame Update Order
+------------------
+Source Files: `src/Engine/main.cpp`, `src/Engine/RenderManager.cpp`, `src/Engine/GameplayManager.cpp`
+Book Reference: Chapter 8, The Game Loop and Real-Time Simulation; Chapter 17.6, Updating Game Objects in Real Time
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+Data Ownership
+--------------
+Source Files: `include/Engine/Globals.h`, `src/Engine/ProjectManager.cpp`, `src/Engine/LevelManager.cpp`, `src/Engine/EntityRegistry.cpp`
+Book Reference: Chapter 3.3, Data, Code and Memory Layout; Chapter 16.3, Data-Driven Game Engines
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+System Dependencies
+-------------------
+Source Files: `src/Engine/main.cpp`, `include/Engine/FrontEndManager.h`, `include/Engine/RenderManager.h`, `include/Engine/GameplayManager.h`, `include/Engine/ProjectManager.h`
+Book Reference: Chapter 6.1, Subsystem Start-Up and Shut-Down; Chapter 8, The Game Loop and Real-Time Simulation
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+Known Constraints
+------------------
+Source Files: `CMakeLists.txt`, `reports/Startup/*.txt`, `reports/GameGUI/*.txt`
+Book Reference: Chapter 2, Tools of the Trade; Chapter 10, Tools for Debugging and Development
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+Open Questions
+--------------
+Source Files: `reports/schedule/three_week_schedule.txt`, `src/Engine/*.cpp`
+Book Reference: Chapter 18, You Mean There's More?
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:
+
+Cross References
+----------------
+Source Files: `src/Engine/*.cpp`, `include/Engine/*.h`, `src/Game/*.cpp`, `include/Game/*.h`
+Book Reference: Chapter 1.6, Tools and the Asset Pipeline; Chapter 17, Runtime Gameplay Systems
+Engine Notes:
+Gregory Alignment:
+Deviations / Risks:

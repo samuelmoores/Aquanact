@@ -1,0 +1,103 @@
+Aquanact Engine Documentation Roadmap
+=====================================
+
+Book Alignment Goal
+-------------------
+
+Confirm the engine still follows the architecture ideas emphasized in Jason Gregory's
+Game Engine Architecture: clear runtime architecture, distinct tools and asset
+pipeline, separated subsystems, explicit update flow, and practical engine
+boundaries.
+
+Primary Book Areas to Check
+---------------------------
+
+1. Chapter 1, Introduction
+2. Chapter 6, Engine Support Systems
+3. Chapter 7, Resources and the File System
+4. Chapter 8, The Game Loop and Real-Time Simulation
+5. Chapter 9, Human Interface Devices
+6. Chapter 10, Tools for Debugging and Development
+7. Chapter 11, Rendering
+8. Chapter 12, Lighting and Post-Processing
+9. Chapter 13, Animation Systems
+10. Chapter 14, Collision and Rigid Body Dynamics
+11. Chapter 15, Audio
+12. Chapter 16, Introduction to Gameplay Systems
+13. Chapter 17, Runtime Gameplay Systems
+
+Reference Themes from the Book
+------------------------------
+
+1. Runtime engine architecture
+2. Tools and the asset pipeline
+3. Data, code, and memory layout
+4. Core engine systems
+5. Rendering, animation, physics, and audio as distinct subsystems
+6. Game object and world model separation
+7. Debugging, profiling, and diagnostics
+
+Morning Review
+--------------
+
+1. Overview <----
+2. Engine Modes
+3. Application Entry
+4. Startup Order
+5. Check runtime architecture against the book's model
+6. Record any subsystem coupling that looks too tight
+
+finish at 1:30pm
+
+Midday Review
+-------------
+
+1. Shutdown Order
+2. Window System
+3. Render Manager
+4. Graphics Device
+5. Front-End Manager
+6. Editor UI
+7. Runtime UI
+8. Project Manager
+9. Project Serialization
+10. Compare asset flow to the book's tools and pipeline ideas
+11. Check whether data ownership is explicit and stable
+
+finish at 3:30pm
+
+Afternoon Review
+---------------
+
+1. Gameplay Manager
+2. Gameplay Flow States
+3. Entity System
+4. Component System
+5. Level System
+6. Animation System
+7. Input System
+8. Event System
+9. File System
+10. Asset Loading
+11. Physics System
+12. Audio System
+13. Camera System
+14. Lighting System
+15. Debug and Diagnostics
+16. Confirm engine subsystems stay separated from game code
+17. Confirm update order is deterministic and documented
+
+finish at 6:30pm
+
+End-of-Day Review
+-----------------
+
+1. Frame Update Order
+2. Data Ownership
+3. System Dependencies
+4. Known Constraints
+5. Open Questions
+6. Cross References
+7. Write the final summary
+8. State whether the engine still matches the book's principles
+9. List any violations or deviations that need design follow-up

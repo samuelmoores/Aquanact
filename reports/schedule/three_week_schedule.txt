@@ -1,0 +1,122 @@
+3-Day Schedule Plan
+
+Range:
+- Start: July 31, 2026
+- End: August 24, 2026
+
+Jul 31 - Aug 2
+- Goal: stabilize HUD and menu flow.
+- Tasks:
+  - Verify the runtime UI modes switch correctly between MainMenu, GameplayHUD, PauseMenu, and PlayerUI.
+  - Confirm GameGUI assets save and reload reliably before play starts.
+  - Remove any remaining ambiguity in diagnostics so the active gameplay state and UI mode are easy to inspect.
+  - Test: boot game, enter New Game, confirm HUD appears during gameplay.
+
+Aug 3 - Aug 5
+- Goal: finish HUD widget behavior.
+- Tasks:
+  - Finalize progress bar behavior in the HUD.
+  - Tighten widget editing for texture, position, size, and binding.
+  - Verify progress bar bindings survive save/load.
+  - Test: change HUD binding, play level, confirm the bar updates at runtime.
+
+Aug 6 - Aug 8
+- Goal: define the gameplay programming layer.
+- Tasks:
+  - Decide which gameplay behaviors should be engine-defined versus game-defined.
+  - Clean up controller and gameplay-state boundaries.
+  - Identify the minimum hooks needed for game logic to drive UI and player actions.
+  - Test: basic gameplay state transitions still behave predictably.
+
+Aug 9 - Aug 11
+- Goal: polish animation.
+- Tasks:
+  - Improve animation state transitions and blend behavior.
+  - Stabilize binding/condition editing for animator transitions.
+  - Verify animation data survives save/load cleanly.
+  - Test: change animation states in-editor and confirm they play in game mode.
+
+Aug 12 - Aug 14
+- Goal: start physics.
+- Tasks:
+  - Define the first physics component or movement/collision system.
+  - Decide what belongs in physics versus controller movement.
+  - Wire the new component into entity update flow.
+  - Test: basic collision or grounding behavior with a controlled object.
+
+Aug 15 - Aug 17
+- Goal: add audio management.
+- Tasks:
+  - Create the audio manager skeleton.
+  - Support UI click sounds, one-shot effects, and simple music playback.
+  - Connect audio triggers to gameplay and menu actions.
+  - Test: a UI action and a gameplay action both trigger audio.
+
+Aug 18 - Aug 20
+- Goal: integrate systems.
+- Tasks:
+  - Connect gameplay, animation, physics, UI, and audio together.
+  - Fix ordering issues between systems.
+  - Run a full startup-to-gameplay-to-pause flow test.
+  - Test: no state resets or missing UI across transitions.
+
+Aug 21 - Aug 23
+- Goal: vertical slice pass.
+- Tasks:
+  - Assemble a playable loop with main menu, level load, player movement, HUD, animation, pause menu, and audio.
+  - Fix save/load edge cases discovered during the slice.
+  - Remove rough edges in editor/game transitions.
+  - Test: play the loop from startup to return-to-editor without manual repair.
+
+Aug 24
+- Goal: final review.
+- Tasks:
+  - Verify the full game loop.
+  - Review remaining blockers.
+  - List follow-up work for the next phase.
+  - Test: confirm the build still runs and the core loop is intact.
+
+Milestone Version
+
+1. UI and flow locked
+- Window: Jul 31 - Aug 5
+- Outcome:
+  - HUD and menus switch reliably.
+  - GameGUI assets save before play.
+  - Progress bar UI is stable in runtime.
+- Risk: medium
+- Exit criteria:
+  - New Game, Play Level, pause, and return flows work without manual repair.
+
+2. Gameplay layer defined
+- Window: Aug 6 - Aug 11
+- Outcome:
+  - Gameplay programming boundaries are clear.
+  - Animation transitions are predictable.
+  - Basic data flows for gameplay scripting are in place.
+- Risk: medium
+- Exit criteria:
+  - Gameplay state, animation state, and save/load are all consistent.
+
+3. Core systems in place
+- Window: Aug 12 - Aug 17
+- Outcome:
+  - Physics exists in a usable first form.
+  - Audio manager can play UI and gameplay sounds.
+- Risk: high
+- Exit criteria:
+  - Physics and audio can both be driven from gameplay events.
+
+4. Integrated vertical slice
+- Window: Aug 18 - Aug 24
+- Outcome:
+  - Full game loop is playable from startup to return-to-editor.
+  - UI, gameplay, animation, physics, and audio all cooperate.
+- Risk: high
+- Exit criteria:
+  - You can ship a minimal complete game loop without crashing or manual state fixes.
+
+Suggested daily order inside each chunk
+- First day: implement the system boundary or missing plumbing.
+- Second day: connect it to the existing runtime/editor flow.
+- Third day: test, fix regressions, and clean up logs or state mismatches.
