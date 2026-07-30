@@ -45,10 +45,6 @@ public:
 	void SetShowEditorWindow(bool showEditorWindow);
 	void SetUIMode(UIMode mode);
 	UIMode Mode() const;
-	void ShowMainMenu();
-	void ShowGameplayHUD();
-	void ShowPauseMenu();
-	void ShowPlayerUI();
 	void HideAll();
 	void LogAction(const std::string& message);
 	void RecordClick(const std::string& message);

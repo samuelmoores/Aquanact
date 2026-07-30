@@ -561,26 +561,6 @@ GameGUIManager::UIMode GameGUIManager::Mode() const
 	return m_mode;
 }
 
-void GameGUIManager::ShowMainMenu()
-{
-	SetUIMode(UIMode::MainMenu);
-}
-
-void GameGUIManager::ShowGameplayHUD()
-{
-	SetUIMode(UIMode::GameplayHUD);
-}
-
-void GameGUIManager::ShowPauseMenu()
-{
-	SetUIMode(UIMode::PauseMenu);
-}
-
-void GameGUIManager::ShowPlayerUI()
-{
-	SetUIMode(UIMode::PlayerUI);
-}
-
 void GameGUIManager::HideAll()
 {
 	m_mode = UIMode::Custom;

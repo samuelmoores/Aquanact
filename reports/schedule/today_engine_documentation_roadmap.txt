@@ -40,10 +40,10 @@ Reference Themes from the Book
 Morning Review
 --------------
 
-1. Overview <----
-2. Engine Modes
-3. Application Entry
-4. Startup Order
+1. Overview x
+2. Engine Modes x
+3. Application Entry x
+4. Startup Order <----
 5. Check runtime architecture against the book's model
 6. Record any subsystem coupling that looks too tight
 

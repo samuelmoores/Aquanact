@@ -11,6 +11,7 @@
 #include <Engine/FileSystem.h>
 #include <Engine/Input.h>
 #include <Engine/FrontEndManager.h>
+#include <Engine/SimulationManager.h>
 #include <filesystem>
 
 #ifdef AQUANACT_GAME
@@ -29,17 +30,6 @@ ProjectManager gProjectManager(gFileSystem);
 GameplayManager gGameplayManager;
 Input gInput;
 EngineState gEngineState;
-
-static void mainLoop()
-{
-    gInput.Update();
-    if (gEngineState.IsGameMode() || gGameplayManager.ShouldUpdateInEditor())
-    {
-        gGameplayManager.Update(gInput.DeltaTime());
-    }
-
-    gRenderManager.Loop();
-}
 
 // Resolve the default project in priority order:
 // 1. a project next to the executable
@@ -70,7 +60,7 @@ static int RunApplication(int argc, char** argv)
 {
     (void)argc;
     (void)argv;
-
+    SimulationManager simulationManager;
 #ifdef AQUANACT_GAME
     gEngineState.SetMode(EngineMode::Game);
 #else
@@ -86,8 +76,7 @@ static int RunApplication(int argc, char** argv)
     gProjectManager.LoadProject(DefaultProjectPath(), gLevelManager);
     gGameplayManager.startUp(gLevelManager);
 
-    while (!gWindow.ShouldClose())
-        mainLoop();
+    simulationManager.run(gWindow, gInput, gGameplayManager, gRenderManager, gEngineState);
 
     gDebug.LogMessage("Main loop exiting because the window close flag was set.");
 

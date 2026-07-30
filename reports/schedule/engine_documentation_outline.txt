@@ -5,33 +5,95 @@ Overview
 --------
 Source Files: `src/Engine/main.cpp`, `include/Engine/Globals.h`
 Book Reference: Chapter 1, Introduction; Chapter 6, Engine Support Systems
-Engine Notes:
-Gregory Alignment:
-Deviations / Risks:
+Engine Notes: 
+	-main loop has a gameplay check called "update in editor" for engine level preview
+	-removed launch config stuff from main and moved it into binary	
+	-global forward declaration and extern declaration
+	-GameState class is not extern
+
+Gregory Alignment: 
+	Globals, and nice and simple startUp functions for the managers
+	Each global should be checked
+
+Deviations / Risks: 
+	still some project filepath logic in main
+	some globals mite not be necessary
 
 Engine Modes
 ------------
 Source Files: `src/Engine/main.cpp`
 Book Reference: Chapter 1.5, Runtime Engine Architecture; Chapter 8, The Game Loop and Real-Time Simulation; Chapter 17.10, High-Level Game Flow
 Engine Notes:
-Gregory Alignment:
-Deviations / Risks:
+	Runtime Arch:
+		1) bootstrap in main, globals, frame loop
+		2) EngineState, editor vs game
+		3) Window
+		4) RenderManager
+		5) FrontEndManager
+		6) ProjectManager
+		7) GameplayManager
+ 		8) LevelManager
+		9) Components
+		10) Services and Utilities (Input, EventManager, FileSystem, FileManager) 
+
+	Game Loop:
+		input -> gameplay -> render
+	High level Game Flow: 
+		!!! TODO !!!!
+
+Gregory Alignment: 
+	-centralized, layered systems, except for input
+Deviations / Risks: 
+	-Input needs a manager to orchestrate input mappings and devices
+	-No fixed timestep loop that is controlled carefully
+	-too simple and nondeterministic 
+	-gameplay update is conditional on mode/state, not just main loop
+	-therefore app mode and simulation policy are mixed into loop body
+	-editor and game are coupled through shared runtime, blurred boundary
+	-too many global dependencies
+		-look at gEngineState, gGameplayManager, gInput, gRenderManager for refarctor
 
 Application Entry
 -----------------
 Source Files: `src/Engine/main.cpp`
 Book Reference: Chapter 1.5, Runtime Engine Architecture; Chapter 6.1, Subsystem Start-Up and Shut-Down
 Engine Notes:
+	-added simulation manager that runs the loop
+
 Gregory Alignment:
+	-pragmatic and sensible
 Deviations / Risks:
+	-heavy use of globals at app root
+	-main doing too much
+	-mode boundary not clear between EngineState, SimulationManager, GameplayManager.startGameSession()
+	-simulationmanager is not fully independent yet
+	-no service or bootstrap layer
 
 Startup Order
 -------------
 Source Files: `src/Engine/main.cpp`, `src/Engine/Window.cpp`, `src/Engine/RenderManager.cpp`, `src/Engine/FrontEndManager.cpp`, `src/Engine/Input.cpp`, `src/Engine/ProjectManager.cpp`, `src/Engine/GameplayManager.cpp`
 Book Reference: Chapter 6.1, Subsystem Start-Up and Shut-Down; Chapter 8.2, The Game Loop
 Engine Notes:
+	-Window
+		-creates OS window and GLFW context
+	-RenderManager
+		-creates camera, sets up graphics devices and prepares frames
+	-FrontendManager
+		-starts EngineGUI, GameGUIManager and GameGUICreator
+	-Input
+		-hooks keyboard/mouse input and stores cursor state
+	-Debug
+		-helpers, diagnostics and editor overlays
+	-FileManager
+		-filesystem state, model root directory
+	-ProjectManager
+		-Loads project and populates level with entities, GUI state and assets into memory
+	-GameplayManager
+		-binds gameplay flow to loaded LevelManager
+		-sets initial gameplay state to MainMenu
+
 Gregory Alignment:
-Deviations / Risks:
+Deviations / Risks: too many wrappers, especially with GameplayManager.startUp() and init for the runtime GUI
 
 Shutdown Order
 --------------

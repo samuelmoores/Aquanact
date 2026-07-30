@@ -15,9 +15,12 @@ void GameplayManager::startUp(LevelManager& levelManager)
 	m_state = FlowState::MainMenu;
 	if (m_levelManager)
 	{
+		// If the runtime UI is already initialized, set it to a known boot
+		// state so the engine opens on the main menu instead of leaving
+		// whatever screen was active from a previous session.
 		if (gFrontEndManager.RuntimeGUI().HasRuntime())
 		{
-			gFrontEndManager.RuntimeGUI().ShowMainMenu();
+			gFrontEndManager.RuntimeGUI().SetUIMode(GameGUIManager::UIMode::MainMenu);
 		}
 	}
 }
@@ -40,7 +43,7 @@ void GameplayManager::BootMainMenu()
 	m_state = FlowState::MainMenu;
 	if (gFrontEndManager.RuntimeGUI().HasRuntime())
 	{
-		gFrontEndManager.RuntimeGUI().ShowMainMenu();
+		gFrontEndManager.RuntimeGUI().SetUIMode(GameGUIManager::UIMode::MainMenu);
 	}
 }
 
@@ -76,7 +79,7 @@ void GameplayManager::StartGameSession()
 	gDebug.LogMessage("GameplayManager::StartGameSession() state=Playing");
 	if (gFrontEndManager.RuntimeGUI().HasRuntime())
 	{
-		gFrontEndManager.RuntimeGUI().ShowGameplayHUD();
+		gFrontEndManager.RuntimeGUI().SetUIMode(GameGUIManager::UIMode::GameplayHUD);
 	}
 }
 
@@ -138,7 +141,7 @@ void GameplayManager::Update(float dt)
 
 	if (m_state == FlowState::Playing && gFrontEndManager.RuntimeGUI().HasRuntime())
 	{
-		gFrontEndManager.RuntimeGUI().ShowGameplayHUD();
+		gFrontEndManager.RuntimeGUI().SetUIMode(GameGUIManager::UIMode::GameplayHUD);
 	}
 
 	Level* activeLevel = m_levelManager ? m_levelManager->ActiveLevel() : nullptr;
@@ -207,15 +210,15 @@ void GameplayManager::SetPaused(bool paused)
 	{
 		if (m_state == FlowState::Paused)
 		{
-			gFrontEndManager.RuntimeGUI().ShowPauseMenu();
+			gFrontEndManager.RuntimeGUI().SetUIMode(GameGUIManager::UIMode::PauseMenu);
 		}
 		else if (m_state == FlowState::Playing)
 		{
-			gFrontEndManager.RuntimeGUI().ShowGameplayHUD();
+			gFrontEndManager.RuntimeGUI().SetUIMode(GameGUIManager::UIMode::GameplayHUD);
 		}
 		else if (m_state == FlowState::MainMenu)
 		{
-			gFrontEndManager.RuntimeGUI().ShowMainMenu();
+			gFrontEndManager.RuntimeGUI().SetUIMode(GameGUIManager::UIMode::MainMenu);
 		}
 	}
 }

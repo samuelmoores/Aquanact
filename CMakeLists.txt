@@ -69,6 +69,7 @@ set(SOURCES
     "include/Engine/Window.h" "src/Engine/Window.cpp"
     "include/Engine/Input.h" "src/Engine/Input.cpp"
     "include/Engine/GameplayManager.h" "src/Engine/GameplayManager.cpp"
+    "include/Engine/SimulationManager.h" "src/Engine/SimulationManager.cpp"
     "include/Engine/RenderManager.h" "src/Engine/RenderManager.cpp"
     "include/Engine/GraphicsDevice.h"
     "include/Engine/OpenGLGraphicsDevice.h" "src/Engine/OpenGLGraphicsDevice.cpp"
