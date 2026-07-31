@@ -1,6 +1,6 @@
 #include "Engine/ProjectManager.h"
 
-#include "Engine/Globals.h"
+#include "Engine/Root.h"
 #include "Engine/FrontEndManager.h"
 #include "Engine/FileSystem.h"
 #include "Engine/LevelManager.h"
@@ -15,8 +15,8 @@
 namespace {
 	void AppendCurrentCameraState(std::string& contents)
 	{
-		const glm::vec3 gameCameraPosition = gRenderManager.GetGameCamera().GetPosition();
-		const glm::vec3 gameCameraFacing = gRenderManager.GetGameCamera().GetFacing();
+		const glm::vec3 gameCameraPosition = Root::Current().Render().GetGameCamera().GetPosition();
+		const glm::vec3 gameCameraFacing = Root::Current().Render().GetGameCamera().GetFacing();
 		contents += "gamecamera;";
 		contents += std::to_string(gameCameraPosition.x) + ";" + std::to_string(gameCameraPosition.y) + ";" + std::to_string(gameCameraPosition.z) + ";";
 		contents += std::to_string(gameCameraFacing.x) + ";" + std::to_string(gameCameraFacing.y) + ";" + std::to_string(gameCameraFacing.z) + "\n";
@@ -36,9 +36,9 @@ namespace {
 	{
 		ProjectStateSerializer::AppendLevelState(contents, path, levelManager);
 		AppendCurrentCameraState(contents);
-		ProjectStateSerializer::AppendRenderState(contents, gFrontEndManager, gRenderManager);
+		ProjectStateSerializer::AppendRenderState(contents, Root::Current().FrontEnd(), Root::Current().Render());
 		levelManager.AppendProjectState(contents);
-		gFrontEndManager.RuntimeGUI().AppendProjectState(contents);
+		Root::Current().FrontEnd().RuntimeGUI().AppendProjectState(contents);
 		AppendImguiLayoutState(contents);
 	}
 
@@ -168,13 +168,13 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 	ProjectStateData::RenderStateData renderState;
 	std::string startupLevelName;
 	const bool loaded = ProjectStateSerializer::LoadLevelState(path, file, projectVersion, pendingLevels, pendingControllers, pendingComponents, pendingGameGUIAssets, pendingActiveGameGUIAsset, renderState, startupLevelName);
-	if (loaded)
+	if (loaded) // broken boundary, no longer just I/O
 	{
 		MaterializePendingLevels(levelManager, pendingLevels);
 		levelManager.ApplyProjectState(pendingLevels, pendingControllers, pendingComponents);
 		ApplyStartupLevel(levelManager, startupLevelName, pendingLevels);
-		gRenderManager.ApplyProjectState(renderState);
-		gFrontEndManager.ApplyProjectState(renderState.editorShowAxis, renderState.editorShowGrid, pendingGameGUIAssets, pendingActiveGameGUIAsset, renderState.imguiLayout);
+		Root::Current().Render().ApplyProjectState(renderState);
+		Root::Current().FrontEnd().ApplyProjectState(renderState.editorShowAxis, renderState.editorShowGrid, pendingGameGUIAssets, pendingActiveGameGUIAsset, renderState.imguiLayout);
 		m_currentProjectPath = path;
 	}
 	return loaded;

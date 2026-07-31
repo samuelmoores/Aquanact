@@ -7,7 +7,7 @@
 
 #include <Engine/GLHeaders.h>
 #include <Engine/RenderManager.h>
-#include <Engine/Globals.h>
+#include <Engine/Root.h>
 #include <Engine/Line.h>
 #include "Engine/ModelImporter.h"
 #include <Engine/Mesh.h>
@@ -128,8 +128,8 @@ glm::vec3 Mesh::maxBounds()
 void Mesh::DrawBoundingBox()
 {
 	Line line(m_meshMinBounds, m_meshMaxBounds);
-	line.UpdateProjection(gRenderManager.GetEngineCamera().GetProjectionMatrix());
-	line.draw(gRenderManager.GetEngineCamera().GetViewMatrix());
+	line.UpdateProjection(Root::Current().Render().GetEngineCamera().GetProjectionMatrix());
+	line.draw(Root::Current().Render().GetEngineCamera().GetViewMatrix());
 }
 
 void Mesh::updateAABB(glm::vec3 position, glm::vec3 scale)

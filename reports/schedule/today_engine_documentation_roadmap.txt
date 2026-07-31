@@ -47,8 +47,6 @@ Morning Review
 5. Check runtime architecture against the book's model  x
 6. Record any subsystem coupling that looks too tight x
 
-finish at 1:30pm 
-
 Midday Review
 -------------
 
@@ -61,41 +59,37 @@ Midday Review
 7. Runtime UI x
 8. Project Manager x
 9. Project Serialization x
-10. Compare asset flow to the book's tools and pipeline ideas <----
-11. Check whether data ownership is explicit and stable
-
-finish at 3:30pm
+10. Compare asset flow to the book's tools and pipeline ideas x
+11. Check whether data ownership is explicit and stable x
 
 Afternoon Review
 ---------------
 
-1. Gameplay Manager
-2. Gameplay Flow States
-3. Entity System
-4. Component System
-5. Level System
-6. Animation System
-7. Input System
-8. Event System
-9. File System
-10. Asset Loading
-11. Physics System
-12. Audio System
-13. Camera System
-14. Lighting System
-15. Debug and Diagnostics
-16. Confirm engine subsystems stay separated from game code
+1. Gameplay Manager x
+2. Gameplay Flow States x
+3. Entity System x
+4. Component System x
+5. Level System x
+6. Animation System x
+7. Input System x
+8. Event System x
+9. File System x
+10. Asset Loading x
+11. Physics System x
+12. Audio System x
+13. Camera System x
+14. Lighting System x
+15. Debug and Diagnostics x
+16. Confirm engine subsystems stay separated from game code 
 17. Confirm update order is deterministic and documented
-
-finish at 6:30pm
 
 End-of-Day Review
 -----------------
 
-1. Frame Update Order
-2. Data Ownership
-3. System Dependencies
-4. Known Constraints
+1. Frame Update Order x
+2. Data Ownership x
+3. System Dependencies x
+4. Known Constraints <----
 5. Open Questions
 6. Cross References
 7. Write the final summary

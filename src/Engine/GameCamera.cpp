@@ -1,7 +1,7 @@
 #include "Engine/GameCamera.h"
 
 #include "Engine/EngineCamera.h"
-#include "Engine/Globals.h"
+#include "Engine/Root.h"
 #include "Engine/Window.h"
 
 #include <glm/ext/matrix_clip_space.hpp>
@@ -9,7 +9,7 @@
 
 void GameCamera::startUp()
 {
-	m_window = gWindow.GLFW();
+	m_window = Root::Current().WindowRef().GLFW();
 
 	int width = 1;
 	int height = 1;

@@ -2,7 +2,7 @@
 
 #include "Engine/Entity.h"
 #include "Engine/FileSystem.h"
-#include "Engine/Globals.h"
+#include "Engine/Root.h"
 #include "Engine/LevelManager.h"
 #include "Engine/ProjectStateData.h"
 #include "Engine/AnimatorComponent.h"
@@ -115,29 +115,29 @@ namespace ProjectStateFormat {
 
 	std::filesystem::path MakePortableSourcePath(const std::filesystem::path& projectPath, const std::filesystem::path& sourcePath)
 	{
-		if (!gFileSystem.Exists(sourcePath)) return sourcePath;
+		if (!Root::Current().FileSystemRef().Exists(sourcePath)) return sourcePath;
 		const std::filesystem::path projectDir = projectPath.parent_path();
 		std::error_code ec;
-		const std::filesystem::path projectRelative = gFileSystem.Relative(sourcePath, projectDir, ec);
+		const std::filesystem::path projectRelative = Root::Current().FileSystemRef().Relative(sourcePath, projectDir, ec);
 		if (!ec && !projectRelative.empty() && !IsRelativeToParent(projectRelative)) return projectRelative;
-		const std::filesystem::path assetsRelative = gFileSystem.Relative(sourcePath, AssetsRoot(), ec);
+		const std::filesystem::path assetsRelative = Root::Current().FileSystemRef().Relative(sourcePath, AssetsRoot(), ec);
 		if (!ec && !assetsRelative.empty() && !IsRelativeToParent(assetsRelative)) return assetsRelative;
 		return sourcePath;
 	}
 
 	std::filesystem::path ResolveSourcePath(const std::filesystem::path& projectPath, const std::filesystem::path& sourcePath)
 	{
-		if (gFileSystem.Exists(sourcePath)) return sourcePath;
+		if (Root::Current().FileSystemRef().Exists(sourcePath)) return sourcePath;
 		const std::filesystem::path projectDir = projectPath.parent_path();
 		const std::filesystem::path projectRelative = projectDir / sourcePath;
-		if (gFileSystem.Exists(projectRelative)) return projectRelative;
+		if (Root::Current().FileSystemRef().Exists(projectRelative)) return projectRelative;
 		const std::filesystem::path assetsRelative = AssetsRoot() / sourcePath;
-		if (gFileSystem.Exists(assetsRelative)) return assetsRelative;
+		if (Root::Current().FileSystemRef().Exists(assetsRelative)) return assetsRelative;
 		const std::filesystem::path searchRoots[] = { ModelsRoot(), TexturesRoot(), ProjectsRoot() };
 		for (const auto& searchRoot : searchRoots)
 		{
-			if (!gFileSystem.Exists(searchRoot) || !gFileSystem.IsDirectory(searchRoot)) continue;
-			for (const auto& entry : gFileSystem.ReadDirectoryRecursive(searchRoot))
+			if (!Root::Current().FileSystemRef().Exists(searchRoot) || !Root::Current().FileSystemRef().IsDirectory(searchRoot)) continue;
+			for (const auto& entry : Root::Current().FileSystemRef().ReadDirectoryRecursive(searchRoot))
 			{
 				if (!entry.is_regular_file()) continue;
 				if (entry.path().filename() == sourcePath.filename()) return entry.path();

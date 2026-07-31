@@ -3,7 +3,7 @@
 #include "Engine/AnimatorComponent.h"
 #include "Engine/Controller.h"
 #include "Engine/Debug.h"
-#include "Engine/Globals.h"
+#include "Engine/Root.h"
 #include "Engine/ModelImporter.h"
 
 #include <algorithm>

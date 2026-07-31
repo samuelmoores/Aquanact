@@ -1,0 +1,119 @@
+Aquanact Global Access Map
+===========================
+
+Purpose
+-------
+
+This file documents the remaining global-style engine access points and whether
+they preserve clear subsystem boundaries or blur them.
+
+Current Status
+--------------
+
+The long-term goal has been completed for this pass: `Root` now owns the engine
+services directly, and the old ambient global compatibility layer has been
+removed.
+
+Recent Progress
+---------------
+
+- `GameGUI.cpp`, `GameGUIManager.cpp`, `GameGUICreator.cpp`, `Debug.cpp`,
+  `ProjectManager.cpp`, `FileManager.cpp`, `Input.cpp`, `RenderManager.cpp`,
+  `Controller.cpp`, `EngineCamera.cpp`, `GameCamera.cpp`, `Mesh.cpp`,
+  `ModelImporter.cpp`, `PlayerController.cpp`, `ProjectStateFormat.cpp`,
+  `SimulationManager.cpp`, `Entity.cpp`, `Component.cpp`, `Level.cpp`,
+  `Enemy.cpp`, `PlayerHealth.cpp`, and `EngineGUI.cpp` have been moved off the
+  old ambient globals and now go through `Root` ownership.
+- `include/Engine/Globals.h` has been removed.
+
+Globals That Still Break Clear Boundaries
+-----------------------------------------
+
+None in the active code path. The old ambient `g...` globals were replaced by
+explicit `Root` ownership and accessors.
+
+What Should Be Considered Clean
+-------------------------------
+
+- `EngineState` as a normal data object owned by `Root`
+- explicit references passed from `Root` into managers
+- low-level services such as file system and event dispatch when they are owned
+  and passed explicitly rather than reached through globals
+
+Rule of Thumb
+-------------
+
+If a global lets one subsystem reach into another subsystem's policy, it breaks
+the boundary.
+
+If a global is only a low-level utility and is passed explicitly from `Root`,
+it is less harmful, but still better as an owned dependency than an ambient
+global.
+
+Root Boundary Review
+--------------------
+
+`Root` is now the ownership boundary for engine services, which is a clear
+improvement over ambient globals. The remaining concern is that `Root` still
+holds both object ownership and several pieces of policy.
+
+Review points:
+
+- `Root::startUp()` owns startup order, mode selection, and initial session
+  routing.
+  - This is acceptable for a bootstrap layer, but it means `Root` still decides
+    when gameplay versus editor behavior begins.
+
+- `Root::UpdateFrame()` is the main coordination point between gameplay state
+  and frontend UI state.
+  - This keeps the loop readable, but it also means `Root` is still translating
+    `GameplayManager::GameState` into frontend UI mode decisions.
+
+- `Root::run()` still passes several managers into the render loop.
+  - This is no longer a global-access problem, but it is still a broad
+    dependency bundle that should be watched if the render loop grows.
+
+- `Root::Current()` is better than ambient globals, but it is still a singleton
+  access point.
+  - The boundary is clearer because ownership is explicit, but the code still
+    needs discipline to avoid turning `Root` into a new hidden-service hub.
+
+Practical conclusion:
+
+The engine is now off `Globals.h`, but `Root` should be treated as a bootstrap
+and coordination layer, not as a place to accumulate arbitrary cross-system
+policy. The next refactor opportunity is to move repeated UI-mode translation
+and gameplay/session coordination into narrower managers where possible.
+
+Next Refactor Actions
+---------------------
+
+1. Move UI mode translation out of `Root::UpdateFrame()`.
+   - Goal: stop `Root` from deciding how gameplay state maps to frontend UI
+     state.
+   - Candidate owner: `FrontEndManager` or `GameplayManager`, depending on
+     whether the mapping is considered presentation policy or gameplay policy.
+
+2. Narrow `Root::run()` to pure orchestration.
+   - Goal: keep `Root` responsible for boot order and frame dispatch, but avoid
+     adding more game-specific logic there.
+   - Watch for: additional mode checks, UI conditions, or gameplay branching in
+     the main loop.
+
+3. Audit `Root::startUp()` for policy that can move into managers.
+   - Goal: keep startup as a bootstrap phase, not a place where feature
+     behavior is decided.
+   - Watch for: session selection, default UI state, and any future project or
+     level-specific startup branching.
+
+4. Reduce direct `Root::Current()` usage inside low-level systems.
+   - Goal: keep the singleton as an ownership bridge, not a routine dependency
+     source.
+   - Candidate files: camera, event, render helper, and gameplay utility code
+     that now reads ownership from `Root` for convenience.
+
+5. Re-check `FrontEndManager` after the next gameplay/UI pass.
+   - Goal: confirm it is only handling UI presentation policy and not quietly
+     absorbing gameplay state decisions.
+   - Watch for: mixed handling of editor UI, runtime UI, and creator UI in the
+     same flow path.

@@ -1,0 +1,186 @@
+Aquanact 3-Day Refactor Plan
+============================
+
+Date Range
+----------
+July 31, 2026 - August 2, 2026
+
+Purpose
+-------
+Use `reports/schedule/engine_documentation_outline.txt` as the working map for a focused 3-day refactor pass.
+
+Day 1
+----
+Format
+-----
+Scope, then actions, then risks, then a follow-up note.
+
+1. Application Entry
+   Scope: `main.cpp`, startup ownership, loop handoff, shutdown.
+   1. Review `main.cpp` ownership of startup, loop handoff, and shutdown.
+   2. Identify which mode decisions belong in `SimulationManager` versus `GameplayManager`.
+   3. List every global touched during boot and mark which ones can be passed explicitly.
+   4. Note any startup order dependencies that later systems rely on.
+   5. Risk: main still owns too much orchestration and mode policy.
+   6. Risk: simulation boundary is still blurred between application shell and gameplay.
+   Follow-up: confirm later systems do not depend on main owning policy.
+2. Engine Modes
+   Scope: editor mode, game mode, preview mode, runtime UI mode.
+   1. Map editor mode, game mode, preview mode, and runtime UI mode.
+   2. Separate engine state from gameplay flow state.
+   3. Record any mode checks that are duplicated across systems.
+   4. Mark the mode transitions that are shared by later systems.
+   5. Risk: repeated mode checks across gameplay and UI systems.
+   6. Risk: editor, runtime, and preview boundaries are still unclear.
+   Follow-up: confirm the runtime mode surface is not duplicated elsewhere.
+3. Startup Order
+   Scope: manager start-up sequencing and dependency ownership.
+   1. Trace each manager start-up call in order.
+   2. Note what data each system expects to already exist.
+   3. Flag any startup steps that are really reconstruction policy.
+   4. Record dependencies that must not be inverted later.
+   5. Risk: managers are mixing startup orchestration and state ownership.
+   Follow-up: verify each startUp only initializes its own subsystem.
+4. Shutdown Order
+   Scope: shutdown sequencing and cleanup ownership.
+   1. Compare current shutdown order against startup order.
+   2. Mark which systems must shut down after their dependents.
+   3. Identify any cleanup that should move into the owning subsystem.
+   4. Capture shutdown assumptions that later refactors might break.
+   5. Risk: shutdown may hide ownership problems if it is not the reverse of startup.
+   Follow-up: confirm cleanup happens in reverse dependency order.
+5. Window System
+   Scope: OS window, context creation, event pump, framebuffer access.
+   1. Separate OS window responsibility from graphics context responsibility.
+   2. Note any rendering assumptions currently baked into the window layer.
+   3. Record how input and front-end systems depend on the window.
+   4. List what can stay and what should move if graphics backends change.
+   5. Risk: window is coupled to graphics setup, which is not backend-neutral.
+   6. Risk: presentation and framebuffer assumptions leak into the window layer.
+   Follow-up: keep backend-specific setup out of the window boundary.
+
+Day 2
+----
+1. Render Manager
+   Scope: frame orchestration, render-state ownership, presentation.
+   1. Split frame orchestration from render-state ownership.
+   2. Identify camera, lighting, debug, and UI responsibilities.
+   3. Note which parts are backend-specific versus backend-neutral.
+   4. Record what later UI or gameplay changes would force here.
+   5. Risk: render manager mixes rendering, camera state, UI, and diagnostics.
+   6. Risk: backend-specific OpenGL behavior is still embedded here.
+   Follow-up: keep the render layer focused on drawing and frame submission.
+2. Graphics Device
+   Scope: backend interface and GPU-specific draw path.
+   1. Isolate OpenGL-specific behavior from renderer-facing interfaces.
+   2. List the assumptions that would need to change for Vulkan.
+   3. Mark where frame begin/end and draw submission are coupled.
+   4. Note any code that belongs closer to the backend than the manager.
+   5. Risk: graphics device is still OpenGL-flavored and not backend-agnostic.
+   Follow-up: preserve a backend-neutral renderer contract.
+3. Front-End Manager
+   Scope: editor UI routing, runtime UI routing, creator UI routing.
+   1. Separate editor UI routing from runtime UI routing.
+   2. Identify which responsibilities belong to GameGUIManager.
+   3. Record how project state restore touches front-end surfaces.
+   4. Mark any UI mode logic that later gameplay refactors should not depend on.
+   5. Risk: front-end manager has mixed responsibilities across editor, runtime, and creator UI.
+   6. Risk: coordination load is too high inside one manager.
+   Follow-up: keep UI mode routing out of gameplay policy.
+4. Editor UI
+   Scope: editor-only features and their dependencies.
+   1. List editor-only features and dependencies.
+   2. Mark every subsystem the editor UI reaches into.
+   3. Identify any features that are actually front-end coordination.
+   4. Flag anything that should become tooling rather than runtime UI.
+   5. Risk: editor UI is becoming a dumping ground for engine features.
+   6. Risk: editor UI depends on too many subsystems.
+   Follow-up: separate tooling from presentation where possible.
+5. Runtime UI
+   Scope: runtime UI presentation, asset loading, diagnostics, serialization touchpoints.
+   1. Separate asset loading, UI mode, diagnostics, and serialization concerns.
+   2. Mark which runtime UI behaviors are presentation-only.
+   3. List the places where runtime UI currently mutates engine state.
+   4. Identify what must remain compatible with project restore.
+   5. Risk: runtime UI is too broad and may become a mixed content manager.
+   6. Risk: runtime UI boundary is blurred with diagnostics, asset loading, and project-state serialization.
+   Follow-up: preserve runtime UI as presentation, not orchestration.
+
+Day 3
+----
+1. Project Manager
+   Scope: project I/O orchestration and reconstruction handoff.
+   1. Separate orchestration from reconstruction policy.
+   2. Trace the load path from file read to subsystem application.
+   3. Mark what should remain in the manager and what should move out.
+   4. Record any save-path assumptions that later systems depend on.
+   5. Risk: project manager still coordinates too many subsystems.
+   6. Risk: it may continue to act as a catch-all for loading and runtime reconstruction.
+   Follow-up: keep it as the project-level coordinator only.
+2. Project Serialization
+   Scope: parsing, format helpers, version compatibility.
+   1. Keep parsing and format helpers isolated from reconstruction.
+   2. List the data groups being serialized and who should own each one.
+   3. Mark any fields that are really runtime state rather than project format.
+   4. Note compatibility constraints for future project versions.
+   5. Risk: serializer still covers a broad amount of session state.
+   6. Risk: reconstruction policy can easily leak back into parsing.
+   Follow-up: keep format logic separate from policy.
+3. Gameplay Manager
+   Scope: gameplay flow control and runtime state transitions.
+   1. Separate flow-state control from UI mode changes.
+   2. Trace the boot path for main menu, gameplay, pause, and preview.
+   3. Mark what depends on `LevelManager` startup.
+   4. Identify any updates that should be deferred to later cleanup.
+   5. Risk: gameplay manager mixes orchestration and state management.
+   6. Risk: gameplay, editor preview, and runtime UI still converge here.
+   Follow-up: keep gameplay flow distinct from UI presentation.
+4. Gameplay Flow States
+   Scope: state transitions and their entry conditions.
+   1. Document each state transition and the allowed entry conditions.
+   2. Note which states are runtime-only and which are editor-assisted.
+   3. Identify repeated state checks that can be centralized.
+   4. Mark which later systems consume the flow state directly.
+   5. Risk: mode transitions are tightly coupled to UI mode switching.
+   6. Risk: flow state is a hotspot for game execution and preview policy.
+   Follow-up: centralize repeated flow checks where possible.
+5. Entity System
+   Scope: entity lifetime, indexing, and behavior ownership.
+   1. Distinguish ownership from indexing and lookup.
+   2. Review entity transform, rendering, and component responsibilities.
+   3. Note what should stay with the entity versus move into components.
+   4. Record the assumptions later gameplay systems make about entity lifetime.
+   5. Risk: entity is doing too much, including transform, rendering, component management, and gameplay helpers.
+   6. Risk: editor and gameplay mutation still leak through shared entity access.
+   Follow-up: keep behavior in components, not entity convenience methods.
+6. Component System
+   Scope: component lifecycle, binding, and event use.
+   1. Review component lifecycle, binding, and event usage.
+   2. Mark which component behaviors are gameplay concerns.
+   3. Identify where component state currently depends on globals.
+   4. Note what may need to change after gameplay flow cleanup.
+   5. Risk: component logic depends on the global event manager.
+   6. Risk: some components are too broad and carry diagnostics or tooling logic.
+   Follow-up: keep component dependencies explicit.
+7. Level System
+   Scope: world container ownership and reconstruction boundary.
+   1. Separate world container responsibility from reconstruction policy.
+   2. Review active-level selection and editor restore behavior.
+   3. Mark how levels own entities and how that affects gameplay update order.
+   4. Identify any load/save assumptions inherited from project serialization.
+   5. Risk: level manager boundary is blurred by reconstruction policy.
+   6. Risk: runtime world and editor restore behavior are still coupled.
+   Follow-up: keep level/world ownership distinct from project restore logic.
+
+Review Anchors
+--------------
+1. Data Ownership
+2. System Dependencies
+3. Frame Update Order
+4. Known Constraints
+
+Completion Check
+----------------
+1. Confirm the documentation outline has been converted into a cleaner engine understanding.
+2. Confirm the refactor decisions still align with Gregory's runtime architecture ideas.
+3. Confirm remaining risks are captured for follow-up work.

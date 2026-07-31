@@ -1,7 +1,7 @@
 #include "Engine/GameGUIManager.h"
 
 #include "Engine/GameGUI.h"
-#include "Engine/Globals.h"
+#include "Engine/Root.h"
 #include "Engine/Debug.h"
 #include "Engine/ProjectManager.h"
 #include "Engine/RenderManager.h"
@@ -109,7 +109,7 @@ namespace {
 	std::filesystem::path AssetDirectory()
 	{
 #ifdef AQUANACT_GAME
-		return gFileSystem.ExecutableDirectory() / "assets" / "gameGUI";
+		return Root::Current().FileSystemRef().ExecutableDirectory() / "assets" / "gameGUI";
 #else
 #ifdef AQUANACT_SOURCE_ROOT
 		// Keep authored GameGUI assets under the source tree so they survive
@@ -493,7 +493,7 @@ void GameGUIManager::DrawDiagnosticsWindow()
 
 void GameGUIManager::DrawReturnButton()
 {
-	if (!gEngineState.IsGameMode())
+	if (!Root::Current().State().IsGameMode())
 	{
 		return;
 	}
@@ -501,17 +501,17 @@ void GameGUIManager::DrawReturnButton()
 	ImGui::Begin("Engine");
 	if (ImGui::Button("Return"))
 	{
-		gLevelManager.RestoreActiveLevelEditorTransforms();
-		if (gProjectManager.CurrentProjectPath().empty())
+		Root::Current().Levels().RestoreActiveLevelEditorTransforms();
+		if (Root::Current().Projects().CurrentProjectPath().empty())
 		{
-			gDebug.LogMessage("Return to editor requested, but no project is currently loaded.");
+			Root::Current().Debugger().LogMessage("Return to editor requested, but no project is currently loaded.");
 		}
-		else if (!gProjectManager.LoadProject(gProjectManager.CurrentProjectPath(), gLevelManager))
+		else if (!Root::Current().Projects().LoadProject(Root::Current().Projects().CurrentProjectPath(), Root::Current().Levels()))
 		{
-			gDebug.LogMessage("Failed to reload the current project while returning to the editor.");
+			Root::Current().Debugger().LogMessage("Failed to reload the current project while returning to the editor.");
 		}
-		gEngineState.SetMode(EngineMode::Editor);
-		gRenderManager.SetEditorMode();
+		Root::Current().State().SetMode(EngineMode::Editor);
+		Root::Current().Render().SetEditorMode();
 		LogAction("Return to editor requested");
 	}
 	ImGui::End();

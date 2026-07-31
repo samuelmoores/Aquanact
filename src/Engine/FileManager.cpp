@@ -1,10 +1,9 @@
 #include "Engine/FileManager.h"
 #include "Engine/Debug.h"
-#include "Engine/Globals.h"
+#include "Engine/Root.h"
 #include "Engine/LevelManager.h"
 #include "Engine/Entity.h"
 #include "Engine/FileSystem.h"
-#include "Engine/Globals.h"
 
 FileManager::FileManager(FileSystem& fileSystem)
 	: m_fileSystem(&fileSystem)
@@ -13,7 +12,7 @@ FileManager::FileManager(FileSystem& fileSystem)
 
 void FileManager::startUp()
 {
-	if (!gEngineState.IsEditorMode())
+	if (!Root::Current().State().IsEditorMode())
 	{
 		return;
 	}
@@ -119,17 +118,17 @@ bool FileManager::ImportSelected()
 	{
 		auto importedObject = std::make_unique<Entity>(absolutePath.string().c_str());
 		importedObject->SetIgnoreCameraCollision(true);
-		if (!gLevelManager.ActiveLevel())
+		if (!Root::Current().Levels().ActiveLevel())
 		{
-			gLevelManager.CreateLevel("Default");
+			Root::Current().Levels().CreateLevel("Default");
 		}
-		gLevelManager.ActiveLevel()->AddObject(std::move(importedObject));
-		gDebug.LogMessage("Imported FBX: " + absolutePath.string());
+		Root::Current().Levels().ActiveLevel()->AddObject(std::move(importedObject));
+		Root::Current().Debugger().LogMessage("Imported FBX: " + absolutePath.string());
 		return true;
 	}
 	catch (const std::exception& ex)
 	{
-		gDebug.LogMessage("Failed to import FBX '" + absolutePath.string() + "': " + ex.what());
+		Root::Current().Debugger().LogMessage("Failed to import FBX '" + absolutePath.string() + "': " + ex.what());
 		return false;
 	}
 }

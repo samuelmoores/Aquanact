@@ -2,7 +2,7 @@
 
 #include "Engine/Debug.h"
 #include "Engine/Entity.h"
-#include "Engine/Globals.h"
+#include "Engine/Root.h"
 
 #include <cmath>
 
@@ -51,7 +51,7 @@ void Controller::ApplyMovement(Entity& owner, float dt)
 	if (glm::length(m_movementDirection) <= m_movementDeadzone)
 	{
 		m_isMoving = false;
-		gDebug.SetGameplayDiagnostics(owner.Name(), m_diagnosticInput, m_moveSpeed, dt, glm::vec3(0.0f), owner.Position());
+		Root::Current().Debugger().SetGameplayDiagnostics(owner.Name(), m_diagnosticInput, m_moveSpeed, dt, glm::vec3(0.0f), owner.Position());
 		return;
 	}
 
@@ -62,5 +62,5 @@ void Controller::ApplyMovement(Entity& owner, float dt)
 
 	const glm::vec3 delta = movement * m_moveSpeed * dt;
 	owner.Move(delta);
-	gDebug.SetGameplayDiagnostics(owner.Name(), m_diagnosticInput, m_moveSpeed, dt, delta, owner.Position());
+	Root::Current().Debugger().SetGameplayDiagnostics(owner.Name(), m_diagnosticInput, m_moveSpeed, dt, delta, owner.Position());
 }

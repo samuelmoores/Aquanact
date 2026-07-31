@@ -247,152 +247,409 @@ Gameplay Manager
 Source Files: `src/Engine/GameplayManager.cpp`, `include/Engine/GameplayManager.h`
 Book Reference: Chapter 8.2, The Game Loop; Chapter 17.10, High-Level Game Flow
 Engine Notes:
+	-loops through level entities and updates components
+	-updates UI
+	-send animation diagnostics
+
 Gregory Alignment:
+	-separates main menu, playing, paused and preview states
+	-does not render or own the window	
+
 Deviations / Risks:
+	-UI coupling
+	-mixes orchestration and state managements
+	-depends on globals instead of recieving colabs explicitly
+	-gameplay, editor preview and runtime UI converge here
 
 Gameplay Flow States
 --------------------
 Source Files: `src/Engine/GameplayManager.cpp`, `include/Engine/GameplayManager.h`
 Book Reference: Chapter 8.3, Game Loop Architectural Styles; Chapter 17.10, High-Level Game Flow
 Engine Notes:
+	-MainMenu, Playing, Paused, Preview
+	-GameplayManager state machine, decides engine state
+	-MainMenu -> no simulating level
+	-Playing -> normal simulation
+	-Paused -> simulation exists, but suspended
+	-Preview -> Level running in editor preview mode	
+
 Gregory Alignment:
+	-small system with clear simulation boundary
+
 Deviations / Risks:
+	-coupled with UI mode switching
+	-hotspot for game execution, editor preview and runtime UI
 
 Entity System
 -------------
 Source Files: `src/Engine/Entity.cpp`, `src/Engine/EntityRegistry.cpp`, `include/Engine/Entity.h`, `include/Engine/EntityRegistry.h`
 Book Reference: Chapter 16.2, Implementing Dynamic Elements: Game Objects; Chapter 17.2, Runtime Object Model Architectures
 Engine Notes:
+	-owns transform, mesh, shader, components, source path	
+	-runs first frame and update hooks for game code
+	-Level owns a vector of entities, LevelManager owns vector of levels, GameplayManager runs level update RenderManager build commands
+
 Gregory Alignment:
+	-level owns entity collections
+	-entity/component boundary is clear
+
 Deviations / Risks:
+	-entity is doing too much, transform, rendering, component management, and gameplay helpers
+	-tightly coupled with globals and editor code
+	-game specific knowledge should be in components
+	-editor gameplay mutation should be routing through managers
 
 Component System
 ---------------
 Source Files: `src/Engine/Component.cpp`, `src/Engine/Controller.cpp`, `src/Engine/PlayerController.cpp`, `src/Engine/AnimatorComponent.cpp`, `include/Engine/Component.h`, `include/Engine/Controller.h`, `include/Engine/PlayerController.h`, `include/Engine/AnimatorComponent.h`
 Book Reference: Chapter 17.1, Components of the Gameplay Foundation System
 Engine Notes:
+	-owns movement, bindings and animation as of now
+	-has startUp(), firstFrame(), Update() and can expose bindable members and events
+	-right now we have, Controller, PlayerController, AnimatorComponent
+	-BindableEventChannel builds per entity channel name for data-driven functionality
+
 Gregory Alignment:
+	-clear boundary between entity and component
+	
 Deviations / Risks:
+	-knows about global event management through EventManager
+	-no excplicit component registry
+	-some are too broad, carry diagnostics and gameplay logic
+	-coupled with tooling
 
 Level System
 ------------
 Source Files: `src/Engine/Level.cpp`, `src/Engine/LevelManager.cpp`, `include/Engine/Level.h`, `include/Engine/LevelManager.h`
 Book Reference: Chapter 16.1, Anatomy of a Game World; Chapter 17.3, World Chunk Data Formats
 Engine Notes:
+	-owns collections of entities, selects active level and handles level startup and editor capture/restore
+	-Level adds removes entites and runs their functions
+	-LevelManager owns the levels, tracks active level, creates and finds them, applies project state for startup	
+	-has a lifecycle, serialization role, and editor role
+
 Gregory Alignment:
+	-world container abstraction
+	-explicit active level selection
+	-startUp and firstFrame separation
+
 Deviations / Risks:
+	-LevelManager does not have clear bounndary from project reconstruction policy
+	-Level::Clear() coupled with global event manager
+	-aids in the dicipation of boundary between runtime world and editor
 
 Animation System
 ---------------
 Source Files: `src/Engine/Animation.cpp`, `src/Engine/Animator.cpp`, `src/Engine/AnimatorComponent.cpp`, `include/Engine/Animation.h`, `include/Engine/Animator.h`, `include/Engine/AnimatorComponent.h`
 Book Reference: Chapter 13, Animation Systems
 Engine Notes:
+	-Animator owns low level playback and blending
+	-also owns animation clips, event callbacs to clip tick times, current next blend clip, skeleton trav
+	-it plays, blends, advances time, updates bone transforms, fires animation events
+	-AnimatorComponent is a wrapper
+	-it owns animation states, transitions, state names and debug stuff
+	-transitions happen on conditions based on constants or bound variables from an entity	
+
 Gregory Alignment:
+	-clear boundary between animator and state machine
+	-component driven animation data
+
 Deviations / Risks:
+	-AnimatorComponent lacks a clear boundary between, runtime state, edit time state, diagnostics and binding logic
+	-knows too much about binding semantics
+	-no clear boundary between transition evaluation and entity/component naming conventions
 
 Input System
 ------------
 Source Files: `src/Engine/Input.cpp`, `include/Engine/Input.h`
 Book Reference: Chapter 9, Human Interface Devices
 Engine Notes:
+	-no input manager yet
+	-only tracks move input, mouse delta, look mode, window focus and frame delta
+	-hard coded WASD and QE for movement	
+
 Gregory Alignment:
+	-isolated from gameplay and rendering
+	-no spread of GLFW calls
+
 Deviations / Risks:
+	-not pushed to a lower HID service, then mapped to higher level action/state layer
+	-no boundary between device polling and gameplay interpretation
 
 Event System
 ------------
 Source Files: `src/Engine/EventManager.cpp`, `include/Engine/EventManager.h`
 Book Reference: Chapter 17.8, Events and Message-Passing
 Engine Notes:
+	-an event is a named channel
+	-EventManager stores a map of event name to an event
+	-an event also stores a list of listeners that can sub to, unsub from or dispatch an event
+	-a listener is a void pointer
+	-components and GameGUI can make use of this
+
 Gregory Alignment:
+	-centralized event logic and reusable between components and GameGUI
+
 Deviations / Risks:
+	-implicit lifetime boundaries, leaks with void pointers
+	-no stongly typed event system
+	-no boundary between gameplay communication and UI binding
 
 File System
 -----------
 Source Files: `src/Engine/FileSystem.cpp`, `src/Engine/FileManager.cpp`, `include/Engine/FileSystem.h`, `include/Engine/FileManager.h`
 Book Reference: Chapter 7.1, File System
 Engine Notes:
+	-thin wrapper over, std::filesystem, ifstream, ofstream
+	-used by ProjectManager for saving and loading
+	-ProjectStateFormat, EngineGUI, GameGUI, GameGUIManager and GameGUICreator for asset/resource path discovery
+
 Gregory Alignment:
+	-low level service
+	-boundary between platform and file operations
+	-boundary betwen files and gameplay/render code
+
 Deviations / Risks:
+	-no policy layer to prevent other systems from reaching in via save/load functions
 
 Asset Loading
 -------------
 Source Files: `src/Engine/ModelImporter.cpp`, `src/Engine/StbImage.cpp`, `src/Engine/GameGUIManager.cpp`, `src/Engine/GameGUICreator.cpp`
 Book Reference: Chapter 1.6, Tools and the Asset Pipeline; Chapter 7, Resources and the File System; Chapter 17.4, Loading and Streaming Game Worlds
 Engine Notes:
+	-Model import uses assimp for meshes, bones, anims, mats and vertex data
+	-model import also searches animations folder
+	-Image loading uses StbImage which wraps stbi_load and stbi_load_from_memory for decoding
+	-Asset browsing placement uses FileManager and handles asset tree in the editor
+	-can import fbx files and is editor facing
+	-Entity -> ModelImporter.Import()
+
 Gregory Alignment:
+	-import is separate from rendering
+	-runtime loads meshes and textures from content files
+	-editor has content browsing path
+
 Deviations / Risks:
+	-no boundary for content pipeline service or asset databse layer
+	-no boundary between constructor logic, editor UI and low level utilities
+	-no boundary between entity and model import
+	-no AssetManager
 
 Physics System
 --------------
 Source Files: `src/Engine/Physics.cpp`, `include/Engine/Physics.h`
 Book Reference: Chapter 14, Collision and Rigid Body Dynamics
 Engine Notes:
+	-small collision and math utility
+	-mesh stores a bounding box
+
 Gregory Alignment:
+	-clear boundary from game and rendering between collision
+
 Deviations / Risks:
+	-no manager, no scene/world query layer, no simulation step, no entity integration
+	-manager would need sim step, world collision, body registration, movement res, collidion callback and event dispatch
 
 Audio System
 ------------
 Source Files: `src/Engine/Audio.cpp`, `src/Engine/miniaudio_impl.c`, `include/Engine/Audio.h`
 Book Reference: Chapter 15, Audio
 Engine Notes:
+	-loads, plays, stops, sets volume using sfml
+	-not in runtime yet
+
 Gregory Alignment:
+	-n/a
+
 Deviations / Risks:
+	-manager would need to be developed
 
 Camera System
 -------------
 Source Files: `src/Engine/CameraManager.cpp`, `src/Engine/EngineCamera.cpp`, `src/Engine/GameCamera.cpp`, `src/Engine/EditorCameraController.cpp`, `include/Engine/CameraManager.h`, `include/Engine/EngineCamera.h`, `include/Engine/GameCamera.h`, `include/Engine/EditorCameraController.h`, `include/Engine/Camera.h`
 Book Reference: Chapter 11.2, Lights, Camera, Action!; Chapter 10.5, Debug Cameras and Pausing the Game
 Engine Notes:
+	-Camera defines rendering interface start, end, projection, view, position, facing
+	-EngineCamera handles fly around, projection from window size and mouse look
+	-GameCamera store pose, copy from editor, has its own projection and view
+	-CameraController defines per frame update behavior
+	-CameraManager selects active camera and updates controller
+	-RenderManager inits both cameras engine mode chooses
+
 Gregory Alignment:
+	-clean interface, no embeded render behavior
+
 Deviations / Risks:
+	-global leak
+	-CameraManager does more than just selection since it owns the active controller
+	-non centralized projection logic between Game and Engine Cameras
+	-control and lifecycle depend on globals and runtime checks
+	-no boundary between editor/game split and camera manager
 
 Lighting System
 ---------------
 Source Files: `src/Engine/LightingManager.cpp`, `include/Engine/LightingManager.h`
 Book Reference: Chapter 12, Lighting and Post-Processing
 Engine Notes:
+	-Directional light for sun and PointLight vector
+	-max point lights is 8
+	-pushes light uniforms to shader
+	-owned by render manager who passes it to graphics device
+	-graphics devices consumes light data for each render command in draw call
+	-EngineGUI allows edits
+
 Gregory Alignment:
+	-lighting is centralized
+	-render layer owns the application of lighting state to shaders
+	-edit inspector
+
 Deviations / Risks:
+	-startUp just logs values
+	-mostly a data container and shader uploader, no simulation 
+	-manager is exposed to both editor and project serialization
+	-should own policy for light naming and registration, category and group handling, helpers for editor and shadow or probe setup
+	-no boundary between EngineGUI and no boundary between the project serializer therefore it does no own all lighting policy
 
 Debug and Diagnostics
 ---------------------
 Source Files: `src/Engine/Debug.cpp`, `include/Engine/Debug.h`, `src/Engine/Axis.cpp`, `src/Engine/Grid.cpp`, `src/Engine/Line.cpp`
 Book Reference: Chapter 10, Tools for Debugging and Development
 Engine Notes:
+	-owns log buffer with tagging
+	-build/dependency verification
+	-grid/axis overlays
+	-point light sphere overlays
+	-gameplay, animation editor and game mode diagnostics
+	
+
 Gregory Alignment:
+	-centralized
+
 Deviations / Risks:
+	-combines logging, startup dependency checks, overlay drawing, gameplay state and animation diagnostics
+	-no boundary between debug and observability coordinator and reaches across every major sub system
+	-no boundary between logging and overlay rendering
+	-no boundary between gameplay snapshots and diagnostics
 
 Frame Update Order
 ------------------
 Source Files: `src/Engine/main.cpp`, `src/Engine/RenderManager.cpp`, `src/Engine/GameplayManager.cpp`
 Book Reference: Chapter 8, The Game Loop and Real-Time Simulation; Chapter 17.6, Updating Game Objects in Real Time
 Engine Notes:
+	-Input -> Update -> Render
+	-GameplayManager.Update 
+		-exits early if not playing or preview
+		-keeps HUD on screen
+		-updates components
+		-writes diagnostics
+	-RenderManager.Loop
+		-resets per frame render state
+		-begins graphics frame
+		-builds render commands from active level
+		-if in editor mode, update editor camera
+		-flush
+		-draw primitives and UI
+		-end frame
+
 Gregory Alignment:
+	-has top level loop
+	-input, update, render order correct
+	-explicit start up and shut down
+
 Deviations / Risks:
+	-too much orchestration in main
+	-update is global driven
+	-Gameplay manager has no clear boundary between flow state and runtime policy
+	-RenderManager has no simulation boundary
+	-no boundary between gameplay and UI mode
+	-no boundary between camera switch policy and renderer
 
 Data Ownership
 --------------
 Source Files: `include/Engine/Globals.h`, `src/Engine/ProjectManager.cpp`, `src/Engine/LevelManager.cpp`, `src/Engine/EntityRegistry.cpp`
 Book Reference: Chapter 3.3, Data, Code and Memory Layout; Chapter 16.3, Data-Driven Game Engines
 Engine Notes:
+	-Globals.h creates broad implicit owndership coupling
+	-ProjectManager owns project level persistence and reconstruction policy
+	-LevelManager owns world/level lifetime and active level state and reconstructs object state
+	-entity registry does not own data, only acts as a lookup index over live entities
+
 Gregory Alignment:
+	-ProjectManager refactor delegated reconstruction out to Level, Render and FrontEnd
+	-this aligns with seperation of persistent data from runtime systems
+
 Deviations / Risks:
+	-Globals.h is not ideal for minimizing coupling or making obvious ownership
+	-ProjectManager still coorfinates multiple subsystems with no clear boundary between orchestration and persistence
+	-LevelManager has no clear boundary between world container and object reconstruction
+	-EntityRegistry is an access structure not an ownership container
+	-Overall no clear boundary between serialized data and runtime objects and no clear path to translate them
 
 System Dependencies
 -------------------
 Source Files: `src/Engine/main.cpp`, `include/Engine/FrontEndManager.h`, `include/Engine/RenderManager.h`, `include/Engine/GameplayManager.h`, `include/Engine/ProjectManager.h`
 Book Reference: Chapter 6.1, Subsystem Start-Up and Shut-Down; Chapter 8, The Game Loop and Real-Time Simulation
 Engine Notes:
+	ProjectManager
+		-FileSystem for disk I/O
+		-LevelManager to materialize and apply world state
+		-RenderManager to restore render/camera/light state
+		-FrontEndManager to restore editore/runtime UI state
+		-ProjectStateSerializer for parse/format logic
+
+	RenderManager
+		-FrontEndManager for editor/runtime UI passes and debug overlays
+		-LevelManager and Level for active world to render
+		-Input and Globals.h for camera updates and global mode switches
+		-Window and GrpahicsDevice for frame lifecycle
+		-Debug for overlay diagnostics	
+	
+	GameplayManager
+		-LevelManager for active level creation, startup and clearing
+		-FrontEndManager to switch UI modes
+		-Debug for logging
+		-Globals.h for engine mode checks
+		
+	FrontEndManager
+		-EngineGUI, GameGUIManager and GameGUICreator
+		-Window for startup
+		-Camera, FileManager, LevelManager and ProjectManager for engine editor drawing
+		-Globals.h for mode checks
+
 Gregory Alignment:
+	-ProjectManager is low in the stack
+	-GameplayManager between input and simulation, flow controller instead of HID handler
+	-FrontEndManager and RenderManager are both low in stack and coordinate multiple systems
+
 Deviations / Risks:
+	-FrontEndManager is not a pure UI manager, there is no boundary between editor, runtime, creator and reconstruction
+	-RenderManager lacks a boundary between rendering, camera state, frame orchestration, debugging and UI presentation
+	-GameplayManager has no boundary between simulation and runtime UI state
+	-ProjectManager reaches across too many subsystems
 
 Known Constraints
 ------------------
 Source Files: `CMakeLists.txt`, `reports/Startup/*.txt`, `reports/GameGUI/*.txt`
 Book Reference: Chapter 2, Tools of the Trade; Chapter 10, Tools for Debugging and Development
 Engine Notes:
+	-locked into C++20
+	-built as two executables for Engine and Game through compile defs
+	-build is MSVC oriented, custom runtime settings, hardcoded visual studio and windows sdk library paths
+	-WIN32 entrypoint for game
+	-externals
+		-SFML, GLFW, Assimp, GLAD, OpenGL, ImGUI, MyGUI, FreeType
+	-MyGUI manual, no Cmake package target warrants extra maintenance
+	-runtime assets have hardcoded path	
+
 Gregory Alignment:
+	-Verison control <---> local MSVC/vcpkg environment
+	-profiling and memory diagnostics <---> global coupling and shared runtime state
+	-technical toolchain record <----> reports
+
 Deviations / Risks:
+	-render stack is first class engine dependency
+	-OpenGL only
+	-explicit links between graphics, windowing, and GUI
 
 Open Questions
 --------------

@@ -1,7 +1,7 @@
 #include "Engine/Input.h"
 
 #include "Engine/Window.h"
-#include "Engine/Globals.h"
+#include "Engine/Root.h"
 #include "GLFW/glfw3.h"
 
 #include <MYGUI/MyGUI_InputManager.h>
@@ -158,7 +158,7 @@ void Input::CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
 
 void Input::HandleMouseButton(int button, int action)
 {
-	if (!m_window || !gEngineState.IsGameMode())
+	if (!m_window || !Root::Current().State().IsGameMode())
 	{
 		return;
 	}
@@ -182,7 +182,7 @@ void Input::HandleMouseButton(int button, int action)
 
 void Input::HandleCursorPos(double xpos, double ypos)
 {
-	if (!m_window || !gEngineState.IsGameMode())
+	if (!m_window || !Root::Current().State().IsGameMode())
 	{
 		return;
 	}

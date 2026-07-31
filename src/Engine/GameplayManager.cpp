@@ -4,23 +4,23 @@
 #include "Engine/AnimatorComponent.h"
 #include "Engine/Debug.h"
 #include "Engine/FrontEndManager.h"
-#include "Engine/Globals.h"
 #include "Engine/Level.h"
+#include "Engine/Root.h"
 
 GameplayManager::~GameplayManager() = default;
 
-void GameplayManager::startUp(LevelManager& levelManager)
+void GameplayManager::startUp(LevelManager& levelManager, FrontEndManager& frontEndManager, Debug& debug, EngineState& engineState)
 {
 	m_levelManager = &levelManager;
-	m_state = FlowState::MainMenu;
+	m_state = GameState::MainMenu;
 	if (m_levelManager)
 	{
 		// If the runtime UI is already initialized, set it to a known boot
 		// state so the engine opens on the main menu instead of leaving
 		// whatever screen was active from a previous session.
-		if (gFrontEndManager.RuntimeGUI().HasRuntime())
+		if (frontEndManager.RuntimeGUI().HasRuntime())
 		{
-			gFrontEndManager.RuntimeGUI().SetUIMode(GameGUIManager::UIMode::MainMenu);
+			frontEndManager.RuntimeGUI().SetUIMode(GameGUIManager::UIMode::MainMenu);
 		}
 	}
 }
@@ -28,35 +28,35 @@ void GameplayManager::startUp(LevelManager& levelManager)
 void GameplayManager::shutDown()
 {
 	m_levelManager = nullptr;
-	m_state = FlowState::MainMenu;
+	m_state = GameState::MainMenu;
 }
 
-void GameplayManager::BootMainMenu()
+void GameplayManager::BootMainMenu(FrontEndManager& frontEndManager, Debug& debug)
 {
 	if (!m_levelManager)
 	{
 		return;
 	}
 
-	gDebug.LogMessage("GameplayManager::BootMainMenu()");
-	m_levelManager->Clear();
-	m_state = FlowState::MainMenu;
-	if (gFrontEndManager.RuntimeGUI().HasRuntime())
+	debug.LogMessage("GameplayManager::BootMainMenu()");
+	m_levelManager->Clear(); // broken boundary
+	m_state = GameState::MainMenu;
+	if (frontEndManager.RuntimeGUI().HasRuntime())
 	{
-		gFrontEndManager.RuntimeGUI().SetUIMode(GameGUIManager::UIMode::MainMenu);
+		frontEndManager.RuntimeGUI().SetUIMode(GameGUIManager::UIMode::MainMenu);
 	}
 }
 
-void GameplayManager::StartGameSession()
+void GameplayManager::StartGameSession(FrontEndManager& frontEndManager, Debug& debug, EngineState& engineState)
 {
-	if (!m_levelManager || !gEngineState.IsGameMode())
+	if (!m_levelManager || !engineState.IsGameMode())
 	{
-		gDebug.LogMessage("GameplayManager::StartGameSession() skipped: no level manager or not in game mode.");
+		debug.LogMessage("GameplayManager::StartGameSession() skipped: no level manager or not in game mode.");
 		return;
 	}
 
-	gDebug.LogMessage("GameplayManager::StartGameSession() begin");
-	if (!m_levelManager->ActiveLevel())
+	debug.LogMessage("GameplayManager::StartGameSession() begin");
+	if (!m_levelManager->ActiveLevel()) // broken boundary
 	{
 		if (!m_levelManager->Levels().empty())
 		{
@@ -75,42 +75,12 @@ void GameplayManager::StartGameSession()
 	{
 		activeLevel->FirstFrame();
 	}
-	m_state = FlowState::Playing;
-	gDebug.LogMessage("GameplayManager::StartGameSession() state=Playing");
-	if (gFrontEndManager.RuntimeGUI().HasRuntime())
+	m_state = GameState::Playing;
+	debug.LogMessage("GameplayManager::StartGameSession() state=Playing");
+	if (frontEndManager.RuntimeGUI().HasRuntime())
 	{
-		gFrontEndManager.RuntimeGUI().SetUIMode(GameGUIManager::UIMode::GameplayHUD);
+		frontEndManager.RuntimeGUI().SetUIMode(GameGUIManager::UIMode::GameplayHUD); // broken boundary
 	}
-}
-
-void GameplayManager::StartLevelPreview()
-{
-	if (!m_levelManager)
-	{
-		return;
-	}
-
-	gDebug.LogMessage("GameplayManager::StartLevelPreview()");
-	if (!m_levelManager->ActiveLevel())
-	{
-		if (!m_levelManager->Levels().empty())
-		{
-			m_levelManager->SetActiveLevel(m_levelManager->Levels().front()->Name());
-		}
-		else
-		{
-			m_levelManager->CreateLevel("Default");
-		}
-	}
-
-	m_levelManager->startUp();
-	m_levelManager->CaptureActiveLevelEditorTransforms();
-	Level* activeLevel = m_levelManager->ActiveLevel();
-	if (activeLevel)
-	{
-		activeLevel->FirstFrame();
-	}
-	m_state = FlowState::Preview;
 }
 
 std::size_t GameplayManager::ControllerCount() const
@@ -132,30 +102,37 @@ std::size_t GameplayManager::ControllerCount() const
 	return count;
 }
 
-void GameplayManager::Update(float dt)
+void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& debug, EngineState& engineState)
 {
-	if (m_state != FlowState::Playing && m_state != FlowState::Preview)
+	// if we are not playing the game we should not be in the Game Loop
+	if (m_state != GameState::Playing)
 	{
 		return;
 	}
 
-	if (m_state == FlowState::Playing && gFrontEndManager.RuntimeGUI().HasRuntime())
+	// why is the GameManager deciding what the runtime UI is doing? 
+	if (frontEndManager.RuntimeGUI().HasRuntime())
 	{
-		gFrontEndManager.RuntimeGUI().SetUIMode(GameGUIManager::UIMode::GameplayHUD);
+		frontEndManager.RuntimeGUI().SetUIMode(GameGUIManager::UIMode::GameplayHUD);
 	}
 
+	// why is the game loop running if there could be no active level?
+	// how can we check this before starting the game loop?
 	Level* activeLevel = m_levelManager ? m_levelManager->ActiveLevel() : nullptr;
 	if (!activeLevel)
 	{
 		return;
 	}
 
-	gDebug.SetGameplayContext(
+	// How can we move this to the debugger?
+	debug.SetGameplayContext(
 		activeLevel->Name(),
 		activeLevel->Objects().size(),
 		ControllerCount(),
-		gEngineState.IsGameMode() ? "Game" : "Editor");
+		engineState.IsGameMode() ? "Game" : "Editor");
 
+
+	// looping through the level's entitys makes sense
 	for (const auto& object : activeLevel->Objects())
 	{
 		if (object)
@@ -168,7 +145,9 @@ void GameplayManager::Update(float dt)
 				{
 					stateListText += state.name + " -> clip " + std::to_string(state.clipIndex) + "\n";
 				}
-				gDebug.SetAnimationDiagnostics(
+
+				// but all this debugging should be moved out of the game loop
+				debug.SetAnimationDiagnostics(
 					animator->CurrentState(),
 					animator->DesiredState(),
 					animator->LastTransitionDebug(),
@@ -190,57 +169,52 @@ void GameplayManager::Update(float dt)
 
 }
 
-void GameplayManager::SetPaused(bool paused)
+void GameplayManager::SetPaused(bool paused, FrontEndManager& frontEndManager, Debug& debug)
 {
 	if (paused)
 	{
-		if (m_state == FlowState::Playing)
+		if (m_state == GameState::Playing)
 		{
-			m_state = FlowState::Paused;
-			gDebug.LogMessage("GameplayManager state=Paused");
+			m_state = GameState::Paused;
+			debug.LogMessage("GameplayManager state=Paused");
 		}
 	}
-	else if (m_state == FlowState::Paused)
+	else if (m_state == GameState::Paused)
 	{
-		m_state = FlowState::Playing;
-		gDebug.LogMessage("GameplayManager state=Playing");
+		m_state = GameState::Playing;
+		debug.LogMessage("GameplayManager state=Playing");
 	}
 
-	if (gFrontEndManager.RuntimeGUI().HasRuntime())
+	if (frontEndManager.RuntimeGUI().HasRuntime())
 	{
-		if (m_state == FlowState::Paused)
+		if (m_state == GameState::Paused)
 		{
-			gFrontEndManager.RuntimeGUI().SetUIMode(GameGUIManager::UIMode::PauseMenu);
+			frontEndManager.RuntimeGUI().SetUIMode(GameGUIManager::UIMode::PauseMenu);
 		}
-		else if (m_state == FlowState::Playing)
+		else if (m_state == GameState::Playing)
 		{
-			gFrontEndManager.RuntimeGUI().SetUIMode(GameGUIManager::UIMode::GameplayHUD);
+			frontEndManager.RuntimeGUI().SetUIMode(GameGUIManager::UIMode::GameplayHUD);
 		}
-		else if (m_state == FlowState::MainMenu)
+		else if (m_state == GameState::MainMenu)
 		{
-			gFrontEndManager.RuntimeGUI().SetUIMode(GameGUIManager::UIMode::MainMenu);
+			frontEndManager.RuntimeGUI().SetUIMode(GameGUIManager::UIMode::MainMenu);
 		}
 	}
 }
 
-void GameplayManager::TogglePaused()
+void GameplayManager::TogglePaused(FrontEndManager& frontEndManager, Debug& debug)
 {
-	SetPaused(m_state != FlowState::Paused);
+	SetPaused(m_state != GameState::Paused, frontEndManager, debug);
 }
 
 bool GameplayManager::IsPaused() const
 {
-	return m_state == FlowState::Paused;
+	return m_state == GameState::Paused;
 }
 
-GameplayManager::FlowState GameplayManager::State() const
+GameplayManager::GameState GameplayManager::State() const
 {
 	return m_state;
-}
-
-bool GameplayManager::ShouldUpdateInEditor() const
-{
-	return m_state == FlowState::Preview;
 }
 
 

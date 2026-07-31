@@ -6,7 +6,7 @@
 #include "Engine/Line.h"
 #include "Engine/Camera.h"
 #include "Engine/Input.h"
-#include "Engine/Globals.h"
+#include "Engine/Root.h"
 #include "Engine/GameplayManager.h"
 #include "Engine/FrontEndManager.h"
 #include "Engine/GameGUIManager.h"
@@ -60,7 +60,7 @@ namespace {
 
 void Debug::startUp()
 {
-	if (!gEngineState.IsEditorMode())
+	if (!Root::Current().State().IsEditorMode())
 	{
 		return;
 	}
@@ -112,7 +112,7 @@ void Debug::RebuildPointLightDebugSpheres()
 	m_pointLightDebugSpheres.clear();
 	m_pointLightDebugColors.clear();
 
-	for (const PointLight& pointLight : gRenderManager.Lights().PointLights())
+	for (const PointLight& pointLight : Root::Current().Render().Lights().PointLights())
 	{
 		const glm::vec3 color = glm::clamp(pointLight.color, glm::vec3(0.0f), glm::vec3(1.0f));
 		m_pointLightDebugSpheres.push_back(new Line(MakeWireSphereVertices(color)));
@@ -159,7 +159,7 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 		m_grid->draw(view, !gui.ShowAxis());
 	}
 
-	const std::vector<PointLight>& pointLights = gRenderManager.Lights().PointLights();
+	const std::vector<PointLight>& pointLights = Root::Current().Render().Lights().PointLights();
 	bool rebuildLightSpheres = m_pointLightDebugSpheres.size() != pointLights.size();
 	if (!rebuildLightSpheres)
 	{
@@ -217,23 +217,23 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 	{
 		ImGui::Begin("Debug Stats", &m_showStatsWindow);
 		ImGui::Text("FPS: %.1f", m_lastFps);
-		const Level* activeLevel = gLevelManager.ActiveLevel();
+		const Level* activeLevel = Root::Current().Levels().ActiveLevel();
 		ImGui::Text("Level objects: %zu", activeLevel ? activeLevel->Objects().size() : 0);
 		ImGui::Separator();
-		ImGui::Text("Render commands: %zu", gRenderManager.LastFrameCommandCount());
-		ImGui::Text("Skipped objects: %zu", gRenderManager.LastFrameSkippedObjects());
-		ImGui::Text("Build time: %.4f ms", gRenderManager.LastFrameBuildMs());
-		ImGui::Text("Flush time: %.4f ms", gRenderManager.LastFrameFlushMs());
+		ImGui::Text("Render commands: %zu", Root::Current().Render().LastFrameCommandCount());
+		ImGui::Text("Skipped objects: %zu", Root::Current().Render().LastFrameSkippedObjects());
+		ImGui::Text("Build time: %.4f ms", Root::Current().Render().LastFrameBuildMs());
+		ImGui::Text("Flush time: %.4f ms", Root::Current().Render().LastFrameFlushMs());
 		ImGui::Separator();
-		ImGui::Text("Debug overlay: %.4f ms", gRenderManager.LastFrameDebugOverlayMs());
-		ImGui::Text("Editor GUI/MyGUI: %.4f ms", gRenderManager.LastFrameEditorGuiMs());
-		ImGui::Text("UI creator: %.4f ms", gRenderManager.LastFrameUiCreatorMs());
-		ImGui::Text("Runtime GUI: %.4f ms", gRenderManager.LastFrameRuntimeGuiMs());
+		ImGui::Text("Debug overlay: %.4f ms", Root::Current().Render().LastFrameDebugOverlayMs());
+		ImGui::Text("Editor GUI/MyGUI: %.4f ms", Root::Current().Render().LastFrameEditorGuiMs());
+		ImGui::Text("UI creator: %.4f ms", Root::Current().Render().LastFrameUiCreatorMs());
+		ImGui::Text("Runtime GUI: %.4f ms", Root::Current().Render().LastFrameRuntimeGuiMs());
 		ImGui::Text("Startup to first draw: %.2f s", m_startupToFirstDrawMs);
 		ImGui::Separator();
-		ImGui::Text("Frame allocator capacity: %.2f KB", static_cast<double>(gRenderManager.FrameAllocatorCapacityBytes()) / 1024.0);
-		ImGui::Text("Frame allocator used: %.2f KB", static_cast<double>(gRenderManager.FrameAllocatorUsedBytes()) / 1024.0);
-		ImGui::Text("Frame allocator peak: %.2f KB", static_cast<double>(gRenderManager.FrameAllocatorPeakBytes()) / 1024.0);
+		ImGui::Text("Frame allocator capacity: %.2f KB", static_cast<double>(Root::Current().Render().FrameAllocatorCapacityBytes()) / 1024.0);
+		ImGui::Text("Frame allocator used: %.2f KB", static_cast<double>(Root::Current().Render().FrameAllocatorUsedBytes()) / 1024.0);
+		ImGui::Text("Frame allocator peak: %.2f KB", static_cast<double>(Root::Current().Render().FrameAllocatorPeakBytes()) / 1024.0);
 		ImGui::End();
 	}
 }
@@ -245,22 +245,21 @@ void Debug::drawGameModeInput(const Input& input)
 	ImGui::Text("Window focused: %s", input.WindowFocused() ? "yes" : "no");
 	ImGui::Text("Look active: %s", input.LookActive() ? "yes" : "no");
 	ImGui::Text("Look became active: %s", input.LookBecameActive() ? "yes" : "no");
-	ImGui::Text("Engine mode: %s", gEngineState.IsGameMode() ? "Game" : "Editor");
+	ImGui::Text("Engine mode: %s", Root::Current().State().IsGameMode() ? "Game" : "Editor");
 	ImGui::Text("Gameplay flow: %s",
-		gGameplayManager.State() == GameplayManager::FlowState::MainMenu ? "MainMenu" :
-		gGameplayManager.State() == GameplayManager::FlowState::Playing ? "Playing" :
-		gGameplayManager.State() == GameplayManager::FlowState::Paused ? "Paused" :
-		gGameplayManager.State() == GameplayManager::FlowState::Preview ? "Preview" : "Unknown");
+		Root::Current().Gameplay().State() == GameplayManager::GameState::MainMenu ? "MainMenu" :
+		Root::Current().Gameplay().State() == GameplayManager::GameState::Playing ? "Playing" :
+		Root::Current().Gameplay().State() == GameplayManager::GameState::Paused ? "Paused" : "Unknown");
 	ImGui::Text("Runtime UI mode: %s",
-		gFrontEndManager.RuntimeGUI().Mode() == GameGUIManager::UIMode::MainMenu ? "MainMenu" :
-		gFrontEndManager.RuntimeGUI().Mode() == GameGUIManager::UIMode::GameplayHUD ? "GameplayHUD" :
-		gFrontEndManager.RuntimeGUI().Mode() == GameGUIManager::UIMode::PauseMenu ? "PauseMenu" :
-		gFrontEndManager.RuntimeGUI().Mode() == GameGUIManager::UIMode::PlayerUI ? "PlayerUI" :
-		gFrontEndManager.RuntimeGUI().Mode() == GameGUIManager::UIMode::Custom ? "Custom" : "Unknown");
-	const Level* activeLevel = gLevelManager.ActiveLevel();
+		Root::Current().FrontEnd().RuntimeGUI().Mode() == GameGUIManager::UIMode::MainMenu ? "MainMenu" :
+		Root::Current().FrontEnd().RuntimeGUI().Mode() == GameGUIManager::UIMode::GameplayHUD ? "GameplayHUD" :
+		Root::Current().FrontEnd().RuntimeGUI().Mode() == GameGUIManager::UIMode::PauseMenu ? "PauseMenu" :
+		Root::Current().FrontEnd().RuntimeGUI().Mode() == GameGUIManager::UIMode::PlayerUI ? "PlayerUI" :
+		Root::Current().FrontEnd().RuntimeGUI().Mode() == GameGUIManager::UIMode::Custom ? "Custom" : "Unknown");
+	const Level* activeLevel = Root::Current().Levels().ActiveLevel();
 	ImGui::Text("Active level: %s", activeLevel ? activeLevel->Name().c_str() : "<none>");
 	ImGui::Text("Active level objects: %zu", activeLevel ? activeLevel->Objects().size() : 0);
-	ImGui::Text("Controller components: %zu", gGameplayManager.ControllerCount());
+	ImGui::Text("Controller components: %zu", Root::Current().Gameplay().ControllerCount());
 	const glm::vec3 move = input.MoveInput();
 	const glm::vec2 mouse = input.MouseDelta();
 	ImGui::Separator();

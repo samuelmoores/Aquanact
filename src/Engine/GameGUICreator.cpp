@@ -5,7 +5,7 @@
 #include "Engine/Debug.h"
 #include "Engine/Window.h"
 #include "Engine/Camera.h"
-#include "Engine/Globals.h"
+#include "Engine/Root.h"
 #include "Engine/FileSystem.h"
 #include "Engine/Level.h"
 #include "Engine/LevelManager.h"
@@ -183,7 +183,7 @@ namespace {
 	std::string MakePortableTexturePath(const std::filesystem::path& absolutePath)
 	{
 		std::error_code ec;
-		const std::filesystem::path relativeToAssets = gFileSystem.Relative(absolutePath, SourceRoot() / "assets", ec);
+		const std::filesystem::path relativeToAssets = Root::Current().FileSystemRef().Relative(absolutePath, SourceRoot() / "assets", ec);
 		if (!ec && !relativeToAssets.empty())
 		{
 			return relativeToAssets.generic_string();
@@ -420,9 +420,9 @@ void GameGUICreator::Draw(const Camera&)
 		{
 			if (ImGui::MenuItem("Leave Creator"))
 			{
-				gFrontEndManager.ReturnToEngineGUIEditor();
-				gRenderManager.SetActiveCamera(gRenderManager.GetEngineCamera());
-				gDebug.LogMessage("Leave Creator requested");
+				Root::Current().FrontEnd().ReturnToEngineGUIEditor();
+				Root::Current().Render().SetActiveCamera(Root::Current().Render().GetEngineCamera());
+				Root::Current().Debugger().LogMessage("Leave Creator requested");
 			}
 			ImGui::EndMenu();
 		}
@@ -431,13 +431,13 @@ void GameGUICreator::Draw(const Camera&)
 			if (ImGui::MenuItem("Save Current GUI"))
 			{
 				SaveSelectedRoleGUI();
-				gDebug.LogMessage("Save Current GUI requested");
+				Root::Current().Debugger().LogMessage("Save Current GUI requested");
 			}
 			if (ImGui::MenuItem("Load Current GUI"))
 			{
 				LoadSelectedRoleGUI();
 				SyncRuntimePreview();
-				gDebug.LogMessage("Load Current GUI requested");
+				Root::Current().Debugger().LogMessage("Load Current GUI requested");
 			}
 			ImGui::EndMenu();
 		}
@@ -723,7 +723,7 @@ void GameGUICreator::DrawCreateWidgetPopup()
 		}
 		if (m_newWidgetIsProgressBar)
 		{
-			Level* activeLevel = gLevelManager.ActiveLevel();
+			Level* activeLevel = Root::Current().Levels().ActiveLevel();
 			ImGui::Separator();
 			ImGui::TextUnformatted("Binding");
 
@@ -872,7 +872,7 @@ void GameGUICreator::DrawCreateWidgetPopup()
 				AddButtonWidget();
 			}
 			SyncRuntimePreview();
-			gDebug.LogMessage(m_newWidgetIsProgressBar ? "Create Progress Bar requested" : (m_newWidgetIsImage ? "Create Image requested" : (m_newWidgetIsText ? "Create Text requested" : "Create Button requested")));
+			Root::Current().Debugger().LogMessage(m_newWidgetIsProgressBar ? "Create Progress Bar requested" : (m_newWidgetIsImage ? "Create Image requested" : (m_newWidgetIsText ? "Create Text requested" : "Create Button requested")));
 			ImGui::CloseCurrentPopup();
 		}
 		ImGui::SameLine();
@@ -947,7 +947,7 @@ void GameGUICreator::DrawBindingPopup()
 	}
 	ImGui::Separator();
 
-	Level* activeLevel = gLevelManager.ActiveLevel();
+	Level* activeLevel = Root::Current().Levels().ActiveLevel();
 	if (!activeLevel)
 	{
 		ImGui::TextDisabled("No active level is available.");
@@ -1283,7 +1283,7 @@ void GameGUICreator::AddButtonWidget()
 {
 	if (GUIIndex(m_selectedGUI) >= m_assets.size())
 	{
-		gDebug.LogMessage("Add button widget skipped: no active GUI");
+		Root::Current().Debugger().LogMessage("Add button widget skipped: no active GUI");
 		return;
 	}
 
@@ -1320,7 +1320,7 @@ void GameGUICreator::AddButtonWidget()
 	m_selectedWidgetIndex = static_cast<int>(asset.widgets.size() - 1);
 	m_newWidgetName[0] = '\0';
 	m_newWidgetAction = GameGUIActionType::None;
-	gDebug.LogMessage(
+	Root::Current().Debugger().LogMessage(
 		std::string("Created button widget in ") + GUIName(m_selectedGUI) + ": name='" + button.name +
 		"', gui='" + asset.name +
 		"', pos=(" + std::to_string(button.x) + "," + std::to_string(button.y) + ")" +
@@ -1331,7 +1331,7 @@ void GameGUICreator::AddTextWidget()
 {
 	if (GUIIndex(m_selectedGUI) >= m_assets.size())
 	{
-		gDebug.LogMessage("Add text widget skipped: no active GUI");
+		Root::Current().Debugger().LogMessage("Add text widget skipped: no active GUI");
 		return;
 	}
 
@@ -1369,7 +1369,7 @@ void GameGUICreator::AddTextWidget()
 	m_selectedWidgetIndex = static_cast<int>(asset.widgets.size() - 1);
 	m_newWidgetName[0] = '\0';
 	m_newWidgetText[0] = '\0';
-	gDebug.LogMessage(
+	Root::Current().Debugger().LogMessage(
 		std::string("Created text widget in ") + GUIName(m_selectedGUI) + ": name='" + text.name +
 		"', gui='" + asset.name +
 		"', pos=(" + std::to_string(text.x) + "," + std::to_string(text.y) + ")" +
@@ -1380,7 +1380,7 @@ void GameGUICreator::AddImageWidget()
 {
 	if (GUIIndex(m_selectedGUI) >= m_assets.size())
 	{
-		gDebug.LogMessage("Add image widget skipped: no active GUI");
+		Root::Current().Debugger().LogMessage("Add image widget skipped: no active GUI");
 		return;
 	}
 
@@ -1418,7 +1418,7 @@ void GameGUICreator::AddImageWidget()
 	m_selectedWidgetIndex = static_cast<int>(asset.widgets.size() - 1);
 	m_newWidgetName[0] = '\0';
 	m_newWidgetTexture[0] = '\0';
-	gDebug.LogMessage(
+	Root::Current().Debugger().LogMessage(
 		std::string("Created image widget in ") + GUIName(m_selectedGUI) + ": name='" + image.name +
 		"', gui='" + asset.name +
 		"', texture='" + image.texture +
@@ -1430,7 +1430,7 @@ void GameGUICreator::AddProgressBarWidget()
 {
 	if (GUIIndex(m_selectedGUI) >= m_assets.size())
 	{
-		gDebug.LogMessage("Add progress bar widget skipped: no active GUI");
+		Root::Current().Debugger().LogMessage("Add progress bar widget skipped: no active GUI");
 		return;
 	}
 
@@ -1480,7 +1480,7 @@ void GameGUICreator::AddProgressBarWidget()
 	m_newWidgetName[0] = '\0';
 	m_newWidgetTexture[0] = '\0';
 	m_pendingProgressBarWidget = {};
-	gDebug.LogMessage(
+	Root::Current().Debugger().LogMessage(
 		std::string("Created progress bar widget in ") + GUIName(m_selectedGUI) + ": name='" + progress.name +
 		"', gui='" + asset.name +
 		"', texture='" + progress.texture +
@@ -1542,13 +1542,13 @@ void GameGUICreator::SaveSelectedRoleGUI()
 	std::ofstream file(assetPath, std::ios::trunc);
 	if (!file.is_open())
 	{
-		gDebug.LogMessage("Failed to save GUI asset: " + assetPath.string());
+		Root::Current().Debugger().LogMessage("Failed to save GUI asset: " + assetPath.string());
 		return;
 	}
 
 	file << json.str();
 	asset.savedOnDisk = true;
-	gDebug.LogMessage("Saved GUI asset: " + assetPath.string());
+	Root::Current().Debugger().LogMessage("Saved GUI asset: " + assetPath.string());
 }
 
 void GameGUICreator::LoadSelectedRoleGUI()
@@ -1604,7 +1604,7 @@ void GameGUICreator::DeleteSelectedWidget()
 
 void GameGUICreator::SyncRuntimePreview()
 {
-	gFrontEndManager.RuntimeGUI().LoadUIAsset(CurrentRoleGUI());
+	Root::Current().FrontEnd().RuntimeGUI().LoadUIAsset(CurrentRoleGUI());
 }
 
 void GameGUICreator::RestoreEditorViewState()
@@ -1614,7 +1614,7 @@ void GameGUICreator::RestoreEditorViewState()
 		return;
 	}
 
-	EngineGUI& engineGUI = gFrontEndManager.EditorGUI();
+	EngineGUI& engineGUI = Root::Current().FrontEnd().EditorGUI();
 	engineGUI.SetShowAxis(m_previousShowAxis);
 	engineGUI.SetShowGrid(m_previousShowGrid);
 	m_previousViewStateCaptured = false;

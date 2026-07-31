@@ -1,16 +1,8 @@
-3-Day Schedule Plan
+3-Week Schedule Plan
 
 Range:
-- Start: July 31, 2026
+- Start: August 3, 2026
 - End: August 24, 2026
-
-Jul 31 - Aug 2
-- Goal: stabilize HUD and menu flow.
-- Tasks:
-  - Verify the runtime UI modes switch correctly between MainMenu, GameplayHUD, PauseMenu, and PlayerUI.
-  - Confirm GameGUI assets save and reload reliably before play starts.
-  - Remove any remaining ambiguity in diagnostics so the active gameplay state and UI mode are easy to inspect.
-  - Test: boot game, enter New Game, confirm HUD appears during gameplay.
 
 Aug 3 - Aug 5
 - Goal: finish HUD widget behavior.
@@ -79,7 +71,7 @@ Aug 24
 Milestone Version
 
 1. UI and flow locked
-- Window: Jul 31 - Aug 5
+- Window: Aug 3 - Aug 5
 - Outcome:
   - HUD and menus switch reliably.
   - GameGUI assets save before play.

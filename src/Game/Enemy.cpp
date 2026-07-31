@@ -1,12 +1,12 @@
 #include "Game/Enemy.h"
 
 #include "Engine/EventManager.h"
-#include "Engine/Globals.h"
+#include "Engine/Root.h"
 
 #include <iostream>
 
 void Enemy::FirstFrame(Entity&)
 {
 	std::cout << "Enemy dispatching Damage event\n";
-	gEventManager.Dispatch("Damage");
+	Root::Current().Events().Dispatch("Damage");
 }

@@ -6,13 +6,13 @@
 
 #include <Engine/EngineCamera.h>
 #include "Engine/Debug.h"
-#include "Engine/Globals.h"
+#include "Engine/Root.h"
 #include <Engine/Window.h>
 #include <Engine/Input.h>
 
 void EngineCamera::startUp()
 {
-	m_window = gWindow.GLFW();
+	m_window = Root::Current().WindowRef().GLFW();
 
 	int width = 1;
 	int height = 1;
@@ -62,7 +62,7 @@ glm::vec3 EngineCamera::GetFacing() const
 
 void EngineCamera::PrintPosition()
 {
-	gDebug.LogMessage(
+	Root::Current().Debugger().LogMessage(
 		"Camera position: " + std::to_string(m_position.x) + ", " +
 		std::to_string(m_position.y) + ", " +
 		std::to_string(m_position.z));

@@ -6,7 +6,7 @@
 #include "Engine/GameplayManager.h"
 #include "Engine/FrontEndManager.h"
 #include "Engine/AquanactBuildSystem.h"
-#include "Engine/Globals.h"
+#include "Engine/Root.h"
 #include "Engine/Input.h"
 #include "Engine/LevelManager.h"
 #include "Engine/ProjectManager.h"
@@ -258,7 +258,7 @@ void EngineGUI::startUp(Window& window)
 		StbImage bootImage;
 		const std::filesystem::path bootImageRoot =
 #ifdef AQUANACT_GAME
-			gFileSystem.ExecutableDirectory() / "assets" / "bootImage";
+			Root::Current().FileSystemRef().ExecutableDirectory() / "assets" / "bootImage";
 #else
 			SourceRoot() / "assets" / "bootImage";
 #endif
@@ -291,7 +291,7 @@ void EngineGUI::startUp(Window& window)
 	}
 	catch (const std::exception& ex)
 	{
-		gDebug.LogMessage("Boot image failed to load: " + std::string(ex.what()));
+		Root::Current().Debugger().LogMessage("Boot image failed to load: " + std::string(ex.what()));
 		if (m_bootTexture != 0)
 		{
 			glDeleteTextures(1, &m_bootTexture);
@@ -416,24 +416,24 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 			ImGui::MenuItem("Axis", nullptr, &m_showAxis);
 			if (ImGui::BeginMenu("EngineCamera"))
 			{
-				float moveSpeed = gRenderManager.GetEngineCamera().MoveSpeed();
+				float moveSpeed = Root::Current().Render().GetEngineCamera().MoveSpeed();
 				ImGui::SetNextItemWidth(140.0f);
 				if (ImGui::InputFloat("Move Speed", &moveSpeed, 0.0f, 0.0f, "%.1f"))
 				{
-					gRenderManager.GetEngineCamera().SetMoveSpeed(moveSpeed);
+					Root::Current().Render().GetEngineCamera().SetMoveSpeed(moveSpeed);
 				}
 				ImGui::EndMenu();
 			}
 			if (ImGui::BeginMenu("Grid"))
 			{
 				ImGui::MenuItem("Show Grid", nullptr, &m_showGrid);
-				float gridSize = gDebug.GridSize();
+				float gridSize = Root::Current().Debugger().GridSize();
 				ImGui::SetNextItemWidth(140.0f);
 				bool sizeChanged = ImGui::DragFloat("Size", &gridSize, 1.0f, 1.0f, 10000.0f, "%.1f");
 				gridSize = std::max(gridSize, 1.0f);
 				if (sizeChanged)
 				{
-					gDebug.SetGridSettings(gridSize);
+					Root::Current().Debugger().SetGridSettings(gridSize);
 				}
 				ImGui::EndMenu();
 			}
@@ -442,24 +442,24 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 		if (ImGui::BeginMenu("Lighting"))
 		{
 			ImGui::MenuItem("Show Lighting Window", nullptr, &m_showLightingWindow);
-			const bool canAddPointLight = gRenderManager.Lights().PointLights().size() < LightingManager::MaxPointLights;
+			const bool canAddPointLight = Root::Current().Render().Lights().PointLights().size() < LightingManager::MaxPointLights;
 			if (ImGui::MenuItem("Add Point Light", nullptr, false, canAddPointLight))
 			{
-				gRenderManager.Lights().AddPointLight();
+				Root::Current().Render().Lights().AddPointLight();
 			}
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Debug"))
 		{
-			bool showLogWindow = gDebug.ShowLogWindow();
-			bool showStatsWindow = gDebug.ShowStatsWindow();
+			bool showLogWindow = Root::Current().Debugger().ShowLogWindow();
+			bool showStatsWindow = Root::Current().Debugger().ShowStatsWindow();
 			if (ImGui::MenuItem("Show Log Window", nullptr, &showLogWindow))
 			{
-				gDebug.SetShowLogWindow(showLogWindow);
+				Root::Current().Debugger().SetShowLogWindow(showLogWindow);
 			}
 			if (ImGui::MenuItem("Show Stats Window", nullptr, &showStatsWindow))
 			{
-				gDebug.SetShowStatsWindow(showStatsWindow);
+				Root::Current().Debugger().SetShowStatsWindow(showStatsWindow);
 			}
 			ImGui::EndMenu();
 		}
@@ -467,37 +467,37 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 		{
 			if (ImGui::MenuItem("Play Game"))
 			{
-				gFrontEndManager.Creator().SaveAllRoleGUIs();
+				Root::Current().FrontEnd().Creator().SaveAllRoleGUIs();
 				if (projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", levelManager))
 				{
-					gEngineState.SetMode(EngineMode::Game);
-					gRenderManager.SetGameMode();
-					gGameplayManager.BootMainMenu();
+					Root::Current().State().SetMode(EngineMode::Game);
+					Root::Current().Render().SetGameMode();
+					Root::Current().Gameplay().BootMainMenu(Root::Current().FrontEnd(), Root::Current().Debugger());
 				}
 				else
 				{
-					gDebug.LogMessage("Play Game aborted because project autosave failed.");
+					Root::Current().Debugger().LogMessage("Play Game aborted because project autosave failed.");
 				}
 			}
 			if (ImGui::MenuItem("Play Level")) 
 			{
-				gFrontEndManager.Creator().SaveAllRoleGUIs();
+				Root::Current().FrontEnd().Creator().SaveAllRoleGUIs();
 				if (projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", levelManager))
 				{
-					gEngineState.SetMode(EngineMode::Game);
-					gRenderManager.SetGameMode();
-					gGameplayManager.StartGameSession();
+					Root::Current().State().SetMode(EngineMode::Game);
+					Root::Current().Render().SetGameMode();
+					Root::Current().Gameplay().StartGameSession(Root::Current().FrontEnd(), Root::Current().Debugger(), Root::Current().State());
 				}
 				else
 				{
-					gDebug.LogMessage("Play Level aborted because project autosave failed.");
+					Root::Current().Debugger().LogMessage("Play Level aborted because project autosave failed.");
 				}
 			}
 			if (ImGui::MenuItem("Set Game Camera"))
 			{
-				gRenderManager.GetGameCamera().SetPose(
-					gRenderManager.GetEngineCamera().GetPosition(),
-					gRenderManager.GetEngineCamera().GetFacing());
+				Root::Current().Render().GetGameCamera().SetPose(
+					Root::Current().Render().GetEngineCamera().GetPosition(),
+					Root::Current().Render().GetEngineCamera().GetFacing());
 			}
 			if (ImGui::MenuItem("Build Game"))
 			{
@@ -548,9 +548,9 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 		{
 			if (ImGui::MenuItem("GameGUI Creator"))
 			{
-				gFrontEndManager.OpenGameGUICreator();
-				gRenderManager.SetGameMode();
-				gDebug.LogMessage("GameGUI Creator opened.");
+				Root::Current().FrontEnd().OpenGameGUICreator();
+				Root::Current().Render().SetGameMode();
+				Root::Current().Debugger().LogMessage("GameGUI Creator opened.");
 			}
 			ImGui::EndMenu();
 		}
@@ -951,7 +951,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 		bool open = m_showLightingWindow;
 		if (ImGui::Begin("Lighting", &open))
 		{
-			DirectionalLight& sunLight = gRenderManager.Lights().SunLight();
+			DirectionalLight& sunLight = Root::Current().Render().Lights().SunLight();
 			if (ImGui::CollapsingHeader("Sun Light", ImGuiTreeNodeFlags_DefaultOpen))
 			{
 				ImGui::DragFloat3("Direction", &sunLight.direction.x, 0.01f, -1.0f, 1.0f, "%.2f");
@@ -967,7 +967,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 				}
 			}
 			ImGui::SeparatorText("Point Lights");
-			std::vector<PointLight>& pointLights = gRenderManager.Lights().PointLights();
+			std::vector<PointLight>& pointLights = Root::Current().Render().Lights().PointLights();
 			for (int i = 0; i < static_cast<int>(pointLights.size()); ++i)
 			{
 				PointLight& pointLight = pointLights[i];
@@ -1305,8 +1305,8 @@ void EngineGUI::CreateGameCodeFile(const std::string& className)
 	std::filesystem::create_directories(headerDir, ec);
 	std::filesystem::create_directories(sourceDir, ec);
 
-	const bool headerWritten = gFileSystem.WriteTextFile(headerPath, MakeHeaderTemplate(className));
-	const bool sourceWritten = gFileSystem.WriteTextFile(sourcePath, MakeSourceTemplate(className));
+	const bool headerWritten = Root::Current().FileSystemRef().WriteTextFile(headerPath, MakeHeaderTemplate(className));
+	const bool sourceWritten = Root::Current().FileSystemRef().WriteTextFile(sourcePath, MakeSourceTemplate(className));
 
 	if (headerWritten && sourceWritten)
 	{
@@ -1452,16 +1452,16 @@ void EngineGUI::DrawNewLevelPopup()
 			{
 				m_newLevelStatusMessage = "Enter a valid level name.";
 			}
-			else if (gLevelManager.FindLevel(levelName))
+			else if (Root::Current().Levels().FindLevel(levelName))
 			{
 				m_newLevelStatusMessage = "Level already exists.";
 			}
 			else
 			{
-				Level* level = gLevelManager.CreateLevel(levelName);
+				Level* level = Root::Current().Levels().CreateLevel(levelName);
 				if (level)
 				{
-					gLevelManager.SetActiveLevel(levelName);
+					Root::Current().Levels().SetActiveLevel(levelName);
 					m_newLevelStatusMessage = "Created level " + levelName + ".";
 				}
 				else

@@ -6,7 +6,7 @@
 #include "Engine/FileManager.h"
 #include "Engine/LevelManager.h"
 #include "Engine/ProjectManager.h"
-#include "Engine/Globals.h"
+#include "Engine/Root.h"
 #include <imgui.h>
 
 FrontEndManager::~FrontEndManager()
@@ -14,6 +14,7 @@ FrontEndManager::~FrontEndManager()
 	shutDown();
 }
 
+// make sure this FrontEndManager is intentionally the owner of all three UI domains
 void FrontEndManager::startUp(Window& window)
 {
 	// both engine and game need the game ui
@@ -23,7 +24,7 @@ void FrontEndManager::startUp(Window& window)
 	}
 
 	// only the engine needs the engine and ui creator ui
-	if (gEngineState.IsEditorMode())
+	if (Root::Current().State().IsEditorMode())
 	{
 		if (!m_engineGUI)
 		{
@@ -39,7 +40,7 @@ void FrontEndManager::startUp(Window& window)
 	else
 	{
 		// only the built game needs to turn off game debugging
-		GameModeDebug = false;
+		Root::Current().GameModeDebugFlag() = false;
 	}
 
 	// both need the game ui
@@ -83,29 +84,21 @@ void FrontEndManager::BeginFrame()
 
 void FrontEndManager::Draw(const Camera& camera, FileManager& fileManager, LevelManager& levelManager, ProjectManager& projectManager)
 {
-	if (!IsEditorMode())
+	if (IsEditorMode())
 	{
-		return;
+		if (m_mode == FrontEndMode::EngineEditor && m_engineGUI)
+		{
+			m_engineGUI->Draw(camera, fileManager, levelManager, projectManager);
+		}
+		else if (m_mode == FrontEndMode::GameGUICreator && m_uiCreator)
+		{
+			m_uiCreator->Draw(camera);
+		}
 	}
-
-	if (m_mode == FrontEndMode::EngineEditor && m_engineGUI)
+	else if (m_gameGUI && IsGameMode())
 	{
-		m_engineGUI->Draw(camera, fileManager, levelManager, projectManager);
-	}
-	else if (m_mode == FrontEndMode::GameGUICreator && m_uiCreator)
-	{
-		m_uiCreator->Draw(camera);
-	}
-
-	// The runtime MyGUI test widget should only be visible while the UI creator is active.
-	// Drawing it here keeps it out of the normal engine editor view.
-	if (m_mode == FrontEndMode::GameGUICreator && m_gameGUI)
-	{
+		// Runtime UI only renders in game mode.
 		m_gameGUI->Draw();
-	}
-
-	if (m_gameGUI && IsGameMode())
-	{
 		m_gameGUI->DrawDiagnosticsWindow();
 	}
 }
@@ -180,17 +173,17 @@ void FrontEndManager::ReturnToEngineGUIEditor()
 
 EngineMode FrontEndManager::AppMode() const
 {
-	return gEngineState.Mode();
+	return Root::Current().State().Mode();
 }
 
 bool FrontEndManager::IsEditorMode() const
 {
-	return gEngineState.IsEditorMode();
+	return Root::Current().State().IsEditorMode();
 }
 
 bool FrontEndManager::IsGameMode() const
 {
-	return gEngineState.IsGameMode();
+	return Root::Current().State().IsGameMode();
 }
 
 EngineGUI& FrontEndManager::EditorGUI()

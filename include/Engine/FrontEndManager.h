@@ -4,7 +4,7 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "Engine/Globals.h"
+#include "Engine/Root.h"
 
 class Window;
 class Camera;

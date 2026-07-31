@@ -1,7 +1,7 @@
 #include "Game/PlayerHealth.h"
 
 #include "Engine/EventManager.h"
-#include "Engine/Globals.h"
+#include "Engine/Root.h"
 #include "Engine/Entity.h"
 
 #include <iostream>
@@ -68,7 +68,7 @@ void PlayerHealth::SetMaxHealth(int maxHealth)
 
 void PlayerHealth::SubscribeToDamage()
 {
-	gEventManager.GetEvent("Damage").Subscribe(this, [this]()
+	Root::Current().Events().GetEvent("Damage").Subscribe(this, [this]()
 	{
 		SetHealth(m_health - 90);
 		std::cout << "PlayerHealth received Damage and now has " << m_health << " health\n";

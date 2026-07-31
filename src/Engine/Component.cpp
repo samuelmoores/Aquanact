@@ -2,11 +2,14 @@
 
 #include "Engine/Entity.h"
 #include "Engine/EventManager.h"
-#include "Engine/Globals.h"
+#include "Engine/Root.h"
 
 Component::~Component()
 {
-	gEventManager.Unsubscribe(this);
+	if (Root::HasCurrent())
+	{
+		Root::Current().Events().Unsubscribe(this);
+	}
 }
 
 std::string Component::BindableEventChannel(const std::string& eventName) const
@@ -17,5 +20,5 @@ std::string Component::BindableEventChannel(const std::string& eventName) const
 
 void Component::DispatchBindableEvent(const std::string& eventName) const
 {
-	gEventManager.Dispatch(BindableEventChannel(eventName));
+	Root::Current().Events().Dispatch(BindableEventChannel(eventName));
 }

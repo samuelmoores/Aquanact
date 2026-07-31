@@ -3,7 +3,7 @@
 #include "Engine/Debug.h"
 #include "Engine/FrontEndManager.h"
 #include "Engine/EventManager.h"
-#include "Engine/Globals.h"
+#include "Engine/Root.h"
 #include "Engine/GameplayManager.h"
 #include "Engine/ProjectManager.h"
 #include "Engine/Window.h"
@@ -37,7 +37,7 @@ namespace {
 			return 0.0f;
 		}
 
-		Level* activeLevel = gLevelManager.ActiveLevel();
+		Level* activeLevel = Root::Current().Levels().ActiveLevel();
 		if (!activeLevel)
 		{
 			return 0.0f;
@@ -76,7 +76,7 @@ namespace {
 			return requestedPath;
 		}
 
-		const std::filesystem::path executableRoot = gFileSystem.ExecutableDirectory();
+		const std::filesystem::path executableRoot = Root::Current().FileSystemRef().ExecutableDirectory();
 		const std::filesystem::path candidatePaths[] = {
 			requestedPath,
 			executableRoot / requestedPath,
@@ -112,7 +112,7 @@ namespace {
 
 	Component* ResolveBoundComponent(const GameGUIWidgetDef& def)
 	{
-		Level* activeLevel = gLevelManager.ActiveLevel();
+		Level* activeLevel = Root::Current().Levels().ActiveLevel();
 		if (!activeLevel)
 		{
 			return nullptr;
@@ -172,7 +172,7 @@ void* GameGUIImageLoader::loadImage(int& _width, int& _height, MyGUI::PixelForma
 	catch (const std::exception& e)
 	{
 		// If the image load fails, MyGUI needs a clean failure instead of partial data.
-		gDebug.LogMessage("GameGUI image load failed: requested='" + _filename + "', reason='" + e.what() + "'");
+		Root::Current().Debugger().LogMessage("GameGUI image load failed: requested='" + _filename + "', reason='" + e.what() + "'");
 		_width = 0;
 		_height = 0;
 		_format = MyGUI::PixelFormat::Unknow;
@@ -214,7 +214,7 @@ void GameGUI::startUp(Window& window)
 		// MyGUI resolves XML resources through its data manager. Register the build
 		// output root without recursion so it can find the copied XML/PNG skin files
 		// without scanning nested build-tree copies under vcpkg.
-		const std::filesystem::path resourceRoot = gFileSystem.ExecutableDirectory();
+		const std::filesystem::path resourceRoot = Root::Current().FileSystemRef().ExecutableDirectory();
 		MyGUI::OpenGLDataManager& dataManager = MyGUI::OpenGLDataManager::getInstance();
 		dataManager.addResourceLocation(resourceRoot.string(), false);
 		dataManager.addResourceLocation((resourceRoot / "assets").string(), true);
@@ -389,7 +389,7 @@ void GameGUI::LoadUIAsset(const GameGUIAsset& asset)
 	{
 		if (!widget.parentName.empty() && createdWidgets.find(widget.name) == createdWidgets.end())
 		{
-			gDebug.LogMessage("GameGUI skipped child widget with missing/cyclic parent: " + widget.name);
+			Root::Current().Debugger().LogMessage("GameGUI skipped child widget with missing/cyclic parent: " + widget.name);
 		}
 	}
 
@@ -413,7 +413,7 @@ void GameGUI::ClearUI()
 		(void)name;
 		if (widget)
 		{
-			gEventManager.Unsubscribe(widget);
+			Root::Current().Events().Unsubscribe(widget);
 		}
 	}
 
@@ -468,12 +468,12 @@ MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::
 			// Button clicks are routed back into GameGUI so we can attach small
 			// built-in behaviors without hardcoding them into the widget assets.
 			button->eventMouseButtonClick += MyGUI::newDelegate(this, &GameGUI::OnWidgetClicked);
-			gDebug.LogMessage(std::string("GameGUI click handler bound for widget: ") + def.name);
+			Root::Current().Debugger().LogMessage(std::string("GameGUI click handler bound for widget: ") + def.name);
 			if (!parent)
 			{
 				MyGUI::LayerManager::getInstance().upLayerItem(button);
 			}
-			gDebug.LogMessage(
+			Root::Current().Debugger().LogMessage(
 				std::string("GameGUI widget created: name='") + def.name +
 				"', type='" + def.type +
 				"', skin='" + def.skin +
@@ -500,7 +500,7 @@ MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::
 			{
 				MyGUI::LayerManager::getInstance().upLayerItem(text);
 			}
-			gDebug.LogMessage(
+			Root::Current().Debugger().LogMessage(
 				std::string("GameGUI widget created: name='") + def.name +
 				"', type='" + def.type +
 				"', skin='" + def.skin +
@@ -526,7 +526,7 @@ MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::
 			{
 				MyGUI::LayerManager::getInstance().upLayerItem(image);
 			}
-			gDebug.LogMessage(
+			Root::Current().Debugger().LogMessage(
 				std::string("GameGUI widget created: name='") + def.name +
 				"', type='" + def.type +
 				"', skin='" + def.skin +
@@ -568,14 +568,14 @@ void GameGUI::BindWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* widg
 	auto* textWidget = dynamic_cast<MyGUI::TextBox*>(widget);
 	if (!textWidget)
 	{
-		gDebug.LogMessage("GameGUI binding ignored for non-text widget: " + def.name);
+		Root::Current().Debugger().LogMessage("GameGUI binding ignored for non-text widget: " + def.name);
 		return;
 	}
 
 	Component* component = ResolveBoundComponent(def);
 	if (!component)
 	{
-		gDebug.LogMessage(
+		Root::Current().Debugger().LogMessage(
 			"GameGUI binding could not resolve component: " +
 			def.bindEntity + "." + def.bindComponent);
 		return;
@@ -588,7 +588,7 @@ void GameGUI::BindWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* widg
 	});
 	if (!exposesEvent)
 	{
-		gDebug.LogMessage(
+		Root::Current().Debugger().LogMessage(
 			"GameGUI binding event is not exposed by component: " +
 			def.bindEntity + "." + def.bindComponent + "." + def.bindEvent);
 		return;
@@ -596,7 +596,7 @@ void GameGUI::BindWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* widg
 
 	textWidget->setCaption(component->GetBindableEventText(def.bindEvent));
 	const std::string channel = component->BindableEventChannel(def.bindEvent);
-	gEventManager.GetEvent(channel).Subscribe(widget, [widget, binding = def]()
+	Root::Current().Events().GetEvent(channel).Subscribe(widget, [widget, binding = def]()
 	{
 		Component* currentComponent = ResolveBoundComponent(binding);
 		auto* currentTextWidget = dynamic_cast<MyGUI::TextBox*>(widget);
@@ -606,7 +606,7 @@ void GameGUI::BindWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* widg
 		}
 		currentTextWidget->setCaption(currentComponent->GetBindableEventText(binding.bindEvent));
 	});
-	gDebug.LogMessage("GameGUI bound widget '" + def.name + "' to " + channel);
+	Root::Current().Debugger().LogMessage("GameGUI bound widget '" + def.name + "' to " + channel);
 }
 
 void GameGUI::OnWidgetClicked(MyGUI::Widget* sender)
@@ -619,9 +619,9 @@ void GameGUI::OnWidgetClicked(MyGUI::Widget* sender)
 	const std::string name = sender->getName();
 	const GameGUIWidgetDef* def = FindWidgetDef(m_loadedAsset, name);
 	const GameGUIActionType action = def ? def->action : GameGUIActionType::None;
-	gDebug.LogMessage(std::string("GameGUI click received for widget: ") + (name.empty() ? "<unnamed>" : name));
-	gFrontEndManager.RuntimeGUI().RecordClick("Clicked widget: " + (name.empty() ? std::string("<unnamed>") : name));
-	gFrontEndManager.RuntimeGUI().RecordButtonClick(m_loadedAsset.name, name, action);
+	Root::Current().Debugger().LogMessage(std::string("GameGUI click received for widget: ") + (name.empty() ? "<unnamed>" : name));
+	Root::Current().FrontEnd().RuntimeGUI().RecordClick("Clicked widget: " + (name.empty() ? std::string("<unnamed>") : name));
+	Root::Current().FrontEnd().RuntimeGUI().RecordButtonClick(m_loadedAsset.name, name, action);
 	switch (action)
 	{
 	case GameGUIActionType::NewGame:
@@ -631,21 +631,21 @@ void GameGUI::OnWidgetClicked(MyGUI::Widget* sender)
 			button->setColour(ParseColour(buttonDef ? buttonDef->clickedColor : std::string{}, MyGUI::Colour::White));
 			button->setStateSelected(true);
 		}
-		gFrontEndManager.RuntimeGUI().RecordClick("New Game action requested");
-		gDebug.LogMessage("GameGUI NewGame action requested");
-		if (gProjectManager.CurrentProjectPath().empty())
+		Root::Current().FrontEnd().RuntimeGUI().RecordClick("New Game action requested");
+		Root::Current().Debugger().LogMessage("GameGUI NewGame action requested");
+		if (Root::Current().Projects().CurrentProjectPath().empty())
 		{
-			gDebug.LogMessage("GameGUI NewGame failed: no project is currently loaded.");
+			Root::Current().Debugger().LogMessage("GameGUI NewGame failed: no project is currently loaded.");
 			break;
 		}
-		gFrontEndManager.RuntimeGUI().HideAll();
-		if (!gProjectManager.LoadProject(gProjectManager.CurrentProjectPath(), gLevelManager))
+		Root::Current().FrontEnd().RuntimeGUI().HideAll();
+		if (!Root::Current().Projects().LoadProject(Root::Current().Projects().CurrentProjectPath(), Root::Current().Levels()))
 		{
-			gDebug.LogMessage("GameGUI NewGame failed: could not reload the current project.");
+			Root::Current().Debugger().LogMessage("GameGUI NewGame failed: could not reload the current project.");
 			break;
 		}
-		gGameplayManager.StartGameSession();
-		gFrontEndManager.RuntimeGUI().RecordClick("New Game started");
+		Root::Current().Gameplay().StartGameSession(Root::Current().FrontEnd(), Root::Current().Debugger(), Root::Current().State());
+		Root::Current().FrontEnd().RuntimeGUI().RecordClick("New Game started");
 		break;
 	case GameGUIActionType::None:
 	default:

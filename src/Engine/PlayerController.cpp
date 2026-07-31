@@ -2,7 +2,7 @@
 
 #include "Engine/Entity.h"
 #include "Engine/Debug.h"
-#include "Engine/Globals.h"
+#include "Engine/Root.h"
 #include "Engine/Input.h"
 #include "Engine/RenderManager.h"
 
@@ -30,13 +30,13 @@ void PlayerController::startUp(Entity&)
 {
 	if (!m_inputDevice)
 	{
-		m_inputDevice = &gInput;
+		m_inputDevice = &Root::Current().InputRef();
 	}
 }
 
 void PlayerController::Update(Entity& owner, float dt)
 {
-	const Input* inputDevice = m_inputDevice ? m_inputDevice : &gInput;
+	const Input* inputDevice = m_inputDevice ? m_inputDevice : &Root::Current().InputRef();
 	const glm::vec3 moveInput = inputDevice->MoveInput();
 	SetDiagnosticInput(moveInput);
 
@@ -48,7 +48,7 @@ void PlayerController::Update(Entity& owner, float dt)
 		return;
 	}
 
-	glm::vec3 forward = gRenderManager.GetGameCamera().GetFacing();
+	glm::vec3 forward = Root::Current().Render().GetGameCamera().GetFacing();
 	forward.y = 0.0f;
 	if (glm::length(forward) <= 0.0001f)
 	{
@@ -71,7 +71,7 @@ void PlayerController::Update(Entity& owner, float dt)
 	if (glm::length(movement) <= m_movementDeadzone)
 	{
 		m_isMoving = false;
-		gDebug.SetGameplayDiagnostics(owner.Name(), moveInput, m_moveSpeed, dt, glm::vec3(0.0f), owner.Position());
+		Root::Current().Debugger().SetGameplayDiagnostics(owner.Name(), moveInput, m_moveSpeed, dt, glm::vec3(0.0f), owner.Position());
 		return;
 	}
 
@@ -87,5 +87,5 @@ void PlayerController::Update(Entity& owner, float dt)
 
 	const glm::vec3 delta = normalizedMovement * m_moveSpeed * dt;
 	owner.Move(delta);
-	gDebug.SetGameplayDiagnostics(owner.Name(), moveInput, m_moveSpeed, dt, delta, owner.Position());
+	Root::Current().Debugger().SetGameplayDiagnostics(owner.Name(), moveInput, m_moveSpeed, dt, delta, owner.Position());
 }

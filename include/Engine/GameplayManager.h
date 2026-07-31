@@ -2,33 +2,34 @@
 
 #include "Engine/LevelManager.h"
 
+class FrontEndManager;
+class Debug;
+class EngineState;
+
 class GameplayManager {
 public:
-	enum class FlowState
+	enum class GameState
 	{
 		MainMenu,
 		Playing,
-		Paused,
-		Preview
+		Paused
 	};
 
 	~GameplayManager();
 
-	void startUp(LevelManager& levelManager);
+	void startUp(LevelManager& levelManager, FrontEndManager& frontEndManager, Debug& debug, EngineState& engineState);
 	void shutDown();
-	void BootMainMenu();
-	void StartGameSession();
-	void StartLevelPreview();
+	void BootMainMenu(FrontEndManager& frontEndManager, Debug& debug);
+	void StartGameSession(FrontEndManager& frontEndManager, Debug& debug, EngineState& engineState);
 
-	void Update(float dt);
-	void SetPaused(bool paused);
-	void TogglePaused();
+	void Update(float dt, FrontEndManager& frontEndManager, Debug& debug, EngineState& engineState);
+	void SetPaused(bool paused, FrontEndManager& frontEndManager, Debug& debug);
+	void TogglePaused(FrontEndManager& frontEndManager, Debug& debug);
 	bool IsPaused() const;
-	FlowState State() const;
-	bool ShouldUpdateInEditor() const;
+	GameState State() const;
 	std::size_t ControllerCount() const;
 
 private:
 	LevelManager* m_levelManager = nullptr;
-	FlowState m_state = FlowState::MainMenu;
+	GameState m_state = GameState::MainMenu;
 };

@@ -1,7 +1,7 @@
 #include "Engine/ModelImporter.h"
 
 #include "Engine/Debug.h"
-#include "Engine/Globals.h"
+#include "Engine/Root.h"
 
 #include <algorithm>
 #include <cassert>
@@ -50,7 +50,7 @@ ImportedModel ModelImporter::Import(const std::string& path, bool flipUvs) const
 	model.scene = model.importer->ReadFile(path, flags | aiProcess_Triangulate | aiProcess_JoinIdenticalVertices);
 	if (!model.scene)
 	{
-		gDebug.LogMessage(std::string("ASSIMP ERROR: ") + model.importer->GetErrorString());
+		Root::Current().Debugger().LogMessage(std::string("ASSIMP ERROR: ") + model.importer->GetErrorString());
 		throw std::runtime_error(model.importer->GetErrorString());
 	}
 

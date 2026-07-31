@@ -16,6 +16,12 @@
 
 class Window;
 class LevelManager;
+class FrontEndManager;
+class FileManager;
+class ProjectManager;
+class Debug;
+class Input;
+class EngineState;
 
 class RenderManager {
 public:
@@ -39,7 +45,7 @@ public:
 	void ApplyProjectState(const ProjectStateData::RenderStateData& renderState);
 	void Submit(const RenderCommand& command);
 	void Flush(const Camera& camera);
-	void Loop();
+	void Loop(FrontEndManager& frontEndManager, FileManager& fileManager, LevelManager& levelManager, ProjectManager& projectManager, Debug& debug, Input& input, Window& window, EngineState& engineState);
 
 	std::size_t LastFrameCommandCount() const;
 	std::size_t LastFrameSkippedObjects() const;

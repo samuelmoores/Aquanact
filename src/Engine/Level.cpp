@@ -1,6 +1,6 @@
 #include "Engine/Level.h"
 #include "Engine/EventManager.h"
-#include "Engine/Globals.h"
+#include "Engine/Root.h"
 
 #include <iostream>
 #include <algorithm>
@@ -49,7 +49,7 @@ void Level::FirstFrame()
 void Level::Clear()
 {
 	m_entities.clear();
-	gEventManager.Clear();
+	Root::Current().Events().Clear();
 	m_firstFramePending = false;
 }
 
