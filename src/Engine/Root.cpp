@@ -150,20 +150,7 @@ void Root::UpdateFrame(float dt)
 {
 	if (m_engineState.IsGameMode())
 	{
-		switch (m_gameplayManager->State())
-		{
-		case GameplayManager::GameState::MainMenu:
-			m_frontEndManager->RuntimeGUI().SetUIMode(GameGUIManager::UIMode::MainMenu);
-			break;
-		case GameplayManager::GameState::Playing:
-			m_frontEndManager->RuntimeGUI().SetUIMode(GameGUIManager::UIMode::GameplayHUD);
-			break;
-		case GameplayManager::GameState::Paused:
-			m_frontEndManager->RuntimeGUI().SetUIMode(GameGUIManager::UIMode::PauseMenu);
-			break;
-		}
-
-		// are we in gameplay?
+		m_gameplayManager->SyncRuntimeUI(*m_frontEndManager);
 		if (m_gameplayManager->State() == GameplayManager::GameState::Playing)
 		{
 			m_gameplayManager->Update(dt, *m_frontEndManager, *m_debug, m_engineState);

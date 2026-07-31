@@ -77,9 +77,27 @@ void GameplayManager::StartGameSession(FrontEndManager& frontEndManager, Debug& 
 	}
 	m_state = GameState::Playing;
 	debug.LogMessage("GameplayManager::StartGameSession() state=Playing");
-	if (frontEndManager.RuntimeGUI().HasRuntime())
+	SyncRuntimeUI(frontEndManager);
+}
+
+void GameplayManager::SyncRuntimeUI(FrontEndManager& frontEndManager) const
+{
+	if (!frontEndManager.RuntimeGUI().HasRuntime())
 	{
-		frontEndManager.RuntimeGUI().SetUIMode(GameGUIManager::UIMode::GameplayHUD); // broken boundary
+		return;
+	}
+
+	switch (m_state)
+	{
+	case GameState::MainMenu:
+		frontEndManager.RuntimeGUI().SetUIMode(GameGUIManager::UIMode::MainMenu);
+		break;
+	case GameState::Playing:
+		frontEndManager.RuntimeGUI().SetUIMode(GameGUIManager::UIMode::GameplayHUD);
+		break;
+	case GameState::Paused:
+		frontEndManager.RuntimeGUI().SetUIMode(GameGUIManager::UIMode::PauseMenu);
+		break;
 	}
 }
 
@@ -108,12 +126,6 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 	if (m_state != GameState::Playing)
 	{
 		return;
-	}
-
-	// why is the GameManager deciding what the runtime UI is doing? 
-	if (frontEndManager.RuntimeGUI().HasRuntime())
-	{
-		frontEndManager.RuntimeGUI().SetUIMode(GameGUIManager::UIMode::GameplayHUD);
 	}
 
 	// why is the game loop running if there could be no active level?

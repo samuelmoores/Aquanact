@@ -82,24 +82,57 @@ void FrontEndManager::BeginFrame()
 	}
 }
 
-void FrontEndManager::Draw(const Camera& camera, FileManager& fileManager, LevelManager& levelManager, ProjectManager& projectManager)
+void FrontEndManager::UpdateEngineGUI(const Camera& camera, FileManager& fileManager, LevelManager& levelManager, ProjectManager& projectManager)
 {
-	if (IsEditorMode())
+	(void)camera;
+	(void)fileManager;
+	(void)levelManager;
+	(void)projectManager;
+	if (IsEditorMode() && m_mode == FrontEndMode::EngineEditor && m_engineGUI)
 	{
-		if (m_mode == FrontEndMode::EngineEditor && m_engineGUI)
-		{
-			m_engineGUI->Draw(camera, fileManager, levelManager, projectManager);
-		}
-		else if (m_mode == FrontEndMode::GameGUICreator && m_uiCreator)
-		{
-			m_uiCreator->Draw(camera);
-		}
+		m_engineGUI->BeginFrame();
 	}
-	else if (m_gameGUI && IsGameMode())
+}
+
+void FrontEndManager::UpdateRuntimeGUI()
+{
+	if (m_gameGUI && IsGameMode())
 	{
-		// Runtime UI only renders in game mode.
+		m_gameGUI->BeginFrame();
+	}
+}
+
+void FrontEndManager::UpdateCreatorGUI(const Camera& camera)
+{
+	(void)camera;
+	if (IsEditorMode() && m_mode == FrontEndMode::GameGUICreator && m_uiCreator)
+	{
+		m_uiCreator->BeginFrame();
+	}
+}
+
+void FrontEndManager::DrawEngineGUI(const Camera& camera, FileManager& fileManager, LevelManager& levelManager, ProjectManager& projectManager)
+{
+	if (IsEditorMode() && m_mode == FrontEndMode::EngineEditor && m_engineGUI)
+	{
+		m_engineGUI->Draw(camera, fileManager, levelManager, projectManager);
+	}
+}
+
+void FrontEndManager::DrawRuntimeGUI()
+{
+	if (m_gameGUI && IsGameMode())
+	{
 		m_gameGUI->Draw();
 		m_gameGUI->DrawDiagnosticsWindow();
+	}
+}
+
+void FrontEndManager::DrawCreatorGUI(const Camera& camera)
+{
+	if (IsEditorMode() && m_mode == FrontEndMode::GameGUICreator && m_uiCreator)
+	{
+		m_uiCreator->Draw(camera);
 	}
 }
 

@@ -251,7 +251,10 @@ void RenderManager::Loop(FrontEndManager& frontEndManager, FileManager& fileMana
 		m_lastFrameDebugOverlayTime = debugEnd - debugStart;
 
 		const auto editorGuiStart = std::chrono::high_resolution_clock::now();
-		frontEndManager.Draw(*m_engineCamera, fileManager, levelManager, projectManager);
+		frontEndManager.UpdateEngineGUI(*m_engineCamera, fileManager, levelManager, projectManager);
+		frontEndManager.UpdateCreatorGUI(*m_engineCamera);
+		frontEndManager.DrawEngineGUI(*m_engineCamera, fileManager, levelManager, projectManager);
+		frontEndManager.DrawCreatorGUI(*m_engineCamera);
 		const auto editorGuiEnd = std::chrono::high_resolution_clock::now();
 		m_lastFrameEditorGuiTime = editorGuiEnd - editorGuiStart;
 
@@ -271,15 +274,14 @@ void RenderManager::Loop(FrontEndManager& frontEndManager, FileManager& fileMana
 	{
 		const auto debugStart = std::chrono::high_resolution_clock::now();
 		frontEndManager.BeginFrame();
+		frontEndManager.UpdateRuntimeGUI();
 		if (Root::Current().GameModeDebugFlag())
 		{
 			debug.drawGameModeInput(input);
-			frontEndManager.RuntimeGUI().DrawDiagnosticsWindow();
-			frontEndManager.RuntimeGUI().DrawReturnButton();
 		}
 		// The runtime manager keeps the first placed asset active, so the render
 		// loop only needs to draw the already-selected GameGUI instance.
-		frontEndManager.RuntimeGUI().Draw();
+		frontEndManager.DrawRuntimeGUI();
 		const auto debugEnd = std::chrono::high_resolution_clock::now();
 		m_lastFrameDebugOverlayTime = debugEnd - debugStart;
 		m_lastFrameEditorGuiTime = std::chrono::duration<double, std::milli>{ 0.0 };

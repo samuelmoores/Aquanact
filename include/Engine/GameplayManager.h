@@ -21,6 +21,7 @@ public:
 	void shutDown();
 	void BootMainMenu(FrontEndManager& frontEndManager, Debug& debug);
 	void StartGameSession(FrontEndManager& frontEndManager, Debug& debug, EngineState& engineState);
+	void SyncRuntimeUI(FrontEndManager& frontEndManager) const;
 
 	void Update(float dt, FrontEndManager& frontEndManager, Debug& debug, EngineState& engineState);
 	void SetPaused(bool paused, FrontEndManager& frontEndManager, Debug& debug);

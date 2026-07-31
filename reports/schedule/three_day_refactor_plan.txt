@@ -15,6 +15,10 @@ Format
 -----
 Scope, then actions, then risks, then a follow-up note.
 
+Status
+------
+Day 1 is complete in code. The global bridge is gone, `Root` now owns the engine services, the quit-time `Component` destructor crash is guarded, and the gameplay-to-UI sync policy has been moved out of `Root` and into `GameplayManager`.
+
 1. Application Entry
    Scope: `main.cpp`, startup ownership, loop handoff, shutdown.
    1. Review `main.cpp` ownership of startup, loop handoff, and shutdown.
@@ -24,6 +28,7 @@ Scope, then actions, then risks, then a follow-up note.
    5. Risk: main still owns too much orchestration and mode policy.
    6. Risk: simulation boundary is still blurred between application shell and gameplay.
    Follow-up: confirm later systems do not depend on main owning policy.
+   Progress: complete.
 2. Engine Modes
    Scope: editor mode, game mode, preview mode, runtime UI mode.
    1. Map editor mode, game mode, preview mode, and runtime UI mode.
@@ -33,6 +38,7 @@ Scope, then actions, then risks, then a follow-up note.
    5. Risk: repeated mode checks across gameplay and UI systems.
    6. Risk: editor, runtime, and preview boundaries are still unclear.
    Follow-up: confirm the runtime mode surface is not duplicated elsewhere.
+   Progress: complete for the Day 1 target. `Root` still owns `EngineState`, but gameplay-to-UI mode translation no longer lives in `Root::UpdateFrame()`.
 3. Startup Order
    Scope: manager start-up sequencing and dependency ownership.
    1. Trace each manager start-up call in order.
@@ -41,6 +47,7 @@ Scope, then actions, then risks, then a follow-up note.
    4. Record dependencies that must not be inverted later.
    5. Risk: managers are mixing startup orchestration and state ownership.
    Follow-up: verify each startUp only initializes its own subsystem.
+   Progress: complete enough for the current refactor pass; startup order now runs through `Root`, but the Day 1 ownership and boot review is complete.
 4. Shutdown Order
    Scope: shutdown sequencing and cleanup ownership.
    1. Compare current shutdown order against startup order.
@@ -49,6 +56,7 @@ Scope, then actions, then risks, then a follow-up note.
    4. Capture shutdown assumptions that later refactors might break.
    5. Risk: shutdown may hide ownership problems if it is not the reverse of startup.
    Follow-up: confirm cleanup happens in reverse dependency order.
+   Progress: complete for the Day 1 safety pass. `Component` teardown is now guarded against late `Root` access, but deeper shutdown-order tuning can be a later refactor.
 5. Window System
    Scope: OS window, context creation, event pump, framebuffer access.
    1. Separate OS window responsibility from graphics context responsibility.
@@ -58,6 +66,7 @@ Scope, then actions, then risks, then a follow-up note.
    5. Risk: window is coupled to graphics setup, which is not backend-neutral.
    6. Risk: presentation and framebuffer assumptions leak into the window layer.
    Follow-up: keep backend-specific setup out of the window boundary.
+   Progress: untouched by the refactor, but still documented for later backend work.
 
 Day 2
 ----
@@ -87,6 +96,7 @@ Day 2
    5. Risk: front-end manager has mixed responsibilities across editor, runtime, and creator UI.
    6. Risk: coordination load is too high inside one manager.
    Follow-up: keep UI mode routing out of gameplay policy.
+   Progress: complete for the boundary split. The old mixed `Draw()` wrapper is gone and the manager now exposes explicit engine, runtime, and creator paths.
 4. Editor UI
    Scope: editor-only features and their dependencies.
    1. List editor-only features and dependencies.
