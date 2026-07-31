@@ -29,9 +29,6 @@ public:
 	void shutDown();
 
 	void BeginFrame();
-	void UpdateEngineGUI(const Camera& camera, FileManager& fileManager, LevelManager& levelManager, ProjectManager& projectManager);
-	void UpdateRuntimeGUI();
-	void UpdateCreatorGUI(const Camera& camera);
 	void DrawEngineGUI(const Camera& camera, FileManager& fileManager, LevelManager& levelManager, ProjectManager& projectManager);
 	void DrawRuntimeGUI();
 	void DrawCreatorGUI(const Camera& camera);

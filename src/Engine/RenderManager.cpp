@@ -64,6 +64,41 @@ void RenderManager::startUp(Window& window)
 	m_lightingManager->startUp();
 }
 
+EngineCamera& RenderManager::GetEngineCamera()
+{
+	return *m_engineCamera;
+}
+
+const EngineCamera& RenderManager::GetEngineCamera() const
+{
+	return *m_engineCamera;
+}
+
+GameCamera& RenderManager::GetGameCamera()
+{
+	return *m_gameCamera;
+}
+
+const GameCamera& RenderManager::GetGameCamera() const
+{
+	return *m_gameCamera;
+}
+
+void RenderManager::SetEditorMode()
+{
+	m_cameraManager.SetEditorMode(*m_engineCamera);
+}
+
+void RenderManager::SetGameMode()
+{
+	m_cameraManager.SetGameMode(*m_gameCamera);
+}
+
+void RenderManager::SetActiveCamera(Camera& camera)
+{
+	m_cameraManager.SetActiveCamera(camera);
+}
+
 RenderManager::~RenderManager()
 {
 	shutDown();
@@ -124,6 +159,157 @@ void RenderManager::ApplyProjectState(const ProjectStateData::RenderStateData& r
 	}
 }
 
+void RenderManager::ApplyCameraMode(const EngineState& engineState)
+{
+	if (engineState.IsGameMode())
+	{
+		m_cameraManager.SetGameMode(*m_gameCamera);
+	}
+	else
+	{
+		m_cameraManager.SetEditorMode(*m_engineCamera);
+	}
+}
+
+void RenderManager::BeginFrame()
+{
+	m_device.ConfigureDefaultState();
+	m_device.Clear(0.0f, 0.0f, 0.0f, 0.0f);
+	m_device.BeginFrame();
+}
+
+void RenderManager::PresentFrame(Window& window)
+{
+	m_device.EndFrame();
+	window.PollEvents();
+}
+
+void RenderManager::UpdateCameraPhase(const Input& input, const EngineState& engineState)
+{
+	ApplyCameraMode(engineState);
+	if (engineState.IsEditorMode())
+	{
+		m_cameraManager.Update(input);
+	}
+}
+
+void RenderManager::ResetFrameState()
+{
+	m_lastFrameCommandCount = 0;
+	m_lastFrameSkippedObjects = 0;
+	m_frameAllocator.Reset();
+	m_commands = nullptr;
+	if (m_commandCapacity > 0)
+	{
+		m_commands = static_cast<RenderCommand*>(m_frameAllocator.Allocate(sizeof(RenderCommand) * m_commandCapacity, alignof(RenderCommand)));
+	}
+	if (!m_commands && m_commandCapacity != 0)
+	{
+		m_commandCapacity = 0;
+	}
+}
+
+bool RenderManager::ShouldPreviewMainMenu(const FrontEndManager& frontEndManager, EngineState& engineState) const
+{
+	return engineState.IsEditorMode() &&
+		frontEndManager.FrontEndModeValue() == FrontEndMode::GameGUICreator &&
+		frontEndManager.Creator().IsMainMenuSelected();
+}
+
+void RenderManager::BuildRenderCommands(FrontEndManager& frontEndManager, LevelManager& levelManager, EngineState& engineState)
+{
+	(void)frontEndManager;
+	(void)engineState;
+	if (ShouldPreviewMainMenu(frontEndManager, engineState))
+	{
+		return;
+	}
+
+	const Level* activeLevel = levelManager.ActiveLevel();
+	static const std::vector<std::unique_ptr<Entity>> emptyObjects;
+	const auto& objects = activeLevel ? activeLevel->Objects() : emptyObjects;
+	for (const auto& object : objects)
+	{
+		if (!object || !object->GetMesh() || !object->GetShader())
+		{
+			++m_lastFrameSkippedObjects;
+			continue;
+		}
+
+		Submit(RenderCommand{
+			object->GetMesh(),
+			object->GetShader(),
+			object->BuildModelMatrix(),
+			object->skinned()
+		});
+	}
+}
+
+void RenderManager::DrawEditorFrame(FrontEndManager& frontEndManager, FileManager& fileManager, LevelManager& levelManager, ProjectManager& projectManager, Debug& debug)
+{
+	frontEndManager.BeginFrame();
+	const auto debugStart = std::chrono::high_resolution_clock::now();
+	debug.draw(ActiveCamera(), frontEndManager.EditorGUI());
+	const auto debugEnd = std::chrono::high_resolution_clock::now();
+	m_lastFrameDebugOverlayTime = debugEnd - debugStart;
+
+	const auto editorGuiStart = std::chrono::high_resolution_clock::now();
+	frontEndManager.DrawEngineGUI(*m_engineCamera, fileManager, levelManager, projectManager);
+	frontEndManager.DrawCreatorGUI(*m_engineCamera);
+	const auto editorGuiEnd = std::chrono::high_resolution_clock::now();
+	m_lastFrameEditorGuiTime = editorGuiEnd - editorGuiStart;
+
+	if (frontEndManager.FrontEndModeValue() == FrontEndMode::GameGUICreator)
+	{
+		m_lastFrameUiCreatorTime = m_lastFrameEditorGuiTime;
+		m_lastFrameRuntimeGuiTime = std::chrono::duration<double, std::milli>{ 0.0 };
+	}
+	else
+	{
+		m_lastFrameUiCreatorTime = std::chrono::duration<double, std::milli>{ 0.0 };
+		m_lastFrameRuntimeGuiTime = std::chrono::duration<double, std::milli>{ 0.0 };
+	}
+	frontEndManager.EndFrame();
+}
+
+void RenderManager::DrawRuntimeFrame(FrontEndManager& frontEndManager, Debug& debug, Input& input)
+{
+	frontEndManager.BeginFrame();
+	const auto debugStart = std::chrono::high_resolution_clock::now();
+	if (Root::Current().GameModeDebugFlag())
+	{
+		debug.drawGameModeInput(input);
+	}
+	frontEndManager.DrawRuntimeGUI();
+	const auto debugEnd = std::chrono::high_resolution_clock::now();
+	m_lastFrameDebugOverlayTime = debugEnd - debugStart;
+	m_lastFrameEditorGuiTime = std::chrono::duration<double, std::milli>{ 0.0 };
+	m_lastFrameUiCreatorTime = std::chrono::duration<double, std::milli>{ 0.0 };
+	m_lastFrameRuntimeGuiTime = std::chrono::duration<double, std::milli>{ 0.0 };
+	frontEndManager.EndFrame();
+}
+
+void RenderManager::DrawFrame(FrontEndManager& frontEndManager, FileManager& fileManager, LevelManager& levelManager, ProjectManager& projectManager, Debug& debug, Input& input, EngineState& engineState)
+{
+	if (engineState.IsEditorMode())
+	{
+		DrawEditorFrame(frontEndManager, fileManager, levelManager, projectManager, debug);
+		return;
+	}
+
+	DrawRuntimeFrame(frontEndManager, debug, input);
+}
+
+Camera& RenderManager::ActiveCamera()
+{
+	return m_cameraManager.ActiveCamera();
+}
+
+const Camera& RenderManager::ActiveCamera() const
+{
+	return m_cameraManager.ActiveCamera();
+}
+
 void RenderManager::Submit(const RenderCommand& command)
 {
 	if (m_commandCount >= m_commandCapacity)
@@ -178,121 +364,20 @@ void RenderManager::Flush(const Camera& camera)
 
 void RenderManager::Loop(FrontEndManager& frontEndManager, FileManager& fileManager, LevelManager& levelManager, ProjectManager& projectManager, Debug& debug, Input& input, Window& window, EngineState& engineState)
 {
-	// Reset per-frame counters and rebuild the command buffer from scratch.
-	m_lastFrameCommandCount = 0;
-	m_lastFrameSkippedObjects = 0;
-	m_frameAllocator.Reset();
-	m_commands = nullptr;
-	if (m_commandCapacity > 0)
-	{
-		// Reuse the existing command capacity so we avoid reallocating every frame.
-		m_commands = static_cast<RenderCommand*>(m_frameAllocator.Allocate(sizeof(RenderCommand) * m_commandCapacity, alignof(RenderCommand)));
-	}
-	if (!m_commands && m_commandCapacity != 0)
-	{
-		m_commandCapacity = 0;
-	}
+	ResetFrameState();
 	const auto buildStart = std::chrono::high_resolution_clock::now();
+	BeginFrame();
 
-	// Start a new editor frame on the active graphics device.
-	// MyGUI uses fixed-function GL state for its overlay pass, so re-apply the
-	// engine's baseline state here to prevent GUI rendering from leaking depth or
-	// blend state into the next 3D frame.
-	m_device.ConfigureDefaultState();
-	m_device.Clear(0.0f, 0.0f, 0.0f, 0.0f);
-	m_device.BeginFrame();
-
-	const bool previewMainMenu =
-		engineState.IsEditorMode() &&
-		frontEndManager.FrontEndModeValue() == FrontEndMode::GameGUICreator &&
-		frontEndManager.Creator().IsMainMenuSelected();
-
-	if (!previewMainMenu) // broken bonudary between LevelManager
-	{
-		// Build render commands from the current level.
-		const Level* activeLevel = levelManager.ActiveLevel();
-		static const std::vector<std::unique_ptr<Entity>> emptyObjects;
-		const auto& objects = activeLevel ? activeLevel->Objects() : emptyObjects;
-		for (const auto& object : objects)
-		{
-			if (!object || !object->GetMesh() || !object->GetShader())
-			{
-				++m_lastFrameSkippedObjects;
-				continue;
-			}
-
-			Submit(RenderCommand{
-				object->GetMesh(),
-				object->GetShader(),
-				object->BuildModelMatrix(),
-				object->skinned()
-			});
-		}
-	}
+	BuildRenderCommands(frontEndManager, levelManager, engineState);
 	const auto buildEnd = std::chrono::high_resolution_clock::now();
 	m_lastFrameBuildTime = buildEnd - buildStart;
 
-	// Submit the built commands using the currently selected camera.
-	if (engineState.IsEditorMode())
-	{
-		m_cameraManager.Update(input);
-	}
-	Flush(m_cameraManager.ActiveCamera());
+	UpdateCameraPhase(input, engineState);
+	Flush(ActiveCamera());
 
-	// Draw ImGui overlays after the 3D pass.
-	if (engineState.IsEditorMode())
-	{
-		const auto debugStart = std::chrono::high_resolution_clock::now();
-		frontEndManager.BeginFrame();
-		// Draw editor overlays from the same camera as the level so preview modes stay consistent.
-		// Use active camera since the game camera can be used as a preview in editor mode
-		debug.draw(ActiveCamera(), frontEndManager.EditorGUI());
-		const auto debugEnd = std::chrono::high_resolution_clock::now();
-		m_lastFrameDebugOverlayTime = debugEnd - debugStart;
+	DrawFrame(frontEndManager, fileManager, levelManager, projectManager, debug, input, engineState);
 
-		const auto editorGuiStart = std::chrono::high_resolution_clock::now();
-		frontEndManager.UpdateEngineGUI(*m_engineCamera, fileManager, levelManager, projectManager);
-		frontEndManager.UpdateCreatorGUI(*m_engineCamera);
-		frontEndManager.DrawEngineGUI(*m_engineCamera, fileManager, levelManager, projectManager);
-		frontEndManager.DrawCreatorGUI(*m_engineCamera);
-		const auto editorGuiEnd = std::chrono::high_resolution_clock::now();
-		m_lastFrameEditorGuiTime = editorGuiEnd - editorGuiStart;
-
-		if (frontEndManager.FrontEndModeValue() == FrontEndMode::GameGUICreator)
-		{
-			m_lastFrameUiCreatorTime = m_lastFrameEditorGuiTime;
-			m_lastFrameRuntimeGuiTime = std::chrono::duration<double, std::milli>{ 0.0 };
-		}
-		else
-		{
-			m_lastFrameUiCreatorTime = std::chrono::duration<double, std::milli>{ 0.0 };
-			m_lastFrameRuntimeGuiTime = std::chrono::duration<double, std::milli>{ 0.0 };
-		}
-		frontEndManager.EndFrame();
-	}
-	else
-	{
-		const auto debugStart = std::chrono::high_resolution_clock::now();
-		frontEndManager.BeginFrame();
-		frontEndManager.UpdateRuntimeGUI();
-		if (Root::Current().GameModeDebugFlag())
-		{
-			debug.drawGameModeInput(input);
-		}
-		// The runtime manager keeps the first placed asset active, so the render
-		// loop only needs to draw the already-selected GameGUI instance.
-		frontEndManager.DrawRuntimeGUI();
-		const auto debugEnd = std::chrono::high_resolution_clock::now();
-		m_lastFrameDebugOverlayTime = debugEnd - debugStart;
-		m_lastFrameEditorGuiTime = std::chrono::duration<double, std::milli>{ 0.0 };
-		m_lastFrameUiCreatorTime = std::chrono::duration<double, std::milli>{ 0.0 };
-		m_lastFrameRuntimeGuiTime = std::chrono::duration<double, std::milli>{ 0.0 };
-		frontEndManager.EndFrame();
-	}
-
-	// Present the frame and process window events.
-	m_device.EndFrame();
-	window.PollEvents();
+	PresentFrame(window);
 }
 
 std::size_t RenderManager::LastFrameCommandCount() const

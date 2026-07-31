@@ -82,35 +82,6 @@ void FrontEndManager::BeginFrame()
 	}
 }
 
-void FrontEndManager::UpdateEngineGUI(const Camera& camera, FileManager& fileManager, LevelManager& levelManager, ProjectManager& projectManager)
-{
-	(void)camera;
-	(void)fileManager;
-	(void)levelManager;
-	(void)projectManager;
-	if (IsEditorMode() && m_mode == FrontEndMode::EngineEditor && m_engineGUI)
-	{
-		m_engineGUI->BeginFrame();
-	}
-}
-
-void FrontEndManager::UpdateRuntimeGUI()
-{
-	if (m_gameGUI && IsGameMode())
-	{
-		m_gameGUI->BeginFrame();
-	}
-}
-
-void FrontEndManager::UpdateCreatorGUI(const Camera& camera)
-{
-	(void)camera;
-	if (IsEditorMode() && m_mode == FrontEndMode::GameGUICreator && m_uiCreator)
-	{
-		m_uiCreator->BeginFrame();
-	}
-}
-
 void FrontEndManager::DrawEngineGUI(const Camera& camera, FileManager& fileManager, LevelManager& levelManager, ProjectManager& projectManager)
 {
 	if (IsEditorMode() && m_mode == FrontEndMode::EngineEditor && m_engineGUI)
