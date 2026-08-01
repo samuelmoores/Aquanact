@@ -52,6 +52,8 @@ public:
 	bool RemoveComponent();
 
 	void UpdateComponents(float dt);
+	void UpdateControllers(float dt);
+	void UpdateNonControllerComponents(float dt);
 	glm::mat4 BuildModelMatrix();
 	void Rotate(glm::vec3 delta);
 	void Move(glm::vec3 delta);

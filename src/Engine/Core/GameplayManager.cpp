@@ -8,6 +8,8 @@
 #include "Engine/Core/Root.h"
 #include "Engine/Core/FrameProfiler.h"
 
+#include <algorithm>
+
 GameplayManager::~GameplayManager() = default;
 
 namespace {
@@ -37,6 +39,7 @@ void GameplayManager::startUp(SceneManager& SceneManager, FrontEndManager& front
 {
 	m_levelManager = &SceneManager;
 	m_state = GameState::MainMenu;
+	m_controllerAccumulator = 0.0f;
 	if (m_levelManager)
 	{
 		// If the runtime UI is already initialized, set it to a known boot
@@ -54,6 +57,7 @@ void GameplayManager::shutDown()
 {
 	m_levelManager = nullptr;
 	m_state = GameState::MainMenu;
+	m_controllerAccumulator = 0.0f;
 }
 
 void GameplayManager::BootMainMenu(FrontEndManager& frontEndManager, Debug& debug)
@@ -206,13 +210,39 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 		engineState.IsGameMode() ? "Game" : "Editor");
 
 
-	// looping through the Scene's entitys makes sense
+	// Controllers use a fixed simulation step so a long render frame cannot
+	// turn directly into a large movement or rotation delta.
+	constexpr float fixedControllerStep = 1.0f / 120.0f;
+	constexpr int maxControllerSteps = 8;
+	m_controllerAccumulator += std::clamp(dt, 0.0f, 0.25f);
+	int controllerSteps = 0;
+	while (m_controllerAccumulator >= fixedControllerStep && controllerSteps < maxControllerSteps)
+	{
+		for (const auto& object : activeLevel->Objects())
+		{
+			if (object)
+			{
+				FrameProfiler::Scope controllerScope(Root::Current().Profiler(), "Controllers");
+				object->UpdateControllers(fixedControllerStep);
+			}
+		}
+		m_controllerAccumulator -= fixedControllerStep;
+		++controllerSteps;
+	}
+	if (controllerSteps == maxControllerSteps && m_controllerAccumulator >= fixedControllerStep)
+	{
+		// Drop excessive backlog instead of allowing a stalled frame to create an
+		// unbounded catch-up loop and freeze the application.
+		m_controllerAccumulator = 0.0f;
+	}
+
+	// Animation and other non-controller components remain frame-rate driven.
 	for (const auto& object : activeLevel->Objects())
 	{
 		if (object)
 		{
 			FrameProfiler::Scope animationScope(Root::Current().Profiler(), "Animation");
-			object->UpdateComponents(dt);
+			object->UpdateNonControllerComponents(dt);
 			if (AnimatorComponent* animator = object->GetAnimatorComponent())
 			{
 				std::string stateListText;

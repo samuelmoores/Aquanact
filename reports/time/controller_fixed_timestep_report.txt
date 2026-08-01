@@ -1,0 +1,96 @@
+Aquanact Controller Fixed Timestep Report
+==========================================
+
+Purpose
+-------
+This report documents the fixed timestep used for controller movement and
+rotation. The change prevents a variable render frame time from directly
+producing a large movement delta.
+
+Previous behavior
+-----------------
+All entity components were updated once per rendered frame. Controller code
+used the render frame delta directly:
+
+    movement = direction * moveSpeed * dt
+
+When a frame took longer than normal, the controller applied a larger movement
+and rotation step. This could appear as the player occasionally skipping ahead
+even when the displayed FPS quickly recovered.
+
+Current behavior
+----------------
+GameplayManager now accumulates elapsed frame time for controllers and updates
+them at a fixed 1/120 second timestep:
+
+    fixedControllerStep = 1.0 / 120.0
+
+The accumulator works as follows:
+
+    accumulator += frameDt
+    while accumulator >= fixedStep:
+        update all controllers with fixedStep
+        accumulator -= fixedStep
+
+At a stable 120 FPS, controllers run once per rendered frame. At a lower frame
+rate, a frame may run multiple fixed controller steps to catch up. At a higher
+render rate, some frames may not run a controller step because the accumulator
+has not reached the next simulation boundary.
+
+Component boundary
+------------------
+Entity component updates are now split into two paths:
+
+    UpdateControllers(fixedStep)
+    UpdateNonControllerComponents(frameDt)
+
+Controllers receive the fixed simulation timestep. Animation and other
+non-controller components continue to receive the frame-rate-driven dt. This
+preserves the existing animation timing behavior while stabilizing player
+translation and rotation.
+
+Catch-up protection
+-------------------
+The controller loop allows at most eight fixed steps per rendered frame. If a
+severe stall creates more backlog after those steps, the remaining backlog is
+dropped. This prevents an unrecoverable catch-up loop, sometimes called the
+spiral of death, from freezing the application after a long pause or debugger
+break.
+
+Tradeoffs
+---------
+
+    Movement and rotation are more consistent across variable render rates.
+    Long frames may perform multiple controller updates.
+    Input is sampled from the current input state for each fixed step.
+    A severe stall can discard excess simulation time after the safety limit.
+    Animation remains frame-rate-driven and may still visually jump if a render
+    frame is missed; fixed movement does not create missing rendered frames.
+
+Relationship to the frame cap
+-----------------------------
+The engine currently targets a 120 FPS render cap, which matches the controller
+fixed step. The fixed timestep remains useful if the render cap changes or a
+frame temporarily falls below the target because movement remains independent
+of the render cadence.
+
+Relevant files
+--------------
+
+    include/Engine/Core/Entity.h
+    src/Engine/Core/Entity.cpp
+    include/Engine/Core/GameplayManager.h
+    src/Engine/Core/GameplayManager.cpp
+    reports/time/frame_cap_report.txt
+
+Validation checklist
+--------------------
+
+    Hold movement at the 120 FPS target and verify normal speed.
+    Reproduce a frame-time spike and confirm the player does not jump farther
+    than expected.
+    Compare movement at 80, 120, and uncapped render rates.
+    Verify turning remains smooth while movement is held.
+    Confirm animation timing remains frame-rate-driven.
+    Confirm a severe stall does not create an unbounded update loop.
+

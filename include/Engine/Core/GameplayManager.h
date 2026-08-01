@@ -34,5 +34,6 @@ public:
 private:
 	SceneManager* m_levelManager = nullptr;
 	GameState m_state = GameState::MainMenu;
+	float m_controllerAccumulator = 0.0f;
 };
 

@@ -144,6 +144,28 @@ void Entity::UpdateComponents(float dt)
 		component->Update(*this, dt);
 	}
 }
+
+void Entity::UpdateControllers(float dt)
+{
+	for (Component* component : OrderedComponents(*this))
+	{
+		if (dynamic_cast<Controller*>(component))
+		{
+			component->Update(*this, dt);
+		}
+	}
+}
+
+void Entity::UpdateNonControllerComponents(float dt)
+{
+	for (Component* component : OrderedComponents(*this))
+	{
+		if (!dynamic_cast<Controller*>(component))
+		{
+			component->Update(*this, dt);
+		}
+	}
+}
 void Entity::FirstFrameComponents()
 {
 	for (Component* component : OrderedComponents(*this))
