@@ -77,6 +77,7 @@ GameplayManager& Root::Gameplay() { return *m_gameplayManager; }
 Input& Root::InputRef() { return *m_input; }
 EngineState& Root::State() { return m_engineState; }
 bool& Root::GameModeDebugFlag() { return m_gameModeDebug; }
+bool& Root::EditorLaunchedGameSession() { return m_editorLaunchedGameSession; }
 
 void Root::InitializeOwnedSystems()
 {
@@ -105,6 +106,7 @@ void Root::startUp(int argc, char** argv)
 #else
 	m_engineState.SetMode(EngineMode::Editor);
 #endif
+	m_editorLaunchedGameSession = false;
 
 	m_window->startUp();
 	m_renderManager->startUp(*m_window);
@@ -120,6 +122,7 @@ void Root::startUp(int argc, char** argv)
 
 void Root::StartEditorSession()
 {
+	m_editorLaunchedGameSession = false;
 	m_frontEndManager->RuntimeGUI().SetUIMode(GameGUIManager::UIMode::MainMenu);
 }
 

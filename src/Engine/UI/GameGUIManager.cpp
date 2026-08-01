@@ -495,9 +495,8 @@ void GameGUIManager::DrawDiagnosticsWindow()
 void GameGUIManager::DrawReturnButton()
 {
 	const bool inGameMode = Root::Current().State().IsGameMode();
-	const bool inCreatorPreview = Root::Current().State().IsEditorMode() &&
-		Root::Current().FrontEnd().FrontEndModeValue() == FrontEndMode::GameGUICreator;
-	if (!inGameMode && !inCreatorPreview)
+	const bool editorLaunchedGameSession = Root::Current().EditorLaunchedGameSession();
+	if (!inGameMode || !editorLaunchedGameSession)
 	{
 		return;
 	}
@@ -514,6 +513,7 @@ void GameGUIManager::DrawReturnButton()
 		{
 			Root::Current().Debugger().LogMessage("Failed to reload the current project while returning to the editor.");
 		}
+		Root::Current().EditorLaunchedGameSession() = false;
 		Root::Current().State().SetMode(EngineMode::Editor);
 		Root::Current().Render().SetEditorMode();
 		LogAction("Return to editor requested");

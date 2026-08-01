@@ -98,6 +98,7 @@ void FrontEndManager::DrawRuntimeGUI()
 	{
 		m_gameGUI->Draw();
 		m_gameGUI->DrawDiagnosticsWindow();
+		m_gameGUI->DrawReturnButton();
 	}
 }
 

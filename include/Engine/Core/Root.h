@@ -56,6 +56,7 @@ public:
 	Input& InputRef();
 	EngineState& State();
 	bool& GameModeDebugFlag();
+	bool& EditorLaunchedGameSession();
 
 private:
 	void StartEditorSession();
@@ -76,6 +77,7 @@ private:
 	std::unique_ptr<Input> m_input;
 	EngineState m_engineState;
 	bool m_gameModeDebug = true;
+	bool m_editorLaunchedGameSession = false;
 	bool m_started = false;
 
 	static Root* s_current;

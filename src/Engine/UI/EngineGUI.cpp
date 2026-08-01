@@ -472,6 +472,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 				if (projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", levelManager))
 				{
 					Root::Current().State().SetMode(EngineMode::Game);
+					Root::Current().EditorLaunchedGameSession() = true;
 					Root::Current().Render().SetGameMode();
 					Root::Current().Gameplay().BootMainMenu(Root::Current().FrontEnd(), Root::Current().Debugger());
 				}
@@ -486,6 +487,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 				if (projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", levelManager))
 				{
 					Root::Current().State().SetMode(EngineMode::Game);
+					Root::Current().EditorLaunchedGameSession() = true;
 					Root::Current().Render().SetGameMode();
 					Root::Current().Gameplay().StartGameSession(Root::Current().FrontEnd(), Root::Current().Debugger(), Root::Current().State());
 				}
