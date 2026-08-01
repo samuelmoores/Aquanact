@@ -23,6 +23,15 @@ static aiMatrix4x4 MakeTranslation(const aiVector3D& t)
 	return m;
 }
 
+static float LoopTicks(float seconds, const Animation* animation)
+{
+	if (!animation || animation->Duration() <= 0.0f)
+	{
+		return 0.0f;
+	}
+	return fmodf(seconds * animation->TicksPerSecond(), animation->Duration());
+}
+
 Animator::Animator(const aiNode* rootNode, Skeleton* skeleton)
 	: m_rootNode(rootNode), m_skeleton(skeleton) {}
 
@@ -78,8 +87,8 @@ void Animator::Update(float dt)
 		}
 		Animation* a = m_clips[m_currentClip].get();
 		Animation* b = m_clips[m_nextClip].get();
-		float ticksA = fmodf(m_currentTime * a->TicksPerSecond(), a->Duration());
-		float ticksB = fmodf(m_nextTime * b->TicksPerSecond(), b->Duration());
+		float ticksA = LoopTicks(m_currentTime, a);
+		float ticksB = LoopTicks(m_nextTime, b);
 		TraverseBlend(ticksA, ticksB, m_blendFactor, m_rootNode, aiMatrix4x4(), a, b);
 		FireEvents(m_nextClip, m_prevTicks, ticksB, b->Duration());
 		m_prevTicks = ticksB;
@@ -92,7 +101,7 @@ void Animator::Update(float dt)
 	else
 	{
 		Animation* a = m_clips[m_currentClip].get();
-		float ticks = fmodf(m_currentTime * a->TicksPerSecond(), a->Duration());
+		float ticks = LoopTicks(m_currentTime, a);
 		Traverse(ticks, m_rootNode, aiMatrix4x4(), a);
 		FireEvents(m_currentClip, m_prevTicks, ticks, a->Duration());
 		m_prevTicks = ticks;
@@ -157,6 +166,22 @@ void Animator::TraverseBlend(float ticksA, float ticksB, float blend,
 		aiVector3D   blendT = (1.0f - blend) * tA + blend * tB;
 
 		nodeTransform = MakeTranslation(blendT) * aiMatrix4x4(blendR.GetMatrix()) * MakeScaling(blendS);
+	}
+	else if (chA || chB)
+	{
+		// Some clips omit channels for bones that do not move in that clip.
+		// Preserve the available animated channel during the transition instead
+		// of replacing it with the bind pose for the whole blend.
+		Animation* sourceAnimation = chA ? animA : animB;
+		const aiNodeAnim* sourceChannel = chA ? chA : chB;
+		aiVector3D scale;
+		aiVector3D translation;
+		aiQuaternion rotation;
+		const float sourceTicks = chA ? ticksA : ticksB;
+		sourceAnimation->CalcScaling(scale, sourceTicks, sourceChannel);
+		sourceAnimation->CalcRotation(rotation, sourceTicks, sourceChannel);
+		sourceAnimation->CalcPosition(translation, sourceTicks, sourceChannel);
+		nodeTransform = MakeTranslation(translation) * aiMatrix4x4(rotation.GetMatrix()) * MakeScaling(scale);
 	}
 
 	aiMatrix4x4 global = parent * nodeTransform;

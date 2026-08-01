@@ -241,7 +241,11 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 void Debug::drawGameModeInput(const Input& input)
 {
 	// Game mode uses this panel to show live input and gameplay state without the editor UI.
+	const float gameFrameTime = input.DeltaTime();
+	m_lastFps = gameFrameTime > 0.0f ? 1.0f / gameFrameTime : 0.0f;
+
 	ImGui::Begin("Game Input");
+	ImGui::Text("FPS: %.1f", m_lastFps);
 	ImGui::Text("Window focused: %s", input.WindowFocused() ? "yes" : "no");
 	ImGui::Text("Look active: %s", input.LookActive() ? "yes" : "no");
 	ImGui::Text("Look became active: %s", input.LookBecameActive() ? "yes" : "no");
@@ -277,6 +281,7 @@ void Debug::drawGameModeInput(const Input& input)
 	ImGui::End();
 
 	ImGui::Begin("Gameplay Diagnostics");
+	ImGui::Text("FPS: %.1f", m_lastFps);
 	ImGui::Text("Controller owner bound: %s", m_controllerOwnerBound ? "yes" : "no");
 	ImGui::Text("Object: %s", m_gameplayObjectName.empty() ? "<none>" : m_gameplayObjectName.c_str());
 	ImGui::Text("Active Scene: %s", m_activeLevelName.empty() ? "<none>" : m_activeLevelName.c_str());

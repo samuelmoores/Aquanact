@@ -48,38 +48,72 @@ int Animation::FindScalingKey(float timeTicks, const aiNodeAnim* ch) const
 
 void Animation::CalcPosition(aiVector3D& out, float timeTicks, const aiNodeAnim* ch) const
 {
+	if (!ch || ch->mNumPositionKeys == 0)
+	{
+		out = aiVector3D(0.0f);
+		return;
+	}
 	if (ch->mNumPositionKeys == 1) { out = ch->mPositionKeys[0].mValue; return; }
+	const int last = static_cast<int>(ch->mNumPositionKeys) - 1;
 	int i = FindPositionKey(timeTicks, ch);
 	float t1 = (float)ch->mPositionKeys[i].mTime;
 	float t2 = (float)ch->mPositionKeys[i + 1].mTime;
+	aiVector3D nextValue = ch->mPositionKeys[i + 1].mValue;
+	if (i == last - 1 && timeTicks >= t2 && m_duration > t2)
+	{
+		t2 = static_cast<float>(ch->mPositionKeys[0].mTime) + m_duration;
+		nextValue = ch->mPositionKeys[0].mValue;
+	}
 	float denom = t2 - t1;
 	float f = denom != 0.0f ? (timeTicks - t1) / denom : 0.0f;
 	f = std::clamp(f, 0.0f, 1.0f);
-	out = ch->mPositionKeys[i].mValue + f * (ch->mPositionKeys[i + 1].mValue - ch->mPositionKeys[i].mValue);
+	out = ch->mPositionKeys[i].mValue + f * (nextValue - ch->mPositionKeys[i].mValue);
 }
 
 void Animation::CalcRotation(aiQuaternion& out, float timeTicks, const aiNodeAnim* ch) const
 {
+	if (!ch || ch->mNumRotationKeys == 0)
+	{
+		out = aiQuaternion();
+		return;
+	}
 	if (ch->mNumRotationKeys == 1) { out = ch->mRotationKeys[0].mValue; return; }
 	int i = FindRotationKey(timeTicks, ch);
 	float t1 = (float)ch->mRotationKeys[i].mTime;
 	float t2 = (float)ch->mRotationKeys[i + 1].mTime;
+	aiQuaternion nextValue = ch->mRotationKeys[i + 1].mValue;
+	if (i == static_cast<int>(ch->mNumRotationKeys) - 2 && timeTicks >= t2 && m_duration > t2)
+	{
+		t2 = static_cast<float>(ch->mRotationKeys[0].mTime) + m_duration;
+		nextValue = ch->mRotationKeys[0].mValue;
+	}
 	float denom = t2 - t1;
 	float f = denom != 0.0f ? (timeTicks - t1) / denom : 0.0f;
 	f = std::clamp(f, 0.0f, 1.0f);
-	aiQuaternion::Interpolate(out, ch->mRotationKeys[i].mValue, ch->mRotationKeys[i + 1].mValue, f);
+	aiQuaternion::Interpolate(out, ch->mRotationKeys[i].mValue, nextValue, f);
 	out.Normalize();
 }
 
 void Animation::CalcScaling(aiVector3D& out, float timeTicks, const aiNodeAnim* ch) const
 {
+	if (!ch || ch->mNumScalingKeys == 0)
+	{
+		out = aiVector3D(1.0f);
+		return;
+	}
 	if (ch->mNumScalingKeys == 1) { out = ch->mScalingKeys[0].mValue; return; }
 	int i = FindScalingKey(timeTicks, ch);
 	float t1 = (float)ch->mScalingKeys[i].mTime;
 	float t2 = (float)ch->mScalingKeys[i + 1].mTime;
+	aiVector3D nextValue = ch->mScalingKeys[i + 1].mValue;
+	if (i == static_cast<int>(ch->mNumScalingKeys) - 2 && timeTicks >= t2 && m_duration > t2)
+	{
+		t2 = static_cast<float>(ch->mScalingKeys[0].mTime) + m_duration;
+		nextValue = ch->mScalingKeys[0].mValue;
+	}
 	float denom = t2 - t1;
 	float f = denom != 0.0f ? (timeTicks - t1) / denom : 0.0f;
 	f = std::clamp(f, 0.0f, 1.0f);
-	out = ch->mScalingKeys[i].mValue + f * (ch->mScalingKeys[i + 1].mValue - ch->mScalingKeys[i].mValue);
+	out = ch->mScalingKeys[i].mValue + f * (nextValue - ch->mScalingKeys[i].mValue);
 }
 

@@ -32,6 +32,70 @@ namespace ProjectStateSerializer {
 			contents += ";";
 			contents += componentType;
 		}
+
+		void AppendComponentState(std::string& contents, const std::filesystem::path& projectPath, const Entity* object)
+		{
+			for (const Component* component : object->Components())
+			{
+				if (!component)
+				{
+					continue;
+				}
+
+				if (const PlayerController* playerController = dynamic_cast<const PlayerController*>(component))
+				{
+					AppendComponentLine(contents, projectPath, object, "playercontroller");
+					contents += ";" + std::to_string(playerController->MoveSpeed()) + "\n";
+				}
+				else if (const Controller* controller = dynamic_cast<const Controller*>(component))
+				{
+					AppendComponentLine(contents, projectPath, object, "controller");
+					contents += ";" + std::to_string(controller->MoveSpeed()) + "\n";
+				}
+				else if (const PlayerHealth* playerHealth = dynamic_cast<const PlayerHealth*>(component))
+				{
+					AppendComponentLine(contents, projectPath, object, "playerhealth");
+					contents += ";" + std::to_string(playerHealth->Health());
+					contents += ";" + std::to_string(playerHealth->MaxHealth()) + "\n";
+				}
+				else if (dynamic_cast<const Enemy*>(component))
+				{
+					AppendComponentLine(contents, projectPath, object, "enemy");
+					contents += "\n";
+				}
+				else if (const AnimatorComponent* animator = dynamic_cast<const AnimatorComponent*>(component))
+				{
+					AppendComponentLine(contents, projectPath, object, "animator");
+					contents += ";" + ProjectStateFormat::EscapeField(animator->InitialState());
+					contents += ";" + std::to_string(animator->States().size());
+					for (const auto& state : animator->States())
+					{
+						contents += ";" + ProjectStateFormat::EscapeField(state.name);
+						contents += ";" + std::to_string(state.clipIndex);
+					}
+
+					contents += ";" + std::to_string(animator->Transitions().size());
+					for (const auto& transition : animator->Transitions())
+					{
+						const auto appendOperand = [&contents](const AnimatorComponent::Operand& operand)
+						{
+							contents += ";" + std::to_string(static_cast<int>(operand.type));
+							contents += ";" + std::to_string(operand.constantValue);
+							contents += ";" + ProjectStateFormat::EscapeField(operand.componentName);
+							contents += ";" + ProjectStateFormat::EscapeField(operand.memberName);
+						};
+
+						contents += ";" + ProjectStateFormat::EscapeField(transition.from);
+						contents += ";" + ProjectStateFormat::EscapeField(transition.to);
+						contents += ";" + std::to_string(transition.blendSeconds);
+						appendOperand(transition.condition.left);
+						contents += ";" + std::to_string(static_cast<int>(transition.condition.comparator));
+						appendOperand(transition.condition.right);
+					}
+					contents += "\n";
+				}
+			}
+		}
 	}
 
 	std::string EscapeField(const std::string& value) { return ProjectStateFormat::EscapeField(value); }
@@ -41,7 +105,29 @@ namespace ProjectStateSerializer {
 	std::string HexDecode(const std::string& text) { return ProjectStateFormat::HexDecode(text); }
 	std::filesystem::path MakePortableSourcePath(const std::filesystem::path& projectPath, const std::filesystem::path& sourcePath) { return ProjectStateFormat::MakePortableSourcePath(projectPath, sourcePath); }
 	std::filesystem::path ResolveSourcePath(const std::filesystem::path& projectPath, const std::filesystem::path& sourcePath) { return ProjectStateFormat::ResolveSourcePath(projectPath, sourcePath); }
-	void AppendLevelState(std::string& contents, const std::filesystem::path& projectPath, const SceneManager& SceneManager) { ProjectStateFormat::AppendLevelState(contents, projectPath, SceneManager); }
+	void AppendLevelState(std::string& contents, const std::filesystem::path& projectPath, const SceneManager& SceneManager)
+	{
+		ProjectStateFormat::AppendLevelState(contents, projectPath, SceneManager);
+
+		// Transform data is written by ProjectStateFormat. Component behavior is
+		// written here so the serializer owns the complete entity reconstruction
+		// record for the component types currently supported by the engine.
+		for (const auto& scene : SceneManager.Levels())
+		{
+			if (!scene)
+			{
+				continue;
+			}
+			contents += "scenecontext;" + ProjectStateFormat::EscapeField(scene->Name()) + "\n";
+			for (const auto& object : scene->Objects())
+			{
+				if (object)
+				{
+					AppendComponentState(contents, projectPath, object.get());
+				}
+			}
+		}
+	}
 
 	bool LoadLevelState(
 		const std::filesystem::path& projectPath,
@@ -137,6 +223,21 @@ namespace ProjectStateSerializer {
 			if (fields.size() == 2 && fields[0] == "startuplevel")
 			{
 				startupLevelName = ProjectStateFormat::UnescapeField(fields[1]);
+				continue;
+			}
+
+			if (fields.size() == 2 && fields[0] == "scenecontext")
+			{
+				const std::string sceneName = ProjectStateFormat::UnescapeField(fields[1]);
+				currentLevel = nullptr;
+				for (auto& pendingLevel : pendingLevels)
+				{
+					if (pendingLevel.name == sceneName)
+					{
+						currentLevel = &pendingLevel;
+						break;
+					}
+				}
 				continue;
 			}
 
