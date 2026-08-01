@@ -50,41 +50,27 @@ void GameGUICreator::Draw(const Camera&)
 			if (ImGui::MenuItem("Create Button"))
 			{
 				m_showCreateWidgetPopup = true;
-				m_newWidgetIsText = false;
 				m_newWidgetIsImage = false;
 				m_newWidgetIsProgressBar = false;
+				m_newWidgetAction = GameGUIActionType::None;
+				m_newWidgetLaunchLevel.clear();
 				m_newWidgetName[0] = '\0';
-				m_newWidgetText[0] = '\0';
-				m_newWidgetTexture[0] = '\0';
-			}
-			if (ImGui::MenuItem("Create Text"))
-			{
-				m_showCreateWidgetPopup = true;
-				m_newWidgetIsText = true;
-				m_newWidgetIsImage = false;
-				m_newWidgetIsProgressBar = false;
-				m_newWidgetName[0] = '\0';
-				std::snprintf(m_newWidgetText, sizeof(m_newWidgetText), "New Text");
 				m_newWidgetTexture[0] = '\0';
 			}
 			if (ImGui::MenuItem("Create Image"))
 			{
 				m_showCreateWidgetPopup = true;
-				m_newWidgetIsText = false;
 				m_newWidgetIsImage = true;
 				m_newWidgetIsProgressBar = false;
 				m_newWidgetName[0] = '\0';
-				m_newWidgetText[0] = '\0';
 				std::snprintf(m_newWidgetTexture, sizeof(m_newWidgetTexture), "textures/example.png");
 			}
 			if (ImGui::MenuItem("Create Progress Bar"))
 			{
 				m_showCreateWidgetPopup = true;
-				m_newWidgetIsText = false;
 				m_newWidgetIsImage = false;
 				m_newWidgetIsProgressBar = true;
 				m_newWidgetName[0] = '\0';
-				m_newWidgetText[0] = '\0';
 				std::snprintf(m_newWidgetTexture, sizeof(m_newWidgetTexture), "textures/example.png");
 			}
 			ImGui::EndMenu();

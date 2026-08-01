@@ -44,6 +44,7 @@ void GameplayManager::startUp(SceneManager& SceneManager, FrontEndManager& front
 		if (frontEndManager.RuntimeGUI().HasRuntime())
 		{
 			frontEndManager.RuntimeGUI().SetUIMode(GameGUIManager::UIMode::MainMenu);
+			frontEndManager.RuntimeGUI().RefreshUIMode();
 		}
 	}
 }

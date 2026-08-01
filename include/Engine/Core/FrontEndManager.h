@@ -62,6 +62,7 @@ private:
 	std::unique_ptr<EngineGUI> m_engineGUI;
 	std::unique_ptr<GameGUIManager> m_gameGUI;
 	std::unique_ptr<GameGUICreator> m_uiCreator;
+	std::string m_lastCreatorAssetName = "MainMenu";
 	std::string m_runtimeImguiLayout;
 	FrontEndMode m_mode = FrontEndMode::EngineEditor;
 };

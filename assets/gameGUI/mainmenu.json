@@ -1,5 +1,29 @@
 {
   "name": "MainMenu",
   "widgets": [
+    {
+      "type": "Button",
+      "name": "New Game",
+      "parent": "",
+      "skin": "",
+      "text": "New Game",
+      "texture": "textures/GUI-Kit-Pack-Free_23.png",
+      "layer": "Main",
+      "x": 551,
+      "y": 328,
+      "width": 100,
+      "height": 30,
+      "textureWidth": 100,
+      "textureHeight": 30,
+      "fontSize": 0,
+      "visible": true,
+      "alpha": 1,
+      "action": "NewGame",
+      "launchLevel": "Level1",
+      "bindEntity": "",
+      "bindComponent": "",
+      "bindMember": "",
+      "bindEvent": ""
+    }
   ]
 }

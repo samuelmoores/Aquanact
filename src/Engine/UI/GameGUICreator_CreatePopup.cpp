@@ -39,14 +39,10 @@ void GameGUICreator::DrawCreateWidgetPopup()
 		return;
 	}
 
-	const char* widgetKind = m_newWidgetIsProgressBar ? "Create a progress bar widget:" : (m_newWidgetIsImage ? "Create an image widget:" : (m_newWidgetIsText ? "Create a text widget:" : "Create a button widget:"));
+	const char* widgetKind = m_newWidgetIsProgressBar ? "Create a progress bar widget:" : (m_newWidgetIsImage ? "Create an image widget:" : "Create a button widget:");
 	ImGui::TextUnformatted(widgetKind);
 	ImGui::InputText("Name", m_newWidgetName, sizeof(m_newWidgetName));
-	if (m_newWidgetIsText)
-	{
-		ImGui::InputText("Text", m_newWidgetText, sizeof(m_newWidgetText));
-	}
-	else if (m_newWidgetIsImage || m_newWidgetIsProgressBar)
+	if (!m_newWidgetIsProgressBar)
 	{
 		ImGui::InputText("Texture", m_newWidgetTexture, sizeof(m_newWidgetTexture));
 		ImGui::SameLine();
@@ -54,6 +50,11 @@ void GameGUICreator::DrawCreateWidgetPopup()
 		{
 			OpenTexturePicker(TexturePickerTarget::NewWidgetTexture);
 		}
+	}
+
+	if (m_newWidgetIsImage || m_newWidgetIsProgressBar)
+	{
+		ImGui::TextUnformatted(m_newWidgetIsProgressBar ? "Configure the progress bar's binding:" : "Choose an image for the widget:");
 	}
 
 	if (m_newWidgetIsProgressBar)
@@ -160,8 +161,11 @@ void GameGUICreator::DrawCreateWidgetPopup()
 	}
 	else
 	{
+		ImGui::Separator();
+		ImGui::TextUnformatted("Binding");
 		GameGUIActionType action = m_newWidgetAction;
-		if (ImGui::BeginCombo("Action", "None"))
+		const char* bindingLabel = action == GameGUIActionType::NewGame ? "New Game" : "None";
+		if (ImGui::BeginCombo("Action", bindingLabel))
 		{
 			const GameGUIActionType options[] = { GameGUIActionType::None, GameGUIActionType::NewGame };
 			for (GameGUIActionType option : options)
@@ -179,15 +183,41 @@ void GameGUICreator::DrawCreateWidgetPopup()
 			ImGui::EndCombo();
 		}
 		m_newWidgetAction = action;
+		if (m_newWidgetAction == GameGUIActionType::NewGame)
+		{
+			SceneManager& sceneManager = Root::Current().Levels();
+			const auto levelNames = sceneManager.SceneNames(SceneManager::SceneKind::Level);
+			const char* launchLabel = m_newWidgetLaunchLevel.empty() ? "<Select Level>" : m_newWidgetLaunchLevel.c_str();
+			if (ImGui::BeginCombo("Launch Level", launchLabel))
+			{
+				for (const std::string& levelName : levelNames)
+				{
+					const bool selected = m_newWidgetLaunchLevel == levelName;
+					if (ImGui::Selectable(levelName.c_str(), selected))
+					{
+						m_newWidgetLaunchLevel = levelName;
+					}
+					if (selected)
+					{
+						ImGui::SetItemDefaultFocus();
+					}
+				}
+				ImGui::EndCombo();
+			}
+			if (levelNames.empty())
+			{
+				ImGui::TextDisabled("No gameplay scenes are available.");
+			}
+		}
+		else
+		{
+			m_newWidgetLaunchLevel.clear();
+		}
 	}
 
 	if (ImGui::Button("Create"))
 	{
-		if (m_newWidgetIsText)
-		{
-			AddTextWidget();
-		}
-		else if (m_newWidgetIsProgressBar)
+		if (m_newWidgetIsProgressBar)
 		{
 			if (m_pendingProgressBarWidget.name.empty())
 			{
@@ -205,7 +235,7 @@ void GameGUICreator::DrawCreateWidgetPopup()
 			AddButtonWidget();
 		}
 		SyncRuntimePreview();
-		Root::Current().Debugger().LogMessage(m_newWidgetIsProgressBar ? "Create Progress Bar requested" : (m_newWidgetIsImage ? "Create Image requested" : (m_newWidgetIsText ? "Create Text requested" : "Create Button requested")));
+		Root::Current().Debugger().LogMessage(m_newWidgetIsProgressBar ? "Create Progress Bar requested" : (m_newWidgetIsImage ? "Create Image requested" : "Create Button requested"));
 		ImGui::CloseCurrentPopup();
 	}
 	ImGui::SameLine();

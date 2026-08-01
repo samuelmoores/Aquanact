@@ -33,6 +33,7 @@ struct GameGUIWidgetDef
 	std::string highlightColor;
 	std::string clickedColor;
 	GameGUIActionType action = GameGUIActionType::None;
+	std::string launchLevel;
 	std::string bindEntity;
 	std::string bindComponent;
 	std::string bindMember;

@@ -20,6 +20,7 @@ public:
 	void Draw();
 	void EndFrame();
 	void LoadUIAsset(const GameGUIAsset& asset);
+	void LoadPreviewAsset(const GameGUIAsset& asset);
 	bool AddSceneAsset(const std::string& name);
 	void RemoveSceneAsset(std::size_t index);
 	void SetSceneAssets(const std::vector<std::string>& names);
@@ -33,6 +34,7 @@ public:
 	bool ShowEditorWindow() const;
 	void SetShowEditorWindow(bool showEditorWindow);
 	void SetUIMode(UIMode mode);
+	void RefreshUIMode();
 	UIMode Mode() const;
 	void HideAll();
 	void LogAction(const std::string& message);
@@ -51,6 +53,8 @@ private:
 	static const char* AssetNameForMode(UIMode mode);
 	std::unique_ptr<GameGUI> m_runtime;
 	std::vector<GameGUIAsset> m_assets;
+	GameGUIAsset m_previewAsset;
+	bool m_previewActive = false;
 	std::vector<std::string> m_sceneAssets;
 	std::vector<std::string> m_actionLog;
 	std::string m_lastClickMessage;

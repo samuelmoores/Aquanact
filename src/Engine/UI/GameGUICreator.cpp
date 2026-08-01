@@ -18,7 +18,7 @@
 namespace {
 	const char* GUIName(std::size_t index)
 	{
-		static constexpr const char* names[] = { "Main Menu", "HUD", "Pause Menu", "Player UI" };
+		static constexpr const char* names[] = { "Main Menu", "HUD" };
 		return index < std::size(names) ? names[index] : "Unknown";
 	}
 
@@ -54,7 +54,7 @@ namespace {
 
 	Entity* FindEntity(Scene* scene, const std::string& name)
 	{
-		if (!scene) return nullptr;
+	if (!scene) return nullptr;
 		for (const auto& entity : scene->Entities())
 		{
 			if (entity && entity->Name() == name) return entity.get();
@@ -149,6 +149,28 @@ bool GameGUICreator::IsMainMenuSelected() const
 	return m_selectedGUI == GUIRole::MainMenu;
 }
 
+std::string GameGUICreator::SelectedGUIAssetName() const
+{
+	return GUIAssetName(GUIIndex(m_selectedGUI));
+}
+
+bool GameGUICreator::SelectGUIAsset(const std::string& assetName)
+{
+	for (std::size_t i = 0; i < m_assets.size(); ++i)
+	{
+		if (m_assets[i].name != assetName && GUIAssetName(i) != assetName)
+		{
+			continue;
+		}
+
+		m_selectedGUI = static_cast<GUIRole>(i);
+		m_selectedWidgetIndex = m_assets[i].widgets.empty() ? -1 : 0;
+		return true;
+	}
+
+	return false;
+}
+
 GameGUIAsset& GameGUICreator::CurrentRoleGUI()
 {
 	return m_assets[GUIIndex(m_selectedGUI)];
@@ -208,21 +230,7 @@ void GameGUICreator::AddButtonWidget()
 	widget.texture = m_newWidgetTexture;
 	widget.layer = "Main";
 	widget.action = m_newWidgetAction;
-	asset.widgets.push_back(widget);
-	m_selectedWidgetIndex = static_cast<int>(asset.widgets.size() - 1);
-	SaveSelectedRoleGUI();
-}
-
-void GameGUICreator::AddTextWidget()
-{
-	GameGUIAsset& asset = CurrentRoleGUI();
-	GameGUIWidgetDef widget;
-	widget.type = "Text";
-	widget.name = m_newWidgetName[0] != '\0' ? m_newWidgetName : "Text";
-	widget.text = m_newWidgetText;
-	widget.layer = "Main";
-	widget.width = 200;
-	widget.height = 30;
+	widget.launchLevel = m_newWidgetLaunchLevel;
 	asset.widgets.push_back(widget);
 	m_selectedWidgetIndex = static_cast<int>(asset.widgets.size() - 1);
 	SaveSelectedRoleGUI();

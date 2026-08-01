@@ -1,4 +1,6 @@
 #include "Engine/UI/GameGUICreator.h"
+#include "Engine/Core/Root.h"
+#include "Engine/Core/SceneManager.h"
 
 #include <imgui.h>
 #include <algorithm>
@@ -23,6 +25,36 @@ void GameGUICreator::DrawWidgetDetails()
 			GameGUIWidgetDef& widget = asset.widgets[static_cast<std::size_t>(m_selectedWidgetIndex)];
 			ImGui::Text("Name: %s", widget.name.c_str());
 			ImGui::Text("Type: %s", widget.type.c_str());
+			if (widget.type == "Button" && widget.action == GameGUIActionType::NewGame)
+			{
+				ImGui::Separator();
+				ImGui::TextUnformatted("New Game Launch");
+				SceneManager& sceneManager = Root::Current().Levels();
+				const auto levelNames = sceneManager.SceneNames(SceneManager::SceneKind::Level);
+				const char* launchLabel = widget.launchLevel.empty() ? "<Select Level>" : widget.launchLevel.c_str();
+				if (ImGui::BeginCombo("Launch Level", launchLabel))
+				{
+					for (const std::string& levelName : levelNames)
+					{
+						const bool selected = widget.launchLevel == levelName;
+						if (ImGui::Selectable(levelName.c_str(), selected))
+						{
+							widget.launchLevel = levelName;
+							SyncRuntimePreview();
+							SaveSelectedRoleGUI();
+						}
+						if (selected)
+						{
+							ImGui::SetItemDefaultFocus();
+						}
+					}
+					ImGui::EndCombo();
+				}
+				if (levelNames.empty())
+				{
+					ImGui::TextDisabled("No gameplay scenes are available.");
+				}
+			}
 			int position[2] = { widget.x, widget.y };
 			if (ImGui::DragInt2("Position", position, 1.0f))
 			{
@@ -37,54 +69,36 @@ void GameGUICreator::DrawWidgetDetails()
 				widget.y = 0;
 				SyncRuntimePreview();
 			}
-			if (widget.type == "TextBox" || widget.type == "Text")
+			int size[2] = { widget.width, widget.height };
+			if (ImGui::Checkbox("Lock Size", &m_lockWidgetSize) && m_lockWidgetSize)
 			{
-				int fontSize = widget.fontSize;
-				if (ImGui::DragInt("Font Size", &fontSize, 1.0f, 0, 200))
-				{
-					widget.fontSize = std::max(0, fontSize);
-					SyncRuntimePreview();
-				}
-				ImGui::SameLine();
-				if (ImGui::SmallButton("Reset##FontSize"))
-				{
-					widget.fontSize = 0;
-					SyncRuntimePreview();
-				}
+				m_lockedWidgetSizeRatio = widget.height > 0 ? static_cast<float>(widget.width) / static_cast<float>(widget.height) : 1.0f;
 			}
-			else
+			if (ImGui::DragInt2("Size", size, 1.0f))
 			{
-				int size[2] = { widget.width, widget.height };
-				if (ImGui::Checkbox("Lock Size", &m_lockWidgetSize) && m_lockWidgetSize)
+				widget.width = std::max(1, size[0]);
+				widget.height = std::max(1, size[1]);
+				if (m_lockWidgetSize)
 				{
-					m_lockedWidgetSizeRatio = widget.height > 0 ? static_cast<float>(widget.width) / static_cast<float>(widget.height) : 1.0f;
+					widget.height = std::max(1, static_cast<int>(std::lround(static_cast<float>(widget.width) / m_lockedWidgetSizeRatio)));
+					size[1] = widget.height;
 				}
-				if (ImGui::DragInt2("Size", size, 1.0f))
+				SyncRuntimePreview();
+			}
+			ImGui::SameLine();
+			if (ImGui::SmallButton("Reset##Size"))
+			{
+				if (widget.type == "ProgressBar")
 				{
-					widget.width = std::max(1, size[0]);
-					widget.height = std::max(1, size[1]);
-					if (m_lockWidgetSize)
-					{
-						widget.height = std::max(1, static_cast<int>(std::lround(static_cast<float>(widget.width) / m_lockedWidgetSizeRatio)));
-						size[1] = widget.height;
-					}
-					SyncRuntimePreview();
+					widget.width = widget.textureWidth;
+					widget.height = widget.defaultTextureHeight;
 				}
-				ImGui::SameLine();
-				if (ImGui::SmallButton("Reset##Size"))
+				else
 				{
-					if (widget.type == "ProgressBar")
-					{
-						widget.width = widget.textureWidth;
-						widget.height = widget.defaultTextureHeight;
-					}
-					else
-					{
-						widget.width = 100;
-						widget.height = 30;
-					}
-					SyncRuntimePreview();
+					widget.width = 100;
+					widget.height = 30;
 				}
+				SyncRuntimePreview();
 			}
 
 			if (widget.type == "ImageBox" || widget.type == "Image" || widget.type == "ProgressBar")

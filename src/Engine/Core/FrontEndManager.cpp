@@ -9,6 +9,7 @@
 #include "Engine/Core/SceneManager.h"
 #include "Engine/Core/ProjectManager.h"
 #include "Engine/Core/Root.h"
+#include "Engine/Core/RenderManager.h"
 #include <imgui.h>
 #include <cstring>
 
@@ -154,7 +155,18 @@ void FrontEndManager::OpenGameGUICreator()
 		m_engineGUI->SetShowAxis(false);
 		m_engineGUI->SetShowGrid(false);
 	}
+	if (m_uiCreator)
+	{
+		m_uiCreator->SelectGUIAsset(m_lastCreatorAssetName);
+	}
 	m_mode = FrontEndMode::GameGUICreator;
+	if (m_uiCreator)
+	{
+		// Load the selected creator asset immediately. The preview path remains
+		// separate from the runtime asset library used by the game.
+		m_uiCreator->PreviewSelectedGUI();
+	}
+	Root::Current().Render().SetActiveCamera(Root::Current().Render().GetGameCamera());
 }
 
 void FrontEndManager::CaptureRuntimeLayout()
@@ -199,6 +211,7 @@ void FrontEndManager::ReturnToEngineGUIEditor()
 {
 	if (m_uiCreator)
 	{
+		m_lastCreatorAssetName = m_uiCreator->SelectedGUIAssetName();
 		m_uiCreator->RestoreEditorViewState();
 	}
 	m_mode = FrontEndMode::EngineEditor;

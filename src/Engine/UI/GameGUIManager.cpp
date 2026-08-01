@@ -187,6 +187,7 @@ namespace {
 			widget.visible = readField("\"visible\":", widgetPos).find("true") != std::string::npos;
 			widget.alpha = ReadFloatField(readField("\"alpha\":", widgetPos), 1.0f);
 			widget.action = StringToAction(readField("\"action\":", widgetPos));
+			widget.launchLevel = readField("\"launchLevel\":", widgetPos);
 			widget.bindEntity = readField("\"bindEntity\":", widgetPos);
 			widget.bindComponent = readField("\"bindComponent\":", widgetPos);
 			widget.bindMember = readField("\"bindMember\":", widgetPos);
@@ -246,6 +247,8 @@ void GameGUIManager::shutDown()
 		m_runtime->shutDown();
 	}
 	m_assets.clear();
+	m_previewAsset = {};
+	m_previewActive = false;
 	m_activeAssetIndex = -1;
 	m_mode = UIMode::MainMenu;
 }
@@ -276,6 +279,7 @@ void GameGUIManager::EndFrame()
 
 void GameGUIManager::LoadUIAsset(const GameGUIAsset& asset)
 {
+	m_previewActive = false;
 	auto existing = std::find_if(m_assets.begin(), m_assets.end(), [&asset](const GameGUIAsset& other)
 	{
 		return other.name == asset.name;
@@ -291,6 +295,18 @@ void GameGUIManager::LoadUIAsset(const GameGUIAsset& asset)
 		m_activeAssetIndex = static_cast<int>(std::distance(m_assets.begin(), existing));
 	}
 	ApplyActiveAsset();
+}
+
+void GameGUIManager::LoadPreviewAsset(const GameGUIAsset& asset)
+{
+	// Creator edits are displayed through the runtime widget system, but they
+	// must not be inserted into the runtime asset library or active game state.
+	m_previewAsset = asset;
+	m_previewActive = true;
+	if (m_runtime)
+	{
+		m_runtime->LoadUIAsset(m_previewAsset);
+	}
 }
 
 bool GameGUIManager::AddSceneAsset(const std::string& name)
@@ -558,6 +574,12 @@ void GameGUIManager::SetUIMode(UIMode mode)
 
 	m_mode = mode;
 	LogAction(std::string("SetUIMode -> ") + (AssetNameForMode(mode) ? AssetNameForMode(mode) : "Custom"));
+	ApplyMode();
+}
+
+void GameGUIManager::RefreshUIMode()
+{
+	m_previewActive = false;
 	ApplyMode();
 }
 

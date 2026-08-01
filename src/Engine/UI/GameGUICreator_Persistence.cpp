@@ -52,7 +52,8 @@ void GameGUICreator::SaveSelectedRoleGUI()
 		json << "      \"fontSize\": " << widget.fontSize << ",\n";
 		json << "      \"visible\": " << (widget.visible ? "true" : "false") << ",\n";
 			json << "      \"alpha\": " << widget.alpha << ",\n";
-			json << "      \"action\": \"" << GameGUICreatorHelpers::ActionToString(widget.action) << "\",\n";
+		json << "      \"action\": \"" << GameGUICreatorHelpers::ActionToString(widget.action) << "\",\n";
+		json << "      \"launchLevel\": \"" << widget.launchLevel << "\",\n";
 		json << "      \"bindEntity\": \"" << widget.bindEntity << "\",\n";
 		json << "      \"bindComponent\": \"" << widget.bindComponent << "\",\n";
 		json << "      \"bindMember\": \"" << widget.bindMember << "\",\n";
@@ -93,7 +94,15 @@ void GameGUICreator::LoadSelectedRoleGUI()
 
 void GameGUICreator::SyncRuntimePreview()
 {
-	Root::Current().FrontEnd().RuntimeGUI().LoadUIAsset(CurrentRoleGUI());
+	Root::Current().FrontEnd().RuntimeGUI().LoadPreviewAsset(CurrentRoleGUI());
+}
+
+void GameGUICreator::PreviewSelectedGUI()
+{
+	if (m_initialized)
+	{
+		SyncRuntimePreview();
+	}
 }
 
 void GameGUICreator::RestoreEditorViewState()

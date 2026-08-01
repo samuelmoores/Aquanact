@@ -161,7 +161,8 @@ void RenderManager::ApplyProjectState(const ProjectStateData::RenderStateData& r
 
 void RenderManager::ApplyCameraMode(const EngineState& engineState)
 {
-	if (engineState.IsGameMode())
+	if (engineState.IsGameMode() ||
+		(engineState.IsEditorMode() && Root::Current().FrontEnd().FrontEndModeValue() == FrontEndMode::GameGUICreator))
 	{
 		m_cameraManager.SetGameMode(*m_gameCamera);
 	}

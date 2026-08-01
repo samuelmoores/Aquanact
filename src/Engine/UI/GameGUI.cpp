@@ -11,6 +11,7 @@
 #include "Engine/Core/StbImage.h"
 #include "Engine/Core/GLHeaders.h"
 #include "Engine/UI/GameGUIAsset.h"
+#include "Engine/UI/GameGUICreatorHelpers.h"
 #include "Engine/Core/FileSystem.h"
 #include "Engine/Core/Scene.h"
 #include "Engine/Core/SceneManager.h"
@@ -27,6 +28,7 @@
 #include <MYGUI/MyGUI_OpenGLImageLoader.h>
 #include <algorithm>
 #include <fstream>
+#include <iostream>
 #include <unordered_map>
 #include "Engine/Core/Texture.h"
 
@@ -107,6 +109,32 @@ namespace {
 			{
 				return &widget;
 			}
+		}
+		return nullptr;
+	}
+
+	Scene* FindPlayableScene(SceneManager& sceneManager)
+	{
+		for (const auto& scene : sceneManager.Levels())
+		{
+			if (scene && sceneManager.SceneKindFor(scene->Name()) == SceneManager::SceneKind::Level)
+			{
+				return scene.get();
+			}
+		}
+		return nullptr;
+	}
+
+	Scene* FindNamedLevel(SceneManager& sceneManager, const std::string& levelName)
+	{
+		if (levelName.empty())
+		{
+			return nullptr;
+		}
+		Scene* scene = sceneManager.FindLevel(levelName);
+		if (scene && sceneManager.SceneKindFor(scene->Name()) == SceneManager::SceneKind::Level)
+		{
+			return scene;
 		}
 		return nullptr;
 	}
@@ -440,12 +468,13 @@ MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::
 {
 	if (def.type == "Button")
 	{
+		const std::string skin = def.skin.empty() ? "Button" : def.skin;
 		MyGUI::Button* button = parent ?
-			parent->createWidget<MyGUI::Button>(def.skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.name) :
-			m_gui->createWidget<MyGUI::Button>(def.skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.layer, def.name);
+			parent->createWidget<MyGUI::Button>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.name) :
+			m_gui->createWidget<MyGUI::Button>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.layer, def.name);
 		if (button)
 		{
-			button->setCaption("");
+			button->setCaption(def.text.empty() ? def.name : def.text);
 			button->setVisible(def.visible);
 			button->setAlpha(def.alpha);
 			button->setColour(ParseColour(def.highlightColor, MyGUI::Colour::White));
@@ -620,12 +649,18 @@ void GameGUI::OnWidgetClicked(MyGUI::Widget* sender)
 	const std::string name = sender->getName();
 	const GameGUIWidgetDef* def = FindWidgetDef(m_loadedAsset, name);
 	const GameGUIActionType action = def ? def->action : GameGUIActionType::None;
+	const std::string launchLevel = def ? def->launchLevel : std::string{};
 	Root::Current().Debugger().LogMessage(std::string("GameGUI click received for widget: ") + (name.empty() ? "<unnamed>" : name));
+	Root::Current().Debugger().LogMessage("GameGUI button action=" + std::string(def ? GameGUICreatorHelpers::ActionToString(action) : "None") + ", launchLevel=" + (launchLevel.empty() ? std::string("<none>") : launchLevel));
+	std::cout << "GameGUI click received for widget: " << (name.empty() ? "<unnamed>" : name) << '\n';
+	std::cout << "GameGUI button action=" << (def ? GameGUICreatorHelpers::ActionToString(action) : "None")
+		<< ", launchLevel=" << (launchLevel.empty() ? "<none>" : launchLevel) << '\n';
 	Root::Current().FrontEnd().RuntimeGUI().RecordClick("Clicked widget: " + (name.empty() ? std::string("<unnamed>") : name));
 	Root::Current().FrontEnd().RuntimeGUI().RecordButtonClick(m_loadedAsset.name, name, action);
 	switch (action)
 	{
 	case GameGUIActionType::NewGame:
+	{
 		if (auto* button = dynamic_cast<MyGUI::Button*>(sender))
 		{
 			const GameGUIWidgetDef* buttonDef = FindWidgetDef(m_loadedAsset, name);
@@ -640,10 +675,40 @@ void GameGUI::OnWidgetClicked(MyGUI::Widget* sender)
 			break;
 		}
 		Root::Current().FrontEnd().RuntimeGUI().HideAll();
-		if (!Root::Current().Projects().LoadProject(Root::Current().Projects().CurrentProjectPath(), Root::Current().Levels()))
+		Scene* targetScene = FindNamedLevel(Root::Current().Levels(), launchLevel);
+		Root::Current().Debugger().LogMessage(
+			"GameGUI NewGame initial scene lookup: " +
+			std::string(targetScene ? targetScene->Name() : "<not found>"));
+		std::cout << "GameGUI NewGame initial scene lookup: " << (targetScene ? targetScene->Name() : "<not found>") << '\n';
+		if (!targetScene)
 		{
-			Root::Current().Debugger().LogMessage("GameGUI NewGame failed: could not reload the current project.");
-			break;
+			Root::Current().Debugger().LogMessage("GameGUI NewGame reloading project to retry scene lookup.");
+			std::cout << "GameGUI NewGame reloading project to retry scene lookup.\n";
+			if (!Root::Current().Projects().LoadProject(Root::Current().Projects().CurrentProjectPath(), Root::Current().Levels()))
+			{
+				Root::Current().Debugger().LogMessage("GameGUI NewGame failed: could not reload the current project.");
+				break;
+			}
+			targetScene = FindNamedLevel(Root::Current().Levels(), launchLevel);
+			Root::Current().Debugger().LogMessage(
+				"GameGUI NewGame post-reload scene lookup: " +
+				std::string(targetScene ? targetScene->Name() : "<not found>"));
+			std::cout << "GameGUI NewGame post-reload scene lookup: " << (targetScene ? targetScene->Name() : "<not found>") << '\n';
+		}
+		if (!targetScene)
+		{
+			targetScene = FindPlayableScene(Root::Current().Levels());
+			Root::Current().Debugger().LogMessage(
+				"GameGUI NewGame fallback playable scene: " +
+				std::string(targetScene ? targetScene->Name() : "<not found>"));
+			std::cout << "GameGUI NewGame fallback playable scene: " << (targetScene ? targetScene->Name() : "<not found>") << '\n';
+		}
+		if (targetScene)
+		{
+			Root::Current().Debugger().LogMessage("GameGUI NewGame launching scene: " + targetScene->Name());
+			std::cout << "GameGUI NewGame launching scene: " << targetScene->Name() << '\n';
+			Root::Current().Levels().SetActiveLevel(targetScene->Name());
+			Root::Current().Levels().SetStartupLevelName(targetScene->Name());
 		}
 		if (!Root::Current().Gameplay().BootPlayableLevel(Root::Current().FrontEnd(), Root::Current().Debugger()))
 		{
@@ -652,6 +717,7 @@ void GameGUI::OnWidgetClicked(MyGUI::Widget* sender)
 		}
 		Root::Current().FrontEnd().RuntimeGUI().RecordClick("New Game started");
 		break;
+	}
 	case GameGUIActionType::None:
 	default:
 		break;

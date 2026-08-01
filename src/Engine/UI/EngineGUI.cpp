@@ -475,6 +475,11 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 					Root::Current().State().SetMode(EngineMode::Game);
 					Root::Current().EditorLaunchedGameSession() = true;
 					Root::Current().Render().SetGameMode();
+					Root::Current().Gameplay().startUp(
+						SceneManager,
+						Root::Current().FrontEnd(),
+						Root::Current().Debugger(),
+						Root::Current().State());
 					Root::Current().Gameplay().BootMainMenu(Root::Current().FrontEnd(), Root::Current().Debugger());
 				}
 				else
@@ -491,6 +496,11 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 					Root::Current().State().SetMode(EngineMode::Game);
 					Root::Current().EditorLaunchedGameSession() = true;
 					Root::Current().Render().SetGameMode();
+					Root::Current().Gameplay().startUp(
+						SceneManager,
+						Root::Current().FrontEnd(),
+						Root::Current().Debugger(),
+						Root::Current().State());
 					Root::Current().Gameplay().StartGameSession(Root::Current().FrontEnd(), Root::Current().Debugger(), Root::Current().State());
 				}
 				else
