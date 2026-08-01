@@ -10,6 +10,7 @@
 #include "Engine/Core/ProjectManager.h"
 #include "Engine/Core/Root.h"
 #include <imgui.h>
+#include <cstring>
 
 FrontEndManager::~FrontEndManager()
 {
@@ -154,6 +155,22 @@ void FrontEndManager::OpenGameGUICreator()
 		m_engineGUI->SetShowGrid(false);
 	}
 	m_mode = FrontEndMode::GameGUICreator;
+}
+
+void FrontEndManager::CaptureRuntimeLayout()
+{
+	if (const char* imguiIniData = ImGui::SaveIniSettingsToMemory())
+	{
+		m_runtimeImguiLayout.assign(imguiIniData, std::strlen(imguiIniData));
+	}
+}
+
+void FrontEndManager::RestoreRuntimeLayout()
+{
+	if (!m_runtimeImguiLayout.empty())
+	{
+		ImGui::LoadIniSettingsFromMemory(m_runtimeImguiLayout.c_str(), m_runtimeImguiLayout.size());
+	}
 }
 
 void FrontEndManager::ApplyProjectState(

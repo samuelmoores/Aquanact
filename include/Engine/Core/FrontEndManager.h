@@ -34,6 +34,8 @@ public:
 	void DrawRuntimePreviewGUI();
 	void DrawCreatorGUI(const Camera& camera);
 	void EndFrame();
+	void CaptureRuntimeLayout();
+	void RestoreRuntimeLayout();
 	void ApplyProjectState(
 		bool editorShowAxis,
 		bool editorShowGrid,
@@ -60,6 +62,7 @@ private:
 	std::unique_ptr<EngineGUI> m_engineGUI;
 	std::unique_ptr<GameGUIManager> m_gameGUI;
 	std::unique_ptr<GameGUICreator> m_uiCreator;
+	std::string m_runtimeImguiLayout;
 	FrontEndMode m_mode = FrontEndMode::EngineEditor;
 };
 

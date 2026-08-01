@@ -504,6 +504,7 @@ void GameGUIManager::DrawReturnButton()
 	ImGui::Begin("Engine");
 	if (ImGui::Button("Return"))
 	{
+		Root::Current().FrontEnd().CaptureRuntimeLayout();
 		Root::Current().Levels().RestoreActiveLevelEditorTransforms();
 		if (Root::Current().Projects().CurrentProjectPath().empty())
 		{

@@ -62,6 +62,8 @@ namespace ProjectStateData {
 		glm::vec3 gameCameraFacing{ 0.0f };
 		bool editorShowAxis = true;
 		bool editorShowGrid = true;
+		bool debugShowLogWindow = false;
+		bool debugShowStatsWindow = false;
 		struct DirectionalLightData {
 			glm::vec3 direction{ 0.0f, -1.0f, 0.0f };
 			glm::vec3 color{ 1.0f };

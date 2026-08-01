@@ -1,6 +1,7 @@
 #include "Engine/Core/ProjectManager.h"
 
 #include "Engine/Core/Root.h"
+#include "Engine/Core/Debug.h"
 #include "Engine/Core/FrontEndManager.h"
 #include "Engine/UI/GameGUIManager.h"
 #include "Engine/Core/FileSystem.h"
@@ -113,7 +114,7 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const LevelM
 		return false;
 	}
 
-	std::string contents = "AquanactProject 13\n";
+		std::string contents = "AquanactProject 14\n";
 	AppendProjectStateSnapshot(contents, path, levelManager);
 
 	const bool written = m_fileSystem->WriteTextFile(path, contents);
@@ -157,6 +158,10 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 	{
 		projectVersion = 13;
 	}
+	else if (header == "AquanactProject 14")
+	{
+		projectVersion = 14;
+	}
 	else
 	{
 		return false;
@@ -176,6 +181,8 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 		ApplyStartupLevel(levelManager, startupLevelName, pendingLevels);
 		Root::Current().Render().ApplyProjectState(renderState);
 		Root::Current().FrontEnd().ApplyProjectState(renderState.editorShowAxis, renderState.editorShowGrid, pendingGameGUIAssets, pendingActiveGameGUIAsset, renderState.imguiLayout);
+		Root::Current().Debugger().SetShowLogWindow(renderState.debugShowLogWindow);
+		Root::Current().Debugger().SetShowStatsWindow(renderState.debugShowStatsWindow);
 		m_currentProjectPath = path;
 	}
 	return loaded;
