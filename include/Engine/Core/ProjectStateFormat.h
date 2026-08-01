@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-class LevelManager;
+class SceneManager;
 
 namespace ProjectStateFormat {
 	std::string EscapeField(const std::string& value);
@@ -14,6 +14,7 @@ namespace ProjectStateFormat {
 	std::string HexDecode(const std::string& text);
 	std::filesystem::path MakePortableSourcePath(const std::filesystem::path& projectPath, const std::filesystem::path& sourcePath);
 	std::filesystem::path ResolveSourcePath(const std::filesystem::path& projectPath, const std::filesystem::path& sourcePath);
-	void AppendLevelState(std::string& contents, const std::filesystem::path& projectPath, const LevelManager& levelManager);
+	void AppendLevelState(std::string& contents, const std::filesystem::path& projectPath, const SceneManager& SceneManager);
 }
+
 

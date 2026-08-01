@@ -2,7 +2,7 @@
 
 #include "Engine/Core/Root.h"
 #include "Engine/Core/FileSystem.h"
-#include "Engine/Core/Level.h"
+#include "Engine/Core/Scene.h"
 
 #include <MYGUI/MyGUI_Colour.h>
 #include <algorithm>
@@ -48,6 +48,20 @@ namespace GameGUICreatorHelpers {
 		switch (action) { case GameGUIActionType::NewGame: return "NewGame"; default: return "None"; }
 	}
 
+	std::filesystem::path AssetDirectory()
+	{
+#ifdef AQUANACT_SOURCE_ROOT
+		return std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets" / "gameGUI";
+#else
+		return std::filesystem::current_path() / "assets" / "gameGUI";
+#endif
+	}
+
+	std::filesystem::path TextureDirectory()
+	{
+		return SourceRoot() / "assets" / "textures";
+	}
+
 	bool ParseBoolField(const std::string& value)
 	{
 		return value.find("true") != std::string::npos;
@@ -78,28 +92,14 @@ namespace GameGUICreatorHelpers {
 		return false;
 	}
 
-	Entity* FindEntity(Level* level, const std::string& name)
+	Entity* FindEntity(Scene* scene, const std::string& name)
 	{
-		if (!level) return nullptr;
-		for (const auto& entity : level->Entities())
+		if (!scene) return nullptr;
+		for (const auto& entity : scene->Entities())
 		{
 			if (entity && entity->Name() == name) return entity.get();
 		}
 		return nullptr;
-	}
-
-	std::filesystem::path AssetDirectory()
-	{
-#ifdef AQUANACT_SOURCE_ROOT
-		return std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets" / "gameGUI";
-#else
-		return std::filesystem::current_path() / "assets" / "gameGUI";
-#endif
-	}
-
-	std::filesystem::path TextureDirectory()
-	{
-		return SourceRoot() / "assets" / "textures";
 	}
 
 	bool IsSupportedTextureFile(const std::filesystem::path& path)
@@ -190,4 +190,8 @@ namespace GameGUICreatorHelpers {
 		return asset;
 	}
 }
+
+
+
+
 

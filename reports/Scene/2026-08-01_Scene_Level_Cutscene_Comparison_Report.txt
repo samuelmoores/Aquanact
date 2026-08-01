@@ -1,0 +1,54 @@
+Scene, Level, and Cutscene Comparison Report
+Date: 2026-08-01
+
+Purpose
+- Document the current `Scene` system after the level-to-scene rename.
+- Clarify how a gameplay level differs from a cutscene scene.
+- Capture the overlap between both scene types so the design boundary stays explicit.
+
+Shared Similarities
+- Both are represented by the same `Scene` class.
+- Both own a collection of entities.
+- Both participate in project loading, saving, and startup selection.
+- Both can be navigated from the editor.
+- Both can be shown as entries in the scene lists.
+
+Key Differences
+- A level is a gameplay scene.
+- A cutscene is a non-gameplay scene.
+- A level may contain gameplay components such as controllers, player logic, and gameplay-driven entities.
+- A cutscene must not carry gameplay components.
+- A level is intended to drive the game loop.
+- A cutscene is intended to drive menus, presentation, or animation-only sequences.
+
+Current Engine Rules
+- `SceneManager::SceneKind` distinguishes `Level` and `Cutscene`.
+- `MainMenu` is treated as a cutscene scene.
+- Gameplay-only component reconstruction is blocked on cutscenes.
+- The editor menu exposes separate lists for levels and cutscenes.
+- New game flow chooses a playable level, not a cutscene.
+
+Why the Boundary Matters
+- It prevents menu and presentation scenes from becoming accidental gameplay scenes.
+- It keeps project startup logic from mixing gameplay intent with UI intent.
+- It gives the editor a clean way to choose between playable scenes and non-playable scenes.
+- It reduces ambiguity in project serialization and runtime startup behavior.
+
+Design Implications
+- A level should be the default target for gameplay sessions.
+- A cutscene should be usable as a main menu, intro sequence, or animated scene without gameplay logic.
+- The same underlying scene container can support both use cases, but reconstruction rules should stay different.
+
+Files Most Relevant
+- `include/Engine/Core/Scene.h`
+- `src/Engine/Core/Scene.cpp`
+- `include/Engine/Core/SceneManager.h`
+- `src/Engine/Core/SceneManager.cpp`
+- `src/Engine/Core/ProjectManager.cpp`
+- `src/Engine/Core/GameplayManager.cpp`
+- `src/Engine/UI/EngineGUI.cpp`
+
+Review Notes
+- The current approach keeps one scene model with two explicit behavioral categories.
+- The boundary is enforced by `SceneKind` and by reconstruction policy, not by separate classes.
+- That makes the system simpler to extend, but it also means the rules must remain consistent across editor, gameplay, and serialization.

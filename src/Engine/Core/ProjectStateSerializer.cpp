@@ -8,7 +8,7 @@
 #include "Engine/Core/Debug.h"
 #include "Engine/Core/Root.h"
 #include "Engine/UI/EngineGUI.h"
-#include "Engine/Core/LevelManager.h"
+#include "Engine/Core/SceneManager.h"
 #include "Engine/Core/PlayerController.h"
 #include "Engine/Core/RenderManager.h"
 #include "Game/Enemy.h"
@@ -41,7 +41,7 @@ namespace ProjectStateSerializer {
 	std::string HexDecode(const std::string& text) { return ProjectStateFormat::HexDecode(text); }
 	std::filesystem::path MakePortableSourcePath(const std::filesystem::path& projectPath, const std::filesystem::path& sourcePath) { return ProjectStateFormat::MakePortableSourcePath(projectPath, sourcePath); }
 	std::filesystem::path ResolveSourcePath(const std::filesystem::path& projectPath, const std::filesystem::path& sourcePath) { return ProjectStateFormat::ResolveSourcePath(projectPath, sourcePath); }
-	void AppendLevelState(std::string& contents, const std::filesystem::path& projectPath, const LevelManager& levelManager) { ProjectStateFormat::AppendLevelState(contents, projectPath, levelManager); }
+	void AppendLevelState(std::string& contents, const std::filesystem::path& projectPath, const SceneManager& SceneManager) { ProjectStateFormat::AppendLevelState(contents, projectPath, SceneManager); }
 
 	bool LoadLevelState(
 		const std::filesystem::path& projectPath,
@@ -237,19 +237,27 @@ namespace ProjectStateSerializer {
 				continue;
 			}
 
-			if (fields.size() >= 2 && fields[0] == "level")
+			if (fields.size() >= 2 && fields[0] == "Scene")
 			{
-				PendingLevel level;
-				level.name = ProjectStateFormat::UnescapeField(fields[1]);
-				if (level.name.empty())
+				PendingLevel Scene;
+				Scene.name = ProjectStateFormat::UnescapeField(fields[1]);
+				if (Scene.name.empty())
 				{
-					level.name = "Level";
+					Scene.name = "Scene";
 				}
 				if (fields.size() >= 3)
 				{
-					level.active = fields[2] == "1" || fields[2] == "true" || fields[2] == "True";
+					Scene.active = fields[2] == "1" || fields[2] == "true" || fields[2] == "True";
 				}
-				pendingLevels.push_back(std::move(level));
+				if (fields.size() >= 4)
+				{
+					Scene.isCutscene = fields[3] == "cutscene";
+				}
+				if (fields.size() >= 5)
+				{
+					Scene.isMainMenu = fields[4] == "1" || fields[4] == "true" || fields[4] == "True";
+				}
+				pendingLevels.push_back(std::move(Scene));
 				currentLevel = &pendingLevels.back();
 				continue;
 			}
@@ -316,3 +324,6 @@ namespace ProjectStateSerializer {
 		}
 	}
 }
+
+
+

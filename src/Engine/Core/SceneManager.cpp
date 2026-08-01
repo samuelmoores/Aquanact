@@ -1,4 +1,4 @@
-#include "Engine/Core/LevelManager.h"
+#include "Engine/Core/SceneManager.h"
 
 #include "Engine/Core/AnimatorComponent.h"
 #include "Engine/Core/Controller.h"
@@ -10,17 +10,18 @@
 
 #include <algorithm>
 
-void LevelManager::Clear()
+void SceneManager::Clear()
 {
 	m_levels.clear();
+	m_sceneKinds.clear();
 	m_activeLevel = nullptr;
 	m_editorTransformSnapshots.clear();
 	m_startupLevelName.clear();
 }
 
-LevelManager::~LevelManager() = default;
+SceneManager::~SceneManager() = default;
 
-Level* LevelManager::startUp()
+Scene* SceneManager::startUp()
 {
 	if (!m_activeLevel)
 	{
@@ -42,11 +43,12 @@ Level* LevelManager::startUp()
 	return m_activeLevel;
 }
 
-Level* LevelManager::CreateLevel(std::string name)
+Scene* SceneManager::CreateLevel(std::string name)
 {
-	auto level = std::make_unique<Level>(std::move(name));
-	Level* rawLevel = level.get();
+	auto level = std::make_unique<Scene>(std::move(name));
+	Scene* rawLevel = level.get();
 	m_levels.push_back(std::move(level));
+	m_sceneKinds[rawLevel->Name()] = SceneKind::Level;
 	if (!m_activeLevel)
 	{
 		m_activeLevel = rawLevel;
@@ -54,7 +56,20 @@ Level* LevelManager::CreateLevel(std::string name)
 	return rawLevel;
 }
 
-Level* LevelManager::FindLevel(const std::string& name) const
+Scene* SceneManager::CreateCutscene(std::string name)
+{
+	auto level = std::make_unique<Scene>(std::move(name));
+	Scene* rawLevel = level.get();
+	m_levels.push_back(std::move(level));
+	m_sceneKinds[rawLevel->Name()] = SceneKind::Cutscene;
+	if (!m_activeLevel)
+	{
+		m_activeLevel = rawLevel;
+	}
+	return rawLevel;
+}
+
+Scene* SceneManager::FindLevel(const std::string& name) const
 {
 	for (const auto& level : m_levels)
 	{
@@ -66,9 +81,9 @@ Level* LevelManager::FindLevel(const std::string& name) const
 	return nullptr;
 }
 
-bool LevelManager::SetActiveLevel(const std::string& name)
+bool SceneManager::SetActiveLevel(const std::string& name)
 {
-	Level* level = FindLevel(name);
+	Scene* level = FindLevel(name);
 	if (!level)
 	{
 		return false;
@@ -78,17 +93,50 @@ bool LevelManager::SetActiveLevel(const std::string& name)
 	return true;
 }
 
-void LevelManager::SetStartupLevelName(std::string name)
+void SceneManager::SetSceneKind(const std::string& name, SceneKind kind)
+{
+	m_sceneKinds[name] = kind;
+}
+
+SceneManager::SceneKind SceneManager::SceneKindFor(const std::string& name) const
+{
+	const auto it = m_sceneKinds.find(name);
+	if (it != m_sceneKinds.end())
+	{
+		return it->second;
+	}
+	return SceneKind::Level;
+}
+
+bool SceneManager::IsMainMenuScene(const std::string& name) const
+{
+	return name == "MainMenu";
+}
+
+std::vector<std::string> SceneManager::SceneNames(SceneKind kind) const
+{
+	std::vector<std::string> names;
+	for (const auto& level : m_levels)
+	{
+		if (level && SceneKindFor(level->Name()) == kind)
+		{
+			names.push_back(level->Name());
+		}
+	}
+	return names;
+}
+
+void SceneManager::SetStartupLevelName(std::string name)
 {
 	m_startupLevelName = std::move(name);
 }
 
-const std::string& LevelManager::StartupLevelName() const
+const std::string& SceneManager::StartupLevelName() const
 {
 	return m_startupLevelName;
 }
 
-void LevelManager::AppendProjectState(std::string& contents) const
+void SceneManager::AppendProjectState(std::string& contents) const
 {
 	if (m_startupLevelName.empty())
 	{
@@ -100,19 +148,19 @@ void LevelManager::AppendProjectState(std::string& contents) const
 	contents += "\n";
 }
 
-void LevelManager::ApplyProjectState(const std::string& startupLevelName)
+void SceneManager::ApplyProjectState(const std::string& startupLevelName)
 {
 	m_startupLevelName = startupLevelName;
 }
 
-void LevelManager::ApplyProjectState(
+void SceneManager::ApplyProjectState(
 	const std::vector<ProjectStateData::PendingLevel>& pendingLevels,
 	const std::vector<ProjectStateData::PendingController>& pendingControllers,
 	const std::vector<ProjectStateData::PendingComponent>& pendingComponents)
 {
-	auto findOrCreateLevel = [this](const std::string& levelName) -> Level*
+	auto findOrCreateLevel = [this](const std::string& levelName) -> Scene*
 	{
-		if (Level* level = FindLevel(levelName))
+		if (Scene* level = FindLevel(levelName))
 		{
 			return level;
 		}
@@ -121,7 +169,7 @@ void LevelManager::ApplyProjectState(
 
 	for (const auto& pendingController : pendingControllers)
 	{
-		Level* level = findOrCreateLevel(pendingController.levelName);
+		Scene* level = findOrCreateLevel(pendingController.levelName);
 		if (!level)
 		{
 			continue;
@@ -130,6 +178,10 @@ void LevelManager::ApplyProjectState(
 		for (const auto& object : level->Objects())
 		{
 			if (!object || object->SourcePath() != pendingController.sourcePath.string())
+			{
+				continue;
+			}
+			if (SceneKindFor(level->Name()) == SceneKind::Cutscene)
 			{
 				continue;
 			}
@@ -161,7 +213,7 @@ void LevelManager::ApplyProjectState(
 
 	for (const auto& pendingComponent : pendingComponents)
 	{
-		Level* level = findOrCreateLevel(pendingComponent.levelName);
+		Scene* level = findOrCreateLevel(pendingComponent.levelName);
 		if (!level)
 		{
 			continue;
@@ -170,6 +222,10 @@ void LevelManager::ApplyProjectState(
 		for (const auto& object : level->Objects())
 		{
 			if (!object || object->SourcePath() != pendingComponent.sourcePath.string())
+			{
+				continue;
+			}
+			if (SceneKindFor(level->Name()) == SceneKind::Cutscene)
 			{
 				continue;
 			}
@@ -233,7 +289,7 @@ void LevelManager::ApplyProjectState(
 
 	if (!pendingLevels.empty())
 	{
-		const Level* activeLevel = nullptr;
+		const Scene* activeLevel = nullptr;
 		for (const auto& pendingLevel : pendingLevels)
 		{
 			if (pendingLevel.active)
@@ -246,21 +302,25 @@ void LevelManager::ApplyProjectState(
 		{
 			activeLevel = m_levels.front().get();
 		}
+		for (const auto& pendingLevel : pendingLevels)
+		{
+			SetSceneKind(pendingLevel.name, pendingLevel.isCutscene ? SceneKind::Cutscene : SceneKind::Level);
+		}
 		SetActiveLevel(activeLevel->Name());
 	}
 }
 
-Level* LevelManager::ActiveLevel()
+Scene* SceneManager::ActiveLevel()
 {
 	return m_activeLevel;
 }
 
-const Level* LevelManager::ActiveLevel() const
+const Scene* SceneManager::ActiveLevel() const
 {
 	return m_activeLevel;
 }
 
-void LevelManager::ResetActiveLevelEntitiesToDefaultPosition()
+void SceneManager::ResetActiveLevelEntitiesToDefaultPosition()
 {
 	if (!m_activeLevel)
 	{
@@ -276,7 +336,7 @@ void LevelManager::ResetActiveLevelEntitiesToDefaultPosition()
 	}
 }
 
-void LevelManager::CaptureActiveLevelEditorTransforms()
+void SceneManager::CaptureActiveLevelEditorTransforms()
 {
 	m_editorTransformSnapshots.clear();
 	if (!m_activeLevel)
@@ -297,7 +357,7 @@ void LevelManager::CaptureActiveLevelEditorTransforms()
 	}
 }
 
-void LevelManager::RestoreActiveLevelEditorTransforms()
+void SceneManager::RestoreActiveLevelEditorTransforms()
 {
 	if (!m_activeLevel)
 	{

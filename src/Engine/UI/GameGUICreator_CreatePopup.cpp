@@ -3,19 +3,19 @@
 #include "Engine/Core/Debug.h"
 #include "Engine/Core/FrontEndManager.h"
 #include "Engine/Core/Root.h"
-#include "Engine/Core/Level.h"
-#include "Engine/Core/LevelManager.h"
+#include "Engine/Core/Scene.h"
+#include "Engine/Core/SceneManager.h"
 
 #include <imgui.h>
 
 namespace {
-	Entity* FindEntity(Level* level, const std::string& name)
+	Entity* FindEntity(Scene* scene, const std::string& name)
 	{
-		if (!level)
+		if (!scene)
 		{
 			return nullptr;
 		}
-		for (const auto& entity : level->Entities())
+		for (const auto& entity : scene->Entities())
 		{
 			if (entity && entity->Name() == name)
 			{
@@ -58,7 +58,7 @@ void GameGUICreator::DrawCreateWidgetPopup()
 
 	if (m_newWidgetIsProgressBar)
 	{
-		Level* activeLevel = Root::Current().Levels().ActiveLevel();
+		Scene* activeLevel = Root::Current().Levels().ActiveLevel();
 		ImGui::Separator();
 		ImGui::TextUnformatted("Binding");
 
@@ -215,4 +215,8 @@ void GameGUICreator::DrawCreateWidgetPopup()
 	}
 	ImGui::EndPopup();
 }
+
+
+
+
 

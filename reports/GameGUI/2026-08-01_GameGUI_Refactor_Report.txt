@@ -1,0 +1,41 @@
+GameGUI Refactor Report
+Date: 2026-08-01
+
+Scope
+- Reworked `GameGUICreator` into smaller source files.
+- Restored the missing `GameGUIManager` implementation after the split.
+- Cleaned up shared helper logic for asset loading, parsing, and path handling.
+- Kept the existing runtime/editor behavior intact.
+
+What Changed
+- `GameGUICreator.cpp` now focuses on creator flow and widget actions.
+- `GameGUICreator_Persistence.cpp` now owns save/load behavior for GUI assets.
+- `GameGUICreatorHelpers.cpp` now holds shared parsing and filesystem helpers.
+- `GameGUIManager.cpp` was restored and reattached to the build.
+
+Cleanups Completed
+- Reduced duplicate `ActionToString` and asset-loading logic.
+- Moved repeated creator file-path resolution into shared helpers.
+- Removed a few local helper copies from the creator and persistence files.
+- Normalized several creator call sites to use the shared helper namespace.
+
+Behavioral Notes
+- The refactor did not change how widgets are created, saved, loaded, or drawn.
+- The editor/runtime behavior for GameGUI assets should remain unchanged.
+- The build was verified after each cleanup pass.
+
+Files Touched
+- `include/Engine/UI/GameGUICreator.h`
+- `include/Engine/UI/GameGUICreatorHelpers.h`
+- `src/Engine/UI/GameGUICreator.cpp`
+- `src/Engine/UI/GameGUICreator_Persistence.cpp`
+- `src/Engine/UI/GameGUICreatorHelpers.cpp`
+- `src/Engine/UI/GameGUIManager.cpp`
+
+Review Notes
+- The split is functional, but `GameGUICreator.cpp` still contains some local helper logic that could be moved later.
+- The current structure is better organized than the original single-file version, but it is not fully minimal yet.
+- Further cleanup should focus on readability only, not behavior.
+
+Verification
+- `cmake --build .` completed successfully after the final cleanup.

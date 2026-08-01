@@ -1,23 +1,23 @@
-#include "Engine/Core/Level.h"
+#include "Engine/Core/Scene.h"
 #include "Engine/Core/EventManager.h"
 #include "Engine/Core/Root.h"
 
 #include <iostream>
 #include <algorithm>
 
-Level::Level(std::string name)
+Scene::Scene(std::string name)
 	: m_name(std::move(name))
 {
 }
 
-Level::~Level() = default;
+Scene::~Scene() = default;
 
-void Level::SetName(std::string name)
+void Scene::SetName(std::string name)
 {
 	m_name = std::move(name);
 }
 
-void Level::startUp()
+void Scene::startUp()
 {
 	for (const auto& entity : m_entities)
 	{
@@ -29,7 +29,7 @@ void Level::startUp()
 	m_firstFramePending = true;
 }
 
-void Level::FirstFrame()
+void Scene::FirstFrame()
 {
 	if (!m_firstFramePending)
 	{
@@ -46,14 +46,14 @@ void Level::FirstFrame()
 	}
 }
 
-void Level::Clear()
+void Scene::Clear()
 {
 	m_entities.clear();
 	Root::Current().Events().Clear();
 	m_firstFramePending = false;
 }
 
-Entity* Level::AddObject(std::unique_ptr<Entity> entity)
+Entity* Scene::AddObject(std::unique_ptr<Entity> entity)
 {
 	if (!entity)
 	{
@@ -65,7 +65,7 @@ Entity* Level::AddObject(std::unique_ptr<Entity> entity)
 	return rawEntity;
 }
 
-bool Level::RemoveObject(Entity* entity)
+bool Scene::RemoveObject(Entity* entity)
 {
 	if (!entity)
 	{

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Engine/Core/LevelManager.h"
+#include "Engine/Core/SceneManager.h"
 
 class FrontEndManager;
 class Debug;
@@ -17,9 +17,10 @@ public:
 
 	~GameplayManager();
 
-	void startUp(LevelManager& levelManager, FrontEndManager& frontEndManager, Debug& debug, EngineState& engineState);
+	void startUp(SceneManager& levelManager, FrontEndManager& frontEndManager, Debug& debug, EngineState& engineState);
 	void shutDown();
 	void BootMainMenu(FrontEndManager& frontEndManager, Debug& debug);
+	bool BootPlayableLevel(FrontEndManager& frontEndManager, Debug& debug);
 	void StartGameSession(FrontEndManager& frontEndManager, Debug& debug, EngineState& engineState);
 	void SyncRuntimeUI(FrontEndManager& frontEndManager) const;
 
@@ -31,7 +32,7 @@ public:
 	std::size_t ControllerCount() const;
 
 private:
-	LevelManager* m_levelManager = nullptr;
+	SceneManager* m_levelManager = nullptr;
 	GameState m_state = GameState::MainMenu;
 };
 

@@ -14,7 +14,7 @@
 #include "Engine/Core/LightingManager.h"
 #include "Engine/Core/FrameAllocator.h"
 #include "Engine/Core/GLHeaders.h"
-#include "Engine/Core/LevelManager.h"
+#include "Engine/Core/SceneManager.h"
 
 #include <imgui.h>
 #include <chrono>
@@ -75,7 +75,7 @@ void Debug::startUp()
 
 void Debug::shutDown()
 {
-	// Release overlay helpers first so they cannot outlive the renderer or level data.
+	// Release overlay helpers first so they cannot outlive the renderer or Scene data.
 	delete m_axis;
 	m_axis = nullptr;
 	delete m_grid;
@@ -217,8 +217,8 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 	{
 		ImGui::Begin("Debug Stats", &m_showStatsWindow);
 		ImGui::Text("FPS: %.1f", m_lastFps);
-		const Level* activeLevel = Root::Current().Levels().ActiveLevel();
-		ImGui::Text("Level objects: %zu", activeLevel ? activeLevel->Objects().size() : 0);
+		const Scene* activeLevel = Root::Current().Levels().ActiveLevel();
+		ImGui::Text("Scene objects: %zu", activeLevel ? activeLevel->Objects().size() : 0);
 		ImGui::Separator();
 		ImGui::Text("Render commands: %zu", Root::Current().Render().LastFrameCommandCount());
 		ImGui::Text("Skipped objects: %zu", Root::Current().Render().LastFrameSkippedObjects());
@@ -256,9 +256,9 @@ void Debug::drawGameModeInput(const Input& input)
 		Root::Current().FrontEnd().RuntimeGUI().Mode() == GameGUIManager::UIMode::PauseMenu ? "PauseMenu" :
 		Root::Current().FrontEnd().RuntimeGUI().Mode() == GameGUIManager::UIMode::PlayerUI ? "PlayerUI" :
 		Root::Current().FrontEnd().RuntimeGUI().Mode() == GameGUIManager::UIMode::Custom ? "Custom" : "Unknown");
-	const Level* activeLevel = Root::Current().Levels().ActiveLevel();
-	ImGui::Text("Active level: %s", activeLevel ? activeLevel->Name().c_str() : "<none>");
-	ImGui::Text("Active level objects: %zu", activeLevel ? activeLevel->Objects().size() : 0);
+	const Scene* activeLevel = Root::Current().Levels().ActiveLevel();
+	ImGui::Text("Active Scene: %s", activeLevel ? activeLevel->Name().c_str() : "<none>");
+	ImGui::Text("Active Scene objects: %zu", activeLevel ? activeLevel->Objects().size() : 0);
 	ImGui::Text("Controller components: %zu", Root::Current().Gameplay().ControllerCount());
 	const glm::vec3 move = input.MoveInput();
 	const glm::vec2 mouse = input.MouseDelta();
@@ -279,9 +279,9 @@ void Debug::drawGameModeInput(const Input& input)
 	ImGui::Begin("Gameplay Diagnostics");
 	ImGui::Text("Controller owner bound: %s", m_controllerOwnerBound ? "yes" : "no");
 	ImGui::Text("Object: %s", m_gameplayObjectName.empty() ? "<none>" : m_gameplayObjectName.c_str());
-	ImGui::Text("Active level: %s", m_activeLevelName.empty() ? "<none>" : m_activeLevelName.c_str());
+	ImGui::Text("Active Scene: %s", m_activeLevelName.empty() ? "<none>" : m_activeLevelName.c_str());
 	ImGui::Text("Engine mode: %s", m_engineMode.empty() ? "<none>" : m_engineMode.c_str());
-	ImGui::Text("Active level objects: %zu", m_activeLevelObjects);
+	ImGui::Text("Active Scene objects: %zu", m_activeLevelObjects);
 	ImGui::Text("Controller component count: %zu", m_controllerCount);
 	ImGui::Separator();
 	ImGui::Text("Move input: %.2f, %.2f, %.2f", m_gameplayMoveInput.x, m_gameplayMoveInput.y, m_gameplayMoveInput.z);
@@ -558,5 +558,8 @@ double Debug::StartupToFirstDrawMs() const
 {
 	return m_startupToFirstDrawMs;
 }
+
+
+
 
 

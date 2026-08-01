@@ -47,6 +47,8 @@ namespace ProjectStateData {
 	struct PendingLevel {
 		std::string name;
 		bool active = false;
+		bool isCutscene = false;
+		bool isMainMenu = false;
 		struct PendingObject {
 			std::filesystem::path sourcePath;
 			glm::vec3 position{ 0.0f };

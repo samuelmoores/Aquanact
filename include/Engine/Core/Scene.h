@@ -7,11 +7,11 @@
 #include <utility>
 #include <vector>
 
-class Level
+class Scene
 {
 public:
-	explicit Level(std::string name = "Level");
-	~Level();
+	explicit Scene(std::string name = "Scene");
+	~Scene();
 
 	const std::string& Name() const { return m_name; }
 	void SetName(std::string name);
@@ -29,4 +29,6 @@ private:
 	std::vector<std::unique_ptr<Entity>> m_entities;
 	bool m_firstFramePending = false;
 };
+
+
 

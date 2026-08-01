@@ -3,20 +3,20 @@
 #include "Engine/Core/Debug.h"
 #include "Engine/Core/FrontEndManager.h"
 #include "Engine/Core/Root.h"
-#include "Engine/Core/Level.h"
-#include "Engine/Core/LevelManager.h"
+#include "Engine/Core/Scene.h"
+#include "Engine/Core/SceneManager.h"
 
 #include <imgui.h>
 #include <vector>
 
 namespace {
-	Entity* FindEntity(Level* level, const std::string& name)
+	Entity* FindEntity(Scene* scene, const std::string& name)
 	{
-		if (!level)
+		if (!scene)
 		{
 			return nullptr;
 		}
-		for (const auto& entity : level->Entities())
+		for (const auto& entity : scene->Entities())
 		{
 			if (entity && entity->Name() == name)
 			{
@@ -76,10 +76,10 @@ void GameGUICreator::DrawBindingPopup()
 	ImGui::Text("Type: %s", widget->type.empty() ? "<Unknown>" : widget->type.c_str());
 	ImGui::Separator();
 
-	Level* activeLevel = Root::Current().Levels().ActiveLevel();
+	Scene* activeLevel = Root::Current().Levels().ActiveLevel();
 	if (!activeLevel)
 	{
-		ImGui::TextDisabled("No active level is available.");
+		ImGui::TextDisabled("No active Scene is available.");
 		if (ImGui::Button("Close"))
 		{
 			m_bindingWidgetName.clear();
@@ -223,4 +223,8 @@ void GameGUICreator::DrawBindingPopup()
 
 	ImGui::EndPopup();
 }
+
+
+
+
 

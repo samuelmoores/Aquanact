@@ -9,7 +9,7 @@
 #include "Engine/Core/AquanactBuildSystem.h"
 #include "Engine/Core/Root.h"
 #include "Engine/Core/Input.h"
-#include "Engine/Core/LevelManager.h"
+#include "Engine/Core/SceneManager.h"
 #include "Engine/Core/ProjectManager.h"
 #include "Engine/Core/Window.h"
 #include "Engine/Core/Camera.h"
@@ -369,9 +369,9 @@ void EngineGUI::BeginFrame()
 	ImGui::NewFrame();
 }
 
-void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& levelManager, ProjectManager& projectManager)
+void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& SceneManager, ProjectManager& projectManager)
 {
-	Level* activeLevel = levelManager.ActiveLevel();
+	Scene* activeLevel = SceneManager.ActiveLevel();
 	static const std::vector<std::unique_ptr<Entity>> emptyObjects;
 	const auto& objects = activeLevel ? activeLevel->Objects() : emptyObjects;
 	if (m_selectedLevelObjectIndex >= static_cast<int>(objects.size()))
@@ -396,11 +396,11 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 		{
 			if (ImGui::MenuItem("Save Project"))
 			{
-				projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", levelManager);
+				projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", SceneManager);
 			}
 			if (ImGui::MenuItem("Load Project"))
 			{
-				projectManager.LoadProject("C:/dev/Aquanact/assets/projects/project.aqua", levelManager);
+				projectManager.LoadProject("C:/dev/Aquanact/assets/projects/project.aqua", SceneManager);
 			}
 			ImGui::Separator();
 			const bool canImport = fileManager.CanImportSelection();
@@ -469,7 +469,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 			if (ImGui::MenuItem("Play Game"))
 			{
 				Root::Current().FrontEnd().Creator().SaveAllRoleGUIs();
-				if (projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", levelManager))
+				if (projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", SceneManager))
 				{
 					Root::Current().FrontEnd().RestoreRuntimeLayout();
 					Root::Current().State().SetMode(EngineMode::Game);
@@ -482,10 +482,10 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 					Root::Current().Debugger().LogMessage("Play Game aborted because project autosave failed.");
 				}
 			}
-			if (ImGui::MenuItem("Play Level")) 
+			if (ImGui::MenuItem("Play Scene")) 
 			{
 				Root::Current().FrontEnd().Creator().SaveAllRoleGUIs();
-				if (projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", levelManager))
+				if (projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", SceneManager))
 				{
 					Root::Current().FrontEnd().RestoreRuntimeLayout();
 					Root::Current().State().SetMode(EngineMode::Game);
@@ -495,7 +495,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 				}
 				else
 				{
-					Root::Current().Debugger().LogMessage("Play Level aborted because project autosave failed.");
+					Root::Current().Debugger().LogMessage("Play Scene aborted because project autosave failed.");
 				}
 			}
 			if (ImGui::MenuItem("Set Game Camera"))
@@ -510,32 +510,48 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 			}
 			ImGui::EndMenu();
 		}
-		if (ImGui::BeginMenu("Level"))
+		if (ImGui::BeginMenu("Scene"))
 		{
-			ImGui::MenuItem("Show Level Window", nullptr, &m_showLevelWindow);
+			ImGui::MenuItem("Show Scene Window", nullptr, &m_showLevelWindow);
 			if (ImGui::BeginMenu("Levels"))
 			{
-				const auto& levels = levelManager.Levels();
-				for (const auto& level : levels)
+				const auto levelNames = SceneManager.SceneNames(SceneManager::SceneKind::Level);
+				for (const auto& levelName : levelNames)
 				{
-					if (!level)
+					const Scene* Scene = SceneManager.FindLevel(levelName);
+					const bool active = SceneManager.ActiveLevel() == Scene;
+					if (ImGui::MenuItem(levelName.c_str(), nullptr, active))
 					{
-						continue;
-					}
-
-					const bool active = levelManager.ActiveLevel() == level.get();
-					if (ImGui::MenuItem(level->Name().c_str(), nullptr, active))
-					{
-						levelManager.SetActiveLevel(level->Name());
+						SceneManager.SetActiveLevel(levelName);
+						SceneManager.SetStartupLevelName(levelName);
 					}
 				}
-				if (levels.empty())
+				if (levelNames.empty())
 				{
-					ImGui::MenuItem("No levels created.", nullptr, false, false);
+					ImGui::MenuItem("No gameplay scenes created.", nullptr, false, false);
 				}
 				ImGui::EndMenu();
 			}
-			if (ImGui::MenuItem("New Level"))
+			if (ImGui::BeginMenu("Cutscenes"))
+			{
+				const auto cutsceneNames = SceneManager.SceneNames(SceneManager::SceneKind::Cutscene);
+				for (const auto& cutsceneName : cutsceneNames)
+				{
+					const Scene* cutscene = SceneManager.FindLevel(cutsceneName);
+					const bool active = SceneManager.ActiveLevel() == cutscene;
+					if (ImGui::MenuItem(cutsceneName.c_str(), nullptr, active))
+					{
+						SceneManager.SetActiveLevel(cutsceneName);
+						SceneManager.SetStartupLevelName(cutsceneName);
+					}
+				}
+				if (cutsceneNames.empty())
+				{
+					ImGui::MenuItem("No cutscenes created.", nullptr, false, false);
+				}
+				ImGui::EndMenu();
+			}
+			if (ImGui::MenuItem("New Scene"))
 			{
 				m_newLevelPopupRequested = true;
 			}
@@ -624,8 +640,8 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 	if (m_showLevelWindow)
 	{
 		bool open = m_showLevelWindow;
-		const Level* activeLevelForTitle = levelManager.ActiveLevel();
-		const std::string levelWindowTitle = activeLevelForTitle ? activeLevelForTitle->Name() : "Level";
+		const Scene* activeLevelForTitle = SceneManager.ActiveLevel();
+		const std::string levelWindowTitle = activeLevelForTitle ? activeLevelForTitle->Name() : "Scene";
 		if (ImGui::Begin(levelWindowTitle.c_str(), &open))
 		{
 			if (activeLevelForTitle)
@@ -647,12 +663,12 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 
 				if (levelObjects.empty())
 				{
-					ImGui::TextUnformatted("No entities in this level.");
+					ImGui::TextUnformatted("No entities in this Scene.");
 				}
 			}
 			else
 			{
-				ImGui::TextUnformatted("No active level selected.");
+				ImGui::TextUnformatted("No active Scene selected.");
 			}
 		}
 		ImGui::End();
@@ -675,10 +691,11 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 				{
 					ImGui::TextUnformatted("Selected object is null.");
 				}
-				else
-				{
-					const glm::vec3 worldCenterPosition = object->WorldCenterPosition();
-					const glm::vec3 defaultWorldCenterPosition = object->InitialWorldCenterPosition();
+					else
+					{
+						const bool activeSceneIsCutscene = SceneManager.SceneKindFor(activeLevel->Name()) == SceneManager::SceneKind::Cutscene;
+						const glm::vec3 worldCenterPosition = object->WorldCenterPosition();
+						const glm::vec3 defaultWorldCenterPosition = object->InitialWorldCenterPosition();
 
 					bool deleteEntity = false;
 					if (ImGui::Button("Delete"))
@@ -694,42 +711,47 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 						const bool hasEnemy = object->GetComponent<Enemy>() != nullptr;
 						const bool hasAnimator = object->GetComponent<AnimatorComponent>() != nullptr;
 
-						ImGui::BeginDisabled(hasController);
+						ImGui::BeginDisabled(hasController || activeSceneIsCutscene);
 						if (ImGui::Selectable("PlayerController"))
 						{
 							object->AddComponent<PlayerController>();
 						}
 						ImGui::EndDisabled();
 
-						ImGui::BeginDisabled(hasController);
+						ImGui::BeginDisabled(hasController || activeSceneIsCutscene);
 						if (ImGui::Selectable("Controller"))
 						{
 							object->AddComponent<Controller>();
 						}
 						ImGui::EndDisabled();
 
-						ImGui::BeginDisabled(hasPlayerHealth);
+						ImGui::BeginDisabled(hasPlayerHealth || activeSceneIsCutscene);
 						if (ImGui::Selectable("PlayerHealth"))
 						{
 							object->AddComponent<PlayerHealth>();
 						}
 						ImGui::EndDisabled();
 
-						ImGui::BeginDisabled(hasEnemy);
+						ImGui::BeginDisabled(hasEnemy || activeSceneIsCutscene);
 						if (ImGui::Selectable("Enemy"))
 						{
 							object->AddComponent<Enemy>();
 						}
 						ImGui::EndDisabled();
 
-						ImGui::BeginDisabled(hasAnimator || object->GetMesh() == nullptr || !object->GetMesh()->Skinned());
+						ImGui::BeginDisabled(hasAnimator || object->GetMesh() == nullptr || !object->GetMesh()->Skinned() || activeSceneIsCutscene);
 						if (ImGui::Selectable("Animator"))
 						{
 							object->AddComponent<AnimatorComponent>(object->GetMesh());
 						}
 						ImGui::EndDisabled();
 
-						if (hasController && hasPlayerHealth && hasEnemy && hasAnimator)
+						if (activeSceneIsCutscene)
+						{
+							ImGui::Separator();
+							ImGui::TextDisabled("Cutscenes cannot receive gameplay components.");
+						}
+						else if (hasController && hasPlayerHealth && hasEnemy && hasAnimator)
 						{
 							ImGui::Separator();
 							ImGui::TextDisabled("All components are already attached.");
@@ -740,7 +762,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, LevelManager& leve
 					if (ImGui::BeginPopupModal("Delete Entity##Confirm", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 					{
 						ImGui::Text("Delete %s from the scene?", object->Name().empty() ? "<unnamed>" : object->Name().c_str());
-						ImGui::TextDisabled("This removes the entity from the active level.");
+						ImGui::TextDisabled("This removes the entity from the active Scene.");
 						if (ImGui::Button("Delete"))
 						{
 							deleteEntity = true;
@@ -1440,14 +1462,14 @@ void EngineGUI::DrawNewLevelPopup()
 {
 	if (m_newLevelPopupRequested)
 	{
-		ImGui::OpenPopup("New Level##AquanactNewLevel");
+		ImGui::OpenPopup("New Scene##AquanactNewLevel");
 		m_newLevelPopupRequested = false;
 		m_newLevelStatusMessage.clear();
 	}
 
-	if (ImGui::BeginPopupModal("New Level##AquanactNewLevel", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+	if (ImGui::BeginPopupModal("New Scene##AquanactNewLevel", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 	{
-		ImGui::TextUnformatted("Create a new level:");
+		ImGui::TextUnformatted("Create a new scene:");
 		ImGui::InputText("Name", m_newLevelName, sizeof(m_newLevelName));
 
 		if (ImGui::Button("Create"))
@@ -1455,23 +1477,23 @@ void EngineGUI::DrawNewLevelPopup()
 			const std::string levelName = NormalizeLevelName(m_newLevelName);
 			if (levelName.empty())
 			{
-				m_newLevelStatusMessage = "Enter a valid level name.";
+				m_newLevelStatusMessage = "Enter a valid scene name.";
 			}
 			else if (Root::Current().Levels().FindLevel(levelName))
 			{
-				m_newLevelStatusMessage = "Level already exists.";
+				m_newLevelStatusMessage = "Scene already exists.";
 			}
 			else
 			{
-				Level* level = Root::Current().Levels().CreateLevel(levelName);
-				if (level)
+				Scene* Scene = Root::Current().Levels().CreateLevel(levelName);
+				if (Scene)
 				{
 					Root::Current().Levels().SetActiveLevel(levelName);
-					m_newLevelStatusMessage = "Created level " + levelName + ".";
+					m_newLevelStatusMessage = "Created scene " + levelName + ".";
 				}
 				else
 				{
-					m_newLevelStatusMessage = "Failed to create level.";
+					m_newLevelStatusMessage = "Failed to create scene.";
 				}
 			}
 		}
@@ -1511,6 +1533,9 @@ std::string EngineGUI::NormalizeLevelName(const std::string& input)
 	}
 	return output;
 }
+
+
+
 
 
 

@@ -5,7 +5,7 @@
 #include "Engine/Core/FrontEndManager.h"
 #include "Engine/UI/GameGUIManager.h"
 #include "Engine/Core/FileSystem.h"
-#include "Engine/Core/LevelManager.h"
+#include "Engine/Core/SceneManager.h"
 #include "Engine/Core/ProjectStateSerializer.h"
 #include "Engine/Core/RenderManager.h"
 #include <fstream>
@@ -34,25 +34,36 @@ namespace {
 		}
 	}
 
-	void AppendProjectStateSnapshot(std::string& contents, const std::filesystem::path& path, const LevelManager& levelManager)
+	void AppendProjectStateSnapshot(std::string& contents, const std::filesystem::path& path, const SceneManager& SceneManager)
 	{
-		ProjectStateSerializer::AppendLevelState(contents, path, levelManager);
+		ProjectStateSerializer::AppendLevelState(contents, path, SceneManager);
 		AppendCurrentCameraState(contents);
 		ProjectStateSerializer::AppendRenderState(contents, Root::Current().FrontEnd(), Root::Current().Render());
-		levelManager.AppendProjectState(contents);
+		SceneManager.AppendProjectState(contents);
+		if (SceneManager.StartupLevelName().empty())
+		{
+			contents += "startuplevel;MainMenu\n";
+		}
 		Root::Current().FrontEnd().RuntimeGUI().AppendProjectState(contents);
 		AppendImguiLayoutState(contents);
 	}
 
-	void MaterializePendingLevels(LevelManager& levelManager, const std::vector<ProjectStateData::PendingLevel>& pendingLevels)
+	void MaterializePendingLevels(SceneManager& SceneManager, const std::vector<ProjectStateData::PendingLevel>& pendingLevels)
 	{
-		levelManager.Clear();
+		SceneManager.Clear();
 		for (const auto& pendingLevel : pendingLevels)
 		{
-			Level* level = levelManager.CreateLevel(pendingLevel.name);
-			if (!level)
+			Scene* Scene = pendingLevel.isCutscene
+				? SceneManager.CreateCutscene(pendingLevel.name)
+				: SceneManager.CreateLevel(pendingLevel.name);
+			if (!Scene)
 			{
 				continue;
+			}
+			SceneManager.SetSceneKind(pendingLevel.name, pendingLevel.isCutscene ? SceneManager::SceneKind::Cutscene : SceneManager::SceneKind::Level);
+			if (pendingLevel.isMainMenu)
+			{
+				SceneManager.SetSceneKind(pendingLevel.name, SceneManager::SceneKind::Cutscene);
 			}
 
 			for (const auto& pendingObject : pendingLevel.objects)
@@ -64,35 +75,48 @@ namespace {
 				object->SetIgnoreCameraCollision(pendingObject.ignoreCameraCollision);
 				object->SetDefaultPosition(object->Position());
 				object->SetDefaultRotation(object->Rotation());
-				level->AddObject(std::move(object));
+				Scene->AddObject(std::move(object));
 			}
 		}
 	}
 
-	void ApplyStartupLevel(LevelManager& levelManager, const std::string& startupLevelName, const std::vector<ProjectStateData::PendingLevel>& pendingLevels)
+	void ApplyStartupLevel(SceneManager& SceneManager, const std::string& startupLevelName, const std::vector<ProjectStateData::PendingLevel>& pendingLevels)
 	{
 		if (!pendingLevels.empty())
 		{
-			const Level* activeLevel = nullptr;
+			const Scene* activeLevel = nullptr;
 			for (const auto& pendingLevel : pendingLevels)
 			{
 				if (pendingLevel.active)
 				{
-					activeLevel = levelManager.FindLevel(pendingLevel.name);
+					activeLevel = SceneManager.FindLevel(pendingLevel.name);
 					break;
 				}
 			}
 			if (!activeLevel)
 			{
-				activeLevel = levelManager.Levels().front().get();
+				activeLevel = SceneManager.Levels().front().get();
 			}
-			levelManager.SetActiveLevel(activeLevel->Name());
+			SceneManager.SetActiveLevel(activeLevel->Name());
 		}
 
 		if (!startupLevelName.empty())
 		{
-			levelManager.ApplyProjectState(startupLevelName);
+			SceneManager.ApplyProjectState(startupLevelName);
 		}
+		else
+		{
+			SceneManager.SetStartupLevelName("MainMenu");
+		}
+	}
+
+	void EnsureMainMenuLevel(SceneManager& SceneManager)
+	{
+		if (!SceneManager.FindLevel("MainMenu"))
+		{
+			SceneManager.CreateCutscene("MainMenu");
+		}
+		SceneManager.SetSceneKind("MainMenu", SceneManager::SceneKind::Cutscene);
 	}
 
 }
@@ -107,15 +131,15 @@ const std::filesystem::path& ProjectManager::CurrentProjectPath() const
 	return m_currentProjectPath;
 }
 
-bool ProjectManager::SaveProject(const std::filesystem::path& path, const LevelManager& levelManager)
+bool ProjectManager::SaveProject(const std::filesystem::path& path, const SceneManager& SceneManager)
 {
 	if (!m_fileSystem)
 	{
 		return false;
 	}
 
-		std::string contents = "AquanactProject 14\n";
-	AppendProjectStateSnapshot(contents, path, levelManager);
+		std::string contents = "AquanactProject 16\n";
+	AppendProjectStateSnapshot(contents, path, SceneManager);
 
 	const bool written = m_fileSystem->WriteTextFile(path, contents);
 	if (written)
@@ -125,7 +149,7 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const LevelM
 	return written;
 }
 
-bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager& levelManager)
+bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager& SceneManager)
 {
 	if (!m_fileSystem)
 	{
@@ -162,6 +186,14 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 	{
 		projectVersion = 14;
 	}
+	else if (header == "AquanactProject 15")
+	{
+		projectVersion = 15;
+	}
+	else if (header == "AquanactProject 16")
+	{
+		projectVersion = 16;
+	}
 	else
 	{
 		return false;
@@ -176,9 +208,14 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 	const bool loaded = ProjectStateSerializer::LoadLevelState(path, file, projectVersion, pendingLevels, pendingControllers, pendingComponents, pendingGameGUIAssets, pendingActiveGameGUIAsset, renderState, startupLevelName);
 	if (loaded) // broken boundary, no longer just I/O
 	{
-		MaterializePendingLevels(levelManager, pendingLevels);
-		levelManager.ApplyProjectState(pendingLevels, pendingControllers, pendingComponents);
-		ApplyStartupLevel(levelManager, startupLevelName, pendingLevels);
+		MaterializePendingLevels(SceneManager, pendingLevels);
+		SceneManager.ApplyProjectState(pendingLevels, pendingControllers, pendingComponents);
+		EnsureMainMenuLevel(SceneManager);
+		ApplyStartupLevel(SceneManager, startupLevelName, pendingLevels);
+		if (SceneManager.StartupLevelName().empty())
+		{
+			SceneManager.SetStartupLevelName("MainMenu");
+		}
 		Root::Current().Render().ApplyProjectState(renderState);
 		Root::Current().FrontEnd().ApplyProjectState(renderState.editorShowAxis, renderState.editorShowGrid, pendingGameGUIAssets, pendingActiveGameGUIAsset, renderState.imguiLayout);
 		Root::Current().Debugger().SetShowLogWindow(renderState.debugShowLogWindow);
@@ -187,5 +224,8 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, LevelManager
 	}
 	return loaded;
 }
+
+
+
 
 

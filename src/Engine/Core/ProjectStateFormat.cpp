@@ -3,7 +3,7 @@
 #include "Engine/Core/Entity.h"
 #include "Engine/Core/FileSystem.h"
 #include "Engine/Core/Root.h"
-#include "Engine/Core/LevelManager.h"
+#include "Engine/Core/SceneManager.h"
 #include "Engine/Core/ProjectStateData.h"
 #include "Engine/Core/AnimatorComponent.h"
 #include "Engine/Core/Controller.h"
@@ -146,23 +146,27 @@ namespace ProjectStateFormat {
 		return projectRelative;
 	}
 
-	void AppendLevelState(std::string& contents, const std::filesystem::path& projectPath, const LevelManager& levelManager)
+	void AppendLevelState(std::string& contents, const std::filesystem::path& projectPath, const SceneManager& SceneManager)
 	{
-		const auto& levels = levelManager.Levels();
+		const auto& levels = SceneManager.Levels();
 		if (levels.empty())
 		{
-			contents += "level;Default;1\n";
+			contents += "Scene;Default;1\n";
 			return;
 		}
-		for (const auto& level : levels)
+		for (const auto& Scene : levels)
 		{
-			if (!level) continue;
-			contents += "level;";
-			contents += EscapeField(level->Name());
+			if (!Scene) continue;
+			contents += "Scene;";
+			contents += EscapeField(Scene->Name());
 			contents += ";";
-			contents += (levelManager.ActiveLevel() == level.get()) ? "1" : "0";
+			contents += (SceneManager.ActiveLevel() == Scene.get()) ? "1" : "0";
+			contents += ";";
+			contents += SceneManager.SceneKindFor(Scene->Name()) == SceneManager::SceneKind::Cutscene ? "cutscene" : "Scene";
+			contents += ";";
+			contents += SceneManager.IsMainMenuScene(Scene->Name()) ? "1" : "0";
 			contents += "\n";
-			for (const auto& object : level->Objects())
+			for (const auto& object : Scene->Objects())
 			{
 				if (!object) continue;
 				const glm::vec3 position = object->Position();
@@ -179,3 +183,6 @@ namespace ProjectStateFormat {
 		}
 	}
 }
+
+
+

@@ -11,7 +11,7 @@
 class Window;
 class Camera;
 class FileManager;
-class LevelManager;
+class SceneManager;
 class ProjectManager;
 enum class EngineMode;
 
@@ -29,7 +29,7 @@ public:
 	void shutDown();
 
 	void BeginFrame();
-	void DrawEngineGUI(const Camera& camera, FileManager& fileManager, LevelManager& levelManager, ProjectManager& projectManager);
+	void DrawEngineGUI(const Camera& camera, FileManager& fileManager, SceneManager& SceneManager, ProjectManager& projectManager);
 	void DrawRuntimeGUI();
 	void DrawRuntimePreviewGUI();
 	void DrawCreatorGUI(const Camera& camera);
@@ -65,4 +65,5 @@ private:
 	std::string m_runtimeImguiLayout;
 	FrontEndMode m_mode = FrontEndMode::EngineEditor;
 };
+
 

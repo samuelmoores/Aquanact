@@ -8,7 +8,7 @@
 #include "Engine/Core/EventManager.h"
 #include "Engine/Core/FileManager.h"
 #include "Engine/Core/FileSystem.h"
-#include "Engine/Core/LevelManager.h"
+#include "Engine/Core/SceneManager.h"
 #include "Engine/Core/ProjectManager.h"
 #include "Engine/Core/GameplayManager.h"
 #include "Engine/Core/Input.h"
@@ -71,7 +71,7 @@ Debug& Root::Debugger() { return *m_debug; }
 EventManager& Root::Events() { return *m_eventManager; }
 FileManager& Root::Files() { return *m_fileManager; }
 FileSystem& Root::FileSystemRef() { return *m_fileSystem; }
-LevelManager& Root::Levels() { return *m_levelManager; }
+SceneManager& Root::Levels() { return *m_levelManager; }
 ProjectManager& Root::Projects() { return *m_projectManager; }
 GameplayManager& Root::Gameplay() { return *m_gameplayManager; }
 Input& Root::InputRef() { return *m_input; }
@@ -88,7 +88,7 @@ void Root::InitializeOwnedSystems()
 	m_eventManager = std::make_unique<EventManager>();
 	m_fileSystem = std::make_unique<FileSystem>();
 	m_fileManager = std::make_unique<FileManager>(*m_fileSystem);
-	m_levelManager = std::make_unique<LevelManager>();
+	m_levelManager = std::make_unique<SceneManager>();
 	m_projectManager = std::make_unique<ProjectManager>(*m_fileSystem);
 	m_gameplayManager = std::make_unique<GameplayManager>();
 	m_input = std::make_unique<Input>();
@@ -181,3 +181,6 @@ void Root::shutDown()
 	m_window->shutDown();
 	m_started = false;
 }
+
+
+

@@ -4,14 +4,37 @@
 #include "Engine/Core/AnimatorComponent.h"
 #include "Engine/Core/Debug.h"
 #include "Engine/Core/FrontEndManager.h"
-#include "Engine/Core/Level.h"
+#include "Engine/Core/Scene.h"
 #include "Engine/Core/Root.h"
 
 GameplayManager::~GameplayManager() = default;
 
-void GameplayManager::startUp(LevelManager& levelManager, FrontEndManager& frontEndManager, Debug& debug, EngineState& engineState)
+namespace {
+	constexpr const char* kMainMenuLevelName = "MainMenu";
+
+	Scene* FindPlayableLevel(SceneManager& SceneManager)
+	{
+		if (Scene* startupLevel = SceneManager.FindLevel(SceneManager.StartupLevelName()); startupLevel &&
+			SceneManager.SceneKindFor(startupLevel->Name()) == SceneManager::SceneKind::Level)
+		{
+			return startupLevel;
+		}
+
+		for (const auto& Scene : SceneManager.Levels())
+		{
+			if (Scene && SceneManager.SceneKindFor(Scene->Name()) == SceneManager::SceneKind::Level)
+			{
+				return Scene.get();
+			}
+		}
+
+		return nullptr;
+	}
+}
+
+void GameplayManager::startUp(SceneManager& SceneManager, FrontEndManager& frontEndManager, Debug& debug, EngineState& engineState)
 {
-	m_levelManager = &levelManager;
+	m_levelManager = &SceneManager;
 	m_state = GameState::MainMenu;
 	if (m_levelManager)
 	{
@@ -39,7 +62,19 @@ void GameplayManager::BootMainMenu(FrontEndManager& frontEndManager, Debug& debu
 	}
 
 	debug.LogMessage("GameplayManager::BootMainMenu()");
-	m_levelManager->Clear(); // broken boundary
+	Scene* mainMenuLevel = m_levelManager->FindLevel(kMainMenuLevelName);
+	if (!mainMenuLevel)
+	{
+		mainMenuLevel = m_levelManager->CreateLevel(kMainMenuLevelName);
+	}
+	if (mainMenuLevel)
+	{
+		m_levelManager->SetActiveLevel(mainMenuLevel->Name());
+		m_levelManager->SetStartupLevelName(mainMenuLevel->Name());
+		m_levelManager->startUp();
+		m_levelManager->CaptureActiveLevelEditorTransforms();
+		mainMenuLevel->FirstFrame();
+	}
 	m_state = GameState::MainMenu;
 	if (frontEndManager.RuntimeGUI().HasRuntime())
 	{
@@ -47,11 +82,36 @@ void GameplayManager::BootMainMenu(FrontEndManager& frontEndManager, Debug& debu
 	}
 }
 
+bool GameplayManager::BootPlayableLevel(FrontEndManager& frontEndManager, Debug& debug)
+{
+	if (!m_levelManager)
+	{
+		return false;
+	}
+
+	Scene* playableLevel = FindPlayableLevel(*m_levelManager);
+	if (!playableLevel)
+	{
+		debug.LogMessage("GameplayManager::BootPlayableLevel() failed: no non-UI Scene is available.");
+		return false;
+	}
+
+	m_levelManager->SetActiveLevel(playableLevel->Name());
+	m_levelManager->SetStartupLevelName(playableLevel->Name());
+	m_levelManager->startUp();
+	m_levelManager->CaptureActiveLevelEditorTransforms();
+	playableLevel->FirstFrame();
+	m_state = GameState::Playing;
+	debug.LogMessage("GameplayManager::BootPlayableLevel() state=Playing Scene=" + playableLevel->Name());
+	SyncRuntimeUI(frontEndManager);
+	return true;
+}
+
 void GameplayManager::StartGameSession(FrontEndManager& frontEndManager, Debug& debug, EngineState& engineState)
 {
 	if (!m_levelManager || !engineState.IsGameMode())
 	{
-		debug.LogMessage("GameplayManager::StartGameSession() skipped: no level manager or not in game mode.");
+		debug.LogMessage("GameplayManager::StartGameSession() skipped: no Scene manager or not in game mode.");
 		return;
 	}
 
@@ -70,7 +130,7 @@ void GameplayManager::StartGameSession(FrontEndManager& frontEndManager, Debug& 
 
 	m_levelManager->startUp();
 	m_levelManager->CaptureActiveLevelEditorTransforms();
-	Level* activeLevel = m_levelManager->ActiveLevel();
+	Scene* activeLevel = m_levelManager->ActiveLevel();
 	if (activeLevel)
 	{
 		activeLevel->FirstFrame();
@@ -103,7 +163,7 @@ void GameplayManager::SyncRuntimeUI(FrontEndManager& frontEndManager) const
 
 std::size_t GameplayManager::ControllerCount() const
 {
-	const Level* activeLevel = m_levelManager ? m_levelManager->ActiveLevel() : nullptr;
+	const Scene* activeLevel = m_levelManager ? m_levelManager->ActiveLevel() : nullptr;
 	if (!activeLevel)
 	{
 		return 0;
@@ -128,9 +188,9 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 		return;
 	}
 
-	// why is the game loop running if there could be no active level?
+	// why is the game loop running if there could be no active Scene?
 	// how can we check this before starting the game loop?
-	Level* activeLevel = m_levelManager ? m_levelManager->ActiveLevel() : nullptr;
+	Scene* activeLevel = m_levelManager ? m_levelManager->ActiveLevel() : nullptr;
 	if (!activeLevel)
 	{
 		return;
@@ -144,7 +204,7 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 		engineState.IsGameMode() ? "Game" : "Editor");
 
 
-	// looping through the level's entitys makes sense
+	// looping through the Scene's entitys makes sense
 	for (const auto& object : activeLevel->Objects())
 	{
 		if (object)
@@ -228,5 +288,8 @@ GameplayManager::GameState GameplayManager::State() const
 {
 	return m_state;
 }
+
+
+
 
 

@@ -7,8 +7,8 @@
 #include "Engine/Core/Window.h"
 #include "Engine/Core/Entity.h"
 #include "Engine/Core/Input.h"
-#include "Engine/Core/Level.h"
-#include "Engine/Core/LevelManager.h"
+#include "Engine/Core/Scene.h"
+#include "Engine/Core/SceneManager.h"
 #include "Engine/Core/ProjectStateData.h"
 
 #include <chrono>
@@ -216,7 +216,7 @@ bool RenderManager::ShouldPreviewMainMenu(const FrontEndManager& frontEndManager
 		frontEndManager.Creator().IsMainMenuSelected();
 }
 
-void RenderManager::BuildRenderCommands(FrontEndManager& frontEndManager, LevelManager& levelManager, EngineState& engineState)
+void RenderManager::BuildRenderCommands(FrontEndManager& frontEndManager, SceneManager& SceneManager, EngineState& engineState)
 {
 	(void)frontEndManager;
 	(void)engineState;
@@ -225,7 +225,7 @@ void RenderManager::BuildRenderCommands(FrontEndManager& frontEndManager, LevelM
 		return;
 	}
 
-	const Level* activeLevel = levelManager.ActiveLevel();
+	const Scene* activeLevel = SceneManager.ActiveLevel();
 	static const std::vector<std::unique_ptr<Entity>> emptyObjects;
 	const auto& objects = activeLevel ? activeLevel->Objects() : emptyObjects;
 	for (const auto& object : objects)
@@ -245,7 +245,7 @@ void RenderManager::BuildRenderCommands(FrontEndManager& frontEndManager, LevelM
 	}
 }
 
-void RenderManager::DrawEditorFrame(FrontEndManager& frontEndManager, FileManager& fileManager, LevelManager& levelManager, ProjectManager& projectManager, Debug& debug)
+void RenderManager::DrawEditorFrame(FrontEndManager& frontEndManager, FileManager& fileManager, SceneManager& SceneManager, ProjectManager& projectManager, Debug& debug)
 {
 	frontEndManager.BeginFrame();
 	const auto debugStart = std::chrono::high_resolution_clock::now();
@@ -254,7 +254,7 @@ void RenderManager::DrawEditorFrame(FrontEndManager& frontEndManager, FileManage
 	m_lastFrameDebugOverlayTime = debugEnd - debugStart;
 
 	const auto editorGuiStart = std::chrono::high_resolution_clock::now();
-	frontEndManager.DrawEngineGUI(*m_engineCamera, fileManager, levelManager, projectManager);
+	frontEndManager.DrawEngineGUI(*m_engineCamera, fileManager, SceneManager, projectManager);
 	frontEndManager.DrawCreatorGUI(*m_engineCamera);
 	if (frontEndManager.FrontEndModeValue() == FrontEndMode::GameGUICreator)
 	{
@@ -293,11 +293,11 @@ void RenderManager::DrawRuntimeFrame(FrontEndManager& frontEndManager, Debug& de
 	frontEndManager.EndFrame();
 }
 
-void RenderManager::DrawFrame(FrontEndManager& frontEndManager, FileManager& fileManager, LevelManager& levelManager, ProjectManager& projectManager, Debug& debug, Input& input, EngineState& engineState)
+void RenderManager::DrawFrame(FrontEndManager& frontEndManager, FileManager& fileManager, SceneManager& SceneManager, ProjectManager& projectManager, Debug& debug, Input& input, EngineState& engineState)
 {
 	if (engineState.IsEditorMode())
 	{
-		DrawEditorFrame(frontEndManager, fileManager, levelManager, projectManager, debug);
+		DrawEditorFrame(frontEndManager, fileManager, SceneManager, projectManager, debug);
 		return;
 	}
 
@@ -366,20 +366,20 @@ void RenderManager::Flush(const Camera& camera)
 	m_lastFrameFlushTime = flushEnd - flushStart;
 }
 
-void RenderManager::Loop(FrontEndManager& frontEndManager, FileManager& fileManager, LevelManager& levelManager, ProjectManager& projectManager, Debug& debug, Input& input, Window& window, EngineState& engineState)
+void RenderManager::Loop(FrontEndManager& frontEndManager, FileManager& fileManager, SceneManager& SceneManager, ProjectManager& projectManager, Debug& debug, Input& input, Window& window, EngineState& engineState)
 {
 	ResetFrameState();
 	const auto buildStart = std::chrono::high_resolution_clock::now();
 	BeginFrame();
 
-	BuildRenderCommands(frontEndManager, levelManager, engineState);
+	BuildRenderCommands(frontEndManager, SceneManager, engineState);
 	const auto buildEnd = std::chrono::high_resolution_clock::now();
 	m_lastFrameBuildTime = buildEnd - buildStart;
 
 	UpdateCameraPhase(input, engineState);
 	Flush(ActiveCamera());
 
-	DrawFrame(frontEndManager, fileManager, levelManager, projectManager, debug, input, engineState);
+	DrawFrame(frontEndManager, fileManager, SceneManager, projectManager, debug, input, engineState);
 
 	PresentFrame(window);
 }
@@ -438,5 +438,8 @@ std::size_t RenderManager::FrameAllocatorPeakBytes() const
 {
 	return m_frameAllocator.PeakBytes();
 }
+
+
+
 
 

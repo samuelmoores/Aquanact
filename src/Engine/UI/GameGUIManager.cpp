@@ -7,7 +7,7 @@
 #include "Engine/Core/ProjectManager.h"
 #include "Engine/Core/RenderManager.h"
 #include "Engine/Core/Input.h"
-#include "Engine/Core/LevelManager.h"
+#include "Engine/Core/SceneManager.h"
 #include "Engine/Core/FileSystem.h"
 
 #include <algorithm>
@@ -743,6 +743,3 @@ void GameGUIManager::ApplyMode()
 		LogAction(std::string("ApplyMode activated -> ") + assetName);
 	}
 }
-
-
-

@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-class LevelManager;
+class SceneManager;
 class FrontEndManager;
 class RenderManager;
 class Entity;
@@ -20,7 +20,7 @@ namespace ProjectStateSerializer {
 	std::string HexDecode(const std::string& text);
 	std::filesystem::path MakePortableSourcePath(const std::filesystem::path& projectPath, const std::filesystem::path& sourcePath);
 	std::filesystem::path ResolveSourcePath(const std::filesystem::path& projectPath, const std::filesystem::path& sourcePath);
-	void AppendLevelState(std::string& contents, const std::filesystem::path& projectPath, const LevelManager& levelManager);
+	void AppendLevelState(std::string& contents, const std::filesystem::path& projectPath, const SceneManager& SceneManager);
 	bool LoadLevelState(
 		const std::filesystem::path& projectPath,
 		std::istream& file,
@@ -34,4 +34,5 @@ namespace ProjectStateSerializer {
 		std::string& startupLevelName);
 	void AppendRenderState(std::string& contents, const FrontEndManager& frontEndManager, const RenderManager& renderManager);
 }
+
 

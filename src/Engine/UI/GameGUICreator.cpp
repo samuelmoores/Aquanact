@@ -5,8 +5,9 @@
 #include "Engine/Core/Window.h"
 #include "Engine/Core/Root.h"
 #include "Engine/Core/FileSystem.h"
-#include "Engine/Core/Level.h"
-#include "Engine/Core/LevelManager.h"
+#include "Engine/Core/Scene.h"
+#include "Engine/Core/SceneManager.h"
+#include "Engine/UI/GameGUICreatorHelpers.h"
 
 #include <MYGUI/MyGUI_Colour.h>
 #include <algorithm>
@@ -15,24 +16,6 @@
 #include <iterator>
 
 namespace {
-	int ReadIntField(const std::string& value, int fallback = 0)
-	{
-		if (value.empty())
-		{
-			return fallback;
-		}
-		try { return std::stoi(value); } catch (...) { return fallback; }
-	}
-
-	std::filesystem::path SourceRoot()
-	{
-#ifdef AQUANACT_SOURCE_ROOT
-		return std::filesystem::path(AQUANACT_SOURCE_ROOT);
-#else
-		return std::filesystem::current_path();
-#endif
-	}
-
 	const char* GUIName(std::size_t index)
 	{
 		static constexpr const char* names[] = { "Main Menu", "HUD", "Pause Menu", "Player UI" };
@@ -43,26 +26,6 @@ namespace {
 	{
 		static constexpr const char* names[] = { "MainMenu", "HUD", "PauseMenu", "PlayerUI" };
 		return index < std::size(names) ? names[index] : "Unknown";
-	}
-
-	const char* ActionLabel(GameGUIActionType action)
-	{
-		return action == GameGUIActionType::NewGame ? "New Game" : "None";
-	}
-
-	std::string ActionToString(GameGUIActionType action)
-	{
-		return action == GameGUIActionType::NewGame ? "NewGame" : "None";
-	}
-
-	MyGUI::Colour ParseColour(const std::string& value, const MyGUI::Colour& fallback)
-	{
-		try { return value.empty() ? fallback : MyGUI::Colour(value); } catch (...) { return fallback; }
-	}
-
-	GameGUIActionType StringToAction(const std::string& value)
-	{
-		return value == "NewGame" ? GameGUIActionType::NewGame : GameGUIActionType::None;
 	}
 
 	bool WouldCreateParentCycle(const GameGUIAsset& asset, const std::string& childName, const std::string& parentName)
@@ -89,28 +52,14 @@ namespace {
 		return false;
 	}
 
-	Entity* FindEntity(Level* level, const std::string& name)
+	Entity* FindEntity(Scene* scene, const std::string& name)
 	{
-		if (!level) return nullptr;
-		for (const auto& entity : level->Entities())
+		if (!scene) return nullptr;
+		for (const auto& entity : scene->Entities())
 		{
 			if (entity && entity->Name() == name) return entity.get();
 		}
 		return nullptr;
-	}
-
-	std::filesystem::path AssetDirectory()
-	{
-#ifdef AQUANACT_SOURCE_ROOT
-		return std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets" / "gameGUI";
-#else
-		return std::filesystem::current_path() / "assets" / "gameGUI";
-#endif
-	}
-
-	std::filesystem::path TextureDirectory()
-	{
-		return SourceRoot() / "assets" / "textures";
 	}
 
 	bool IsSupportedTextureFile(const std::filesystem::path& path)
@@ -123,7 +72,7 @@ namespace {
 	std::string MakePortableTexturePath(const std::filesystem::path& absolutePath)
 	{
 		std::error_code ec;
-		const std::filesystem::path relativeToAssets = Root::Current().FileSystemRef().Relative(absolutePath, SourceRoot() / "assets", ec);
+		const std::filesystem::path relativeToAssets = Root::Current().FileSystemRef().Relative(absolutePath, GameGUICreatorHelpers::SourceRoot() / "assets", ec);
 		return (!ec && !relativeToAssets.empty()) ? relativeToAssets.generic_string() : absolutePath.generic_string();
 	}
 
@@ -169,8 +118,8 @@ void GameGUICreator::startUp(Window& window)
 	m_assets.resize(GUIIndex(GUIRole::Count));
 	for (std::size_t i = 0; i < m_assets.size(); ++i)
 	{
-		const std::filesystem::path assetPath = AssetDirectory() / (std::string(GUIAssetName(i)) + ".json");
-		m_assets[i] = std::filesystem::exists(assetPath) ? LoadAssetFile(assetPath) : MakeEmptyAsset(GUIAssetName(i));
+		const std::filesystem::path assetPath = GameGUICreatorHelpers::AssetDirectory() / (std::string(GUIAssetName(i)) + ".json");
+		m_assets[i] = std::filesystem::exists(assetPath) ? GameGUICreatorHelpers::LoadAssetFile(assetPath) : MakeEmptyAsset(GUIAssetName(i));
 	}
 	m_selectedGUI = GUIRole::MainMenu;
 	m_selectedWidgetIndex = m_assets[GUIIndex(m_selectedGUI)].widgets.empty() ? -1 : 0;
@@ -222,7 +171,7 @@ const GameGUIAsset& GameGUICreator::GUIFor(GUIRole role) const
 
 std::filesystem::path GameGUICreator::GUIPathFor(const GameGUIAsset& asset) const
 {
-	return AssetDirectory() / (asset.name + ".json");
+	return GameGUICreatorHelpers::AssetDirectory() / (asset.name + ".json");
 }
 
 std::size_t GameGUICreator::GUIIndex(GUIRole role)
@@ -236,3 +185,104 @@ const char* GameGUICreator::GUIName(GUIRole role)
 }
 
 void GameGUICreator::EndFrame() {}
+
+void GameGUICreator::OpenTexturePicker(TexturePickerTarget target)
+{
+	m_texturePickerTarget = target;
+	m_showTexturePickerPopup = true;
+	m_texturePickerSelectedPath.clear();
+	if (m_texturePickerRootDirectory.empty())
+	{
+		m_texturePickerRootDirectory = GameGUICreatorHelpers::SourceRoot() / "assets" / "textures";
+	}
+	m_texturePickerCurrentDirectory = m_texturePickerRootDirectory;
+}
+
+void GameGUICreator::AddButtonWidget()
+{
+	GameGUIAsset& asset = CurrentRoleGUI();
+	GameGUIWidgetDef widget;
+	widget.type = "Button";
+	widget.name = m_newWidgetName[0] != '\0' ? m_newWidgetName : "Button";
+	widget.text = widget.name;
+	widget.texture = m_newWidgetTexture;
+	widget.layer = "Main";
+	widget.action = m_newWidgetAction;
+	asset.widgets.push_back(widget);
+	m_selectedWidgetIndex = static_cast<int>(asset.widgets.size() - 1);
+	SaveSelectedRoleGUI();
+}
+
+void GameGUICreator::AddTextWidget()
+{
+	GameGUIAsset& asset = CurrentRoleGUI();
+	GameGUIWidgetDef widget;
+	widget.type = "Text";
+	widget.name = m_newWidgetName[0] != '\0' ? m_newWidgetName : "Text";
+	widget.text = m_newWidgetText;
+	widget.layer = "Main";
+	widget.width = 200;
+	widget.height = 30;
+	asset.widgets.push_back(widget);
+	m_selectedWidgetIndex = static_cast<int>(asset.widgets.size() - 1);
+	SaveSelectedRoleGUI();
+}
+
+void GameGUICreator::AddImageWidget()
+{
+	GameGUIAsset& asset = CurrentRoleGUI();
+	GameGUIWidgetDef widget;
+	widget.type = "Image";
+	widget.name = m_newWidgetName[0] != '\0' ? m_newWidgetName : "Image";
+	widget.texture = m_newWidgetTexture;
+	widget.layer = "Main";
+	widget.width = 100;
+	widget.height = 100;
+	asset.widgets.push_back(widget);
+	m_selectedWidgetIndex = static_cast<int>(asset.widgets.size() - 1);
+	SaveSelectedRoleGUI();
+}
+
+void GameGUICreator::AddProgressBarWidget()
+{
+	GameGUIAsset& asset = CurrentRoleGUI();
+	GameGUIWidgetDef widget = m_pendingProgressBarWidget;
+	if (widget.name.empty())
+	{
+		widget.name = m_newWidgetName[0] != '\0' ? m_newWidgetName : "ProgressBar";
+	}
+	widget.type = "ProgressBar";
+	widget.layer = "Main";
+	if (widget.texture.empty())
+	{
+		widget.texture = m_newWidgetTexture;
+	}
+	asset.widgets.push_back(widget);
+	m_selectedWidgetIndex = static_cast<int>(asset.widgets.size() - 1);
+	SaveSelectedRoleGUI();
+}
+
+void GameGUICreator::DeleteSelectedWidget()
+{
+	GameGUIAsset& asset = CurrentRoleGUI();
+	if (m_selectedWidgetIndex < 0 || m_selectedWidgetIndex >= static_cast<int>(asset.widgets.size()))
+	{
+		return;
+	}
+
+	asset.widgets.erase(asset.widgets.begin() + static_cast<std::ptrdiff_t>(m_selectedWidgetIndex));
+	if (asset.widgets.empty())
+	{
+		m_selectedWidgetIndex = -1;
+	}
+	else if (m_selectedWidgetIndex >= static_cast<int>(asset.widgets.size()))
+	{
+		m_selectedWidgetIndex = static_cast<int>(asset.widgets.size() - 1);
+	}
+	SaveSelectedRoleGUI();
+	SyncRuntimePreview();
+}
+
+
+
+

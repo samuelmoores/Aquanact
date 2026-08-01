@@ -12,8 +12,8 @@
 #include "Engine/Core/GLHeaders.h"
 #include "Engine/UI/GameGUIAsset.h"
 #include "Engine/Core/FileSystem.h"
-#include "Engine/Core/Level.h"
-#include "Engine/Core/LevelManager.h"
+#include "Engine/Core/Scene.h"
+#include "Engine/Core/SceneManager.h"
 
 #include <MYGUI/MyGUI_Button.h>
 #include <MYGUI/MyGUI_Colour.h>
@@ -38,7 +38,7 @@ namespace {
 			return 0.0f;
 		}
 
-		Level* activeLevel = Root::Current().Levels().ActiveLevel();
+		Scene* activeLevel = Root::Current().Levels().ActiveLevel();
 		if (!activeLevel)
 		{
 			return 0.0f;
@@ -113,7 +113,7 @@ namespace {
 
 	Component* ResolveBoundComponent(const GameGUIWidgetDef& def)
 	{
-		Level* activeLevel = Root::Current().Levels().ActiveLevel();
+		Scene* activeLevel = Root::Current().Levels().ActiveLevel();
 		if (!activeLevel)
 		{
 			return nullptr;
@@ -311,7 +311,7 @@ void GameGUI::Draw()
 	// MyGUI needs a per-frame tick so internal widget state and input-driven updates
 	// advance before the renderer submits the overlay.
 	m_gui->frameEvent(0.0f);
-	// The final bug was not in MyGUI itself, but in inherited level render state.
+	// The final bug was not in MyGUI itself, but in inherited Scene render state.
 	// The GUI pass must start from a clean overlay-friendly OpenGL state.
 	glDisable(GL_DEPTH_TEST);
 	glDisable(GL_CULL_FACE);
@@ -319,7 +319,7 @@ void GameGUI::Draw()
 	glDisable(GL_SCISSOR_TEST);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	// Clear 3D state that leaked in from the level pass. MyGUI's OpenGL renderer
+	// Clear 3D state that leaked in from the Scene pass. MyGUI's OpenGL renderer
 	// expects to control its own simple overlay pipeline.
 	glUseProgram(0);
 	glBindVertexArray(0);
@@ -645,7 +645,11 @@ void GameGUI::OnWidgetClicked(MyGUI::Widget* sender)
 			Root::Current().Debugger().LogMessage("GameGUI NewGame failed: could not reload the current project.");
 			break;
 		}
-		Root::Current().Gameplay().StartGameSession(Root::Current().FrontEnd(), Root::Current().Debugger(), Root::Current().State());
+		if (!Root::Current().Gameplay().BootPlayableLevel(Root::Current().FrontEnd(), Root::Current().Debugger()))
+		{
+			Root::Current().Debugger().LogMessage("GameGUI NewGame failed: no playable Scene could be selected.");
+			break;
+		}
 		Root::Current().FrontEnd().RuntimeGUI().RecordClick("New Game started");
 		break;
 	case GameGUIActionType::None:
@@ -653,6 +657,9 @@ void GameGUI::OnWidgetClicked(MyGUI::Widget* sender)
 		break;
 	}
 }
+
+
+
 
 
 

@@ -15,7 +15,7 @@
 #include "Engine/Core/ProjectStateData.h"
 
 class Window;
-class LevelManager;
+class SceneManager;
 class FrontEndManager;
 class FileManager;
 class ProjectManager;
@@ -45,7 +45,7 @@ public:
 	void ApplyProjectState(const ProjectStateData::RenderStateData& renderState);
 	void Submit(const RenderCommand& command);
 	void Flush(const Camera& camera);
-	void Loop(FrontEndManager& frontEndManager, FileManager& fileManager, LevelManager& levelManager, ProjectManager& projectManager, Debug& debug, Input& input, Window& window, EngineState& engineState);
+	void Loop(FrontEndManager& frontEndManager, FileManager& fileManager, SceneManager& SceneManager, ProjectManager& projectManager, Debug& debug, Input& input, Window& window, EngineState& engineState);
 	void UpdateCameraPhase(const Input& input, const EngineState& engineState);
 
 	std::size_t LastFrameCommandCount() const;
@@ -62,10 +62,10 @@ public:
 
 private:
 	void ResetFrameState();
-	void BuildRenderCommands(FrontEndManager& frontEndManager, LevelManager& levelManager, EngineState& engineState);
-	void DrawEditorFrame(FrontEndManager& frontEndManager, FileManager& fileManager, LevelManager& levelManager, ProjectManager& projectManager, Debug& debug);
+	void BuildRenderCommands(FrontEndManager& frontEndManager, SceneManager& SceneManager, EngineState& engineState);
+	void DrawEditorFrame(FrontEndManager& frontEndManager, FileManager& fileManager, SceneManager& SceneManager, ProjectManager& projectManager, Debug& debug);
 	void DrawRuntimeFrame(FrontEndManager& frontEndManager, Debug& debug, Input& input);
-	void DrawFrame(FrontEndManager& frontEndManager, FileManager& fileManager, LevelManager& levelManager, ProjectManager& projectManager, Debug& debug, Input& input, EngineState& engineState);
+	void DrawFrame(FrontEndManager& frontEndManager, FileManager& fileManager, SceneManager& SceneManager, ProjectManager& projectManager, Debug& debug, Input& input, EngineState& engineState);
 	bool ShouldPreviewMainMenu(const FrontEndManager& frontEndManager, EngineState& engineState) const;
 	void ApplyCameraMode(const EngineState& engineState);
 	void BeginFrame();
@@ -91,6 +91,7 @@ private:
 	std::chrono::duration<double, std::milli> m_lastFrameUiCreatorTime{ 0.0 };
 	std::chrono::duration<double, std::milli> m_lastFrameRuntimeGuiTime{ 0.0 };
 };
+
 
 
 

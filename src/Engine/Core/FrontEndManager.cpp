@@ -6,7 +6,7 @@
 #include "Engine/Core/Window.h"
 #include "Engine/Core/Camera.h"
 #include "Engine/Core/FileManager.h"
-#include "Engine/Core/LevelManager.h"
+#include "Engine/Core/SceneManager.h"
 #include "Engine/Core/ProjectManager.h"
 #include "Engine/Core/Root.h"
 #include <imgui.h>
@@ -85,11 +85,11 @@ void FrontEndManager::BeginFrame()
 	}
 }
 
-void FrontEndManager::DrawEngineGUI(const Camera& camera, FileManager& fileManager, LevelManager& levelManager, ProjectManager& projectManager)
+void FrontEndManager::DrawEngineGUI(const Camera& camera, FileManager& fileManager, SceneManager& SceneManager, ProjectManager& projectManager)
 {
 	if (IsEditorMode() && m_mode == FrontEndMode::EngineEditor && m_engineGUI)
 	{
-		m_engineGUI->Draw(camera, fileManager, levelManager, projectManager);
+		m_engineGUI->Draw(camera, fileManager, SceneManager, projectManager);
 	}
 }
 
@@ -248,4 +248,7 @@ const GameGUICreator& FrontEndManager::Creator() const
 {
 	return *m_uiCreator;
 }
+
+
+
 
