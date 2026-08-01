@@ -1,7 +1,7 @@
 #include "Game/Enemy.h"
 
-#include "Engine/EventManager.h"
-#include "Engine/Root.h"
+#include "Engine/Core/EventManager.h"
+#include "Engine/Core/Root.h"
 
 #include <iostream>
 

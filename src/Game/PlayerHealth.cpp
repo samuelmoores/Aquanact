@@ -1,8 +1,8 @@
 #include "Game/PlayerHealth.h"
 
-#include "Engine/EventManager.h"
-#include "Engine/Root.h"
-#include "Engine/Entity.h"
+#include "Engine/Core/EventManager.h"
+#include "Engine/Core/Root.h"
+#include "Engine/Core/Entity.h"
 
 #include <iostream>
 

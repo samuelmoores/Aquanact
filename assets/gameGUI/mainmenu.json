@@ -1,28 +1,5 @@
 {
   "name": "MainMenu",
   "widgets": [
-    {
-      "type": "Button",
-      "name": "New Game",
-      "parent": "",
-      "skin": "ButtonSkin",
-      "text": "New Game",
-      "texture": "",
-      "layer": "Main",
-      "x": 480,
-      "y": 315,
-      "width": 320,
-      "height": 90,
-      "textureWidth": 100,
-      "textureHeight": 30,
-      "fontSize": 39,
-      "visible": true,
-      "alpha": 1,
-      "action": "NewGame",
-      "bindEntity": "",
-      "bindComponent": "",
-      "bindMember": "",
-      "bindEvent": ""
-    }
   ]
 }

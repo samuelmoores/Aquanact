@@ -1,0 +1,35 @@
+#pragma once
+
+#include "Engine/Core/GraphicsDevice.h"
+#include "Engine/Core/OpenGLGraphics.h"
+#include "Engine/Core/LightingManager.h"
+
+#include <memory>
+
+class Window;
+class LightingManager;
+
+class OpenGLGraphicsDevice final : public GraphicsDevice {
+public:
+	OpenGLGraphicsDevice() = default;
+	~OpenGLGraphicsDevice() override;
+	void startUp(Window& window);
+	void shutDown() override;
+
+	void BeginFrame() override;
+	void Clear(float r, float g, float b, float a) override;
+	void EndFrame() override;
+	void ConfigureDefaultState();
+	// Called immediately before GUI submission so overlays do not inherit scene GL state.
+	void ConfigureGuiState();
+
+	void Draw(const RenderCommand& command, const Camera& camera, const LightingManager& lightingManager) override;
+
+private:
+	void startUp() override;
+	std::unique_ptr<OpenGLGraphics> m_platform;
+	Window* m_window = nullptr;
+	bool m_initialized = false;
+};
+
+

@@ -26,67 +26,78 @@ endif()
 set(AQUANACT_VCPKG_TARGET_TRIPLET "${VCPKG_TARGET_TRIPLET}")
 
 set(SOURCES
-    "src/Engine/main.cpp"
-    "include/Engine/ShaderProgram.h" "src/Engine/ShaderProgram.cpp"
-    "include/Engine/StbImage.h" "src/Engine/StbImage.cpp"
-    "include/Engine/Mesh.h" "src/Engine/Mesh.cpp"
-    "include/Engine/ModelImporter.h" "src/Engine/ModelImporter.cpp"
-    "include/Engine/Camera.h"
-    "include/Engine/CameraController.h"
-    "include/Engine/CameraManager.h" "src/Engine/CameraManager.cpp"
-    "include/Engine/EngineCamera.h" "src/Engine/EngineCamera.cpp"
-    "include/Engine/EditorCameraController.h" "src/Engine/EditorCameraController.cpp"
-    "include/Engine/GameCamera.h" "src/Engine/GameCamera.cpp"
-    "include/Engine/Renderer.h"
-    "include/Engine/Axis.h" "src/Engine/Axis.cpp"
-    "include/Engine/Grid.h" "src/Engine/Grid.cpp"
-    "include/Engine/Texture.h"
-    "include/Engine/Line.h" "src/Engine/Line.cpp"
-    "include/Engine/Debug.h" "src/Engine/Debug.cpp"
-    "include/Engine/GameGUIAsset.h"
-    "include/Engine/EngineGUI.h" "src/Engine/EngineGUI.cpp"
-    "include/Engine/GameGUI.h" "src/Engine/GameGUI.cpp"
-    "include/Engine/GameGUIManager.h" "src/Engine/GameGUIManager.cpp"
-    "include/Engine/GameGUICreator.h" "src/Engine/GameGUICreator.cpp"
-    "include/Engine/FrontEndManager.h" "src/Engine/FrontEndManager.cpp"
-    "include/Engine/FileManager.h" "src/Engine/FileManager.cpp"
-    "include/Engine/FileSystem.h" "src/Engine/FileSystem.cpp"
-    "include/Engine/Level.h" "src/Engine/Level.cpp"
-    "include/Engine/LevelManager.h" "src/Engine/LevelManager.cpp"
-    "include/Engine/ProjectManager.h" "src/Engine/ProjectManager.cpp"
-    "include/Engine/ProjectStateData.h"
-    "include/Engine/ProjectStateFormat.h" "src/Engine/ProjectStateFormat.cpp"
-    "include/Engine/ProjectStateSerializer.h" "src/Engine/ProjectStateSerializer.cpp"
-    "include/Engine/Animation.h" "src/Engine/Animation.cpp"
-    "include/Engine/Animator.h" "src/Engine/Animator.cpp"
-    "include/Engine/AnimatorComponent.h" "src/Engine/AnimatorComponent.cpp"
-    "include/Engine/Controller.h" "src/Engine/Controller.cpp"
-    "include/Engine/PlayerController.h" "src/Engine/PlayerController.cpp"
-    "include/Engine/Component.h" "src/Engine/Component.cpp"
-    "include/Engine/Entity.h" "src/Engine/Entity.cpp"
-    "include/Engine/EntityRegistry.h" "src/Engine/EntityRegistry.cpp"
-    "include/Engine/EventManager.h" "src/Engine/EventManager.cpp"
+    "src/Engine/Core/main.cpp"
+    "include/Engine/Core/ShaderProgram.h" "src/Engine/Core/ShaderProgram.cpp"
+    "include/Engine/Core/StbImage.h" "src/Engine/Core/StbImage.cpp"
+    "include/Engine/Core/Mesh.h" "src/Engine/Core/Mesh.cpp"
+    "include/Engine/Core/ModelImporter.h" "src/Engine/Core/ModelImporter.cpp"
+    "include/Engine/Core/Camera.h"
+    "include/Engine/Core/CameraController.h"
+    "include/Engine/Core/CameraManager.h" "src/Engine/Core/CameraManager.cpp"
+    "include/Engine/Core/EngineCamera.h" "src/Engine/Core/EngineCamera.cpp"
+    "include/Engine/Core/EditorCameraController.h" "src/Engine/Core/EditorCameraController.cpp"
+    "include/Engine/Core/GameCamera.h" "src/Engine/Core/GameCamera.cpp"
+    "include/Engine/Core/Renderer.h"
+    "include/Engine/Core/Axis.h" "src/Engine/Core/Axis.cpp"
+    "include/Engine/Core/Grid.h" "src/Engine/Core/Grid.cpp"
+    "include/Engine/Core/Texture.h"
+    "include/Engine/Core/Line.h" "src/Engine/Core/Line.cpp"
+    "include/Engine/Core/Debug.h" "src/Engine/Core/Debug.cpp"
+    "include/Engine/UI/GameGUIAsset.h"
+    "include/Engine/UI/EngineGUI.h" "src/Engine/UI/EngineGUI.cpp"
+    "include/Engine/UI/GameGUI.h" "src/Engine/UI/GameGUI.cpp"
+    "include/Engine/UI/GameGUIManager.h" "src/Engine/UI/GameGUIManager.cpp"
+    "include/Engine/UI/GameGUICreatorHelpers.h" "src/Engine/UI/GameGUICreatorHelpers.cpp"
+    "include/Engine/UI/GameGUICreatorModel.h" "src/Engine/UI/GameGUICreatorModel.cpp"
+    "include/Engine/UI/GameGUICreatorView.h" "src/Engine/UI/GameGUICreatorView.cpp"
+    "include/Engine/UI/GameGUICreator.h" "src/Engine/UI/GameGUICreator.cpp"
+    "src/Engine/UI/GameGUICreator_Persistence.cpp"
+    "src/Engine/UI/GameGUICreator_WidgetOps.cpp"
+    "src/Engine/UI/GameGUICreator_Panels.cpp"
+    "src/Engine/UI/GameGUICreator_CreatePopup.cpp"
+    "src/Engine/UI/GameGUICreator_BindingPopup.cpp"
+    "src/Engine/UI/GameGUICreator_TexturePopup.cpp"
+    "src/Engine/UI/GameGUICreator_PanelsList.cpp"
+    "src/Engine/UI/GameGUICreator_PanelsDetails.cpp"
+    "include/Engine/Core/FrontEndManager.h" "src/Engine/Core/FrontEndManager.cpp"
+    "include/Engine/Core/FileManager.h" "src/Engine/Core/FileManager.cpp"
+    "include/Engine/Core/FileSystem.h" "src/Engine/Core/FileSystem.cpp"
+    "include/Engine/Core/Level.h" "src/Engine/Core/Level.cpp"
+    "include/Engine/Core/LevelManager.h" "src/Engine/Core/LevelManager.cpp"
+    "include/Engine/Core/ProjectManager.h" "src/Engine/Core/ProjectManager.cpp"
+    "include/Engine/Core/ProjectStateData.h"
+    "include/Engine/Core/ProjectStateFormat.h" "src/Engine/Core/ProjectStateFormat.cpp"
+    "include/Engine/Core/ProjectStateSerializer.h" "src/Engine/Core/ProjectStateSerializer.cpp"
+    "include/Engine/Core/Animation.h" "src/Engine/Core/Animation.cpp"
+    "include/Engine/Core/Animator.h" "src/Engine/Core/Animator.cpp"
+    "include/Engine/Core/AnimatorComponent.h" "src/Engine/Core/AnimatorComponent.cpp"
+    "include/Engine/Core/Controller.h" "src/Engine/Core/Controller.cpp"
+    "include/Engine/Core/PlayerController.h" "src/Engine/Core/PlayerController.cpp"
+    "include/Engine/Core/Component.h" "src/Engine/Core/Component.cpp"
+    "include/Engine/Core/Entity.h" "src/Engine/Core/Entity.cpp"
+    "include/Engine/Core/EntityRegistry.h" "src/Engine/Core/EntityRegistry.cpp"
+    "include/Engine/Core/EventManager.h" "src/Engine/Core/EventManager.cpp"
     "include/Game/Enemy.h" "src/Game/Enemy.cpp"
     "include/Game/PlayerHealth.h" "src/Game/PlayerHealth.cpp"
-    "include/Engine/Window.h" "src/Engine/Window.cpp"
-    "include/Engine/Input.h" "src/Engine/Input.cpp"
-    "include/Engine/GameplayManager.h" "src/Engine/GameplayManager.cpp"
-    "include/Engine/SimulationManager.h" "src/Engine/SimulationManager.cpp"
-    "include/Engine/Root.h" "src/Engine/Root.cpp"
-    "include/Engine/RenderManager.h" "src/Engine/RenderManager.cpp"
-    "include/Engine/GraphicsDevice.h"
-    "include/Engine/OpenGLGraphicsDevice.h" "src/Engine/OpenGLGraphicsDevice.cpp"
-    "include/Engine/OpenGLGraphics.h" "src/Engine/OpenGLGraphics.cpp"
-    "include/Engine/Physics.h" "src/Engine/Physics.cpp"
-    "include/Engine/MathUtils.h" "src/Engine/MathUtils.cpp"
-    "include/Engine/Audio.h" "src/Engine/Audio.cpp"
-    "include/Engine/RenderCommand.h"
-    "include/Engine/FrameAllocator.h"
-    "include/Engine/GLHeaders.h"
-    "include/Engine/AquanactBuildSystem.h" "src/Engine/AquanactBuildSystem.cpp"
+    "include/Engine/Core/Window.h" "src/Engine/Core/Window.cpp"
+    "include/Engine/Core/Input.h" "src/Engine/Core/Input.cpp"
+    "include/Engine/Core/GameplayManager.h" "src/Engine/Core/GameplayManager.cpp"
+    "include/Engine/Core/SimulationManager.h" "src/Engine/Core/SimulationManager.cpp"
+    "include/Engine/Core/Root.h" "src/Engine/Core/Root.cpp"
+    "include/Engine/Core/RenderManager.h" "src/Engine/Core/RenderManager.cpp"
+    "include/Engine/Core/GraphicsDevice.h"
+    "include/Engine/Core/OpenGLGraphicsDevice.h" "src/Engine/Core/OpenGLGraphicsDevice.cpp"
+    "include/Engine/Core/OpenGLGraphics.h" "src/Engine/Core/OpenGLGraphics.cpp"
+    "include/Engine/Core/Physics.h" "src/Engine/Core/Physics.cpp"
+    "include/Engine/Core/MathUtils.h" "src/Engine/Core/MathUtils.cpp"
+    "include/Engine/Core/Audio.h" "src/Engine/Core/Audio.cpp"
+    "include/Engine/Core/RenderCommand.h"
+    "include/Engine/Core/FrameAllocator.h"
+    "include/Engine/Core/GLHeaders.h"
+    "include/Engine/Core/AquanactBuildSystem.h" "src/Engine/Core/AquanactBuildSystem.cpp"
 )
 
-add_executable (AquanactEngine ${SOURCES} "include/Engine/LightingManager.h" "src/Engine/LightingManager.cpp")
+add_executable (AquanactEngine ${SOURCES} "include/Engine/Core/LightingManager.h" "src/Engine/Core/LightingManager.cpp")
 target_compile_definitions(AquanactEngine PRIVATE AQUANACT_EDITOR)
 target_compile_definitions(AquanactEngine PRIVATE AQUANACT_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
 target_compile_definitions(AquanactEngine PRIVATE MYGUI_STATIC)
@@ -96,7 +107,7 @@ target_compile_definitions(AquanactEngine PRIVATE AQUANACT_MYGUI_OPENGL_LIBRARY=
 target_compile_definitions(AquanactEngine PRIVATE AQUANACT_FREETYPE_LIBRARY="freetype")
 target_compile_features(AquanactEngine PRIVATE cxx_std_20)
 
-add_executable (AquanactGame WIN32 ${SOURCES} "include/Engine/LightingManager.h" "src/Engine/LightingManager.cpp")
+add_executable (AquanactGame WIN32 ${SOURCES} "include/Engine/Core/LightingManager.h" "src/Engine/Core/LightingManager.cpp")
 target_compile_definitions(AquanactGame PRIVATE AQUANACT_GAME)
 target_compile_definitions(AquanactGame PRIVATE AQUANACT_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
 target_compile_definitions(AquanactGame PRIVATE MYGUI_STATIC)
@@ -107,8 +118,8 @@ target_compile_definitions(AquanactGame PRIVATE AQUANACT_FREETYPE_LIBRARY="freet
 target_compile_features(AquanactGame PRIVATE cxx_std_20)
 
 add_executable (AquanactBuildTool
-    "src/Engine/BuildToolMain.cpp"
-    "include/Engine/AquanactBuildSystem.h" "src/Engine/AquanactBuildSystem.cpp")
+    "src/Engine/Core/BuildToolMain.cpp"
+    "include/Engine/Core/AquanactBuildSystem.h" "src/Engine/Core/AquanactBuildSystem.cpp")
 target_compile_definitions(AquanactBuildTool PRIVATE AQUANACT_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
 
 if (MSVC)
@@ -236,6 +247,7 @@ add_custom_target(copymygui
 add_dependencies(AquanactEngine copyshaders copymodels)
 add_dependencies(AquanactEngine copymygui)
 add_dependencies(AquanactGame copyshaders copymodels copymygui)
+
 
 
 

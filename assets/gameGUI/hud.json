@@ -1,28 +1,5 @@
 {
   "name": "hud",
   "widgets": [
-    {
-      "type": "ProgressBar",
-      "name": "healthbar",
-      "parent": "",
-      "skin": "ImageBox",
-      "text": "",
-      "texture": "textures/GUI-Kit-Pack-Free_54.png",
-      "layer": "Main",
-      "x": 540,
-      "y": 346,
-      "width": 256,
-      "height": 32,
-      "textureWidth": 100,
-      "textureHeight": 30,
-      "fontSize": 0,
-      "visible": true,
-      "alpha": 1,
-      "action": "None",
-      "bindEntity": "griff.fbx",
-      "bindComponent": "PlayerHealth",
-      "bindMember": "Health",
-      "bindEvent": ""
-    }
   ]
 }

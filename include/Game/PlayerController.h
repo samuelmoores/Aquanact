@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Engine/Entity.h"
+#include "Engine/Core/Entity.h"
 
 // Generated gameplay class. Start here if you want to add game behavior.
 //
