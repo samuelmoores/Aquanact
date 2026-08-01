@@ -27,7 +27,9 @@ void Window::startUp()
 
     /* Make the window's context current */
     glfwMakeContextCurrent(m_glfwWindow);
-    glfwSwapInterval(1);
+    // Frame pacing is controlled by Root rather than the display compositor.
+    // This keeps Present from blocking at an unexpected refresh interval.
+    glfwSwapInterval(0);
 }
 
 void Window::shutDown()

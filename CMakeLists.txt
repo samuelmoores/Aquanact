@@ -93,6 +93,7 @@ set(SOURCES
     "include/Engine/Core/Audio.h" "src/Engine/Core/Audio.cpp"
     "include/Engine/Core/RenderCommand.h"
     "include/Engine/Core/FrameAllocator.h"
+    "include/Engine/Core/FrameProfiler.h" "src/Engine/Core/FrameProfiler.cpp"
     "include/Engine/Core/GLHeaders.h"
     "include/Engine/Core/AquanactBuildSystem.h" "src/Engine/Core/AquanactBuildSystem.cpp"
 )

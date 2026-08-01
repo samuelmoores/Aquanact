@@ -13,6 +13,7 @@ class SceneManager;
 class ProjectManager;
 class GameplayManager;
 class Input;
+class FrameProfiler;
 
 enum class EngineMode {
 	Editor,
@@ -54,6 +55,7 @@ public:
 	ProjectManager& Projects();
 	GameplayManager& Gameplay();
 	Input& InputRef();
+	FrameProfiler& Profiler();
 	EngineState& State();
 	bool& GameModeDebugFlag();
 	bool& EditorLaunchedGameSession();
@@ -75,6 +77,7 @@ private:
 	std::unique_ptr<ProjectManager> m_projectManager;
 	std::unique_ptr<GameplayManager> m_gameplayManager;
 	std::unique_ptr<Input> m_input;
+	std::unique_ptr<FrameProfiler> m_profiler;
 	EngineState m_engineState;
 	bool m_gameModeDebug = true;
 	bool m_editorLaunchedGameSession = false;

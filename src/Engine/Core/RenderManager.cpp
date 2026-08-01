@@ -10,6 +10,7 @@
 #include "Engine/Core/Scene.h"
 #include "Engine/Core/SceneManager.h"
 #include "Engine/Core/ProjectStateData.h"
+#include "Engine/Core/FrameProfiler.h"
 
 #include <chrono>
 #include <iomanip>
@@ -373,16 +374,31 @@ void RenderManager::Loop(FrontEndManager& frontEndManager, FileManager& fileMana
 	const auto buildStart = std::chrono::high_resolution_clock::now();
 	BeginFrame();
 
-	BuildRenderCommands(frontEndManager, SceneManager, engineState);
+	{
+		FrameProfiler::Scope scope(Root::Current().Profiler(), "RenderCommands");
+		BuildRenderCommands(frontEndManager, SceneManager, engineState);
+	}
 	const auto buildEnd = std::chrono::high_resolution_clock::now();
 	m_lastFrameBuildTime = buildEnd - buildStart;
 
-	UpdateCameraPhase(input, engineState);
-	Flush(ActiveCamera());
+	{
+		FrameProfiler::Scope scope(Root::Current().Profiler(), "Camera");
+		UpdateCameraPhase(input, engineState);
+	}
+	{
+		FrameProfiler::Scope scope(Root::Current().Profiler(), "Flush");
+		Flush(ActiveCamera());
+	}
 
-	DrawFrame(frontEndManager, fileManager, SceneManager, projectManager, debug, input, engineState);
+	{
+		FrameProfiler::Scope scope(Root::Current().Profiler(), "Frontend");
+		DrawFrame(frontEndManager, fileManager, SceneManager, projectManager, debug, input, engineState);
+	}
 
-	PresentFrame(window);
+	{
+		FrameProfiler::Scope scope(Root::Current().Profiler(), "Present");
+		PresentFrame(window);
+	}
 }
 
 std::size_t RenderManager::LastFrameCommandCount() const

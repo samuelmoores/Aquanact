@@ -30,6 +30,8 @@ public:
 	const std::vector<std::string>& SceneAssets() const;
 	void DrawEditorWindow();
 	void DrawDiagnosticsWindow();
+	bool ShowDiagnosticsWindow() const;
+	void SetShowDiagnosticsWindow(bool show);
 	void DrawReturnButton();
 	bool ShowEditorWindow() const;
 	void SetShowEditorWindow(bool showEditorWindow);
@@ -64,5 +66,6 @@ private:
 	std::size_t m_buttonClickCount = 0;
 	int m_activeAssetIndex = -1;
 	bool m_showEditorWindow = false;
+	bool m_showDiagnosticsWindow = true;
 	UIMode m_mode = UIMode::MainMenu;
 };

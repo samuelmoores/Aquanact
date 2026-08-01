@@ -13,6 +13,7 @@
 #include "Engine/Core/RenderManager.h"
 #include "Engine/Core/LightingManager.h"
 #include "Engine/Core/FrameAllocator.h"
+#include "Engine/Core/FrameProfiler.h"
 #include "Engine/Core/GLHeaders.h"
 #include "Engine/Core/SceneManager.h"
 
@@ -125,8 +126,6 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 	// This runs only in editor mode and is responsible for the visible debugging overlay.
 	// It intentionally reads current frame data instead of caching renderer state itself.
 	static bool firstFrame = true;
-	static auto lastFrameTime = std::chrono::high_resolution_clock::now();
-	const auto now = std::chrono::high_resolution_clock::now();
 	if (firstFrame)
 	{
 		firstFrame = false;
@@ -139,10 +138,8 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 	}
 	else
 	{
-		const std::chrono::duration<float> dt = now - lastFrameTime;
-		m_lastFps = (dt.count() > 0.0f) ? (1.0f / dt.count()) : 0.0f;
+		m_lastFps = static_cast<float>(Root::Current().Profiler().SmoothedFps());
 	}
-	lastFrameTime = now;
 
 	auto projection = camera.GetProjectionMatrix();
 	auto view = camera.GetViewMatrix();
@@ -241,11 +238,14 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 void Debug::drawGameModeInput(const Input& input)
 {
 	// Game mode uses this panel to show live input and gameplay state without the editor UI.
-	const float gameFrameTime = input.DeltaTime();
-	m_lastFps = gameFrameTime > 0.0f ? 1.0f / gameFrameTime : 0.0f;
+	m_lastFps = static_cast<float>(Root::Current().Profiler().SmoothedFps());
 
-	ImGui::Begin("Game Input");
+	if (m_showGameInputWindow)
+	{
+		bool open = m_showGameInputWindow;
+		ImGui::Begin("Game Input", &open);
 	ImGui::Text("FPS: %.1f", m_lastFps);
+	ImGui::Text("Frame: %.3f ms", Root::Current().Profiler().FrameMs());
 	ImGui::Text("Window focused: %s", input.WindowFocused() ? "yes" : "no");
 	ImGui::Text("Look active: %s", input.LookActive() ? "yes" : "no");
 	ImGui::Text("Look became active: %s", input.LookBecameActive() ? "yes" : "no");
@@ -271,6 +271,20 @@ void Debug::drawGameModeInput(const Input& input)
 	ImGui::Text("Mouse delta: %.2f, %.2f", mouse.x, mouse.y);
 	ImGui::Text("Delta time: %.4f", input.DeltaTime());
 	ImGui::Separator();
+	if (Root::Current().Profiler().IsEnabled())
+	{
+		ImGui::TextUnformatted("Frame profile:");
+		for (const FrameProfiler::Sample& sample : Root::Current().Profiler().Samples())
+		{
+			ImGui::Text(
+				"%-16s current %.3f ms | avg %.3f ms | max %.3f ms",
+				sample.name.c_str(),
+				sample.currentMs,
+				sample.averageMs,
+				sample.maximumMs);
+		}
+	}
+	ImGui::Separator();
 	ImGui::TextUnformatted("Recent logs:");
 	const std::size_t logCount = m_logMessages.size();
 	const std::size_t startIndex = logCount > 5 ? logCount - 5 : 0;
@@ -278,10 +292,16 @@ void Debug::drawGameModeInput(const Input& input)
 	{
 		ImGui::BulletText("%s", m_logMessages[i].c_str());
 	}
-	ImGui::End();
+		ImGui::End();
+		m_showGameInputWindow = open;
+	}
 
-	ImGui::Begin("Gameplay Diagnostics");
+	if (m_showGameplayDiagnosticsWindow)
+	{
+		bool open = m_showGameplayDiagnosticsWindow;
+		ImGui::Begin("Gameplay Diagnostics", &open);
 	ImGui::Text("FPS: %.1f", m_lastFps);
+	ImGui::Text("Frame: %.3f ms", Root::Current().Profiler().FrameMs());
 	ImGui::Text("Controller owner bound: %s", m_controllerOwnerBound ? "yes" : "no");
 	ImGui::Text("Object: %s", m_gameplayObjectName.empty() ? "<none>" : m_gameplayObjectName.c_str());
 	ImGui::Text("Active Scene: %s", m_activeLevelName.empty() ? "<none>" : m_activeLevelName.c_str());
@@ -294,9 +314,14 @@ void Debug::drawGameModeInput(const Input& input)
 	ImGui::Text("Delta time: %.4f", m_gameplayDt);
 	ImGui::Text("Applied delta: %.3f, %.3f, %.3f", m_gameplayDelta.x, m_gameplayDelta.y, m_gameplayDelta.z);
 	ImGui::Text("Position: %.3f, %.3f, %.3f", m_gameplayPosition.x, m_gameplayPosition.y, m_gameplayPosition.z);
-	ImGui::End();
+		ImGui::End();
+		m_showGameplayDiagnosticsWindow = open;
+	}
 
-	ImGui::Begin("Animation Diagnostics");
+	if (m_showAnimationDiagnosticsWindow)
+	{
+		bool open = m_showAnimationDiagnosticsWindow;
+		ImGui::Begin("Animation Diagnostics", &open);
 	ImGui::Text("Current state: %s", m_animationCurrentState.empty() ? "<none>" : m_animationCurrentState.c_str());
 	ImGui::Text("Desired state: %s", m_animationDesiredState.empty() ? "<none>" : m_animationDesiredState.c_str());
 	ImGui::TextWrapped("Last transition: %s", m_animationLastTransitionDebug.empty() ? "<none>" : m_animationLastTransitionDebug.c_str());
@@ -319,7 +344,9 @@ void Debug::drawGameModeInput(const Input& input)
 	ImGui::BeginChild("AnimatorStateList", ImVec2(0.0f, 120.0f), true);
 	ImGui::TextUnformatted(m_animationStateListText.empty() ? "<none>" : m_animationStateListText.c_str());
 	ImGui::EndChild();
-	ImGui::End();
+		ImGui::End();
+		m_showAnimationDiagnosticsWindow = open;
+	}
 }
 
 void Debug::SetGameplayDiagnostics(const std::string& objectName, const glm::vec3& moveInput, float moveSpeed, float dt, const glm::vec3& delta, const glm::vec3& position)
@@ -366,6 +393,12 @@ bool Debug::ShowLogWindow() const { return m_showLogWindow; }
 bool Debug::ShowStatsWindow() const { return m_showStatsWindow; }
 void Debug::SetShowLogWindow(bool showLogWindow) { m_showLogWindow = showLogWindow; }
 void Debug::SetShowStatsWindow(bool showStatsWindow) { m_showStatsWindow = showStatsWindow; }
+bool Debug::ShowGameInputWindow() const { return m_showGameInputWindow; }
+void Debug::SetShowGameInputWindow(bool show) { m_showGameInputWindow = show; }
+bool Debug::ShowGameplayDiagnosticsWindow() const { return m_showGameplayDiagnosticsWindow; }
+void Debug::SetShowGameplayDiagnosticsWindow(bool show) { m_showGameplayDiagnosticsWindow = show; }
+bool Debug::ShowAnimationDiagnosticsWindow() const { return m_showAnimationDiagnosticsWindow; }
+void Debug::SetShowAnimationDiagnosticsWindow(bool show) { m_showAnimationDiagnosticsWindow = show; }
 
 void Debug::LogMessage(const std::string& message)
 {

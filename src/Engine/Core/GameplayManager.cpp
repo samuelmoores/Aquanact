@@ -6,6 +6,7 @@
 #include "Engine/Core/FrontEndManager.h"
 #include "Engine/Core/Scene.h"
 #include "Engine/Core/Root.h"
+#include "Engine/Core/FrameProfiler.h"
 
 GameplayManager::~GameplayManager() = default;
 
@@ -210,6 +211,7 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 	{
 		if (object)
 		{
+			FrameProfiler::Scope animationScope(Root::Current().Profiler(), "Animation");
 			object->UpdateComponents(dt);
 			if (AnimatorComponent* animator = object->GetAnimatorComponent())
 			{

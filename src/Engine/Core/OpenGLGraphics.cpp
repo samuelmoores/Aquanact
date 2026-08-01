@@ -23,7 +23,7 @@ void OpenGLGraphics::startUp(Window& window)
 
 	// The scene renderer starts from a known baseline so the 3D pass is consistent.
 	ConfigureDefaultState();
-	SetVSync(true);
+	SetVSync(false);
 	UpdateViewport();
 	m_initialized = true;
 }

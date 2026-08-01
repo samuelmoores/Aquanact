@@ -8,6 +8,7 @@
 #include "Engine/Core/RenderManager.h"
 #include "Engine/Core/Input.h"
 #include "Engine/Core/SceneManager.h"
+#include "Engine/Core/FrameProfiler.h"
 #include "Engine/Core/FileSystem.h"
 
 #include <algorithm>
@@ -448,7 +449,12 @@ void GameGUIManager::DrawEditorWindow()
 
 void GameGUIManager::DrawDiagnosticsWindow()
 {
-	ImGui::Begin("GameGUIDiagnostics");
+	if (!m_showDiagnosticsWindow)
+	{
+		return;
+	}
+	bool open = m_showDiagnosticsWindow;
+	ImGui::Begin("GameGUIDiagnostics", &open);
 	ImGui::Text("Runtime wrapper: %s", m_runtime ? "ready" : "missing");
 	ImGui::Text("Loaded assets: %zu", m_assets.size());
 	ImGui::Text("Placed assets: %zu", m_sceneAssets.size());
@@ -506,6 +512,17 @@ void GameGUIManager::DrawDiagnosticsWindow()
 		ImGui::BulletText("<no buttons loaded>");
 	}
 	ImGui::End();
+	m_showDiagnosticsWindow = open;
+}
+
+bool GameGUIManager::ShowDiagnosticsWindow() const
+{
+	return m_showDiagnosticsWindow;
+}
+
+void GameGUIManager::SetShowDiagnosticsWindow(bool show)
+{
+	m_showDiagnosticsWindow = show;
 }
 
 void GameGUIManager::DrawReturnButton()
@@ -518,6 +535,8 @@ void GameGUIManager::DrawReturnButton()
 	}
 
 	ImGui::Begin("Engine");
+	ImGui::Text("FPS: %.1f", Root::Current().Profiler().SmoothedFps());
+	ImGui::Text("Frame: %.3f ms", Root::Current().Profiler().FrameMs());
 	if (ImGui::Button("Return"))
 	{
 		Root::Current().FrontEnd().CaptureRuntimeLayout();

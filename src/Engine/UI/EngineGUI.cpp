@@ -8,6 +8,7 @@
 #include "Engine/UI/GameGUICreator.h"
 #include "Engine/Core/AquanactBuildSystem.h"
 #include "Engine/Core/Root.h"
+#include "Engine/Core/FrameProfiler.h"
 #include "Engine/Core/Input.h"
 #include "Engine/Core/SceneManager.h"
 #include "Engine/Core/ProjectManager.h"
@@ -454,6 +455,11 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 		{
 			bool showLogWindow = Root::Current().Debugger().ShowLogWindow();
 			bool showStatsWindow = Root::Current().Debugger().ShowStatsWindow();
+			bool profilerEnabled = Root::Current().Profiler().IsEnabled();
+			bool showGameInput = Root::Current().Debugger().ShowGameInputWindow();
+			bool showGameplayDiagnostics = Root::Current().Debugger().ShowGameplayDiagnosticsWindow();
+			bool showAnimationDiagnostics = Root::Current().Debugger().ShowAnimationDiagnosticsWindow();
+			bool showGameGUIDiagnostics = Root::Current().FrontEnd().RuntimeGUI().ShowDiagnosticsWindow();
 			if (ImGui::MenuItem("Show Log Window", nullptr, &showLogWindow))
 			{
 				Root::Current().Debugger().SetShowLogWindow(showLogWindow);
@@ -461,6 +467,26 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 			if (ImGui::MenuItem("Show Stats Window", nullptr, &showStatsWindow))
 			{
 				Root::Current().Debugger().SetShowStatsWindow(showStatsWindow);
+			}
+			if (ImGui::MenuItem("Profiler", nullptr, &profilerEnabled))
+			{
+				Root::Current().Profiler().SetEnabled(profilerEnabled);
+			}
+			if (ImGui::MenuItem("Game Input", nullptr, &showGameInput))
+			{
+				Root::Current().Debugger().SetShowGameInputWindow(showGameInput);
+			}
+			if (ImGui::MenuItem("Gameplay Diagnostics", nullptr, &showGameplayDiagnostics))
+			{
+				Root::Current().Debugger().SetShowGameplayDiagnosticsWindow(showGameplayDiagnostics);
+			}
+			if (ImGui::MenuItem("Animation Diagnostics", nullptr, &showAnimationDiagnostics))
+			{
+				Root::Current().Debugger().SetShowAnimationDiagnosticsWindow(showAnimationDiagnostics);
+			}
+			if (ImGui::MenuItem("GameGUI Diagnostics", nullptr, &showGameGUIDiagnostics))
+			{
+				Root::Current().FrontEnd().RuntimeGUI().SetShowDiagnosticsWindow(showGameGUIDiagnostics);
 			}
 			ImGui::EndMenu();
 		}

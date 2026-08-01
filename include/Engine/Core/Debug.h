@@ -69,6 +69,12 @@ public:
 	bool ShowStatsWindow() const;
 	void SetShowLogWindow(bool showLogWindow);
 	void SetShowStatsWindow(bool showStatsWindow);
+	bool ShowGameInputWindow() const;
+	void SetShowGameInputWindow(bool show);
+	bool ShowGameplayDiagnosticsWindow() const;
+	void SetShowGameplayDiagnosticsWindow(bool show);
+	bool ShowAnimationDiagnosticsWindow() const;
+	void SetShowAnimationDiagnosticsWindow(bool show);
 
 private:
 	// Rebuilds the axis/grid helpers when the grid configuration changes.
@@ -89,6 +95,9 @@ private:
 	double m_startupToFirstDrawMs = -1.0;
 	bool m_showLogWindow = false;
 	bool m_showStatsWindow = false;
+	bool m_showGameInputWindow = true;
+	bool m_showGameplayDiagnosticsWindow = true;
+	bool m_showAnimationDiagnosticsWindow = true;
 	bool m_controllerOwnerBound = false;
 	std::string m_gameplayObjectName;
 	std::string m_activeLevelName;

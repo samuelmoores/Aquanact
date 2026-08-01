@@ -12,8 +12,11 @@
 #include "Engine/Core/ProjectManager.h"
 #include "Engine/Core/GameplayManager.h"
 #include "Engine/Core/Input.h"
+#include "Engine/Core/FrameProfiler.h"
 
+#include <chrono>
 #include <filesystem>
+#include <thread>
 
 Root* Root::s_current = nullptr;
 
@@ -75,6 +78,7 @@ SceneManager& Root::Levels() { return *m_levelManager; }
 ProjectManager& Root::Projects() { return *m_projectManager; }
 GameplayManager& Root::Gameplay() { return *m_gameplayManager; }
 Input& Root::InputRef() { return *m_input; }
+FrameProfiler& Root::Profiler() { return *m_profiler; }
 EngineState& Root::State() { return m_engineState; }
 bool& Root::GameModeDebugFlag() { return m_gameModeDebug; }
 bool& Root::EditorLaunchedGameSession() { return m_editorLaunchedGameSession; }
@@ -92,6 +96,7 @@ void Root::InitializeOwnedSystems()
 	m_projectManager = std::make_unique<ProjectManager>(*m_fileSystem);
 	m_gameplayManager = std::make_unique<GameplayManager>();
 	m_input = std::make_unique<Input>();
+	m_profiler = std::make_unique<FrameProfiler>();
 }
 
 void Root::startUp(int argc, char** argv)
@@ -143,9 +148,32 @@ void Root::run()
 {
 	while (!m_window->ShouldClose())
 	{
-		m_input->Update();
-		UpdateFrame(m_input->DeltaTime());
-		m_renderManager->Loop(*m_frontEndManager, *m_fileManager, *m_levelManager, *m_projectManager, *m_debug, *m_input, *m_window, m_engineState);
+		const auto frameStart = std::chrono::steady_clock::now();
+		m_profiler->BeginFrame();
+		{
+			FrameProfiler::Scope scope(*m_profiler, "Input");
+			m_input->Update();
+		}
+		{
+			FrameProfiler::Scope scope(*m_profiler, "Gameplay");
+			UpdateFrame(m_input->DeltaTime());
+		}
+		{
+			FrameProfiler::Scope scope(*m_profiler, "Render");
+			m_renderManager->Loop(*m_frontEndManager, *m_fileManager, *m_levelManager, *m_projectManager, *m_debug, *m_input, *m_window, m_engineState);
+		}
+
+		// Use an explicit 120 Hz cap instead of relying on VSync or the window
+		// compositor to choose the presentation interval.
+		constexpr auto targetFrameDuration = std::chrono::duration<double>(1.0 / 120.0);
+		const auto targetFrameEnd = frameStart + targetFrameDuration;
+		// Windows sleep resolution can round an 8.33 ms wait up to roughly
+		// 16.6 ms. Yield in the final pacing loop instead of falling to 60 Hz.
+		while (std::chrono::steady_clock::now() < targetFrameEnd)
+		{
+			std::this_thread::yield();
+		}
+		m_profiler->EndFrame();
 	}
 }
 

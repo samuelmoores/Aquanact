@@ -1,0 +1,113 @@
+Aquanact Frame Cap Report
+=========================
+
+Purpose
+-------
+This report documents the engine's explicit frame cap and the changes made to
+prevent the display compositor from controlling the runtime frame rate.
+
+Previous behavior
+-----------------
+The engine originally enabled VSync through GLFW. Window startup called:
+
+    glfwSwapInterval(1)
+
+OpenGL startup also called SetVSync(true). This caused glfwSwapBuffers() to
+block until the display compositor accepted the next synchronized frame.
+Depending on the monitor, window mode, VRR configuration, and missed refresh
+deadlines, the frame rate could fluctuate between values such as 80 and 120 FPS.
+
+Why the model count was not the deciding factor
+------------------------------------------------
+The number of visible models only describes part of the frame workload. A frame
+also includes input, gameplay, animation, GUI drawing, diagnostics, command
+submission, buffer swapping, and operating-system presentation behavior. A
+small scene can still be limited by presentation synchronization or UI work.
+
+Current behavior
+----------------
+VSync is disabled in both Window.cpp and OpenGLGraphics.cpp:
+
+    glfwSwapInterval(0)
+    SetVSync(false)
+
+The frame rate is capped explicitly in Root::run(). Each frame records its
+start time, runs input, gameplay, and rendering, then waits until the target
+frame duration has elapsed.
+
+The target duration is:
+
+    1.0 / 120.0 seconds
+    approximately 8.33 milliseconds
+
+The pacing loop uses std::this_thread::yield() while waiting. This avoids the
+coarse Windows sleep resolution that caused sleep_until() to oversleep an
+8.33 millisecond target toward approximately 16.6 milliseconds, which produced
+a 60 FPS result.
+
+Frame order
+-----------
+
+    record frame start
+    begin profiler frame
+    update input
+    update gameplay
+    render scene and frontend
+    present through glfwSwapBuffers()
+    yield until 8.33 milliseconds have elapsed
+    end profiler frame
+
+The profiler's Frame sample includes the explicit cap wait. The Render and
+Present scopes finish before the cap wait, so their measurements represent
+actual engine and presentation work rather than intentional pacing delay.
+
+Profiler interaction
+--------------------
+Detailed profiling is disabled by default and can be enabled from the editor's
+Debug menu. When enabled, the profiler reports current, smoothed average, and
+maximum timings for frame phases such as:
+
+    Input
+    Gameplay
+    Animation
+    Render
+    RenderCommands
+    Camera
+    Flush
+    Frontend
+    Present
+
+When disabled, detailed scopes do not allocate scope-name strings or record
+per-phase samples. Lightweight frame timing continues so the FPS display can
+remain available.
+
+CPU tradeoff
+------------
+The yield-based cap is more precise than the previous sleep_until() approach,
+but it can consume additional CPU while waiting for the next frame boundary.
+This is an intentional development-time tradeoff for stable frame pacing.
+
+If lower CPU usage becomes more important, the pacing system can later be
+changed to a hybrid strategy using a high-resolution platform timer, a short
+coarse sleep, and a final short spin/yield phase.
+
+Validation checklist
+--------------------
+
+    Verify the FPS display stabilizes near 120 on a 120 Hz monitor.
+    Confirm the Frame timing is approximately 8.33 milliseconds.
+    Disable detailed profiling when measuring normal runtime performance.
+    Disable runtime diagnostics when measuring scene and animation cost.
+    Use the Present scope to identify compositor or swap-buffer stalls.
+    Compare performance with the explicit cap temporarily removed when testing
+    the maximum rendering throughput.
+
+Relevant files
+--------------
+
+    src/Engine/Core/Root.cpp
+    src/Engine/Core/Window.cpp
+    src/Engine/Core/OpenGLGraphics.cpp
+    include/Engine/Core/FrameProfiler.h
+    src/Engine/Core/FrameProfiler.cpp
+
