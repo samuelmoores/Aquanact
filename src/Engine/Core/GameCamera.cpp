@@ -78,7 +78,7 @@ void GameCamera::SetPose(const glm::vec3& position, const glm::vec3& facing)
 	}
 	m_up = glm::vec3(0.0f, 1.0f, 0.0f);
 	m_view_matrix = glm::lookAt(m_position, m_position + m_front, m_up);
-	m_yaw = glm::degrees(std::atan2(m_front.z, m_front.x));
+	m_yaw = glm::degrees(std::atan2(m_front.x, m_front.z));
 	m_pitch = glm::degrees(std::asin(glm::clamp(m_front.y, -1.0f, 1.0f)));
 	if (m_target)
 	{
@@ -124,14 +124,15 @@ void GameCamera::RebuildView()
 	m_view_matrix = glm::lookAt(m_position, m_position + m_front, m_up);
 }
 
-void GameCamera::UpdateThirdPerson(const Input& input)
+void GameCamera::UpdateThirdPerson(const Input& input, float dt)
 {
 	(void)input;
 	const glm::vec2 look = Root::Current().InputActions().VectorValue("Look");
 	if (glm::length(look) > 0.0f)
 	{
-		m_yaw += look.x * m_lookSensitivity;
-		m_pitch = glm::clamp(m_pitch - look.y * m_lookSensitivity, -75.0f, 75.0f);
+		const float stepScale = glm::max(dt, 0.0001f) * 120.0f;
+		m_yaw -= look.x * m_lookSensitivity * stepScale;
+		m_pitch = glm::clamp(m_pitch + look.y * m_lookSensitivity * stepScale, -75.0f, 75.0f);
 	}
 
 	Entity* target = m_target;
@@ -148,9 +149,9 @@ void GameCamera::UpdateThirdPerson(const Input& input)
 	const float yawRad = glm::radians(m_yaw);
 	const float pitchRad = glm::radians(m_pitch);
 	glm::vec3 offset;
-	offset.x = std::cos(pitchRad) * std::cos(yawRad);
+	offset.x = std::sin(yawRad) * std::cos(pitchRad);
 	offset.y = std::sin(pitchRad);
-	offset.z = std::cos(pitchRad) * std::sin(yawRad);
+	offset.z = std::cos(yawRad) * std::cos(pitchRad);
 	if (!std::isfinite(offset.x) || !std::isfinite(offset.y) || !std::isfinite(offset.z) || glm::length(offset) <= 0.0001f)
 	{
 		return;

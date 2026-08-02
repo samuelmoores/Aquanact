@@ -29,7 +29,7 @@ public:
 	float Yaw() const { return m_yaw; }
 	float Pitch() const { return m_pitch; }
 	void SetOrbitAngles(float yaw, float pitch);
-	void UpdateThirdPerson(const class Input& input);
+	void UpdateThirdPerson(const class Input& input, float dt);
 
 private:
 	void RebuildView();
@@ -49,7 +49,7 @@ private:
 	float m_radius = 10.0f;
 	float m_yaw = 0.0f;
 	float m_pitch = 15.0f;
-	float m_lookSensitivity = 0.08f;
+	float m_lookSensitivity = 1.2f;
 };
 
 

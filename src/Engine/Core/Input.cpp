@@ -7,6 +7,7 @@
 #include <cmath>
 #include <algorithm>
 
+#include <imgui.h>
 #include <MYGUI/MyGUI_InputManager.h>
 #include <MYGUI/MyGUI_MouseButton.h>
 
@@ -42,6 +43,7 @@ void Input::shutDown()
 	m_previousMouseButtonCallback = nullptr;
 	m_previousCursorPosCallback = nullptr;
 	m_lookActive = false;
+	m_ignoreMouseDeltaOnce = false;
 	m_lookBecameActive = false;
 	m_mouseDelta = glm::vec2(0.0f);
 }
@@ -67,6 +69,43 @@ void Input::Update()
 
 	m_moveInput = glm::vec3(0.0f);
 	m_lookBecameActive = false;
+
+	const bool gameMode = Root::Current().State().IsGameMode();
+	const bool escapePressed = glfwGetKey(m_window->GLFW(), GLFW_KEY_ESCAPE) == GLFW_PRESS;
+	if (!gameMode || !m_windowFocused || escapePressed)
+	{
+		if (m_lookActive)
+		{
+			m_lookActive = false;
+			m_ignoreMouseDeltaOnce = false;
+			glfwSetInputMode(m_window->GLFW(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+		}
+	}
+	else if (gameMode && !m_lookActive)
+	{
+		const ImGuiIO& io = ImGui::GetIO();
+		if (io.WantCaptureMouse || ImGui::IsAnyItemActive())
+		{
+			m_mouseDelta = glm::vec2(0.0f);
+			return;
+		}
+
+		const bool mouseClick =
+			glfwGetMouseButton(m_window->GLFW(), GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS ||
+			glfwGetMouseButton(m_window->GLFW(), GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS ||
+			glfwGetMouseButton(m_window->GLFW(), GLFW_MOUSE_BUTTON_MIDDLE) == GLFW_PRESS;
+		if (mouseClick)
+		{
+			m_lookActive = true;
+			m_lookBecameActive = true;
+			m_ignoreMouseDeltaOnce = true;
+			double x = 0.0;
+			double y = 0.0;
+			glfwGetCursorPos(m_window->GLFW(), &x, &y);
+			m_lastCursorPos = glm::vec2(static_cast<float>(x), static_cast<float>(y));
+			glfwSetInputMode(m_window->GLFW(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+		}
+	}
 	if (glfwGetKey(m_window->GLFW(), GLFW_KEY_W) == GLFW_PRESS) m_moveInput.z += 1.0f;
 	if (glfwGetKey(m_window->GLFW(), GLFW_KEY_S) == GLFW_PRESS) m_moveInput.z -= 1.0f;
 	if (glfwGetKey(m_window->GLFW(), GLFW_KEY_D) == GLFW_PRESS) m_moveInput.x += 1.0f;
@@ -74,27 +113,56 @@ void Input::Update()
 	if (glfwGetKey(m_window->GLFW(), GLFW_KEY_E) == GLFW_PRESS) m_moveInput.y += 1.0f;
 	if (glfwGetKey(m_window->GLFW(), GLFW_KEY_Q) == GLFW_PRESS) m_moveInput.y -= 1.0f;
 
-	const bool rightDown = glfwGetMouseButton(m_window->GLFW(), GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
-	if (rightDown && !m_lookActive) {
-		m_lookActive = true;
-		m_lookBecameActive = true;
-		double x = 0.0;
-		double y = 0.0;
-		glfwGetCursorPos(m_window->GLFW(), &x, &y);
-		m_lastCursorPos = glm::vec2(static_cast<float>(x), static_cast<float>(y));
-		glfwSetInputMode(m_window->GLFW(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-	} else if (!rightDown && m_lookActive) {
-		m_lookActive = false;
-		glfwSetInputMode(m_window->GLFW(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+	if (!gameMode)
+	{
+		const bool rightDown = glfwGetMouseButton(m_window->GLFW(), GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
+		if (rightDown && !m_lookActive) {
+			m_lookActive = true;
+			m_lookBecameActive = true;
+			m_ignoreMouseDeltaOnce = true;
+			double x = 0.0;
+			double y = 0.0;
+			glfwGetCursorPos(m_window->GLFW(), &x, &y);
+			m_lastCursorPos = glm::vec2(static_cast<float>(x), static_cast<float>(y));
+			glfwSetInputMode(m_window->GLFW(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+		} else if (!rightDown && m_lookActive) {
+			m_lookActive = false;
+			m_ignoreMouseDeltaOnce = false;
+			glfwSetInputMode(m_window->GLFW(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+		}
 	}
 
 	m_mouseDelta = glm::vec2(0.0f);
 	if (m_lookActive) {
+		if (m_ignoreMouseDeltaOnce)
+		{
+			double x = 0.0;
+			double y = 0.0;
+			glfwGetCursorPos(m_window->GLFW(), &x, &y);
+			m_lastCursorPos = glm::vec2(static_cast<float>(x), static_cast<float>(y));
+			m_ignoreMouseDeltaOnce = false;
+			return;
+		}
+
 		double x = 0.0;
 		double y = 0.0;
 		glfwGetCursorPos(m_window->GLFW(), &x, &y);
 		const glm::vec2 cursorPos(static_cast<float>(x), static_cast<float>(y));
 		m_mouseDelta = cursorPos - m_lastCursorPos;
+		const float mouseDeltaLength = glm::length(m_mouseDelta);
+		if (mouseDeltaLength < 0.75f)
+		{
+			m_mouseDelta = glm::vec2(0.0f);
+		}
+		else
+		{
+			const float maxMouseDelta = 8.0f;
+			if (mouseDeltaLength > maxMouseDelta)
+			{
+				m_mouseDelta = glm::normalize(m_mouseDelta) * maxMouseDelta;
+			}
+			m_mouseDelta.y = -m_mouseDelta.y;
+		}
 		m_lastCursorPos = cursorPos;
 	}
 }

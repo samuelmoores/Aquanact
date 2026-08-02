@@ -204,7 +204,8 @@ void RenderManager::UpdateCameraPhase(const Input& input, const EngineState& eng
 	ApplyCameraMode(engineState);
 	if (engineState.IsGameMode())
 	{
-		m_gameCamera->UpdateThirdPerson(input);
+		constexpr float fixedCameraStep = 1.0f / 120.0f;
+		m_gameCamera->UpdateThirdPerson(input, fixedCameraStep);
 	}
 	if (engineState.IsEditorMode())
 	{

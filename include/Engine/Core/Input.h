@@ -35,6 +35,7 @@ private:
 	GLFWmousebuttonfun m_previousMouseButtonCallback = nullptr;
 	GLFWcursorposfun m_previousCursorPosCallback = nullptr;
 	bool m_lookActive = false;
+	bool m_ignoreMouseDeltaOnce = false;
 	glm::vec2 m_lastCursorPos = glm::vec2(0.0f);
 	glm::vec2 m_mouseDelta = glm::vec2(0.0f);
 	glm::vec3 m_moveInput = glm::vec3(0.0f);
