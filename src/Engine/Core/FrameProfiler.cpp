@@ -76,7 +76,6 @@ void FrameProfiler::SetEnabled(bool enabled)
 	if (!enabled)
 	{
 		m_currentSamples.clear();
-		m_frameActive = false;
 	}
 }
 

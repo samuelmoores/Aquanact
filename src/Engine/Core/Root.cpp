@@ -163,15 +163,17 @@ void Root::run()
 			m_renderManager->Loop(*m_frontEndManager, *m_fileManager, *m_levelManager, *m_projectManager, *m_debug, *m_input, *m_window, m_engineState);
 		}
 
-		// Use an explicit 120 Hz cap instead of relying on VSync or the window
-		// compositor to choose the presentation interval.
-		constexpr auto targetFrameDuration = std::chrono::duration<double>(1.0 / 120.0);
-		const auto targetFrameEnd = frameStart + targetFrameDuration;
-		// Windows sleep resolution can round an 8.33 ms wait up to roughly
-		// 16.6 ms. Yield in the final pacing loop instead of falling to 60 Hz.
-		while (std::chrono::steady_clock::now() < targetFrameEnd)
+		// Frame pacing is independent from optional profiler sampling.
+		if (m_frameCapEnabled && m_targetFrameRate > 0.0)
 		{
-			std::this_thread::yield();
+			const auto targetFrameDuration = std::chrono::duration<double>(1.0 / m_targetFrameRate);
+			const auto targetFrameEnd = frameStart + targetFrameDuration;
+			// Windows sleep resolution can round an 8.33 ms wait up to roughly
+			// 16.6 ms. Yield in the final pacing loop instead of falling to 60 Hz.
+			while (std::chrono::steady_clock::now() < targetFrameEnd)
+			{
+				std::this_thread::yield();
+			}
 		}
 		m_profiler->EndFrame();
 	}
