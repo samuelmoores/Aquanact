@@ -95,6 +95,11 @@ void RenderManager::SetGameMode()
 	m_cameraManager.SetGameMode(*m_gameCamera);
 }
 
+void RenderManager::SetCameraMode(CameraMode mode)
+{
+	m_cameraMode = mode;
+}
+
 void RenderManager::SetActiveCamera(Camera& camera)
 {
 	m_cameraManager.SetActiveCamera(camera);
@@ -114,6 +119,11 @@ void RenderManager::shutDown()
 	{
 		m_lightingManager->shutDown();
 		m_lightingManager.reset();
+	}
+
+	if (m_gameCamera)
+	{
+		m_gameCamera->SetTarget(nullptr);
 	}
 
 	//Graphics
@@ -140,6 +150,9 @@ void RenderManager::shutDown()
 void RenderManager::ApplyProjectState(const ProjectStateData::RenderStateData& renderState)
 {
 	m_gameCamera->SetPose(renderState.gameCameraPosition, renderState.gameCameraFacing);
+	m_gameCamera->SetRadius(renderState.gameCameraRadius);
+	m_gameCamera->SetOrbitAngles(renderState.gameCameraYaw, renderState.gameCameraPitch);
+	m_gameCamera->SetTargetName(renderState.gameCameraTarget);
 	m_lightingManager->SunLight().direction = renderState.sunLight.direction;
 	m_lightingManager->SunLight().color = renderState.sunLight.color;
 	m_lightingManager->SunLight().intensity = renderState.sunLight.intensity;
@@ -189,6 +202,10 @@ void RenderManager::PresentFrame(Window& window)
 void RenderManager::UpdateCameraPhase(const Input& input, const EngineState& engineState)
 {
 	ApplyCameraMode(engineState);
+	if (engineState.IsGameMode())
+	{
+		m_gameCamera->UpdateThirdPerson(input);
+	}
 	if (engineState.IsEditorMode())
 	{
 		m_cameraManager.Update(input);

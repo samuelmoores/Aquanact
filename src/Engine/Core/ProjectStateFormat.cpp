@@ -178,7 +178,8 @@ namespace ProjectStateFormat {
 				contents += ";";
 				contents += std::to_string(position.x) + ";" + std::to_string(position.y) + ";" + std::to_string(position.z) + ";";
 				contents += std::to_string(rotation.x) + ";" + std::to_string(rotation.y) + ";" + std::to_string(rotation.z) + ";";
-				contents += std::to_string(scale.x) + ";" + std::to_string(scale.y) + ";" + std::to_string(scale.z) + "\n";
+				contents += std::to_string(scale.x) + ";" + std::to_string(scale.y) + ";" + std::to_string(scale.z) + ";";
+				contents += std::to_string(object->Id()) + "\n";
 			}
 		}
 	}

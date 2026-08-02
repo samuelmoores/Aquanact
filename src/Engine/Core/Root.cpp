@@ -206,6 +206,10 @@ void Root::shutDown()
 	}
 
 	m_debug->LogMessage("Main loop exiting because the window close flag was set.");
+	if (m_renderManager)
+	{
+		m_renderManager->GetGameCamera().SetTarget(nullptr);
+	}
 
 	m_gameplayManager->shutDown();
 	m_fileManager->shutDown();

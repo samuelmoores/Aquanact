@@ -1,11 +1,15 @@
 #include "Engine/Core/GameCamera.h"
 
+#include "Engine/Core/Entity.h"
 #include "Engine/Core/EngineCamera.h"
 #include "Engine/Core/Root.h"
+#include "Engine/Core/Input.h"
+#include "Engine/Core/InputManager.h"
 #include "Engine/Core/Window.h"
 
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
+#include <cmath>
 
 void GameCamera::startUp()
 {
@@ -74,6 +78,87 @@ void GameCamera::SetPose(const glm::vec3& position, const glm::vec3& facing)
 	}
 	m_up = glm::vec3(0.0f, 1.0f, 0.0f);
 	m_view_matrix = glm::lookAt(m_position, m_position + m_front, m_up);
+	m_yaw = glm::degrees(std::atan2(m_front.z, m_front.x));
+	m_pitch = glm::degrees(std::asin(glm::clamp(m_front.y, -1.0f, 1.0f)));
+	if (m_target)
+	{
+		m_radius = glm::length(m_target->WorldCenterPosition() - m_position);
+	}
+}
+
+void GameCamera::SetTarget(Entity* target)
+{
+	m_target = target;
+	if (!m_target)
+	{
+		m_targetId = 0;
+		m_targetName.clear();
+		return;
+	}
+
+	m_targetId = m_target->Id();
+	m_targetName = m_target->Name();
+
+	if (m_target)
+	{
+		const glm::vec3 targetCenter = m_target->WorldCenterPosition();
+		const float distance = glm::length(m_position - targetCenter);
+		m_radius = distance > 0.1f ? distance : m_radius;
+	}
+}
+
+void GameCamera::SetRadius(float radius)
+{
+	m_radius = glm::max(radius, 0.1f);
+}
+
+void GameCamera::SetOrbitAngles(float yaw, float pitch)
+{
+	m_yaw = yaw;
+	m_pitch = glm::clamp(pitch, -75.0f, 75.0f);
+}
+
+void GameCamera::RebuildView()
+{
+	m_up = glm::vec3(0.0f, 1.0f, 0.0f);
+	m_view_matrix = glm::lookAt(m_position, m_position + m_front, m_up);
+}
+
+void GameCamera::UpdateThirdPerson(const Input& input)
+{
+	(void)input;
+	const glm::vec2 look = Root::Current().InputActions().VectorValue("Look");
+	if (glm::length(look) > 0.0f)
+	{
+		m_yaw += look.x * m_lookSensitivity;
+		m_pitch = glm::clamp(m_pitch - look.y * m_lookSensitivity, -75.0f, 75.0f);
+	}
+
+	Entity* target = m_target;
+	if (!target)
+	{
+		return;
+	}
+
+	const glm::vec3 targetPos = target->WorldCenterPosition();
+	if (!std::isfinite(targetPos.x) || !std::isfinite(targetPos.y) || !std::isfinite(targetPos.z))
+	{
+		return;
+	}
+	const float yawRad = glm::radians(m_yaw);
+	const float pitchRad = glm::radians(m_pitch);
+	glm::vec3 offset;
+	offset.x = std::cos(pitchRad) * std::cos(yawRad);
+	offset.y = std::sin(pitchRad);
+	offset.z = std::cos(pitchRad) * std::sin(yawRad);
+	if (!std::isfinite(offset.x) || !std::isfinite(offset.y) || !std::isfinite(offset.z) || glm::length(offset) <= 0.0001f)
+	{
+		return;
+	}
+	offset = glm::normalize(offset) * m_radius;
+	m_position = targetPos - offset;
+	m_front = glm::normalize(targetPos - m_position);
+	RebuildView();
 }
 
 

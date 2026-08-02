@@ -6,6 +6,7 @@
 #include <filesystem>
 
 #include "Engine/Core/GLHeaders.h"
+#include "Engine/Core/Debug.h"
 #include "Engine/Core/RenderManager.h"
 #include "Engine/Core/Root.h"
 #include "Engine/Core/Line.h"
@@ -100,6 +101,24 @@ void Mesh::AdoptImportedModel(ImportedModel&& importedModel)
 	m_meshMaxBounds = importedModel.meshMaxBounds; // Runtime AABB max for object picking/collision.
 	m_sourcePath = std::move(importedModel.sourcePath);
 
+	const auto invalid = [](float v)
+	{
+		return !std::isfinite(v);
+	};
+	const bool hasValidBounds =
+		!invalid(m_minBounds.x) && !invalid(m_minBounds.y) && !invalid(m_minBounds.z) &&
+		!invalid(m_maxBounds.x) && !invalid(m_maxBounds.y) && !invalid(m_maxBounds.z) &&
+		m_minBounds.x <= m_maxBounds.x &&
+		m_minBounds.y <= m_maxBounds.y &&
+		m_minBounds.z <= m_maxBounds.z;
+	if (!hasValidBounds)
+	{
+		m_minBounds = glm::vec3(-0.5f, -0.5f, -0.5f);
+		m_maxBounds = glm::vec3(0.5f, 0.5f, 0.5f);
+		m_meshMinBounds = m_minBounds;
+		m_meshMaxBounds = m_maxBounds;
+	}
+
 	if (m_scene)
 	{
 		for (unsigned int i = 0; i < m_scene->mNumMeshes; ++i)
@@ -147,6 +166,22 @@ void Mesh::updateAABB(glm::vec3 position, glm::vec3 scale)
 
 glm::vec3 Mesh::centerAABB()
 {
+	auto invalid = [](float v) { return !std::isfinite(v); };
+	if (invalid(m_minBounds.x) || invalid(m_minBounds.y) || invalid(m_minBounds.z) ||
+		invalid(m_maxBounds.x) || invalid(m_maxBounds.y) || invalid(m_maxBounds.z) ||
+		m_minBounds.x > m_maxBounds.x || m_minBounds.y > m_maxBounds.y || m_minBounds.z > m_maxBounds.z)
+	{
+		Root::Current().Debugger().LogTagged(
+			Debug::Severity::Warning,
+			"Mesh",
+			"Invalid AABB encountered. min=(" +
+				std::to_string(m_minBounds.x) + "," + std::to_string(m_minBounds.y) + "," + std::to_string(m_minBounds.z) +
+				") max=(" +
+				std::to_string(m_maxBounds.x) + "," + std::to_string(m_maxBounds.y) + "," + std::to_string(m_maxBounds.z) +
+				")");
+		return glm::vec3(0.0f);
+	}
+
 	return {
 		(m_minBounds.x + m_maxBounds.x) / 2.0f,
 		(m_minBounds.y + m_maxBounds.y) / 2.0f,

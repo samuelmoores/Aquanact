@@ -41,6 +41,10 @@ void InputManager::ResetToDefaults()
 		{ InputBindingType::ControllerDigital, GLFW_GAMEPAD_BUTTON_DPAD_RIGHT, GLFW_JOYSTICK_1, 1.0f, glm::vec2(1.0f, 0.0f) },
 		{ InputBindingType::ControllerStick, 0, GLFW_JOYSTICK_1, 1.0f, glm::vec2(0.0f), InputStick::Left },
 	});
+	SetBindings("Look", {
+		{ InputBindingType::MouseDelta, 0, GLFW_JOYSTICK_1, 1.0f, glm::vec2(1.0f, 1.0f) },
+		{ InputBindingType::ControllerStick, 0, GLFW_JOYSTICK_1, 1.0f, glm::vec2(0.0f), InputStick::Right },
+	});
 }
 
 void InputManager::Bind(const std::string& action, InputBinding binding)
@@ -96,6 +100,10 @@ bool InputManager::IsBindingConnected(const InputBinding& binding) const
 	{
 		return binding.code >= 0 && binding.code <= GLFW_KEY_LAST;
 	}
+	if (binding.type == InputBindingType::MouseDelta)
+	{
+		return true;
+	}
 	if (binding.type == InputBindingType::ControllerDigital || binding.type == InputBindingType::ControllerStick)
 	{
 		return m_input && binding.joystick >= GLFW_JOYSTICK_1 && binding.joystick <= GLFW_JOYSTICK_LAST
@@ -113,6 +121,10 @@ bool InputManager::IsBindingDown(const InputBinding& binding) const
 	if (binding.type == InputBindingType::Key)
 	{
 		return m_input->KeyDown(binding.code);
+	}
+	if (binding.type == InputBindingType::MouseDelta)
+	{
+		return false;
 	}
 	if (binding.type == InputBindingType::ControllerDigital)
 	{
@@ -153,6 +165,10 @@ void InputManager::EvaluateActions()
 				{
 					vectorValue += binding.vector * binding.scale;
 				}
+			}
+			else if (binding.type == InputBindingType::MouseDelta)
+			{
+				vectorValue += m_input->MouseDelta() * binding.vector;
 			}
 			else if (binding.type == InputBindingType::ControllerDigital)
 			{

@@ -23,6 +23,8 @@ public:
 
 	const std::string& Name() const { return m_name; }
 	void SetName(std::string name) { m_name = std::move(name); }
+	unsigned int Id() const { return m_id; }
+	void SetId(unsigned int id);
 
 	virtual const char* TypeName() const { return "Entity"; }
 	virtual std::vector<BindableMember> GetBindableMembers() const { return {}; }
@@ -96,6 +98,7 @@ protected:
 	bool m_ignoreCameraCollision = false;
 	std::string m_name;
 	std::string m_sourcePath;
+	unsigned int m_id = 0;
 	std::vector<std::unique_ptr<Component>> m_components;
 
 public:

@@ -12,6 +12,7 @@ class Input;
 enum class InputBindingType
 {
 	Key,
+	MouseDelta,
 	ControllerDigital,
 	ControllerStick,
 };

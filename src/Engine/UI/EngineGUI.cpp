@@ -15,6 +15,7 @@
 #include "Engine/Core/ProjectManager.h"
 #include "Engine/Core/Window.h"
 #include "Engine/Core/Camera.h"
+#include "Engine/Core/GameCamera.h"
 #include "Engine/Core/Entity.h"
 #include "Engine/Core/Controller.h"
 #include "Engine/Core/PlayerController.h"
@@ -57,6 +58,11 @@ namespace {
 			case GLFW_KEY_DOWN: return "Key: Down";
 			default: return "Key: " + std::to_string(binding.code);
 			}
+		}
+
+		if (binding.type == InputBindingType::MouseDelta)
+		{
+			return "Mouse";
 		}
 
 		if (binding.type == InputBindingType::ControllerStick)
@@ -490,6 +496,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 			ImGui::TextDisabled("Engine");
 			ImGui::Separator();
 			ToggleMenuItem("Axis", m_showAxis);
+			ToggleMenuItem("Camera Window", m_showCameraWindow);
 			if (ImGui::BeginMenu("EngineCamera"))
 			{
 				float moveSpeed = Root::Current().Render().GetEngineCamera().MoveSpeed();
@@ -547,6 +554,15 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 		}
 		if (ImGui::BeginMenu("Game"))
 		{
+			if (ImGui::BeginMenu("Camera"))
+			{
+				const bool thirdPerson = Root::Current().Render().CameraModeValue() == RenderManager::CameraMode::ThirdPerson;
+				if (ImGui::MenuItem("Third Person", nullptr, thirdPerson))
+				{
+					Root::Current().Render().SetCameraMode(RenderManager::CameraMode::ThirdPerson);
+				}
+				ImGui::EndMenu();
+			}
 			if (ImGui::MenuItem("Play Game"))
 			{
 				Root::Current().FrontEnd().Creator().SaveAllRoleGUIs();
@@ -672,6 +688,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 	DrawAddCodeFilePopup();
 	DrawNewLevelPopup();
 	DrawInputMapWindow();
+	DrawCameraWindow();
 
 	if (m_showFileExplorer)
 	{
@@ -1125,6 +1142,59 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 		m_showLightingWindow = pendingLightingWindow;
 	}
 
+}
+
+void EngineGUI::DrawCameraWindow()
+{
+	if (!m_showCameraWindow)
+	{
+		return;
+	}
+
+	Scene* activeLevel = Root::Current().Levels().ActiveLevel();
+	static const std::vector<std::unique_ptr<Entity>> emptyObjects;
+	const auto& objects = activeLevel ? activeLevel->Objects() : emptyObjects;
+
+	bool open = m_showCameraWindow;
+	if (ImGui::Begin("Camera", &open, ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		GameCamera& camera = Root::Current().Render().GetGameCamera();
+		ImGui::Text("Radius: %.2f", camera.Radius());
+		ImGui::Text("Target: %s", camera.Target() ? camera.Target()->Name().c_str() : "<none>");
+
+		if (ImGui::BeginCombo("##CameraTarget", camera.Target() ? camera.Target()->Name().c_str() : "<select entity>"))
+		{
+			for (const auto& object : objects)
+			{
+				if (!object)
+				{
+					continue;
+				}
+
+				const bool selected = camera.Target() == object.get();
+				if (ImGui::Selectable(object->Name().c_str(), selected))
+				{
+					camera.SetTarget(object.get());
+				}
+				if (selected)
+				{
+					ImGui::SetItemDefaultFocus();
+				}
+			}
+			ImGui::EndCombo();
+		}
+
+		if (!camera.Target())
+		{
+			ImGui::TextDisabled("Select an entity to follow.");
+		}
+		else
+		{
+			ImGui::TextDisabled("The camera orbits the selected target using Look input.");
+		}
+	}
+	ImGui::End();
+	m_showCameraWindow = open;
 }
 
 void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
@@ -1634,6 +1704,16 @@ bool EngineGUI::ShowFileExplorer() const
 	return m_showFileExplorer;
 }
 
+bool EngineGUI::ShowInputMapWindow() const
+{
+	return m_showInputMapWindow;
+}
+
+bool EngineGUI::ShowCameraWindow() const
+{
+	return m_showCameraWindow;
+}
+
 void EngineGUI::SetShowAxis(bool showAxis)
 {
 	m_showAxis = showAxis;
@@ -1662,6 +1742,16 @@ void EngineGUI::SetShowLightingWindow(bool showLightingWindow)
 void EngineGUI::SetShowFileExplorer(bool showFileExplorer)
 {
 	m_showFileExplorer = showFileExplorer;
+}
+
+void EngineGUI::SetShowInputMapWindow(bool showInputMapWindow)
+{
+	m_showInputMapWindow = showInputMapWindow;
+}
+
+void EngineGUI::SetShowCameraWindow(bool showCameraWindow)
+{
+	m_showCameraWindow = showCameraWindow;
 }
 
 void EngineGUI::DrawInputMapWindow()

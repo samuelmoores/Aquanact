@@ -25,6 +25,11 @@ class EngineState;
 
 class RenderManager {
 public:
+	enum class CameraMode
+	{
+		ThirdPerson,
+	};
+
 	RenderManager() = default;
 	~RenderManager();
 	void startUp(Window& window);
@@ -37,6 +42,8 @@ public:
 	const GameCamera& GetGameCamera() const;
 	void SetEditorMode();
 	void SetGameMode();
+	void SetCameraMode(CameraMode mode);
+	CameraMode CameraModeValue() const { return m_cameraMode; }
 	void SetActiveCamera(Camera& camera);
 	Camera& ActiveCamera();
 	const Camera& ActiveCamera() const;
@@ -74,6 +81,7 @@ private:
 	std::unique_ptr<EngineCamera> m_engineCamera;
 	std::unique_ptr<GameCamera> m_gameCamera;
 	CameraManager m_cameraManager;
+	CameraMode m_cameraMode = CameraMode::ThirdPerson;
 	OpenGLGraphicsDevice m_device;
 	FrameAllocator m_frameAllocator;
 	RenderCommand* m_commands = nullptr;

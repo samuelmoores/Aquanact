@@ -18,11 +18,18 @@
 namespace {
 	void AppendCurrentCameraState(std::string& contents)
 	{
-		const glm::vec3 gameCameraPosition = Root::Current().Render().GetGameCamera().GetPosition();
-		const glm::vec3 gameCameraFacing = Root::Current().Render().GetGameCamera().GetFacing();
+		const GameCamera& gameCamera = Root::Current().Render().GetGameCamera();
+		const glm::vec3 gameCameraPosition = gameCamera.GetPosition();
+		const glm::vec3 gameCameraFacing = gameCamera.GetFacing();
 		contents += "gamecamera;";
 		contents += std::to_string(gameCameraPosition.x) + ";" + std::to_string(gameCameraPosition.y) + ";" + std::to_string(gameCameraPosition.z) + ";";
-		contents += std::to_string(gameCameraFacing.x) + ";" + std::to_string(gameCameraFacing.y) + ";" + std::to_string(gameCameraFacing.z) + "\n";
+		contents += std::to_string(gameCameraFacing.x) + ";" + std::to_string(gameCameraFacing.y) + ";" + std::to_string(gameCameraFacing.z) + ";";
+		contents += std::to_string(gameCamera.Radius()) + ";";
+		contents += std::to_string(gameCamera.Yaw()) + ";";
+		contents += std::to_string(gameCamera.Pitch()) + ";";
+		contents += ProjectStateSerializer::EscapeField(gameCamera.TargetName()) + ";";
+		contents += (gameCamera.TargetName().empty() ? "0" : "1");
+		contents += "\n";
 	}
 
 	void AppendImguiLayoutState(std::string& contents)
@@ -38,7 +45,6 @@ namespace {
 	void AppendProjectStateSnapshot(std::string& contents, const std::filesystem::path& path, const SceneManager& SceneManager)
 	{
 		ProjectStateSerializer::AppendLevelState(contents, path, SceneManager);
-		AppendCurrentCameraState(contents);
 		ProjectStateSerializer::AppendRenderState(contents, Root::Current().FrontEnd(), Root::Current().Render());
 		SceneManager.AppendProjectState(contents);
 		if (SceneManager.StartupLevelName().empty())
@@ -54,6 +60,7 @@ namespace {
 		SceneManager.Clear();
 		for (const auto& pendingLevel : pendingLevels)
 		{
+			Root::Current().Debugger().LogTagged("ProjectLoad", "Materializing scene: " + pendingLevel.name);
 			Scene* Scene = pendingLevel.isCutscene
 				? SceneManager.CreateCutscene(pendingLevel.name)
 				: SceneManager.CreateLevel(pendingLevel.name);
@@ -69,7 +76,12 @@ namespace {
 
 			for (const auto& pendingObject : pendingLevel.objects)
 			{
+				Root::Current().Debugger().LogTagged("ProjectLoad", "Creating object from source: " + pendingObject.sourcePath.string() + " in scene: " + pendingLevel.name);
 				auto object = std::make_unique<Entity>(pendingObject.sourcePath.string().c_str());
+				if (pendingObject.id != 0)
+				{
+					object->SetId(pendingObject.id);
+				}
 				object->Translate(pendingObject.position);
 				object->SetRotation(pendingObject.rotation);
 				object->SetScale(pendingObject.scale);
@@ -111,6 +123,43 @@ namespace {
 		}
 	}
 
+	void RestoreGameCameraTarget(SceneManager& SceneManager, const ProjectStateData::RenderStateData& renderState)
+	{
+		GameCamera& gameCamera = Root::Current().Render().GetGameCamera();
+		gameCamera.SetTarget(nullptr);
+		Root::Current().Debugger().LogTagged(
+			"ProjectLoad",
+			"Restoring camera target id=" + std::to_string(renderState.gameCameraTargetId) + " hasTarget=" + std::string(renderState.gameCameraHasTarget ? "true" : "false"));
+		if (!renderState.gameCameraHasTarget || renderState.gameCameraTargetId == 0)
+		{
+			return;
+		}
+
+		Scene* activeLevel = SceneManager.ActiveLevel();
+		if (!activeLevel)
+		{
+			return;
+		}
+
+		for (const auto& object : activeLevel->Objects())
+		{
+			if (!object)
+			{
+				continue;
+			}
+			Root::Current().Debugger().LogTagged("ProjectLoad", "Checking camera target candidate id=" + std::to_string(object->Id()) + " name=" + object->Name());
+			if (object->Id() != renderState.gameCameraTargetId)
+			{
+				continue;
+			}
+
+			gameCamera.SetTarget(object.get());
+			Root::Current().Debugger().LogTagged("ProjectLoad", "Camera target restored to id=" + std::to_string(object->Id()));
+			return;
+		}
+		Root::Current().Debugger().LogTagged(Debug::Severity::Warning, "ProjectLoad", "Camera target id not found in active scene: " + std::to_string(renderState.gameCameraTargetId));
+	}
+
 	void EnsureMainMenuLevel(SceneManager& SceneManager)
 	{
 		if (!SceneManager.FindLevel("MainMenu"))
@@ -139,8 +188,8 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const SceneM
 		return false;
 	}
 
-		std::string contents = "AquanactProject 17\n";
-	AppendProjectStateSnapshot(contents, path, SceneManager);
+		std::string contents = "AquanactProject\n";
+		AppendProjectStateSnapshot(contents, path, SceneManager);
 
 	const bool written = m_fileSystem->WriteTextFile(path, contents);
 	if (written)
@@ -166,40 +215,8 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 	std::istringstream file(fileContents);
 	std::string header;
 	std::getline(file, header);
-	int projectVersion = 0;
-	if (header == "AquanactProject 10")
-	{
-		projectVersion = 10;
-	}
-	else if (header == "AquanactProject 11")
-	{
-		projectVersion = 11;
-	}
-	else if (header == "AquanactProject 12")
-	{
-		projectVersion = 12;
-	}
-	else if (header == "AquanactProject 13")
-	{
-		projectVersion = 13;
-	}
-	else if (header == "AquanactProject 14")
-	{
-		projectVersion = 14;
-	}
-	else if (header == "AquanactProject 15")
-	{
-		projectVersion = 15;
-	}
-	else if (header == "AquanactProject 16")
-	{
-		projectVersion = 16;
-	}
-	else if (header == "AquanactProject 17")
-	{
-		projectVersion = 17;
-	}
-	else
+	const int projectVersion = 18;
+	if (header != "AquanactProject" && header != "AquanactProject 18")
 	{
 		return false;
 	}
@@ -230,7 +247,9 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 		{
 			SceneManager.SetStartupLevelName("MainMenu");
 		}
+		Root::Current().Debugger().LogTagged("ProjectLoad", "Applying render state and camera settings");
 		Root::Current().Render().ApplyProjectState(renderState);
+		RestoreGameCameraTarget(SceneManager, renderState);
 		Root::Current().FrontEnd().ApplyProjectState(renderState.editorShowAxis, renderState.editorShowGrid, pendingGameGUIAssets, pendingActiveGameGUIAsset, renderState.imguiLayout);
 		Root::Current().Debugger().SetShowLogWindow(renderState.debugShowLogWindow);
 		Root::Current().Debugger().SetShowStatsWindow(renderState.debugShowStatsWindow);
@@ -238,6 +257,8 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 		Root::Current().FrontEnd().EditorGUI().SetShowLevelWindow(renderState.showLevelWindow);
 		Root::Current().FrontEnd().EditorGUI().SetShowEntityWindow(renderState.showEntityWindow);
 		Root::Current().FrontEnd().EditorGUI().SetShowLightingWindow(renderState.showLightingWindow);
+		Root::Current().FrontEnd().EditorGUI().SetShowInputMapWindow(renderState.showInputMapWindow);
+		Root::Current().FrontEnd().EditorGUI().SetShowCameraWindow(renderState.showCameraWindow);
 		Root::Current().Debugger().SetShowGameInputWindow(renderState.showGameInputWindow);
 		Root::Current().Debugger().SetShowGameplayDiagnosticsWindow(renderState.showGameplayDiagnosticsWindow);
 		Root::Current().Debugger().SetShowAnimationDiagnosticsWindow(renderState.showAnimationDiagnosticsWindow);

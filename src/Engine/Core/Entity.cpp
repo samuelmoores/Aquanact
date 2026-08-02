@@ -12,6 +12,8 @@
 
 namespace
 {
+	unsigned int g_nextEntityId = 1;
+
 	std::vector<Component*> OrderedComponents(Entity& entity)
 	{
 		std::vector<Component*> components = entity.Components();
@@ -26,10 +28,12 @@ namespace
 Entity::Entity(std::string name)
 	: m_name(std::move(name))
 {
+	m_id = g_nextEntityId++;
 }
 
 Entity::Entity(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 {
+	m_id = g_nextEntityId++;
 	m_skinned = false;
 	m_mesh = new Mesh(vertices, faces);
 	m_shader.load("shaders/texture_perspective.vert", "shaders/texturing.frag");
@@ -37,11 +41,17 @@ Entity::Entity(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 	m_position = glm::vec3(0);
 	m_rotation = glm::vec3(0);
 	m_scale = glm::vec3(1);
-	m_initialWorldCenter = WorldCenterPosition();
+	m_initialWorldCenter = glm::vec3(0.0f);
+	if (m_mesh)
+	{
+		m_initialWorldCenter = glm::vec3(BuildModelMatrix() * glm::vec4(m_mesh->centerAABB(), 1.0f));
+	}
 }
 
 Entity::Entity(const char* modelFile)
 {
+	m_id = g_nextEntityId++;
+	Root::Current().Debugger().LogTagged("MeshLoad", std::string("Importing model: ") + modelFile);
 	auto model = ModelImporter().Import(modelFile, true);
 	m_mesh = new Mesh(std::move(model));
 	m_skinned = m_mesh->Skinned();
@@ -53,13 +63,27 @@ Entity::Entity(const char* modelFile)
 	m_position = glm::vec3(0);
 	m_rotation = glm::vec3(0);
 	m_scale = glm::vec3(1);
-	m_initialWorldCenter = WorldCenterPosition();
+	m_initialWorldCenter = glm::vec3(0.0f);
 	m_sourcePath = modelFile;
 	m_name = m_sourcePath;
 	size_t lastSlash = m_name.find_last_of("/\\");
 	if (lastSlash != std::string::npos)
 	{
 		m_name = m_name.substr(lastSlash + 1);
+	}
+	if (m_mesh)
+	{
+		m_initialWorldCenter = glm::vec3(BuildModelMatrix() * glm::vec4(m_mesh->centerAABB(), 1.0f));
+	}
+	Root::Current().Debugger().LogTagged("MeshLoad", "Imported model ready: " + m_name);
+}
+
+void Entity::SetId(unsigned int id)
+{
+	m_id = id;
+	if (g_nextEntityId <= id)
+	{
+		g_nextEntityId = id + 1;
 	}
 }
 

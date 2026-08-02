@@ -4,6 +4,10 @@
 #include "Engine/Core/EngineCamera.h"
 #include "GLFW/glfw3.h"
 
+#include <string>
+
+class Entity;
+
 class GameCamera final : public Camera {
 public:
 	GameCamera() = default;
@@ -15,8 +19,21 @@ public:
 	glm::vec3 GetFacing() const override;
 	void CopyFrom(const EngineCamera& camera);
 	void SetPose(const glm::vec3& position, const glm::vec3& facing);
+	void SetTarget(Entity* target);
+	Entity* Target() const { return m_target; }
+	unsigned int TargetId() const { return m_targetId; }
+	void SetTargetName(std::string targetName) { m_targetName = std::move(targetName); }
+	const std::string& TargetName() const { return m_targetName; }
+	float Radius() const { return m_radius; }
+	void SetRadius(float radius);
+	float Yaw() const { return m_yaw; }
+	float Pitch() const { return m_pitch; }
+	void SetOrbitAngles(float yaw, float pitch);
+	void UpdateThirdPerson(const class Input& input);
 
 private:
+	void RebuildView();
+
 	float m_fieldOfView = 45.0f;
 	float m_nearPlane = 0.1f;
 	float m_farPlane = 1000000.0f;
@@ -26,6 +43,13 @@ private:
 	glm::vec3 m_front{ 0.0f, 0.0f, 1.0f };
 	glm::vec3 m_up{ 0.0f, 1.0f, 0.0f };
 	GLFWwindow* m_window = nullptr;
+	Entity* m_target = nullptr;
+	unsigned int m_targetId = 0;
+	std::string m_targetName;
+	float m_radius = 10.0f;
+	float m_yaw = 0.0f;
+	float m_pitch = 15.0f;
+	float m_lookSensitivity = 0.08f;
 };
 
 

@@ -160,12 +160,41 @@ namespace ProjectStateSerializer {
 			}
 
 			const std::vector<std::string> fields = ProjectStateFormat::SplitFields(line);
-			if ((fields.size() == 7 && fields[0] == "gamecamera") || (fields.size() == 3 && fields[0] == "editorview") || (fields.size() >= 3 && fields[0] == "debugwindows") || ((fields.size() == 8 || fields.size() == 9) && fields[0] == "sunlight") || ((fields.size() == 12 || fields.size() == 13 || fields.size() == 14) && fields[0] == "pointlight") || (fields.size() == 2 && fields[0] == "imguilayout"))
+			if ((fields.size() >= 7 && fields[0] == "gamecamera") || (fields.size() == 3 && fields[0] == "editorview") || (fields.size() >= 3 && fields[0] == "debugwindows") || ((fields.size() == 8 || fields.size() == 9) && fields[0] == "sunlight") || ((fields.size() == 12 || fields.size() == 13 || fields.size() == 14) && fields[0] == "pointlight") || (fields.size() == 2 && fields[0] == "imguilayout"))
 			{
-				if (fields.size() == 7 && fields[0] == "gamecamera")
+				if (fields.size() >= 7 && fields[0] == "gamecamera")
 				{
-					renderState.gameCameraPosition = glm::vec3(std::stof(fields[1]), std::stof(fields[2]), std::stof(fields[3]));
-					renderState.gameCameraFacing = glm::vec3(std::stof(fields[4]), std::stof(fields[5]), std::stof(fields[6]));
+					if (fields.size() >= 7)
+					{
+						renderState.gameCameraPosition = glm::vec3(std::stof(fields[1]), std::stof(fields[2]), std::stof(fields[3]));
+						renderState.gameCameraFacing = glm::vec3(std::stof(fields[4]), std::stof(fields[5]), std::stof(fields[6]));
+					}
+					if (fields.size() >= 8)
+					{
+						renderState.gameCameraRadius = std::stof(fields[7]);
+					}
+					if (fields.size() >= 9)
+					{
+						renderState.gameCameraYaw = std::stof(fields[8]);
+					}
+					if (fields.size() >= 10)
+					{
+						renderState.gameCameraPitch = std::stof(fields[9]);
+					}
+					if (fields.size() >= 11)
+					{
+						try
+						{
+							renderState.gameCameraTargetId = static_cast<unsigned int>(std::stoul(fields[10]));
+							renderState.gameCameraHasTarget = renderState.gameCameraTargetId != 0;
+						}
+						catch (...)
+						{
+							renderState.gameCameraTargetId = 0;
+							renderState.gameCameraHasTarget = false;
+							Root::Current().Debugger().LogTagged(Debug::Severity::Warning, "ProjectLoad", "Failed to parse camera target id from gamecamera line");
+						}
+					}
 				}
 				else if (fields.size() == 3 && fields[0] == "editorview")
 				{
@@ -185,11 +214,13 @@ namespace ProjectStateSerializer {
 					renderState.showLevelWindow = readBool(4, renderState.showLevelWindow);
 					renderState.showEntityWindow = readBool(5, renderState.showEntityWindow);
 					renderState.showLightingWindow = readBool(6, renderState.showLightingWindow);
-					renderState.showGameInputWindow = readBool(7, renderState.showGameInputWindow);
-					renderState.showGameplayDiagnosticsWindow = readBool(8, renderState.showGameplayDiagnosticsWindow);
-					renderState.showAnimationDiagnosticsWindow = readBool(9, renderState.showAnimationDiagnosticsWindow);
-					renderState.showGameGUIDiagnosticsWindow = readBool(10, renderState.showGameGUIDiagnosticsWindow);
-					renderState.profilerEnabled = readBool(11, renderState.profilerEnabled);
+					renderState.showInputMapWindow = readBool(7, renderState.showInputMapWindow);
+					renderState.showCameraWindow = readBool(8, renderState.showCameraWindow);
+					renderState.showGameInputWindow = readBool(9, renderState.showGameInputWindow);
+					renderState.showGameplayDiagnosticsWindow = readBool(10, renderState.showGameplayDiagnosticsWindow);
+					renderState.showAnimationDiagnosticsWindow = readBool(11, renderState.showAnimationDiagnosticsWindow);
+					renderState.showGameGUIDiagnosticsWindow = readBool(12, renderState.showGameGUIDiagnosticsWindow);
+					renderState.profilerEnabled = readBool(13, renderState.profilerEnabled);
 				}
 				else if ((fields.size() == 8 || fields.size() == 9) && fields[0] == "sunlight")
 				{
@@ -403,7 +434,7 @@ namespace ProjectStateSerializer {
 				continue;
 			}
 
-			if (fields.size() != 11 || fields[0] != "object")
+			if (((fields.size() != 11 && fields.size() != 12) || fields[0] != "object"))
 			{
 				continue;
 			}
@@ -418,6 +449,17 @@ namespace ProjectStateSerializer {
 			object.position = glm::vec3(std::stof(fields[2]), std::stof(fields[3]), std::stof(fields[4]));
 			object.rotation = glm::vec3(std::stof(fields[5]), std::stof(fields[6]), std::stof(fields[7]));
 			object.scale = glm::vec3(std::stof(fields[8]), std::stof(fields[9]), std::stof(fields[10]));
+			if (fields.size() == 12)
+			{
+				try
+				{
+					object.id = static_cast<unsigned int>(std::stoul(fields[11]));
+				}
+				catch (...)
+				{
+					object.id = 0;
+				}
+			}
 			currentLevel->objects.push_back(std::move(object));
 		}
 
@@ -428,9 +470,14 @@ namespace ProjectStateSerializer {
 	{
 		const glm::vec3 gameCameraPosition = renderManager.GetGameCamera().GetPosition();
 		const glm::vec3 gameCameraFacing = renderManager.GetGameCamera().GetFacing();
+		const GameCamera& gameCamera = renderManager.GetGameCamera();
 		contents += "gamecamera;";
 		contents += std::to_string(gameCameraPosition.x) + ";" + std::to_string(gameCameraPosition.y) + ";" + std::to_string(gameCameraPosition.z) + ";";
-		contents += std::to_string(gameCameraFacing.x) + ";" + std::to_string(gameCameraFacing.y) + ";" + std::to_string(gameCameraFacing.z) + "\n";
+		contents += std::to_string(gameCameraFacing.x) + ";" + std::to_string(gameCameraFacing.y) + ";" + std::to_string(gameCameraFacing.z) + ";";
+		contents += std::to_string(gameCamera.Radius()) + ";";
+		contents += std::to_string(gameCamera.Yaw()) + ";";
+		contents += std::to_string(gameCamera.Pitch()) + ";";
+		contents += std::to_string(gameCamera.TargetId()) + "\n";
 
 		contents += "editorview;";
 		contents += frontEndManager.EditorGUI().ShowAxis() ? "1" : "0";
@@ -438,27 +485,44 @@ namespace ProjectStateSerializer {
 		contents += frontEndManager.EditorGUI().ShowGrid() ? "1" : "0";
 		contents += "\n";
 		contents += "debugwindows;";
-		contents += Root::Current().Debugger().ShowLogWindow() ? "1" : "0";
+		const bool showLogWindow = Root::Current().Debugger().ShowLogWindow();
+		const bool showStatsWindow = Root::Current().Debugger().ShowStatsWindow();
+		const bool showFileExplorer = Root::Current().FrontEnd().EditorGUI().ShowFileExplorer();
+		const bool showLevelWindow = Root::Current().FrontEnd().EditorGUI().ShowLevelWindow();
+		const bool showEntityWindow = Root::Current().FrontEnd().EditorGUI().ShowEntityWindow();
+		const bool showLightingWindow = Root::Current().FrontEnd().EditorGUI().ShowLightingWindow();
+		const bool showInputMapWindow = Root::Current().FrontEnd().EditorGUI().ShowInputMapWindow();
+		const bool showCameraWindow = Root::Current().FrontEnd().EditorGUI().ShowCameraWindow();
+		const bool showGameInputWindow = Root::Current().Debugger().ShowGameInputWindow();
+		const bool showGameplayDiagnosticsWindow = Root::Current().Debugger().ShowGameplayDiagnosticsWindow();
+		const bool showAnimationDiagnosticsWindow = Root::Current().Debugger().ShowAnimationDiagnosticsWindow();
+		const bool showGameGUIDiagnosticsWindow = Root::Current().FrontEnd().RuntimeGUI().ShowDiagnosticsWindow();
+		const bool profilerEnabled = Root::Current().Profiler().IsEnabled();
+		contents += showLogWindow ? "1" : "0";
 		contents += ";";
-		contents += Root::Current().Debugger().ShowStatsWindow() ? "1" : "0";
+		contents += showStatsWindow ? "1" : "0";
 		contents += ";";
-		contents += Root::Current().FrontEnd().EditorGUI().ShowFileExplorer() ? "1" : "0";
+		contents += showFileExplorer ? "1" : "0";
 		contents += ";";
-		contents += Root::Current().FrontEnd().EditorGUI().ShowLevelWindow() ? "1" : "0";
+		contents += showLevelWindow ? "1" : "0";
 		contents += ";";
-		contents += Root::Current().FrontEnd().EditorGUI().ShowEntityWindow() ? "1" : "0";
+		contents += showEntityWindow ? "1" : "0";
 		contents += ";";
-		contents += Root::Current().FrontEnd().EditorGUI().ShowLightingWindow() ? "1" : "0";
+		contents += showLightingWindow ? "1" : "0";
 		contents += ";";
-		contents += Root::Current().Debugger().ShowGameInputWindow() ? "1" : "0";
+		contents += showInputMapWindow ? "1" : "0";
 		contents += ";";
-		contents += Root::Current().Debugger().ShowGameplayDiagnosticsWindow() ? "1" : "0";
+		contents += showCameraWindow ? "1" : "0";
 		contents += ";";
-		contents += Root::Current().Debugger().ShowAnimationDiagnosticsWindow() ? "1" : "0";
+		contents += showGameInputWindow ? "1" : "0";
 		contents += ";";
-		contents += Root::Current().FrontEnd().RuntimeGUI().ShowDiagnosticsWindow() ? "1" : "0";
+		contents += showGameplayDiagnosticsWindow ? "1" : "0";
 		contents += ";";
-		contents += Root::Current().Profiler().IsEnabled() ? "1" : "0";
+		contents += showAnimationDiagnosticsWindow ? "1" : "0";
+		contents += ";";
+		contents += showGameGUIDiagnosticsWindow ? "1" : "0";
+		contents += ";";
+		contents += profilerEnabled ? "1" : "0";
 		contents += "\n";
 
 		const DirectionalLight& sunLight = renderManager.Lights().SunLight();

@@ -66,6 +66,7 @@ namespace ProjectStateData {
 			glm::vec3 position{ 0.0f };
 			glm::vec3 rotation{ 0.0f };
 			glm::vec3 scale{ 1.0f };
+			unsigned int id = 0;
 			bool ignoreCameraCollision = true;
 		};
 		std::vector<PendingObject> objects;
@@ -74,6 +75,12 @@ namespace ProjectStateData {
 	struct RenderStateData {
 		glm::vec3 gameCameraPosition{ 0.0f };
 		glm::vec3 gameCameraFacing{ 0.0f };
+		unsigned int gameCameraTargetId = 0;
+		std::string gameCameraTarget;
+		float gameCameraRadius = 10.0f;
+		float gameCameraYaw = 0.0f;
+		float gameCameraPitch = 15.0f;
+		bool gameCameraHasTarget = false;
 		bool editorShowAxis = true;
 		bool editorShowGrid = true;
 		bool debugShowLogWindow = false;
@@ -82,6 +89,8 @@ namespace ProjectStateData {
 		bool showLevelWindow = true;
 		bool showEntityWindow = false;
 		bool showLightingWindow = false;
+		bool showInputMapWindow = false;
+		bool showCameraWindow = false;
 		bool showGameInputWindow = true;
 		bool showGameplayDiagnosticsWindow = true;
 		bool showAnimationDiagnosticsWindow = true;

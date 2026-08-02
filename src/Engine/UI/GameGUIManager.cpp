@@ -558,6 +558,7 @@ void GameGUIManager::DrawReturnButton()
 			{
 				Root::Current().Debugger().LogMessage("Failed to save diagnostic window state before returning to the editor.");
 			}
+			Root::Current().Render().GetGameCamera().SetTarget(nullptr);
 			if (!Root::Current().Projects().LoadProject(projectPath, Root::Current().Levels()))
 			{
 				Root::Current().Debugger().LogMessage("Failed to reload the current project while returning to the editor.");
