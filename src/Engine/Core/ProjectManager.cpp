@@ -77,7 +77,9 @@ namespace {
 			for (const auto& pendingObject : pendingLevel.objects)
 			{
 				Root::Current().Debugger().LogTagged("ProjectLoad", "Creating object from source: " + pendingObject.sourcePath.string() + " in scene: " + pendingLevel.name);
-				auto object = std::make_unique<Entity>(pendingObject.sourcePath.string().c_str());
+				// Project component records are authoritative. Imported models still receive
+				// their default components through Entity's default constructor behavior.
+				auto object = std::make_unique<Entity>(pendingObject.sourcePath.string().c_str(), false);
 				if (pendingObject.id != 0)
 				{
 					object->SetId(pendingObject.id);
@@ -248,8 +250,10 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 			SceneManager.SetStartupLevelName("MainMenu");
 		}
 		Root::Current().Debugger().LogTagged("ProjectLoad", "Applying render state and camera settings");
-		Root::Current().Render().ApplyProjectState(renderState);
+		// SetTarget establishes the default orbit distance. Apply the saved camera
+		// pose and radius afterward so loading cannot replace that saved radius.
 		RestoreGameCameraTarget(SceneManager, renderState);
+		Root::Current().Render().ApplyProjectState(renderState);
 		Root::Current().FrontEnd().ApplyProjectState(renderState.editorShowAxis, renderState.editorShowGrid, pendingGameGUIAssets, pendingActiveGameGUIAsset, renderState.imguiLayout);
 		Root::Current().Debugger().SetShowLogWindow(renderState.debugShowLogWindow);
 		Root::Current().Debugger().SetShowStatsWindow(renderState.debugShowStatsWindow);

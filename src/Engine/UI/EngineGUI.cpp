@@ -198,7 +198,8 @@ namespace {
 	void DrawAnimatorOperandEditor(
 		const char* label,
 		AnimatorComponent::Operand& operand,
-		const std::vector<AnimatorBindingSource>& sources)
+		const std::vector<AnimatorBindingSource>& sources,
+		bool useBooleanConstant = false)
 	{
 		ImGui::PushID(label);
 		if (label && label[0] != '\0')
@@ -221,7 +222,20 @@ namespace {
 		if (operand.type == AnimatorComponent::OperandType::Constant)
 		{
 			ImGui::SetNextItemWidth(160.0f);
-			ImGui::InputFloat("Value", &operand.constantValue, 0.0f, 0.0f, "%.3f");
+			if (useBooleanConstant)
+			{
+				const char* booleanValues[] = { "False", "True" };
+				int booleanValue = operand.constantValue != 0.0f ? 1 : 0;
+				operand.constantValue = booleanValue == 1 ? 1.0f : 0.0f;
+				if (ImGui::Combo("Value", &booleanValue, booleanValues, IM_ARRAYSIZE(booleanValues)))
+				{
+					operand.constantValue = booleanValue == 1 ? 1.0f : 0.0f;
+				}
+			}
+			else
+			{
+				ImGui::InputFloat("Value", &operand.constantValue, 0.0f, 0.0f, "%.3f");
+			}
 			ImGui::PopID();
 			return;
 		}
@@ -541,12 +555,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 			{
 				Root::Current().Debugger().SetShowStatsWindow(showStatsWindow);
 			}
-			bool showCameraCollisionDebug = Root::Current().Debugger().ShowCameraCollisionDebug();
-			if (ToggleMenuItem("Camera Collision Debug", showCameraCollisionDebug))
-			{
-				Root::Current().Debugger().SetShowCameraCollisionDebug(showCameraCollisionDebug);
-			}
-			bool showPhysicsDiagnosticsWindow = Root::Current().Debugger().ShowPhysicsDiagnosticsWindow();
+		bool showPhysicsDiagnosticsWindow = Root::Current().Debugger().ShowPhysicsDiagnosticsWindow();
 			if (ToggleMenuItem("Physics Diagnostics", showPhysicsDiagnosticsWindow))
 			{
 				Root::Current().Debugger().SetShowPhysicsDiagnosticsWindow(showPhysicsDiagnosticsWindow);
@@ -573,10 +582,11 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 				}
 				ImGui::EndMenu();
 			}
-			if (ImGui::MenuItem("Play Game"))
-			{
-				Root::Current().FrontEnd().Creator().SaveAllRoleGUIs();
-				if (projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", SceneManager))
+		if (ImGui::MenuItem("Play Game"))
+		{
+			Root::Current().FrontEnd().Creator().SaveAllRoleGUIs();
+			Root::Current().Render().GetGameCamera().CaptureEditorState();
+			if (projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", SceneManager))
 				{
 					Root::Current().FrontEnd().RestoreRuntimeLayout();
 					Root::Current().State().SetMode(EngineMode::Game);
@@ -594,10 +604,11 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 					Root::Current().Debugger().LogMessage("Play Game aborted because project autosave failed.");
 				}
 			}
-			if (ImGui::MenuItem("Play Scene")) 
-			{
-				Root::Current().FrontEnd().Creator().SaveAllRoleGUIs();
-				if (projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", SceneManager))
+		if (ImGui::MenuItem("Play Scene")) 
+		{
+			Root::Current().FrontEnd().Creator().SaveAllRoleGUIs();
+			Root::Current().Render().GetGameCamera().CaptureEditorState();
+			if (projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", SceneManager))
 				{
 					Root::Current().FrontEnd().RestoreRuntimeLayout();
 					Root::Current().State().SetMode(EngineMode::Game);
@@ -973,7 +984,22 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 
 						ImGui::PushID(component);
 						const std::string componentLabel = component->Name();
-						const bool open = ImGui::CollapsingHeader(componentLabel.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
+						const float removeButtonWidth = ImGui::CalcTextSize("Remove").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+						bool open = false;
+						if (ImGui::BeginTable("ComponentHeader", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoSavedSettings))
+						{
+							ImGui::TableSetupColumn("Component", ImGuiTableColumnFlags_WidthStretch);
+							ImGui::TableSetupColumn("Remove", ImGuiTableColumnFlags_WidthFixed, removeButtonWidth);
+							ImGui::TableNextRow();
+							ImGui::TableSetColumnIndex(0);
+							open = ImGui::CollapsingHeader(componentLabel.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
+							ImGui::TableSetColumnIndex(1);
+							if (ImGui::SmallButton("Remove"))
+							{
+								ImGui::OpenPopup("Remove Component##Confirm");
+							}
+							ImGui::EndTable();
+						}
 						if (!open)
 						{
 							ImGui::PopID();
@@ -982,11 +1008,6 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 								ImGui::Separator();
 							}
 							continue;
-						}
-
-						if (ImGui::SmallButton("Remove"))
-						{
-							ImGui::OpenPopup("Remove Component##Confirm");
 						}
 
 						if (AnimatorComponent* animator = dynamic_cast<AnimatorComponent*>(component))
@@ -1169,13 +1190,7 @@ void EngineGUI::DrawCameraWindow()
 	if (ImGui::Begin("Camera", &open, ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize))
 	{
 		GameCamera& camera = Root::Current().Render().GetGameCamera();
-		ImGui::Text("Radius: %.2f", camera.Radius());
-		float colliderRadius = camera.ColliderRadius();
-		if (ImGui::DragFloat("Collider Radius", &colliderRadius, 0.1f, 0.01f, 10000.0f, "%.2f"))
-		{
-			camera.SetColliderRadius(colliderRadius);
-		}
-		ImGui::Text("Target: %s", camera.Target() ? camera.Target()->Name().c_str() : "<none>");
+		ImGui::TextUnformatted("Target");
 
 		if (ImGui::BeginCombo("##CameraTarget", camera.Target() ? camera.Target()->Name().c_str() : "<select entity>"))
 		{
@@ -1199,13 +1214,24 @@ void EngineGUI::DrawCameraWindow()
 			ImGui::EndCombo();
 		}
 
-		if (!camera.Target())
+		float distance = camera.Radius();
+		ImGui::SetNextItemWidth(80.0f);
+		if (ImGui::InputFloat("Distance", &distance, 0.0f, 0.0f, "%.2f"))
 		{
-			ImGui::TextDisabled("Select an entity to follow.");
+			camera.SetRadius(distance);
 		}
-		else
+		ImGui::Separator();
+		ImGui::TextUnformatted("Collider");
+		float colliderRadius = camera.ColliderRadius();
+		ImGui::SetNextItemWidth(80.0f);
+		if (ImGui::DragFloat("Sphere Radius", &colliderRadius, 0.1f, 0.01f, 10000.0f, "%.2f"))
 		{
-			ImGui::TextDisabled("The camera orbits the selected target using Look input.");
+			camera.SetColliderRadius(colliderRadius);
+		}
+		bool showCameraCollisionDebug = Root::Current().Debugger().ShowCameraCollisionDebug();
+		if (ImGui::Checkbox("Camera Collision Debug", &showCameraCollisionDebug))
+		{
+			Root::Current().Debugger().SetShowCameraCollisionDebug(showCameraCollisionDebug);
 		}
 	}
 	ImGui::End();
@@ -1436,13 +1462,18 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 
 				ImGui::TextUnformatted("Right Operand");
 				ImGui::PushID("Right");
-				DrawAnimatorOperandEditor("", condition.right, bindingSources);
+				DrawAnimatorOperandEditor("", condition.right, bindingSources, isBooleanBinding(condition.left));
 				ImGui::PopID();
 				ImGui::Separator();
+				const bool booleanConstant = isBooleanBinding(condition.left)
+					&& condition.right.type == AnimatorComponent::OperandType::Constant;
+				const std::string rightOperandText = booleanConstant
+					? (condition.right.constantValue != 0.0f ? "true" : "false")
+					: AnimatorComponent::OperandToString(condition.right);
 				ImGui::Text("Condition %zu: %s %s %s", conditionIndex + 1,
 					AnimatorComponent::OperandToString(condition.left).c_str(),
 					AnimatorComponent::ComparatorToString(condition.comparator),
-					AnimatorComponent::OperandToString(condition.right).c_str());
+					rightOperandText.c_str());
 				ImGui::Separator();
 				if (ui.conditions.size() > 1 && ImGui::SmallButton("Remove Condition"))
 				{

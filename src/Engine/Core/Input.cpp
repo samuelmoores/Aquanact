@@ -72,7 +72,7 @@ void Input::Update()
 
 	const bool gameMode = Root::Current().State().IsGameMode();
 	const bool escapePressed = glfwGetKey(m_window->GLFW(), GLFW_KEY_ESCAPE) == GLFW_PRESS;
-	if (!gameMode || !m_windowFocused || escapePressed)
+	if (gameMode && (!m_windowFocused || escapePressed))
 	{
 		if (m_lookActive)
 		{

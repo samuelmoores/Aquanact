@@ -554,6 +554,7 @@ void GameGUIManager::DrawReturnButton()
 		else
 		{
 			const auto projectPath = Root::Current().Projects().CurrentProjectPath();
+			Root::Current().Render().GetGameCamera().RestoreEditorState();
 			if (!Root::Current().Projects().SaveProject(projectPath, Root::Current().Levels()))
 			{
 				Root::Current().Debugger().LogMessage("Failed to save diagnostic window state before returning to the editor.");

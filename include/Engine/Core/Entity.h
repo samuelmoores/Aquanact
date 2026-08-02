@@ -17,7 +17,7 @@ class Entity
 {
 public:
 	Entity(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces);
-	Entity(const char* modelFile);
+	Entity(const char* modelFile, bool addDefaultComponents = true);
 	explicit Entity(std::string name = "Entity");
 	virtual ~Entity();
 

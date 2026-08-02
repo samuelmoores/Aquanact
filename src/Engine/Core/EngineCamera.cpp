@@ -71,7 +71,7 @@ void EngineCamera::PrintPosition()
 void EngineCamera::FlyControl(glm::vec2 mouseDiff, glm::vec3 moveInput, float dt)
 {
 	m_yaw += mouseDiff.x * m_mouseSensitivity;
-	m_pitch -= mouseDiff.y * m_mouseSensitivity;
+	m_pitch += mouseDiff.y * m_mouseSensitivity;
 	m_pitch = glm::clamp(m_pitch, -89.0f, 89.0f);
 
 	float yawRad = glm::radians(m_yaw);

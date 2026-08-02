@@ -93,11 +93,6 @@ void Debug::shutDown()
 	m_pointLightDebugColors.clear();
 	delete m_cameraCollisionSphere;
 	m_cameraCollisionSphere = nullptr;
-	for (Line* box : m_cameraCollisionBoxes)
-	{
-		delete box;
-	}
-	m_cameraCollisionBoxes.clear();
 	m_logMessages.clear();
 	m_logOnceKeys.clear();
 }
@@ -120,43 +115,6 @@ void Debug::DrawCameraCollisionDebug(const Camera& camera)
 	m_cameraCollisionSphere->draw(
 		camera.GetViewMatrix(),
 		glm::translate(glm::mat4(1.0f), collider.Position()) * glm::scale(glm::mat4(1.0f), glm::vec3(collider.Radius())));
-
-	const Scene* activeLevel = Root::Current().Levels().ActiveLevel();
-	const std::size_t boxCount = activeLevel ? activeLevel->Objects().size() : 0;
-	while (m_cameraCollisionBoxes.size() < boxCount)
-	{
-		m_cameraCollisionBoxes.push_back(new Line(glm::vec3(0.0f), glm::vec3(0.0f)));
-	}
-
-	std::size_t boxIndex = 0;
-	if (activeLevel)
-	{
-		for (const auto& object : activeLevel->Objects())
-		{
-			if (!object || !object->GetMesh())
-			{
-				continue;
-			}
-
-			glm::vec3 minBounds;
-			glm::vec3 maxBounds;
-			if (!object->WorldAABB(minBounds, maxBounds))
-			{
-				continue;
-			}
-			const bool overlaps = collider.OverlapsAABB(minBounds, maxBounds);
-			m_cameraCollisionBoxes[boxIndex]->SetBounds(
-				minBounds, maxBounds, overlaps ? glm::vec3(1.0f, 0.1f, 0.1f) : glm::vec3(0.1f, 1.0f, 0.1f));
-			m_cameraCollisionBoxes[boxIndex]->UpdateProjection(camera.GetProjectionMatrix());
-			m_cameraCollisionBoxes[boxIndex]->draw(camera.GetViewMatrix());
-			++boxIndex;
-		}
-	}
-
-	for (; boxIndex < m_cameraCollisionBoxes.size(); ++boxIndex)
-	{
-		m_cameraCollisionBoxes[boxIndex]->SetColor(glm::vec3(0.0f));
-	}
 }
 
 void Debug::RebuildGrid()

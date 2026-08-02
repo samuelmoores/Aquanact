@@ -104,6 +104,30 @@ void GameCamera::SetPose(const glm::vec3& position, const glm::vec3& facing)
 	}
 }
 
+void GameCamera::CaptureEditorState()
+{
+	m_editorPosition = m_position;
+	m_editorFacing = m_front;
+	m_editorRadius = m_radius;
+	m_editorYaw = m_yaw;
+	m_editorPitch = m_pitch;
+	m_editorColliderRadius = ColliderRadius();
+	m_hasEditorState = true;
+}
+
+void GameCamera::RestoreEditorState()
+{
+	if (!m_hasEditorState)
+	{
+		return;
+	}
+
+	SetPose(m_editorPosition, m_editorFacing);
+	SetRadius(m_editorRadius);
+	SetOrbitAngles(m_editorYaw, m_editorPitch);
+	SetColliderRadius(m_editorColliderRadius);
+}
+
 void GameCamera::SetTarget(Entity* target)
 {
 	m_target = target;

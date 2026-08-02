@@ -22,6 +22,8 @@ public:
 	glm::vec3 GetFacing() const override;
 	void CopyFrom(const EngineCamera& camera);
 	void SetPose(const glm::vec3& position, const glm::vec3& facing);
+	void CaptureEditorState();
+	void RestoreEditorState();
 	void SetTarget(Entity* target);
 	Entity* Target() const { return m_target; }
 	unsigned int TargetId() const { return m_targetId; }
@@ -57,6 +59,13 @@ private:
 	float m_yaw = 0.0f;
 	float m_pitch = 15.0f;
 	float m_lookSensitivity = 1.2f;
+	glm::vec3 m_editorPosition{ 0.0f, 0.0f, -10.0f };
+	glm::vec3 m_editorFacing{ 0.0f, 0.0f, 1.0f };
+	float m_editorRadius = 10.0f;
+	float m_editorYaw = 0.0f;
+	float m_editorPitch = 15.0f;
+	float m_editorColliderRadius = 25.0f;
+	bool m_hasEditorState = false;
 	std::unique_ptr<CameraCollider> m_collider;
 	glm::vec3 m_lastSafePosition{ 0.0f, 0.0f, -10.0f };
 	bool m_hasSafePosition = false;

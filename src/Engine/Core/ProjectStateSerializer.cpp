@@ -31,7 +31,51 @@ namespace ProjectStateSerializer {
 			contents += "component;";
 			contents += ProjectStateFormat::EscapeField(ProjectStateFormat::MakePortableSourcePath(projectPath, object->SourcePath()).string());
 			contents += ";";
+			contents += std::to_string(object->Id());
+			contents += ";";
 			contents += componentType;
+		}
+
+		bool IsComponentType(const std::string& type)
+		{
+			return type == "controller" || type == "playercontroller" || type == "playerhealth" || type == "enemy" || type == "animator";
+		}
+
+		struct ComponentRecordLayout
+		{
+			std::size_t typeIndex = 2;
+			std::size_t dataIndex = 3;
+			unsigned int entityId = 0;
+		};
+
+		bool ReadComponentRecordLayout(const std::vector<std::string>& fields, ComponentRecordLayout& layout)
+		{
+			if (fields.size() < 3 || fields[0] != "component")
+			{
+				return false;
+			}
+
+			if (IsComponentType(fields[2]))
+			{
+				return true;
+			}
+
+			if (fields.size() < 4 || !IsComponentType(fields[3]))
+			{
+				return false;
+			}
+
+			try
+			{
+				layout.entityId = static_cast<unsigned int>(std::stoul(fields[2]));
+			}
+			catch (...)
+			{
+				return false;
+			}
+			layout.typeIndex = 3;
+			layout.dataIndex = 4;
+			return true;
 		}
 
 		void AppendComponentState(std::string& contents, const std::filesystem::path& projectPath, const Entity* object)
@@ -46,12 +90,15 @@ namespace ProjectStateSerializer {
 				if (const PlayerController* playerController = dynamic_cast<const PlayerController*>(component))
 				{
 					AppendComponentLine(contents, projectPath, object, "playercontroller");
-					contents += ";" + std::to_string(playerController->MoveSpeed()) + "\n";
+					contents += ";" + std::to_string(playerController->MoveSpeed());
+					contents += ";" + std::to_string(playerController->TurnSpeed());
+					contents += ";" + std::to_string(playerController->MovementDeadzone()) + "\n";
 				}
 				else if (const Controller* controller = dynamic_cast<const Controller*>(component))
 				{
 					AppendComponentLine(contents, projectPath, object, "controller");
-					contents += ";" + std::to_string(controller->MoveSpeed()) + "\n";
+					contents += ";" + std::to_string(controller->MoveSpeed());
+					contents += ";" + std::to_string(controller->MovementDeadzone()) + "\n";
 				}
 				else if (const PlayerHealth* playerHealth = dynamic_cast<const PlayerHealth*>(component))
 				{
@@ -312,107 +359,132 @@ namespace ProjectStateSerializer {
 				continue;
 			}
 
-			if (fields.size() == 4 && fields[0] == "component" && (fields[2] == "controller" || fields[2] == "playercontroller"))
+			ComponentRecordLayout componentLayout;
+			if (ReadComponentRecordLayout(fields, componentLayout))
 			{
 				if (!currentLevel)
 				{
 					return false;
 				}
-				pendingControllers.push_back(PendingController{ ProjectStateFormat::ResolveSourcePath(projectPath, fields[1]), std::stof(fields[3]), currentLevel->name, fields[2] == "playercontroller" || projectVersion <= 11 });
-				continue;
-			}
 
-			if (fields.size() >= 3 && fields[0] == "component" && fields[2] == "playerhealth")
-			{
-				if (!currentLevel)
+				const std::string& componentType = fields[componentLayout.typeIndex];
+				const std::filesystem::path sourcePath = ProjectStateFormat::ResolveSourcePath(projectPath, fields[1]);
+				if (componentType == "controller" || componentType == "playercontroller")
 				{
-					return false;
-				}
-				PendingComponent component;
-				component.sourcePath = ProjectStateFormat::ResolveSourcePath(projectPath, fields[1]);
-				component.levelName = currentLevel->name;
-				component.type = "playerhealth";
-				if (fields.size() >= 4) { component.value1 = std::stoi(fields[3]); component.hasValue1 = true; }
-				if (fields.size() >= 5) { component.value2 = std::stoi(fields[4]); component.hasValue2 = true; }
-				pendingComponents.push_back(std::move(component));
-				continue;
-			}
-
-			if (fields.size() == 3 && fields[0] == "component" && fields[2] == "enemy")
-			{
-				if (!currentLevel)
-				{
-					return false;
-				}
-				PendingComponent component;
-				component.sourcePath = ProjectStateFormat::ResolveSourcePath(projectPath, fields[1]);
-				component.levelName = currentLevel->name;
-				component.type = "enemy";
-				pendingComponents.push_back(std::move(component));
-				continue;
-			}
-
-			if (fields.size() >= 6 && fields[0] == "component" && fields[2] == "animator")
-			{
-				if (!currentLevel)
-				{
-					return false;
-				}
-				PendingComponent component;
-				component.sourcePath = ProjectStateFormat::ResolveSourcePath(projectPath, fields[1]);
-				component.levelName = currentLevel->name;
-				component.type = "animator";
-				component.initialState = ProjectStateFormat::UnescapeField(fields[3]);
-				const int stateCount = std::stoi(fields[4]);
-				std::size_t index = 5;
-				for (int i = 0; i < stateCount; ++i)
-				{
-					PendingComponent::AnimatorStateData state;
-					state.name = ProjectStateFormat::UnescapeField(fields[index++]);
-					state.clipIndex = std::stoi(fields[index++]);
-					component.animatorStates.push_back(std::move(state));
-				}
-				const int transitionCount = std::stoi(fields[index++]);
-				for (int i = 0; i < transitionCount; ++i)
-				{
-					PendingComponent::AnimatorTransitionData transition;
-					transition.from = ProjectStateFormat::UnescapeField(fields[index++]);
-					transition.to = ProjectStateFormat::UnescapeField(fields[index++]);
-					transition.blendSeconds = std::stof(fields[index++]);
-					if (projectVersion >= 17)
+					if (fields.size() <= componentLayout.dataIndex)
 					{
-						const int conditionCount = std::stoi(fields[index++]);
-						for (int conditionIndex = 0; conditionIndex < conditionCount; ++conditionIndex)
+						return false;
+					}
+
+					PendingController controller;
+					controller.sourcePath = sourcePath;
+					controller.entityId = componentLayout.entityId;
+					controller.moveSpeed = std::stof(fields[componentLayout.dataIndex]);
+					controller.levelName = currentLevel->name;
+					controller.playerControlled = componentType == "playercontroller" || projectVersion <= 11;
+					if (componentLayout.entityId != 0)
+					{
+						if (controller.playerControlled && fields.size() > componentLayout.dataIndex + 1)
 						{
-							ProjectStateData::PendingComponent::AnimatorConditionData condition;
-							condition.left.type = std::stoi(fields[index++]);
-							condition.left.constantValue = std::stof(fields[index++]);
-							condition.left.componentName = ProjectStateFormat::UnescapeField(fields[index++]);
-							condition.left.memberName = ProjectStateFormat::UnescapeField(fields[index++]);
-							condition.comparator = std::stoi(fields[index++]);
-							condition.right.type = std::stoi(fields[index++]);
-							condition.right.constantValue = std::stof(fields[index++]);
-							condition.right.componentName = ProjectStateFormat::UnescapeField(fields[index++]);
-							condition.right.memberName = ProjectStateFormat::UnescapeField(fields[index++]);
-							transition.conditions.push_back(std::move(condition));
+							controller.turnSpeed = std::stof(fields[componentLayout.dataIndex + 1]);
+						}
+						const std::size_t deadzoneIndex = componentLayout.dataIndex + (controller.playerControlled ? 2 : 1);
+						if (fields.size() > deadzoneIndex)
+						{
+							controller.movementDeadzone = std::stof(fields[deadzoneIndex]);
 						}
 					}
-					else if (projectVersion >= 11)
-					{
-						transition.left.type = std::stoi(fields[index++]);
-						transition.left.constantValue = std::stof(fields[index++]);
-						transition.left.componentName = ProjectStateFormat::UnescapeField(fields[index++]);
-						transition.left.memberName = ProjectStateFormat::UnescapeField(fields[index++]);
-						transition.comparator = std::stoi(fields[index++]);
-						transition.right.type = std::stoi(fields[index++]);
-						transition.right.constantValue = std::stof(fields[index++]);
-						transition.right.componentName = ProjectStateFormat::UnescapeField(fields[index++]);
-						transition.right.memberName = ProjectStateFormat::UnescapeField(fields[index++]);
-					}
-					component.animatorTransitions.push_back(std::move(transition));
+					pendingControllers.push_back(std::move(controller));
+					continue;
 				}
-				pendingComponents.push_back(std::move(component));
-				continue;
+
+				PendingComponent component;
+				component.sourcePath = sourcePath;
+				component.entityId = componentLayout.entityId;
+				component.levelName = currentLevel->name;
+				component.type = componentType;
+
+				if (componentType == "playerhealth")
+				{
+					if (fields.size() > componentLayout.dataIndex)
+					{
+						component.value1 = std::stoi(fields[componentLayout.dataIndex]);
+						component.hasValue1 = true;
+					}
+					if (fields.size() > componentLayout.dataIndex + 1)
+					{
+						component.value2 = std::stoi(fields[componentLayout.dataIndex + 1]);
+						component.hasValue2 = true;
+					}
+					pendingComponents.push_back(std::move(component));
+					continue;
+				}
+
+				if (componentType == "enemy")
+				{
+					pendingComponents.push_back(std::move(component));
+					continue;
+				}
+
+				if (componentType == "animator")
+				{
+					if (fields.size() < componentLayout.dataIndex + 3)
+					{
+						return false;
+					}
+
+					std::size_t index = componentLayout.dataIndex;
+					component.initialState = ProjectStateFormat::UnescapeField(fields[index++]);
+					const int stateCount = std::stoi(fields[index++]);
+					for (int i = 0; i < stateCount; ++i)
+					{
+						PendingComponent::AnimatorStateData state;
+						state.name = ProjectStateFormat::UnescapeField(fields[index++]);
+						state.clipIndex = std::stoi(fields[index++]);
+						component.animatorStates.push_back(std::move(state));
+					}
+					const int transitionCount = std::stoi(fields[index++]);
+					for (int i = 0; i < transitionCount; ++i)
+					{
+						PendingComponent::AnimatorTransitionData transition;
+						transition.from = ProjectStateFormat::UnescapeField(fields[index++]);
+						transition.to = ProjectStateFormat::UnescapeField(fields[index++]);
+						transition.blendSeconds = std::stof(fields[index++]);
+						if (projectVersion >= 17)
+						{
+							const int conditionCount = std::stoi(fields[index++]);
+							for (int conditionIndex = 0; conditionIndex < conditionCount; ++conditionIndex)
+							{
+								ProjectStateData::PendingComponent::AnimatorConditionData condition;
+								condition.left.type = std::stoi(fields[index++]);
+								condition.left.constantValue = std::stof(fields[index++]);
+								condition.left.componentName = ProjectStateFormat::UnescapeField(fields[index++]);
+								condition.left.memberName = ProjectStateFormat::UnescapeField(fields[index++]);
+								condition.comparator = std::stoi(fields[index++]);
+								condition.right.type = std::stoi(fields[index++]);
+								condition.right.constantValue = std::stof(fields[index++]);
+								condition.right.componentName = ProjectStateFormat::UnescapeField(fields[index++]);
+								condition.right.memberName = ProjectStateFormat::UnescapeField(fields[index++]);
+								transition.conditions.push_back(std::move(condition));
+							}
+						}
+						else if (projectVersion >= 11)
+						{
+							transition.left.type = std::stoi(fields[index++]);
+							transition.left.constantValue = std::stof(fields[index++]);
+							transition.left.componentName = ProjectStateFormat::UnescapeField(fields[index++]);
+							transition.left.memberName = ProjectStateFormat::UnescapeField(fields[index++]);
+							transition.comparator = std::stoi(fields[index++]);
+							transition.right.type = std::stoi(fields[index++]);
+							transition.right.constantValue = std::stof(fields[index++]);
+							transition.right.componentName = ProjectStateFormat::UnescapeField(fields[index++]);
+							transition.right.memberName = ProjectStateFormat::UnescapeField(fields[index++]);
+						}
+						component.animatorTransitions.push_back(std::move(transition));
+					}
+					pendingComponents.push_back(std::move(component));
+					continue;
+				}
 			}
 
 			if (fields.size() >= 2 && fields[0] == "Scene")

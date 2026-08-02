@@ -94,7 +94,6 @@ private:
 	class Grid* m_grid = nullptr;
 	std::vector<class Line*> m_pointLightDebugSpheres;
 	class Line* m_cameraCollisionSphere = nullptr;
-	std::vector<class Line*> m_cameraCollisionBoxes;
 	std::vector<glm::vec3> m_pointLightDebugColors;
 	float m_axisLength = 1200.0f;
 	float m_gridSize = 1200.0f;

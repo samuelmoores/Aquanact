@@ -49,14 +49,14 @@ Entity::Entity(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 	}
 }
 
-Entity::Entity(const char* modelFile)
+Entity::Entity(const char* modelFile, bool addDefaultComponents)
 {
 	m_id = g_nextEntityId++;
 	Root::Current().Debugger().LogTagged("MeshLoad", std::string("Importing model: ") + modelFile);
 	auto model = ModelImporter().Import(modelFile, true);
 	m_mesh = new Mesh(std::move(model));
 	m_skinned = m_mesh->Skinned();
-	if (m_skinned)
+	if (m_skinned && addDefaultComponents)
 	{
 		AddComponent<AnimatorComponent>(m_mesh);
 	}

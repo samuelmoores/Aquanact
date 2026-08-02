@@ -303,7 +303,6 @@ void RenderManager::DrawRuntimeFrame(FrontEndManager& frontEndManager, Debug& de
 	const auto debugStart = std::chrono::high_resolution_clock::now();
 	if (Root::Current().GameModeDebugFlag())
 	{
-		debug.DrawCameraCollisionDebug(ActiveCamera());
 		debug.drawGameModeInput(input);
 	}
 	frontEndManager.DrawRuntimeGUI();

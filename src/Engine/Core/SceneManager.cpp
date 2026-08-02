@@ -10,6 +10,16 @@
 
 #include <algorithm>
 
+namespace
+{
+	bool MatchesComponentOwner(const Entity& object, unsigned int entityId, const std::filesystem::path& sourcePath)
+	{
+		return entityId != 0
+			? object.Id() == entityId
+			: object.SourcePath() == sourcePath.string();
+	}
+}
+
 void SceneManager::Clear()
 {
 	m_levels.clear();
@@ -177,7 +187,7 @@ void SceneManager::ApplyProjectState(
 
 		for (const auto& object : level->Objects())
 		{
-			if (!object || object->SourcePath() != pendingController.sourcePath.string())
+			if (!object || !MatchesComponentOwner(*object, pendingController.entityId, pendingController.sourcePath))
 			{
 				continue;
 			}
@@ -195,6 +205,8 @@ void SceneManager::ApplyProjectState(
 				if (PlayerController* playerController = object->GetComponent<PlayerController>())
 				{
 					playerController->SetMoveSpeed(pendingController.moveSpeed);
+					playerController->SetMovementDeadzone(pendingController.movementDeadzone);
+					playerController->SetTurnSpeed(pendingController.turnSpeed);
 				}
 			}
 			else
@@ -206,6 +218,7 @@ void SceneManager::ApplyProjectState(
 				if (Controller* controller = object->GetController())
 				{
 					controller->SetMoveSpeed(pendingController.moveSpeed);
+					controller->SetMovementDeadzone(pendingController.movementDeadzone);
 				}
 			}
 		}
@@ -221,7 +234,7 @@ void SceneManager::ApplyProjectState(
 
 		for (const auto& object : level->Objects())
 		{
-			if (!object || object->SourcePath() != pendingComponent.sourcePath.string())
+			if (!object || !MatchesComponentOwner(*object, pendingComponent.entityId, pendingComponent.sourcePath))
 			{
 				continue;
 			}

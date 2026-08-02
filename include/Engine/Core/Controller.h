@@ -14,6 +14,8 @@ public:
 
 	float MoveSpeed() const { return m_moveSpeed; }
 	void SetMoveSpeed(float moveSpeed) { m_moveSpeed = moveSpeed; }
+	float MovementDeadzone() const { return m_movementDeadzone; }
+	void SetMovementDeadzone(float deadzone) { m_movementDeadzone = deadzone; }
 	bool IsMoving() const { return m_isMoving; }
 	std::vector<BindableMember> GetBindableMembers() const override;
 	bool TryGetBindableValue(const std::string& memberName, float& value) const override;

@@ -8,13 +8,17 @@
 namespace ProjectStateData {
 	struct PendingController {
 		std::filesystem::path sourcePath;
+		unsigned int entityId = 0;
 		float moveSpeed = 50.0f;
+		float movementDeadzone = 0.01f;
+		float turnSpeed = 8.0f;
 		std::string levelName;
 		bool playerControlled = false;
 	};
 
 	struct PendingComponent {
 		std::filesystem::path sourcePath;
+		unsigned int entityId = 0;
 		std::string levelName;
 		std::string type;
 		std::string initialState;
