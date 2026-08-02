@@ -70,6 +70,7 @@ public:
 	glm::vec3 Position() const;
 	glm::vec3 WorldPosition();
 	glm::vec3 WorldCenterPosition();
+	bool WorldAABB(glm::vec3& minBounds, glm::vec3& maxBounds);
 	glm::vec3 InitialWorldCenterPosition() const;
 	glm::vec3 DefaultPosition() const;
 	glm::vec3 DefaultRotation() const;

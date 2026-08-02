@@ -541,6 +541,16 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 			{
 				Root::Current().Debugger().SetShowStatsWindow(showStatsWindow);
 			}
+			bool showCameraCollisionDebug = Root::Current().Debugger().ShowCameraCollisionDebug();
+			if (ToggleMenuItem("Camera Collision Debug", showCameraCollisionDebug))
+			{
+				Root::Current().Debugger().SetShowCameraCollisionDebug(showCameraCollisionDebug);
+			}
+			bool showPhysicsDiagnosticsWindow = Root::Current().Debugger().ShowPhysicsDiagnosticsWindow();
+			if (ToggleMenuItem("Physics Diagnostics", showPhysicsDiagnosticsWindow))
+			{
+				Root::Current().Debugger().SetShowPhysicsDiagnosticsWindow(showPhysicsDiagnosticsWindow);
+			}
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Lighting"))
@@ -1160,6 +1170,11 @@ void EngineGUI::DrawCameraWindow()
 	{
 		GameCamera& camera = Root::Current().Render().GetGameCamera();
 		ImGui::Text("Radius: %.2f", camera.Radius());
+		float colliderRadius = camera.ColliderRadius();
+		if (ImGui::DragFloat("Collider Radius", &colliderRadius, 0.1f, 0.01f, 10000.0f, "%.2f"))
+		{
+			camera.SetColliderRadius(colliderRadius);
+		}
 		ImGui::Text("Target: %s", camera.Target() ? camera.Target()->Name().c_str() : "<none>");
 
 		if (ImGui::BeginCombo("##CameraTarget", camera.Target() ? camera.Target()->Name().c_str() : "<select entity>"))

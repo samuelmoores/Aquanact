@@ -16,11 +16,15 @@
 #include "Engine/Core/FrameProfiler.h"
 #include "Engine/Core/GLHeaders.h"
 #include "Engine/Core/SceneManager.h"
+#include "Engine/Core/GameCamera.h"
+#include "Engine/Core/CameraCollider.h"
+#include "Engine/Core/Mesh.h"
 
 #include <imgui.h>
 #include <chrono>
 #include <algorithm>
 #include <cmath>
+#include <glm/gtc/matrix_transform.hpp>
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -87,8 +91,72 @@ void Debug::shutDown()
 	}
 	m_pointLightDebugSpheres.clear();
 	m_pointLightDebugColors.clear();
+	delete m_cameraCollisionSphere;
+	m_cameraCollisionSphere = nullptr;
+	for (Line* box : m_cameraCollisionBoxes)
+	{
+		delete box;
+	}
+	m_cameraCollisionBoxes.clear();
 	m_logMessages.clear();
 	m_logOnceKeys.clear();
+}
+
+void Debug::DrawCameraCollisionDebug(const Camera& camera)
+{
+	if (!m_showCameraCollisionDebug)
+	{
+		return;
+	}
+
+	const GameCamera& gameCamera = Root::Current().Render().GetGameCamera();
+	const CameraCollider& collider = gameCamera.Collider();
+	if (!m_cameraCollisionSphere)
+	{
+		m_cameraCollisionSphere = new Line(MakeWireSphereVertices(glm::vec3(1.0f, 1.0f, 0.0f)));
+	}
+
+	m_cameraCollisionSphere->UpdateProjection(camera.GetProjectionMatrix());
+	m_cameraCollisionSphere->draw(
+		camera.GetViewMatrix(),
+		glm::translate(glm::mat4(1.0f), collider.Position()) * glm::scale(glm::mat4(1.0f), glm::vec3(collider.Radius())));
+
+	const Scene* activeLevel = Root::Current().Levels().ActiveLevel();
+	const std::size_t boxCount = activeLevel ? activeLevel->Objects().size() : 0;
+	while (m_cameraCollisionBoxes.size() < boxCount)
+	{
+		m_cameraCollisionBoxes.push_back(new Line(glm::vec3(0.0f), glm::vec3(0.0f)));
+	}
+
+	std::size_t boxIndex = 0;
+	if (activeLevel)
+	{
+		for (const auto& object : activeLevel->Objects())
+		{
+			if (!object || !object->GetMesh())
+			{
+				continue;
+			}
+
+			glm::vec3 minBounds;
+			glm::vec3 maxBounds;
+			if (!object->WorldAABB(minBounds, maxBounds))
+			{
+				continue;
+			}
+			const bool overlaps = collider.OverlapsAABB(minBounds, maxBounds);
+			m_cameraCollisionBoxes[boxIndex]->SetBounds(
+				minBounds, maxBounds, overlaps ? glm::vec3(1.0f, 0.1f, 0.1f) : glm::vec3(0.1f, 1.0f, 0.1f));
+			m_cameraCollisionBoxes[boxIndex]->UpdateProjection(camera.GetProjectionMatrix());
+			m_cameraCollisionBoxes[boxIndex]->draw(camera.GetViewMatrix());
+			++boxIndex;
+		}
+	}
+
+	for (; boxIndex < m_cameraCollisionBoxes.size(); ++boxIndex)
+	{
+		m_cameraCollisionBoxes[boxIndex]->SetColor(glm::vec3(0.0f));
+	}
 }
 
 void Debug::RebuildGrid()
@@ -143,6 +211,7 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 
 	auto projection = camera.GetProjectionMatrix();
 	auto view = camera.GetViewMatrix();
+	DrawCameraCollisionDebug(camera);
 
 	if (m_axis && gui.ShowAxis())
 	{
@@ -269,7 +338,8 @@ void Debug::drawGameModeInput(const Input& input)
 	ImGui::Separator();
 	ImGui::Text("Move input: %.2f, %.2f", move.x, move.z);
 	ImGui::Text("Mouse delta: %.2f, %.2f", mouse.x, mouse.y);
-	ImGui::Text("Delta time: %.4f", input.DeltaTime());
+		ImGui::Text("Delta time: %.4f", input.DeltaTime());
+		ImGui::Checkbox("Camera Collision Debug", &m_showCameraCollisionDebug);
 	ImGui::Separator();
 	ImGui::Separator();
 	ImGui::TextUnformatted("Recent logs:");
@@ -281,6 +351,22 @@ void Debug::drawGameModeInput(const Input& input)
 	}
 		ImGui::End();
 		m_showGameInputWindow = open;
+	}
+
+	if (m_showPhysicsDiagnosticsWindow)
+	{
+		bool open = m_showPhysicsDiagnosticsWindow;
+		ImGui::Begin("Physics Diagnostics", &open);
+		ImGui::Text("Camera: %.3f, %.3f, %.3f", m_physicsCameraPosition.x, m_physicsCameraPosition.y, m_physicsCameraPosition.z);
+		ImGui::Text("Desired: %.3f, %.3f, %.3f", m_physicsDesiredPosition.x, m_physicsDesiredPosition.y, m_physicsDesiredPosition.z);
+		ImGui::Text("Resolved: %.3f, %.3f, %.3f", m_physicsResolvedPosition.x, m_physicsResolvedPosition.y, m_physicsResolvedPosition.z);
+		ImGui::Text("Collider radius: %.3f", m_physicsColliderRadius);
+		ImGui::Text("Collision count: %d", m_physicsCollisionCount);
+		ImGui::Text("Last object: %s", m_physicsCollisionObject.empty() ? "<none>" : m_physicsCollisionObject.c_str());
+		ImGui::Text("Normal: %.3f, %.3f, %.3f", m_physicsCollisionNormal.x, m_physicsCollisionNormal.y, m_physicsCollisionNormal.z);
+		ImGui::Text("Penetration: %.3f", m_physicsPenetration);
+		ImGui::End();
+		m_showPhysicsDiagnosticsWindow = open;
 	}
 
 	if (Root::Current().Profiler().IsEnabled())
@@ -353,6 +439,33 @@ void Debug::drawGameModeInput(const Input& input)
 	ImGui::EndChild();
 		ImGui::End();
 		m_showAnimationDiagnosticsWindow = open;
+	}
+}
+
+bool Debug::ShowCameraCollisionDebug() const { return m_showCameraCollisionDebug; }
+void Debug::SetShowCameraCollisionDebug(bool show) { m_showCameraCollisionDebug = show; }
+bool Debug::ShowPhysicsDiagnosticsWindow() const { return m_showPhysicsDiagnosticsWindow; }
+void Debug::SetShowPhysicsDiagnosticsWindow(bool show) { m_showPhysicsDiagnosticsWindow = show; }
+
+void Debug::SetPhysicsDiagnostics(const glm::vec3& cameraPosition, const glm::vec3& desiredPosition, const glm::vec3& resolvedPosition, float colliderRadius, int collisionCount, const glm::vec3& collisionNormal, float penetration, const std::string& collisionObject)
+{
+	m_physicsCameraPosition = cameraPosition;
+	m_physicsDesiredPosition = desiredPosition;
+	m_physicsResolvedPosition = resolvedPosition;
+	m_physicsColliderRadius = colliderRadius;
+	m_physicsCollisionCount = collisionCount;
+	m_physicsCollisionNormal = collisionNormal;
+	m_physicsPenetration = penetration;
+	m_physicsCollisionObject = collisionObject;
+	if (collisionCount > 0 && (++m_physicsDiagnosticsFrame % 30u) == 0u)
+	{
+		LogTagged("Physics", "Camera collision count=" + std::to_string(collisionCount) +
+			" object=" + (collisionObject.empty() ? std::string("<unknown>") : collisionObject) +
+			" normal=(" + std::to_string(collisionNormal.x) + "," + std::to_string(collisionNormal.y) + "," + std::to_string(collisionNormal.z) + ")" +
+			" penetration=" + std::to_string(penetration) +
+			" cameraY=" + std::to_string(cameraPosition.y) +
+			" desiredY=" + std::to_string(desiredPosition.y) +
+			" resolvedY=" + std::to_string(resolvedPosition.y));
 	}
 }
 

@@ -20,6 +20,128 @@ bool Physics::SweepAABB(
 	return AABBOverlap(minA + movement, maxA + movement, minB, maxB);
 }
 
+bool Physics::SphereAABBOverlap(
+	const glm::vec3& center, float radius,
+	const glm::vec3& boxMin, const glm::vec3& boxMax)
+{
+	const glm::vec3 closest = glm::clamp(center, boxMin, boxMax);
+	return glm::dot(center - closest, center - closest) <= radius * radius;
+}
+
+bool Physics::SweepSphereAABB(
+	const glm::vec3& center, float radius,
+	const glm::vec3& movement,
+	const glm::vec3& boxMin, const glm::vec3& boxMax)
+{
+	return GetSphereAABBSweep(center, radius, movement, boxMin, boxMax).hit;
+}
+
+Physics::SweepCollision Physics::GetSphereAABBSweep(
+	const glm::vec3& center, float radius,
+	const glm::vec3& movement,
+	const glm::vec3& boxMin, const glm::vec3& boxMax)
+{
+	SweepCollision result;
+	const glm::vec3 expandedMin = boxMin - glm::vec3(radius);
+	const glm::vec3 expandedMax = boxMax + glm::vec3(radius);
+	float enterTime = 0.0f;
+	float exitTime = 1.0f;
+	glm::vec3 enterNormal(0.0f);
+
+	for (int axis = 0; axis < 3; ++axis)
+	{
+		if (std::abs(movement[axis]) <= 1e-6f)
+		{
+			if (center[axis] < expandedMin[axis] || center[axis] > expandedMax[axis])
+			{
+				return result;
+			}
+			continue;
+		}
+
+		float nearTime = (expandedMin[axis] - center[axis]) / movement[axis];
+		float farTime = (expandedMax[axis] - center[axis]) / movement[axis];
+		glm::vec3 nearNormal(0.0f);
+		nearNormal[axis] = movement[axis] > 0.0f ? -1.0f : 1.0f;
+		if (nearTime > farTime)
+		{
+			std::swap(nearTime, farTime);
+		}
+
+		if (nearTime >= enterTime)
+		{
+			enterTime = nearTime;
+			enterNormal = nearNormal;
+		}
+		exitTime = std::min(exitTime, farTime);
+		if (enterTime > exitTime)
+		{
+			return result;
+		}
+	}
+
+	if (enterTime < 0.0f || enterTime > 1.0f || glm::length2(enterNormal) <= 0.0f)
+	{
+		return result;
+	}
+
+	result.hit = true;
+	result.normal = enterNormal;
+	result.time = enterTime;
+	return result;
+}
+
+Physics::Collision Physics::GetSphereAABBCollision(
+	const glm::vec3& center, float radius,
+	const glm::vec3& boxMin, const glm::vec3& boxMax,
+	const glm::vec3& movement)
+{
+	Collision result = { false, glm::vec3(0.0f), 0.0f };
+	const glm::vec3 sphereCenter = center + movement;
+	const glm::vec3 closest = glm::clamp(sphereCenter, boxMin, boxMax);
+	const glm::vec3 offset = sphereCenter - closest;
+	const float distanceSquared = glm::dot(offset, offset);
+	if (distanceSquared > radius * radius)
+	{
+		return result;
+	}
+
+	result.hit = true;
+	const float distance = std::sqrt(distanceSquared);
+	if (distance > 1e-6f)
+	{
+		result.normal = offset / distance;
+		result.penetration = radius - distance;
+		return result;
+	}
+
+	const float distances[6] = {
+		sphereCenter.x - boxMin.x, boxMax.x - sphereCenter.x,
+		sphereCenter.y - boxMin.y, boxMax.y - sphereCenter.y,
+		sphereCenter.z - boxMin.z, boxMax.z - sphereCenter.z
+	};
+	const glm::vec3 normals[6] = {
+		{-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f},
+		{0.0f, -1.0f, 0.0f}, {0.0f, 1.0f, 0.0f},
+		{0.0f, 0.0f, -1.0f}, {0.0f, 0.0f, 1.0f}
+	};
+	int closestFace = 0;
+	for (int i = 1; i < 6; ++i)
+	{
+		const float distanceDifference = distances[i] - distances[closestFace];
+		const bool closer = distanceDifference < -1e-5f;
+		const bool tiedAndOpposesMovement = std::abs(distanceDifference) <= 1e-5f
+			&& glm::dot(normals[i], movement) < glm::dot(normals[closestFace], movement);
+		if (closer || tiedAndOpposesMovement)
+		{
+			closestFace = i;
+		}
+	}
+	result.normal = normals[closestFace];
+	result.penetration = radius + distances[closestFace];
+	return result;
+}
+
 static glm::vec3 ClosestPointOnSegment(const glm::vec3& a, const glm::vec3& b, const glm::vec3& p)
 {
 	glm::vec3 ab = b - a;

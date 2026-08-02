@@ -5,12 +5,15 @@
 #include "GLFW/glfw3.h"
 
 #include <string>
+#include <memory>
 
 class Entity;
+class CameraCollider;
 
 class GameCamera final : public Camera {
 public:
-	GameCamera() = default;
+	GameCamera();
+	~GameCamera() override;
 	void startUp() override;
 	void shutDown() override;
 	glm::mat4 GetProjectionMatrix() const override;
@@ -30,6 +33,10 @@ public:
 	float Pitch() const { return m_pitch; }
 	void SetOrbitAngles(float yaw, float pitch);
 	void UpdateThirdPerson(const class Input& input, float dt);
+	float ColliderRadius() const;
+	void SetColliderRadius(float radius);
+	CameraCollider& Collider();
+	const CameraCollider& Collider() const;
 
 private:
 	void RebuildView();
@@ -50,6 +57,9 @@ private:
 	float m_yaw = 0.0f;
 	float m_pitch = 15.0f;
 	float m_lookSensitivity = 1.2f;
+	std::unique_ptr<CameraCollider> m_collider;
+	glm::vec3 m_lastSafePosition{ 0.0f, 0.0f, -10.0f };
+	bool m_hasSafePosition = false;
 };
 
 

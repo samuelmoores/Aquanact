@@ -152,6 +152,7 @@ void RenderManager::ApplyProjectState(const ProjectStateData::RenderStateData& r
 	m_gameCamera->SetPose(renderState.gameCameraPosition, renderState.gameCameraFacing);
 	m_gameCamera->SetRadius(renderState.gameCameraRadius);
 	m_gameCamera->SetOrbitAngles(renderState.gameCameraYaw, renderState.gameCameraPitch);
+	m_gameCamera->SetColliderRadius(renderState.gameCameraColliderRadius);
 	m_gameCamera->SetTargetName(renderState.gameCameraTarget);
 	m_lightingManager->SunLight().direction = renderState.sunLight.direction;
 	m_lightingManager->SunLight().color = renderState.sunLight.color;
@@ -302,6 +303,7 @@ void RenderManager::DrawRuntimeFrame(FrontEndManager& frontEndManager, Debug& de
 	const auto debugStart = std::chrono::high_resolution_clock::now();
 	if (Root::Current().GameModeDebugFlag())
 	{
+		debug.DrawCameraCollisionDebug(ActiveCamera());
 		debug.drawGameModeInput(input);
 	}
 	frontEndManager.DrawRuntimeGUI();

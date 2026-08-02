@@ -150,19 +150,11 @@ void Input::Update()
 		const glm::vec2 cursorPos(static_cast<float>(x), static_cast<float>(y));
 		m_mouseDelta = cursorPos - m_lastCursorPos;
 		const float mouseDeltaLength = glm::length(m_mouseDelta);
-		if (mouseDeltaLength < 0.75f)
+		if (mouseDeltaLength > 8.0f)
 		{
-			m_mouseDelta = glm::vec2(0.0f);
+			m_mouseDelta = glm::normalize(m_mouseDelta) * 8.0f;
 		}
-		else
-		{
-			const float maxMouseDelta = 8.0f;
-			if (mouseDeltaLength > maxMouseDelta)
-			{
-				m_mouseDelta = glm::normalize(m_mouseDelta) * maxMouseDelta;
-			}
-			m_mouseDelta.y = -m_mouseDelta.y;
-		}
+		m_mouseDelta.y = -m_mouseDelta.y;
 		m_lastCursorPos = cursorPos;
 	}
 }

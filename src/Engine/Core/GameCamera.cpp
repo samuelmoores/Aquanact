@@ -1,15 +1,27 @@
 #include "Engine/Core/GameCamera.h"
 
+#include "Engine/Core/CameraCollider.h"
 #include "Engine/Core/Entity.h"
 #include "Engine/Core/EngineCamera.h"
 #include "Engine/Core/Root.h"
 #include "Engine/Core/Input.h"
 #include "Engine/Core/InputManager.h"
 #include "Engine/Core/Window.h"
+#include "Engine/Core/Mesh.h"
+#include "Engine/Core/Scene.h"
+#include "Engine/Core/SceneManager.h"
+#include "Engine/Core/Debug.h"
 
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <cmath>
+
+GameCamera::GameCamera()
+	: m_collider(std::make_unique<CameraCollider>())
+{
+}
+
+GameCamera::~GameCamera() = default;
 
 void GameCamera::startUp()
 {
@@ -28,6 +40,9 @@ void GameCamera::startUp()
 	m_front = glm::vec3(0.0f, 0.0f, 1.0f);
 	m_up = glm::vec3(0.0f, 1.0f, 0.0f);
 	m_view_matrix = glm::lookAt(m_position, glm::vec3(0.0f), m_up);
+	m_collider->SetPosition(m_position);
+	m_lastSafePosition = m_position;
+	m_hasSafePosition = true;
 }
 
 void GameCamera::shutDown()
@@ -78,6 +93,9 @@ void GameCamera::SetPose(const glm::vec3& position, const glm::vec3& facing)
 	}
 	m_up = glm::vec3(0.0f, 1.0f, 0.0f);
 	m_view_matrix = glm::lookAt(m_position, m_position + m_front, m_up);
+	m_collider->SetPosition(m_position);
+	m_lastSafePosition = m_position;
+	m_hasSafePosition = true;
 	m_yaw = glm::degrees(std::atan2(m_front.x, m_front.z));
 	m_pitch = glm::degrees(std::asin(glm::clamp(m_front.y, -1.0f, 1.0f)));
 	if (m_target)
@@ -157,9 +175,139 @@ void GameCamera::UpdateThirdPerson(const Input& input, float dt)
 		return;
 	}
 	offset = glm::normalize(offset) * m_radius;
-	m_position = targetPos - offset;
+	const glm::vec3 desiredPosition = targetPos - offset;
+	glm::vec3 resolvedPosition = m_position;
+	int collisionCount = 0;
+	glm::vec3 lastCollisionNormal(0.0f);
+	float lastPenetration = 0.0f;
+	std::string lastCollisionObject;
+	const Scene* activeLevel = Root::Current().Levels().ActiveLevel();
+	if (activeLevel)
+	{
+		const auto positionBlocked = [&](const glm::vec3& position)
+		{
+			m_collider->SetPosition(position);
+			for (const auto& object : activeLevel->Objects())
+			{
+				if (!object || object.get() == target || object->IgnoreCameraCollision() || !object->GetMesh())
+				{
+					continue;
+				}
+
+				glm::vec3 boxMin;
+				glm::vec3 boxMax;
+				if (object->WorldAABB(boxMin, boxMax) && m_collider->OverlapsAABB(boxMin, boxMax))
+				{
+					return true;
+				}
+			}
+			return false;
+		};
+
+		const glm::vec3 frameStartPosition = m_position;
+		if (positionBlocked(m_position) && m_hasSafePosition && !positionBlocked(m_lastSafePosition))
+		{
+			resolvedPosition = m_lastSafePosition;
+		}
+
+		glm::vec3 remainingMovement = desiredPosition - resolvedPosition;
+		constexpr int maxSlideIterations = 3;
+		constexpr float collisionSkin = 0.05f;
+		for (int iteration = 0; iteration < maxSlideIterations && glm::length(remainingMovement) > 0.0001f; ++iteration)
+		{
+			m_collider->SetPosition(resolvedPosition);
+			Physics::SweepCollision earliestHit;
+			Entity* hitObject = nullptr;
+			for (const auto& object : activeLevel->Objects())
+			{
+				if (!object || object.get() == target || object->IgnoreCameraCollision() || !object->GetMesh())
+				{
+					continue;
+				}
+
+				glm::vec3 boxMin;
+				glm::vec3 boxMax;
+				if (!object->WorldAABB(boxMin, boxMax))
+				{
+					continue;
+				}
+
+				const Physics::SweepCollision hit = m_collider->SweepAgainstAABB(remainingMovement, boxMin, boxMax);
+				if (hit.hit && hit.time < earliestHit.time)
+				{
+					earliestHit = hit;
+					hitObject = object.get();
+				}
+			}
+
+			if (!earliestHit.hit)
+			{
+				resolvedPosition += remainingMovement;
+				remainingMovement = glm::vec3(0.0f);
+				break;
+			}
+
+			++collisionCount;
+			lastCollisionNormal = earliestHit.normal;
+			lastPenetration = 0.0f;
+			lastCollisionObject = hitObject ? hitObject->Name() : std::string();
+			const float movementLength = glm::length(remainingMovement);
+			const float safeTime = glm::max(0.0f, earliestHit.time - collisionSkin / movementLength);
+			resolvedPosition += remainingMovement * safeTime;
+
+			glm::vec3 slideMovement = remainingMovement * (1.0f - earliestHit.time);
+			const float intoSurface = glm::dot(slideMovement, earliestHit.normal);
+			if (intoSurface < 0.0f)
+			{
+				slideMovement -= earliestHit.normal * intoSurface;
+			}
+			remainingMovement = slideMovement;
+		}
+
+		if (positionBlocked(resolvedPosition))
+		{
+			resolvedPosition = frameStartPosition;
+		}
+		else
+		{
+			m_lastSafePosition = resolvedPosition;
+			m_hasSafePosition = true;
+		}
+	}
+	else
+	{
+		resolvedPosition = desiredPosition;
+		m_lastSafePosition = resolvedPosition;
+		m_hasSafePosition = true;
+	}
+
+	m_position = resolvedPosition;
+	m_collider->SetPosition(m_position);
 	m_front = glm::normalize(targetPos - m_position);
 	RebuildView();
+	Root::Current().Debugger().SetPhysicsDiagnostics(
+		m_position, desiredPosition, resolvedPosition, m_collider->Radius(),
+		collisionCount, lastCollisionNormal, lastPenetration, lastCollisionObject);
+}
+
+CameraCollider& GameCamera::Collider()
+{
+	return *m_collider;
+}
+
+float GameCamera::ColliderRadius() const
+{
+	return m_collider->Radius();
+}
+
+void GameCamera::SetColliderRadius(float radius)
+{
+	m_collider->SetRadius(radius);
+}
+
+const CameraCollider& GameCamera::Collider() const
+{
+	return *m_collider;
 }
 
 

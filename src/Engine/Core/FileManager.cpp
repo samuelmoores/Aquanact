@@ -117,7 +117,7 @@ bool FileManager::ImportSelected()
 	try
 	{
 		auto importedObject = std::make_unique<Entity>(absolutePath.string().c_str());
-		importedObject->SetIgnoreCameraCollision(true);
+		importedObject->SetIgnoreCameraCollision(false);
 		if (!Root::Current().Levels().ActiveLevel())
 		{
 			Root::Current().Levels().CreateLevel("Default");

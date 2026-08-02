@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <glm/gtc/matrix_transform.hpp>
 #include <utility>
+#include <limits>
 
 namespace
 {
@@ -224,6 +225,36 @@ std::string Entity::SourcePath() const { return m_sourcePath; }
 glm::vec3 Entity::Position() const { return m_position; }
 glm::vec3 Entity::WorldPosition() { return glm::vec3(BuildModelMatrix()[3]); }
 glm::vec3 Entity::WorldCenterPosition() { const glm::vec3 localCenter = m_mesh ? m_mesh->centerAABB() : glm::vec3(0.0f); return glm::vec3(BuildModelMatrix() * glm::vec4(localCenter, 1.0f)); }
+bool Entity::WorldAABB(glm::vec3& minBounds, glm::vec3& maxBounds)
+{
+	if (!m_mesh)
+	{
+		return false;
+	}
+
+	const glm::vec3 localMin = m_mesh->LocalMinBounds();
+	const glm::vec3 localMax = m_mesh->LocalMaxBounds();
+	const glm::mat4 model = BuildModelMatrix();
+	minBounds = glm::vec3(std::numeric_limits<float>::max());
+	maxBounds = glm::vec3(std::numeric_limits<float>::lowest());
+	for (int x = 0; x < 2; ++x)
+	{
+		for (int y = 0; y < 2; ++y)
+		{
+			for (int z = 0; z < 2; ++z)
+			{
+				const glm::vec3 corner(
+					x ? localMax.x : localMin.x,
+					y ? localMax.y : localMin.y,
+					z ? localMax.z : localMin.z);
+				const glm::vec3 worldCorner = glm::vec3(model * glm::vec4(corner, 1.0f));
+				minBounds = glm::min(minBounds, worldCorner);
+				maxBounds = glm::max(maxBounds, worldCorner);
+			}
+		}
+	}
+	return true;
+}
 glm::vec3 Entity::InitialWorldCenterPosition() const { return m_initialWorldCenter; }
 glm::vec3 Entity::DefaultPosition() const { return m_defaultPosition; }
 glm::vec3 Entity::DefaultRotation() const { return m_defaultRotation; }

@@ -75,6 +75,12 @@ public:
 	void SetShowGameplayDiagnosticsWindow(bool show);
 	bool ShowAnimationDiagnosticsWindow() const;
 	void SetShowAnimationDiagnosticsWindow(bool show);
+	bool ShowCameraCollisionDebug() const;
+	void SetShowCameraCollisionDebug(bool show);
+	void DrawCameraCollisionDebug(const Camera& camera);
+	void SetPhysicsDiagnostics(const glm::vec3& cameraPosition, const glm::vec3& desiredPosition, const glm::vec3& resolvedPosition, float colliderRadius, int collisionCount, const glm::vec3& collisionNormal, float penetration, const std::string& collisionObject);
+	bool ShowPhysicsDiagnosticsWindow() const;
+	void SetShowPhysicsDiagnosticsWindow(bool show);
 
 private:
 	// Rebuilds the axis/grid helpers when the grid configuration changes.
@@ -87,6 +93,8 @@ private:
 	class Axis* m_axis = nullptr;
 	class Grid* m_grid = nullptr;
 	std::vector<class Line*> m_pointLightDebugSpheres;
+	class Line* m_cameraCollisionSphere = nullptr;
+	std::vector<class Line*> m_cameraCollisionBoxes;
 	std::vector<glm::vec3> m_pointLightDebugColors;
 	float m_axisLength = 1200.0f;
 	float m_gridSize = 1200.0f;
@@ -98,6 +106,17 @@ private:
 	bool m_showGameInputWindow = true;
 	bool m_showGameplayDiagnosticsWindow = true;
 	bool m_showAnimationDiagnosticsWindow = true;
+	bool m_showCameraCollisionDebug = false;
+	bool m_showPhysicsDiagnosticsWindow = true;
+	unsigned int m_physicsDiagnosticsFrame = 0;
+	glm::vec3 m_physicsCameraPosition{ 0.0f };
+	glm::vec3 m_physicsDesiredPosition{ 0.0f };
+	glm::vec3 m_physicsResolvedPosition{ 0.0f };
+	glm::vec3 m_physicsCollisionNormal{ 0.0f };
+	float m_physicsColliderRadius = 0.0f;
+	float m_physicsPenetration = 0.0f;
+	int m_physicsCollisionCount = 0;
+	std::string m_physicsCollisionObject;
 	bool m_controllerOwnerBound = false;
 	std::string m_gameplayObjectName;
 	std::string m_activeLevelName;

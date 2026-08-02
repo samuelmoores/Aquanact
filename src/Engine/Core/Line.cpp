@@ -8,6 +8,11 @@ Line::Line()
 
 Line::Line(glm::vec3 minBounds, glm::vec3 maxBounds) :m_vao(-1), m_vbo(-1)
 {
+	SetBounds(minBounds, maxBounds, glm::vec3(1.0f, 0.0f, 1.0f));
+}
+
+void Line::SetBounds(glm::vec3 minBounds, glm::vec3 maxBounds, const glm::vec3& color)
+{
 	// 8 corners of the cube
 	glm::vec3 v000(minBounds.x, minBounds.y, minBounds.z);
 	glm::vec3 v100(maxBounds.x, minBounds.y, minBounds.z);
@@ -33,32 +38,46 @@ Line::Line(glm::vec3 minBounds, glm::vec3 maxBounds) :m_vao(-1), m_vbo(-1)
 	m_vertices.clear();
 	for (auto& v : edgeVerts)
 	{
-		m_vertices.push_back({ v.x, v.y, v.z, 1.0f, 0.0f, 1.0f }); // magenta for example
+		m_vertices.push_back({ v.x, v.y, v.z, color.r, color.g, color.b });
 	}
 
-	glGenVertexArrays(1, &m_vao);
-	glGenBuffers(1, &m_vbo);
+	if (m_vao == 0 || m_vao == static_cast<uint32_t>(-1))
+	{
+		glGenVertexArrays(1, &m_vao);
+		glGenBuffers(1, &m_vbo);
 
-	glBindVertexArray(m_vao);
+		glBindVertexArray(m_vao);
+		glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
+		glBufferData(GL_ARRAY_BUFFER, m_vertices.size() * sizeof(LineVertex3D), m_vertices.data(), GL_DYNAMIC_DRAW);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(LineVertex3D), (void*)0);
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(LineVertex3D), (void*)12);
+		glEnableVertexAttribArray(1);
+		glBindVertexArray(0);
+
+		m_shader.load("shaders/vertexColor.vert", "shaders/vertexColor.frag");
+		m_shader.activate();
+		m_shader.setUniform("projection", glm::perspective(glm::radians(45.0f), static_cast<float>(1200) / 800, 0.1f, 1000.0f));
+		return;
+	}
 
 	glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
-	glBufferData(GL_ARRAY_BUFFER, m_vertices.size() * sizeof(LineVertex3D), m_vertices.data(), GL_STATIC_DRAW);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, m_vertices.size() * sizeof(LineVertex3D), m_vertices.data());
+}
 
-	const int numPosFloats = 3;
-	const int numColorFloats = 3;
-	// Position attribute
-	glVertexAttribPointer(0, numPosFloats, GL_FLOAT, GL_FALSE, sizeof(LineVertex3D), (void*)0);
-	glEnableVertexAttribArray(0);
-
-	// Color attribute
-	glVertexAttribPointer(1, numColorFloats, GL_FLOAT, GL_FALSE, sizeof(LineVertex3D), (void*)12);
-	glEnableVertexAttribArray(1);
-
-	glBindVertexArray(0);
-
-	m_shader.load("shaders/vertexColor.vert", "shaders/vertexColor.frag");
-	m_shader.activate();
-	m_shader.setUniform("projection", glm::perspective(glm::radians(45.0f), static_cast<float>(1200) / 800, 0.1f, 1000.0f));
+void Line::SetColor(const glm::vec3& color)
+{
+	for (LineVertex3D& vertex : m_vertices)
+	{
+		vertex.r = color.r;
+		vertex.g = color.g;
+		vertex.b = color.b;
+	}
+	if (m_vbo != static_cast<uint32_t>(-1))
+	{
+		glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
+		glBufferSubData(GL_ARRAY_BUFFER, 0, m_vertices.size() * sizeof(LineVertex3D), m_vertices.data());
+	}
 }
 
 Line::Line(std::vector<LineVertex3D> verts) : m_vao(-1), m_vbo(-1)

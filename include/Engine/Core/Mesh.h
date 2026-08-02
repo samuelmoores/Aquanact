@@ -53,6 +53,8 @@ class Mesh {
 		bool intersectsRay(const glm::vec3& rayOrigin, const glm::vec3& rayDir) const;
 		glm::vec3 minBounds();
 		glm::vec3 maxBounds();
+		const glm::vec3& LocalMinBounds() const { return m_minBounds; }
+		const glm::vec3& LocalMaxBounds() const { return m_maxBounds; }
 		void DrawBoundingBox();
 		bool SphereAABBOverlap(const glm::vec3& center, float radius);
 		bool RayHit(const glm::vec3& ro, const glm::vec3& rd, float& tHit);

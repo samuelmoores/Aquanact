@@ -193,11 +193,6 @@ void InputManager::EvaluateActions()
 			}
 		}
 
-		if (action == "Look" && glm::length(vectorValue) > 1.0f)
-		{
-			vectorValue = glm::normalize(vectorValue);
-		}
-
 		state.value = glm::clamp(glm::length(vectorValue), 0.0f, 1.0f);
 		m_vectorStates[action] = glm::clamp(vectorValue, glm::vec2(-1.0f), glm::vec2(1.0f));
 		state.value = std::clamp(state.value, 0.0f, 1.0f);

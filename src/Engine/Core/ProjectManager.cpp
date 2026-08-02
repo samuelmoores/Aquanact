@@ -262,6 +262,8 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 		Root::Current().Debugger().SetShowGameInputWindow(renderState.showGameInputWindow);
 		Root::Current().Debugger().SetShowGameplayDiagnosticsWindow(renderState.showGameplayDiagnosticsWindow);
 		Root::Current().Debugger().SetShowAnimationDiagnosticsWindow(renderState.showAnimationDiagnosticsWindow);
+		Root::Current().Debugger().SetShowCameraCollisionDebug(renderState.showCameraCollisionDebug);
+		Root::Current().Debugger().SetShowPhysicsDiagnosticsWindow(renderState.showPhysicsDiagnosticsWindow);
 		Root::Current().FrontEnd().RuntimeGUI().SetShowDiagnosticsWindow(renderState.showGameGUIDiagnosticsWindow);
 		Root::Current().Profiler().SetEnabled(renderState.profilerEnabled);
 		m_currentProjectPath = path;

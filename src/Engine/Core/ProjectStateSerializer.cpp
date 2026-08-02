@@ -195,6 +195,10 @@ namespace ProjectStateSerializer {
 							Root::Current().Debugger().LogTagged(Debug::Severity::Warning, "ProjectLoad", "Failed to parse camera target id from gamecamera line");
 						}
 					}
+					if (fields.size() >= 12)
+					{
+						renderState.gameCameraColliderRadius = std::stof(fields[11]);
+					}
 				}
 				else if (fields.size() == 3 && fields[0] == "editorview")
 				{
@@ -219,8 +223,10 @@ namespace ProjectStateSerializer {
 					renderState.showGameInputWindow = readBool(9, renderState.showGameInputWindow);
 					renderState.showGameplayDiagnosticsWindow = readBool(10, renderState.showGameplayDiagnosticsWindow);
 					renderState.showAnimationDiagnosticsWindow = readBool(11, renderState.showAnimationDiagnosticsWindow);
-					renderState.showGameGUIDiagnosticsWindow = readBool(12, renderState.showGameGUIDiagnosticsWindow);
-					renderState.profilerEnabled = readBool(13, renderState.profilerEnabled);
+						 renderState.showGameGUIDiagnosticsWindow = readBool(12, renderState.showGameGUIDiagnosticsWindow);
+						renderState.profilerEnabled = readBool(13, renderState.profilerEnabled);
+						renderState.showCameraCollisionDebug = readBool(14, renderState.showCameraCollisionDebug);
+						renderState.showPhysicsDiagnosticsWindow = readBool(15, renderState.showPhysicsDiagnosticsWindow);
 				}
 				else if ((fields.size() == 8 || fields.size() == 9) && fields[0] == "sunlight")
 				{
@@ -434,7 +440,7 @@ namespace ProjectStateSerializer {
 				continue;
 			}
 
-			if (((fields.size() != 11 && fields.size() != 12) || fields[0] != "object"))
+			if (((fields.size() != 11 && fields.size() != 12 && fields.size() != 13) || fields[0] != "object"))
 			{
 				continue;
 			}
@@ -449,7 +455,7 @@ namespace ProjectStateSerializer {
 			object.position = glm::vec3(std::stof(fields[2]), std::stof(fields[3]), std::stof(fields[4]));
 			object.rotation = glm::vec3(std::stof(fields[5]), std::stof(fields[6]), std::stof(fields[7]));
 			object.scale = glm::vec3(std::stof(fields[8]), std::stof(fields[9]), std::stof(fields[10]));
-			if (fields.size() == 12)
+			if (fields.size() >= 12)
 			{
 				try
 				{
@@ -459,6 +465,10 @@ namespace ProjectStateSerializer {
 				{
 					object.id = 0;
 				}
+			}
+			if (fields.size() >= 13)
+			{
+				object.ignoreCameraCollision = fields[12] == "1" || fields[12] == "true" || fields[12] == "True";
 			}
 			currentLevel->objects.push_back(std::move(object));
 		}
@@ -477,7 +487,8 @@ namespace ProjectStateSerializer {
 		contents += std::to_string(gameCamera.Radius()) + ";";
 		contents += std::to_string(gameCamera.Yaw()) + ";";
 		contents += std::to_string(gameCamera.Pitch()) + ";";
-		contents += std::to_string(gameCamera.TargetId()) + "\n";
+		contents += std::to_string(gameCamera.TargetId()) + ";";
+		contents += std::to_string(gameCamera.ColliderRadius()) + "\n";
 
 		contents += "editorview;";
 		contents += frontEndManager.EditorGUI().ShowAxis() ? "1" : "0";
@@ -498,6 +509,8 @@ namespace ProjectStateSerializer {
 		const bool showAnimationDiagnosticsWindow = Root::Current().Debugger().ShowAnimationDiagnosticsWindow();
 		const bool showGameGUIDiagnosticsWindow = Root::Current().FrontEnd().RuntimeGUI().ShowDiagnosticsWindow();
 		const bool profilerEnabled = Root::Current().Profiler().IsEnabled();
+		const bool showCameraCollisionDebug = Root::Current().Debugger().ShowCameraCollisionDebug();
+		const bool showPhysicsDiagnosticsWindow = Root::Current().Debugger().ShowPhysicsDiagnosticsWindow();
 		contents += showLogWindow ? "1" : "0";
 		contents += ";";
 		contents += showStatsWindow ? "1" : "0";
@@ -523,6 +536,10 @@ namespace ProjectStateSerializer {
 		contents += showGameGUIDiagnosticsWindow ? "1" : "0";
 		contents += ";";
 		contents += profilerEnabled ? "1" : "0";
+		contents += ";";
+		contents += showCameraCollisionDebug ? "1" : "0";
+		contents += ";";
+		contents += showPhysicsDiagnosticsWindow ? "1" : "0";
 		contents += "\n";
 
 		const DirectionalLight& sunLight = renderManager.Lights().SunLight();
