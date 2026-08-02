@@ -12,6 +12,7 @@
 #include "Engine/Core/ProjectManager.h"
 #include "Engine/Core/GameplayManager.h"
 #include "Engine/Core/Input.h"
+#include "Engine/Core/InputManager.h"
 #include "Engine/Core/FrameProfiler.h"
 
 #include <chrono>
@@ -78,6 +79,7 @@ SceneManager& Root::Levels() { return *m_levelManager; }
 ProjectManager& Root::Projects() { return *m_projectManager; }
 GameplayManager& Root::Gameplay() { return *m_gameplayManager; }
 Input& Root::InputRef() { return *m_input; }
+InputManager& Root::InputActions() { return *m_inputManager; }
 FrameProfiler& Root::Profiler() { return *m_profiler; }
 EngineState& Root::State() { return m_engineState; }
 bool& Root::GameModeDebugFlag() { return m_gameModeDebug; }
@@ -96,6 +98,7 @@ void Root::InitializeOwnedSystems()
 	m_projectManager = std::make_unique<ProjectManager>(*m_fileSystem);
 	m_gameplayManager = std::make_unique<GameplayManager>();
 	m_input = std::make_unique<Input>();
+	m_inputManager = std::make_unique<InputManager>();
 	m_profiler = std::make_unique<FrameProfiler>();
 }
 
@@ -117,6 +120,7 @@ void Root::startUp(int argc, char** argv)
 	m_renderManager->startUp(*m_window);
 	m_frontEndManager->startUp(*m_window);
 	m_input->startUp(*m_window);
+	m_inputManager->startUp(*m_input);
 	m_debug->startUp();
 	m_fileManager->startUp();
 	m_projectManager->LoadProject(DefaultProjectPath(), *m_levelManager);
@@ -153,6 +157,7 @@ void Root::run()
 		{
 			FrameProfiler::Scope scope(*m_profiler, "Input");
 			m_input->Update();
+			m_inputManager->Update();
 		}
 		{
 			FrameProfiler::Scope scope(*m_profiler, "Gameplay");
@@ -205,6 +210,7 @@ void Root::shutDown()
 	m_gameplayManager->shutDown();
 	m_fileManager->shutDown();
 	m_debug->shutDown();
+	m_inputManager->shutDown();
 	m_input->shutDown();
 	m_frontEndManager->shutDown();
 	m_renderManager->shutDown();

@@ -10,6 +10,7 @@
 #include "Engine/Core/Root.h"
 #include "Engine/Core/FrameProfiler.h"
 #include "Engine/Core/Input.h"
+#include "Engine/Core/InputManager.h"
 #include "Engine/Core/SceneManager.h"
 #include "Engine/Core/ProjectManager.h"
 #include "Engine/Core/Window.h"
@@ -36,6 +37,54 @@
 #include <string>
 
 namespace {
+	std::string InputBindingLabel(const InputBinding& binding)
+	{
+		if (binding.type == InputBindingType::Key)
+		{
+			if (const char* name = glfwGetKeyName(binding.code, 0))
+			{
+				return std::string("Key: ") + name;
+			}
+
+			switch (binding.code)
+			{
+			case GLFW_KEY_SPACE: return "Key: Space";
+			case GLFW_KEY_ENTER: return "Key: Enter";
+			case GLFW_KEY_ESCAPE: return "Key: Escape";
+			case GLFW_KEY_LEFT: return "Key: Left";
+			case GLFW_KEY_RIGHT: return "Key: Right";
+			case GLFW_KEY_UP: return "Key: Up";
+			case GLFW_KEY_DOWN: return "Key: Down";
+			default: return "Key: " + std::to_string(binding.code);
+			}
+		}
+
+		if (binding.type == InputBindingType::ControllerStick)
+		{
+			return binding.stick == InputStick::Left ? "Left Stick" : "Right Stick";
+		}
+
+		if (binding.type == InputBindingType::ControllerDigital)
+		{
+			switch (binding.code)
+			{
+			case GLFW_GAMEPAD_BUTTON_A: return "A";
+			case GLFW_GAMEPAD_BUTTON_B: return "B";
+			case GLFW_GAMEPAD_BUTTON_X: return "X";
+			case GLFW_GAMEPAD_BUTTON_Y: return "Y";
+			case GLFW_GAMEPAD_BUTTON_LEFT_BUMPER: return "Left Bumper";
+			case GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER: return "Right Bumper";
+			case GLFW_GAMEPAD_BUTTON_DPAD_UP: return "D-pad Up";
+			case GLFW_GAMEPAD_BUTTON_DPAD_DOWN: return "D-pad Down";
+			case GLFW_GAMEPAD_BUTTON_DPAD_LEFT: return "D-pad Left";
+			case GLFW_GAMEPAD_BUTTON_DPAD_RIGHT: return "D-pad Right";
+			default: return "Controller digital: " + std::to_string(binding.code);
+			}
+		}
+
+		return "Unknown binding";
+	}
+
 	std::filesystem::path SourceRoot()
 	{
 #ifdef AQUANACT_SOURCE_ROOT
@@ -405,6 +454,10 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 
 		if (ImGui::BeginMenu("Aquanact"))
 		{
+			if (ImGui::MenuItem("Input Map"))
+			{
+				m_showInputMapWindow = true;
+			}
 			if (ImGui::MenuItem("Quit"))
 			{
 				if (m_window)
@@ -618,6 +671,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 	DrawBuildGamePopup();
 	DrawAddCodeFilePopup();
 	DrawNewLevelPopup();
+	DrawInputMapWindow();
 
 	if (m_showFileExplorer)
 	{
@@ -1608,6 +1662,209 @@ void EngineGUI::SetShowLightingWindow(bool showLightingWindow)
 void EngineGUI::SetShowFileExplorer(bool showFileExplorer)
 {
 	m_showFileExplorer = showFileExplorer;
+}
+
+void EngineGUI::DrawInputMapWindow()
+{
+	if (!m_showInputMapWindow)
+	{
+		return;
+	}
+
+	InputManager& inputManager = Root::Current().InputActions();
+	auto findBinding = [](std::vector<InputBinding>& bindings, InputBindingType type, int code, InputStick stick = InputStick::Left) -> InputBinding*
+	{
+		for (InputBinding& binding : bindings)
+		{
+			if (binding.type == type && binding.code == code && binding.stick == stick)
+			{
+				return &binding;
+			}
+		}
+		return nullptr;
+	};
+
+	auto ensureBinding = [](std::vector<InputBinding>& bindings, InputBinding binding)
+	{
+		for (InputBinding& existing : bindings)
+		{
+			if (existing.type == binding.type && existing.code == binding.code && existing.stick == binding.stick)
+			{
+				existing = binding;
+				return;
+			}
+		}
+		bindings.push_back(binding);
+	};
+
+	bool open = m_showInputMapWindow;
+	if (ImGui::Begin("Input Map", &open, ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		const auto bindingIt = inputManager.Bindings().find("Move");
+		if (bindingIt != inputManager.Bindings().end())
+		{
+			std::vector<InputBinding> editedBindings = bindingIt->second;
+			bool bindingsChanged = false;
+
+			auto drawKeyboardBinding = [&](const char* label, int keyCode, const glm::vec2& vector)
+			{
+				InputBinding* binding = findBinding(editedBindings, InputBindingType::Key, keyCode);
+				if (!binding)
+				{
+					ensureBinding(editedBindings, { InputBindingType::Key, keyCode, GLFW_JOYSTICK_1, 1.0f, vector });
+					binding = findBinding(editedBindings, InputBindingType::Key, keyCode);
+				}
+
+				if (!binding)
+				{
+					return;
+				}
+
+				if (ImGui::BeginCombo(label, InputBindingLabel(*binding).c_str()))
+				{
+					const InputBinding options[] = {
+						{ InputBindingType::Key, GLFW_KEY_W, GLFW_JOYSTICK_1, 1.0f, glm::vec2(0.0f, 1.0f) },
+						{ InputBindingType::Key, GLFW_KEY_A, GLFW_JOYSTICK_1, 1.0f, glm::vec2(-1.0f, 0.0f) },
+						{ InputBindingType::Key, GLFW_KEY_S, GLFW_JOYSTICK_1, 1.0f, glm::vec2(0.0f, -1.0f) },
+						{ InputBindingType::Key, GLFW_KEY_D, GLFW_JOYSTICK_1, 1.0f, glm::vec2(1.0f, 0.0f) },
+					};
+					for (const InputBinding& option : options)
+					{
+						const bool selected = option.code == binding->code;
+						if (ImGui::Selectable(InputBindingLabel(option).c_str(), selected))
+						{
+							*binding = option;
+							bindingsChanged = true;
+						}
+						if (selected)
+						{
+							ImGui::SetItemDefaultFocus();
+						}
+					}
+					ImGui::EndCombo();
+				}
+			};
+
+			ImGui::PushID("Move");
+			ImGui::TextUnformatted("Move");
+			ImGui::TextDisabled("Keyboard");
+			ImGui::Separator();
+			drawKeyboardBinding("Up##KeyboardUp", GLFW_KEY_W, glm::vec2(0.0f, 1.0f));
+			drawKeyboardBinding("Down##KeyboardDown", GLFW_KEY_S, glm::vec2(0.0f, -1.0f));
+			drawKeyboardBinding("Left##KeyboardLeft", GLFW_KEY_A, glm::vec2(-1.0f, 0.0f));
+			drawKeyboardBinding("Right##KeyboardRight", GLFW_KEY_D, glm::vec2(1.0f, 0.0f));
+
+			ImGui::Spacing();
+			ImGui::TextDisabled("Controller");
+			ImGui::Separator();
+			static const char* controllerModes[] = { "Digital", "Analog" };
+			int controllerMode = findBinding(editedBindings, InputBindingType::ControllerStick, 0, InputStick::Left) ? 1 : 0;
+			if (ImGui::Combo("##MoveControllerMode", &controllerMode, controllerModes, IM_ARRAYSIZE(controllerModes)))
+			{
+				editedBindings.erase(std::remove_if(editedBindings.begin(), editedBindings.end(), [](const InputBinding& binding)
+				{
+					return binding.type == InputBindingType::ControllerDigital || binding.type == InputBindingType::ControllerStick;
+				}), editedBindings.end());
+
+				if (controllerMode == 0)
+				{
+					editedBindings.push_back({ InputBindingType::ControllerDigital, GLFW_GAMEPAD_BUTTON_DPAD_UP, GLFW_JOYSTICK_1, 1.0f, glm::vec2(0.0f, 1.0f) });
+					editedBindings.push_back({ InputBindingType::ControllerDigital, GLFW_GAMEPAD_BUTTON_DPAD_DOWN, GLFW_JOYSTICK_1, 1.0f, glm::vec2(0.0f, -1.0f) });
+					editedBindings.push_back({ InputBindingType::ControllerDigital, GLFW_GAMEPAD_BUTTON_DPAD_LEFT, GLFW_JOYSTICK_1, 1.0f, glm::vec2(-1.0f, 0.0f) });
+					editedBindings.push_back({ InputBindingType::ControllerDigital, GLFW_GAMEPAD_BUTTON_DPAD_RIGHT, GLFW_JOYSTICK_1, 1.0f, glm::vec2(1.0f, 0.0f) });
+				}
+				else
+				{
+					editedBindings.push_back({ InputBindingType::ControllerStick, 0, GLFW_JOYSTICK_1, 1.0f, glm::vec2(0.0f), InputStick::Left });
+				}
+				bindingsChanged = true;
+			}
+
+			if (controllerMode == 0)
+			{
+				const char* labels[] = { "Up", "Down", "Left", "Right" };
+				const InputBinding options[] = {
+					{ InputBindingType::ControllerDigital, GLFW_GAMEPAD_BUTTON_DPAD_UP, GLFW_JOYSTICK_1, 1.0f, glm::vec2(0.0f, 1.0f) },
+					{ InputBindingType::ControllerDigital, GLFW_GAMEPAD_BUTTON_DPAD_DOWN, GLFW_JOYSTICK_1, 1.0f, glm::vec2(0.0f, -1.0f) },
+					{ InputBindingType::ControllerDigital, GLFW_GAMEPAD_BUTTON_DPAD_LEFT, GLFW_JOYSTICK_1, 1.0f, glm::vec2(-1.0f, 0.0f) },
+					{ InputBindingType::ControllerDigital, GLFW_GAMEPAD_BUTTON_DPAD_RIGHT, GLFW_JOYSTICK_1, 1.0f, glm::vec2(1.0f, 0.0f) },
+				};
+
+				for (int i = 0; i < 4; ++i)
+				{
+					InputBinding* binding = findBinding(editedBindings, InputBindingType::ControllerDigital, options[i].code);
+					if (!binding)
+					{
+						ensureBinding(editedBindings, options[i]);
+						binding = findBinding(editedBindings, InputBindingType::ControllerDigital, options[i].code);
+					}
+
+					if (!binding)
+					{
+						continue;
+					}
+
+					if (ImGui::BeginCombo(labels[i], InputBindingLabel(*binding).c_str()))
+					{
+						for (const InputBinding& option : options)
+						{
+							const bool selected = option.code == binding->code;
+							if (ImGui::Selectable(InputBindingLabel(option).c_str(), selected))
+							{
+								*binding = option;
+								bindingsChanged = true;
+							}
+							if (selected)
+							{
+								ImGui::SetItemDefaultFocus();
+							}
+						}
+						ImGui::EndCombo();
+					}
+				}
+			}
+			else
+			{
+				InputBinding* stickBinding = findBinding(editedBindings, InputBindingType::ControllerStick, 0, InputStick::Left);
+				if (!stickBinding)
+				{
+					ensureBinding(editedBindings, { InputBindingType::ControllerStick, 0, GLFW_JOYSTICK_1, 1.0f, glm::vec2(0.0f), InputStick::Left });
+					stickBinding = findBinding(editedBindings, InputBindingType::ControllerStick, 0, InputStick::Left);
+				}
+
+				if (stickBinding && ImGui::BeginCombo("##ControllerAnalog", InputBindingLabel(*stickBinding).c_str()))
+				{
+					const InputBinding options[] = {
+						{ InputBindingType::ControllerStick, 0, GLFW_JOYSTICK_1, 1.0f, glm::vec2(0.0f), InputStick::Left },
+						{ InputBindingType::ControllerStick, 0, GLFW_JOYSTICK_1, 1.0f, glm::vec2(0.0f), InputStick::Right },
+					};
+					for (const InputBinding& option : options)
+					{
+						const bool selected = option.stick == stickBinding->stick;
+						if (ImGui::Selectable(InputBindingLabel(option).c_str(), selected))
+						{
+							*stickBinding = option;
+							bindingsChanged = true;
+						}
+						if (selected)
+						{
+							ImGui::SetItemDefaultFocus();
+						}
+					}
+					ImGui::EndCombo();
+				}
+			}
+
+			ImGui::PopID();
+
+			if (bindingsChanged)
+			{
+				inputManager.SetBindings("Move", std::move(editedBindings));
+			}
+		}
+	}
+	ImGui::End();
+	m_showInputMapWindow = open;
 }
 
 void EngineGUI::DrawNewLevelPopup()

@@ -13,6 +13,7 @@ class SceneManager;
 class ProjectManager;
 class GameplayManager;
 class Input;
+class InputManager;
 class FrameProfiler;
 
 enum class EngineMode {
@@ -55,6 +56,7 @@ public:
 	ProjectManager& Projects();
 	GameplayManager& Gameplay();
 	Input& InputRef();
+	InputManager& InputActions();
 	FrameProfiler& Profiler();
 	EngineState& State();
 	bool& GameModeDebugFlag();
@@ -77,6 +79,7 @@ private:
 	std::unique_ptr<ProjectManager> m_projectManager;
 	std::unique_ptr<GameplayManager> m_gameplayManager;
 	std::unique_ptr<Input> m_input;
+	std::unique_ptr<InputManager> m_inputManager;
 	std::unique_ptr<FrameProfiler> m_profiler;
 	bool m_frameCapEnabled = true;
 	double m_targetFrameRate = 120.0;

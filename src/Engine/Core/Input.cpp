@@ -4,6 +4,9 @@
 #include "Engine/Core/Root.h"
 #include "GLFW/glfw3.h"
 
+#include <cmath>
+#include <algorithm>
+
 #include <MYGUI/MyGUI_InputManager.h>
 #include <MYGUI/MyGUI_MouseButton.h>
 
@@ -119,6 +122,45 @@ bool Input::LookBecameActive() const
 float Input::DeltaTime() const
 {
 	return m_deltaTime;
+}
+
+bool Input::KeyDown(int key) const
+{
+	return m_window && m_windowFocused && glfwGetKey(m_window->GLFW(), key) == GLFW_PRESS;
+}
+
+bool Input::ControllerButtonDown(int button, int joystick) const
+{
+	if (!m_windowFocused || !glfwJoystickIsGamepad(joystick))
+	{
+		return false;
+	}
+
+	GLFWgamepadstate state{};
+	return glfwGetGamepadState(joystick, &state) == GLFW_TRUE
+		&& button >= 0
+		&& button <= GLFW_GAMEPAD_BUTTON_LAST
+		&& state.buttons[button] == GLFW_PRESS;
+}
+
+float Input::ControllerAxisValue(int axis, int joystick) const
+{
+	if (!m_windowFocused || !glfwJoystickIsGamepad(joystick))
+	{
+		return 0.0f;
+	}
+
+	GLFWgamepadstate state{};
+	if (glfwGetGamepadState(joystick, &state) != GLFW_TRUE
+		|| axis < 0
+		|| axis > GLFW_GAMEPAD_AXIS_LAST)
+	{
+		return 0.0f;
+	}
+
+	const float value = state.axes[axis];
+	const float deadzone = 0.15f;
+	return std::abs(value) >= deadzone ? value : 0.0f;
 }
 
 bool Input::WindowFocused() const

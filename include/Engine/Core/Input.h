@@ -20,6 +20,9 @@ public:
 	bool LookBecameActive() const;
 	bool WindowFocused() const;
 	float DeltaTime() const;
+	bool KeyDown(int key) const;
+	bool ControllerButtonDown(int button, int joystick = GLFW_JOYSTICK_1) const;
+	float ControllerAxisValue(int axis, int joystick = GLFW_JOYSTICK_1) const;
 
 private:
 	static void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods);

@@ -81,6 +81,7 @@ set(SOURCES
     "include/Game/PlayerHealth.h" "src/Game/PlayerHealth.cpp"
     "include/Engine/Core/Window.h" "src/Engine/Core/Window.cpp"
     "include/Engine/Core/Input.h" "src/Engine/Core/Input.cpp"
+    "include/Engine/Core/InputManager.h" "src/Engine/Core/InputManager.cpp"
     "include/Engine/Core/GameplayManager.h" "src/Engine/Core/GameplayManager.cpp"
     "include/Engine/Core/SimulationManager.h" "src/Engine/Core/SimulationManager.cpp"
     "include/Engine/Core/Root.h" "src/Engine/Core/Root.cpp"

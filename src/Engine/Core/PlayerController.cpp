@@ -4,6 +4,7 @@
 #include "Engine/Core/Debug.h"
 #include "Engine/Core/Root.h"
 #include "Engine/Core/Input.h"
+#include "Engine/Core/InputManager.h"
 #include "Engine/Core/RenderManager.h"
 
 #include <algorithm>
@@ -28,19 +29,16 @@ float PlayerController::ShortestAngleDelta(float from, float to)
 
 void PlayerController::startUp(Entity&)
 {
-	if (!m_inputDevice)
-	{
-		m_inputDevice = &Root::Current().InputRef();
-	}
 }
 
 void PlayerController::Update(Entity& owner, float dt)
 {
-	const Input* inputDevice = m_inputDevice ? m_inputDevice : &Root::Current().InputRef();
-	const glm::vec3 moveInput = inputDevice->MoveInput();
+	const InputManager& input = Root::Current().InputActions();
+	const glm::vec2 move2D = input.VectorValue("Move");
+	const glm::vec3 moveInput(move2D.x, 0.0f, move2D.y);
 	SetDiagnosticInput(moveInput);
 
-	if (glm::length(glm::vec2(moveInput.x, moveInput.z)) <= m_movementDeadzone)
+	if (glm::length(move2D) <= m_movementDeadzone)
 	{
 		StopMoving();
 		SetDiagnosticInput(moveInput);
@@ -63,7 +61,7 @@ void PlayerController::Update(Entity& owner, float dt)
 	}
 	right = glm::normalize(right);
 
-	glm::vec3 movement = forward * moveInput.z + right * moveInput.x;
+	glm::vec3 movement = forward * move2D.y + right * move2D.x;
 	movement.y = 0.0f;
 	SetMovementDirection(movement);
 	SetDiagnosticInput(moveInput);
