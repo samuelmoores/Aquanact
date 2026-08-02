@@ -28,6 +28,12 @@
 
 #ifdef _WIN32
 #include <Windows.h>
+#ifdef min
+#undef min
+#endif
+#ifdef max
+#undef max
+#endif
 #endif
 
 namespace {
@@ -61,6 +67,79 @@ namespace {
 
 		return vertices;
 	}
+
+	void BuildVerticalCapsule(const glm::vec3& boxMin, const glm::vec3& boxMax,
+		glm::vec3& base, glm::vec3& tip, float& radius)
+	{
+		const glm::vec3 center = (boxMin + boxMax) * 0.5f;
+		const glm::vec3 halfExtents = (boxMax - boxMin) * 0.5f;
+		radius = std::min(std::min(halfExtents.x, halfExtents.z), halfExtents.y);
+		radius = std::max(radius, 0.001f);
+		const float baseY = boxMin.y + radius;
+		const float tipY = boxMax.y - radius;
+		base = glm::vec3(center.x, std::min(baseY, tipY), center.z);
+		tip = glm::vec3(center.x, std::max(baseY, tipY), center.z);
+	}
+
+	std::vector<LineVertex3D> MakeWireCapsuleVertices(
+		const glm::vec3& base, const glm::vec3& tip, float radius, const glm::vec3& color)
+	{
+		constexpr int segments = 12;
+		constexpr int hemisphereRings = 3;
+		constexpr float pi = 3.14159265358979323846f;
+		std::vector<std::vector<glm::vec3>> rings;
+		rings.reserve(hemisphereRings * 2 + 2);
+
+		auto addRing = [&](float centerY, float angle)
+		{
+			std::vector<glm::vec3> ring;
+			ring.reserve(segments);
+			const float ringRadius = std::cos(angle) * radius;
+			const float y = centerY + std::sin(angle) * radius;
+			const glm::vec3 center = (base + tip) * 0.5f;
+			for (int segment = 0; segment < segments; ++segment)
+			{
+				const float a = static_cast<float>(segment) / static_cast<float>(segments) * 2.0f * pi;
+				ring.emplace_back(center.x + std::cos(a) * ringRadius, y, center.z + std::sin(a) * ringRadius);
+			}
+			rings.push_back(std::move(ring));
+		};
+
+		for (int ring = 0; ring <= hemisphereRings; ++ring)
+		{
+			const float angle = -0.5f * pi + (0.5f * pi * static_cast<float>(ring) / hemisphereRings);
+			addRing(base.y, angle);
+		}
+		for (int ring = 0; ring <= hemisphereRings; ++ring)
+		{
+			const float angle = 0.5f * pi * static_cast<float>(ring) / hemisphereRings;
+			addRing(tip.y, angle);
+		}
+
+		std::vector<LineVertex3D> vertices;
+		vertices.reserve((rings.size() * segments + (rings.size() - 1) * segments) * 2);
+		auto addLine = [&](const glm::vec3& a, const glm::vec3& b)
+		{
+			vertices.push_back({ a.x, a.y, a.z, color.r, color.g, color.b });
+			vertices.push_back({ b.x, b.y, b.z, color.r, color.g, color.b });
+		};
+
+		for (const auto& ring : rings)
+		{
+			for (int segment = 0; segment < segments; ++segment)
+			{
+				addLine(ring[segment], ring[(segment + 1) % segments]);
+			}
+		}
+		for (std::size_t ring = 1; ring < rings.size(); ++ring)
+		{
+			for (int segment = 0; segment < segments; ++segment)
+			{
+				addLine(rings[ring - 1][segment], rings[ring][segment]);
+			}
+		}
+		return vertices;
+	}
 }
 
 void Debug::startUp()
@@ -91,10 +170,21 @@ void Debug::shutDown()
 	}
 	m_pointLightDebugSpheres.clear();
 	m_pointLightDebugColors.clear();
+	ClearEntityBoundingBoxes();
 	delete m_cameraCollisionSphere;
 	m_cameraCollisionSphere = nullptr;
 	m_logMessages.clear();
 	m_logOnceKeys.clear();
+}
+
+void Debug::ClearEntityBoundingBoxes()
+{
+	for (Line* box : m_entityBoundingBoxes)
+	{
+		delete box;
+	}
+	m_entityBoundingBoxes.clear();
+	m_entityBoundingBoxObjects.clear();
 }
 
 void Debug::DrawCameraCollisionDebug(const Camera& camera)
@@ -220,6 +310,62 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 		sphere->UpdateProjection(projection);
 		glLineWidth(2.0f);
 		sphere->draw(view, model);
+	}
+
+	const Scene* activeLevel = Root::Current().Levels().ActiveLevel();
+	std::vector<Entity*> currentBoundingBoxObjects;
+	if (activeLevel)
+	{
+		currentBoundingBoxObjects.reserve(activeLevel->Objects().size());
+		for (const auto& object : activeLevel->Objects())
+		{
+			if (object)
+			{
+				currentBoundingBoxObjects.push_back(object.get());
+			}
+		}
+	}
+	if (currentBoundingBoxObjects != m_entityBoundingBoxObjects)
+	{
+		ClearEntityBoundingBoxes();
+		m_entityBoundingBoxObjects = currentBoundingBoxObjects;
+		for (Entity* object : m_entityBoundingBoxObjects)
+		{
+			m_entityBoundingBoxes.push_back(new Line(glm::vec3(0.0f), glm::vec3(0.0f)));
+		}
+	}
+
+	for (std::size_t i = 0; i < m_entityBoundingBoxObjects.size(); ++i)
+	{
+		Entity* object = m_entityBoundingBoxObjects[i];
+		if (!object || !object->ShowPhysicsBoundingBox() || !object->GetMesh())
+		{
+			continue;
+		}
+
+		glm::vec3 boxMin;
+		glm::vec3 boxMax;
+		if (!object->WorldAABB(boxMin, boxMax))
+		{
+			continue;
+		}
+
+		Line* box = m_entityBoundingBoxes[i];
+		const glm::vec3 debugColor(1.0f, 0.7f, 0.1f);
+		if (object->GetPhysicsColliderShape() == PhysicsColliderShape::Capsule)
+		{
+			glm::vec3 base;
+			glm::vec3 tip;
+			float radius = 0.0f;
+			BuildVerticalCapsule(boxMin, boxMax, base, tip, radius);
+			box->SetVertices(MakeWireCapsuleVertices(base, tip, radius, debugColor));
+		}
+		else
+		{
+			box->SetBounds(boxMin, boxMax, debugColor);
+		}
+		box->UpdateProjection(projection);
+		box->draw(view);
 	}
 
 	if (m_showLogWindow)

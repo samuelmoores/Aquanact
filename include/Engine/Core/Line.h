@@ -14,6 +14,7 @@ public:
 	Line(std::vector<LineVertex3D> verts);
 	~Line();
 	void SetBounds(glm::vec3 minBounds, glm::vec3 maxBounds, const glm::vec3& color);
+	void SetVertices(std::vector<LineVertex3D> verts);
 	void SetColor(const glm::vec3& color);
 	void UpdateProjection(glm::mat4 projectionMatrix);
 	void draw(glm::mat4 viewMatrix);

@@ -13,6 +13,12 @@
 class AnimatorComponent;
 class Controller;
 
+enum class PhysicsColliderShape
+{
+	Box = 0,
+	Capsule = 1
+};
+
 class Entity
 {
 public:
@@ -84,6 +90,10 @@ public:
 
 	void SetIgnoreCameraCollision(bool ignore) { m_ignoreCameraCollision = ignore; }
 	bool IgnoreCameraCollision() const { return m_ignoreCameraCollision; }
+	void SetShowPhysicsBoundingBox(bool show) { m_showPhysicsBoundingBox = show; }
+	bool ShowPhysicsBoundingBox() const { return m_showPhysicsBoundingBox; }
+	void SetPhysicsColliderShape(PhysicsColliderShape shape) { m_physicsColliderShape = shape; }
+	PhysicsColliderShape GetPhysicsColliderShape() const { return m_physicsColliderShape; }
 	bool HasAnimatorComponent() const;
 
 protected:
@@ -97,6 +107,8 @@ protected:
 	glm::vec3 m_defaultRotation{0.0f};
 	bool m_skinned = false;
 	bool m_ignoreCameraCollision = false;
+	bool m_showPhysicsBoundingBox = false;
+	PhysicsColliderShape m_physicsColliderShape = PhysicsColliderShape::Box;
 	std::string m_name;
 	std::string m_sourcePath;
 	unsigned int m_id = 0;

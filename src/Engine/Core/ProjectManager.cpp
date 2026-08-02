@@ -88,6 +88,10 @@ namespace {
 				object->SetRotation(pendingObject.rotation);
 				object->SetScale(pendingObject.scale);
 				object->SetIgnoreCameraCollision(pendingObject.ignoreCameraCollision);
+				object->SetShowPhysicsBoundingBox(pendingObject.showPhysicsBoundingBox);
+				object->SetPhysicsColliderShape(pendingObject.physicsColliderShape == 1
+					? PhysicsColliderShape::Capsule
+					: PhysicsColliderShape::Box);
 				object->SetDefaultPosition(object->Position());
 				object->SetDefaultRotation(object->Rotation());
 				Scene->AddObject(std::move(object));

@@ -84,6 +84,6 @@ void PlayerController::Update(Entity& owner, float dt)
 	owner.SetRotation(glm::vec3(owner.Rotation().x, nextYaw, owner.Rotation().z));
 
 	const glm::vec3 delta = normalizedMovement * m_moveSpeed * dt;
-	owner.Move(delta);
-	Root::Current().Debugger().SetGameplayDiagnostics(owner.Name(), moveInput, m_moveSpeed, dt, delta, owner.Position());
+	const glm::vec3 appliedDelta = MoveWithCollision(owner, delta);
+	Root::Current().Debugger().SetGameplayDiagnostics(owner.Name(), moveInput, m_moveSpeed, dt, appliedDelta, owner.Position());
 }

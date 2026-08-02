@@ -965,6 +965,23 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 						object->SetRotation(glm::vec3(rotation.x, rotation.y, editedRotZ));
 					}
 
+					if (ImGui::CollapsingHeader("Physics", ImGuiTreeNodeFlags_DefaultOpen))
+					{
+						const char* colliderShapes[] = { "Box", "Capsule" };
+						int colliderShape = object->GetPhysicsColliderShape() == PhysicsColliderShape::Capsule ? 1 : 0;
+						if (ImGui::Combo("Collider", &colliderShape, colliderShapes, IM_ARRAYSIZE(colliderShapes)))
+						{
+							object->SetPhysicsColliderShape(colliderShape == 1
+								? PhysicsColliderShape::Capsule
+								: PhysicsColliderShape::Box);
+						}
+						bool showBoundingBox = object->ShowPhysicsBoundingBox();
+						if (ImGui::Checkbox("Draw Bounding Volume", &showBoundingBox))
+						{
+							object->SetShowPhysicsBoundingBox(showBoundingBox);
+						}
+					}
+
 					ImGui::Separator();
 					ImGui::TextUnformatted("Components");
 					ImGui::Separator();

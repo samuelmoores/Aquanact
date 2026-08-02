@@ -26,6 +26,11 @@ public:
 		const glm::vec3& movement,
 		const glm::vec3& minB, const glm::vec3& maxB);
 
+	static SweepCollision GetAABBSweep(
+		const glm::vec3& minA, const glm::vec3& maxA,
+		const glm::vec3& movement,
+		const glm::vec3& minB, const glm::vec3& maxB);
+
 	static bool SphereAABBOverlap(
 		const glm::vec3& center, float radius,
 		const glm::vec3& boxMin, const glm::vec3& boxMax);
@@ -58,5 +63,10 @@ public:
 		const glm::vec3& capBase, const glm::vec3& capTip, float radius,
 		const glm::vec3& boxMin, const glm::vec3& boxMax,
 		const glm::vec3& movement);
+
+	static SweepCollision GetCapsuleAABBSweep(
+		const glm::vec3& capBase, const glm::vec3& capTip, float radius,
+		const glm::vec3& movement,
+		const glm::vec3& boxMin, const glm::vec3& boxMax);
 };
 

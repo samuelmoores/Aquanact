@@ -524,7 +524,7 @@ namespace ProjectStateSerializer {
 				continue;
 			}
 
-			if (((fields.size() != 11 && fields.size() != 12 && fields.size() != 13) || fields[0] != "object"))
+			if (((fields.size() < 11 || fields.size() > 15) || fields[0] != "object"))
 			{
 				continue;
 			}
@@ -553,6 +553,21 @@ namespace ProjectStateSerializer {
 			if (fields.size() >= 13)
 			{
 				object.ignoreCameraCollision = fields[12] == "1" || fields[12] == "true" || fields[12] == "True";
+			}
+			if (fields.size() >= 14)
+			{
+				object.showPhysicsBoundingBox = fields[13] == "1" || fields[13] == "true" || fields[13] == "True";
+			}
+			if (fields.size() >= 15)
+			{
+				try
+				{
+					object.physicsColliderShape = std::stoi(fields[14]) == 1 ? 1 : 0;
+				}
+				catch (...)
+				{
+					object.physicsColliderShape = 0;
+				}
 			}
 			currentLevel->objects.push_back(std::move(object));
 		}

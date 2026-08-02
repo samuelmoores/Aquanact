@@ -28,6 +28,7 @@ public:
 	protected:
 	void SetDiagnosticInput(const glm::vec3& input) { m_diagnosticInput = input; }
 	void ApplyMovement(Entity& owner, float dt);
+	glm::vec3 MoveWithCollision(Entity& owner, const glm::vec3& delta);
 
 	float m_moveSpeed = 50.0f;
 	bool m_isMoving = false;

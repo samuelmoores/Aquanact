@@ -80,6 +80,18 @@ void Line::SetColor(const glm::vec3& color)
 	}
 }
 
+void Line::SetVertices(std::vector<LineVertex3D> verts)
+{
+	m_vertices = std::move(verts);
+	if (m_vbo == static_cast<uint32_t>(-1))
+	{
+		return;
+	}
+
+	glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
+	glBufferData(GL_ARRAY_BUFFER, m_vertices.size() * sizeof(LineVertex3D), m_vertices.data(), GL_DYNAMIC_DRAW);
+}
+
 Line::Line(std::vector<LineVertex3D> verts) : m_vao(-1), m_vbo(-1)
 {
 	m_vertices = std::move(verts);

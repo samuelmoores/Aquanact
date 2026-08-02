@@ -180,7 +180,9 @@ namespace ProjectStateFormat {
 				contents += std::to_string(rotation.x) + ";" + std::to_string(rotation.y) + ";" + std::to_string(rotation.z) + ";";
 				contents += std::to_string(scale.x) + ";" + std::to_string(scale.y) + ";" + std::to_string(scale.z) + ";";
 				contents += std::to_string(object->Id()) + ";";
-				contents += object->IgnoreCameraCollision() ? "1\n" : "0\n";
+				contents += (object->IgnoreCameraCollision() ? "1;" : "0;");
+				contents += (object->ShowPhysicsBoundingBox() ? "1;" : "0;");
+				contents += (object->GetPhysicsColliderShape() == PhysicsColliderShape::Capsule ? "1\n" : "0\n");
 			}
 		}
 	}

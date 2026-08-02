@@ -72,6 +72,8 @@ namespace ProjectStateData {
 			glm::vec3 scale{ 1.0f };
 			unsigned int id = 0;
 			bool ignoreCameraCollision = false;
+			bool showPhysicsBoundingBox = false;
+			int physicsColliderShape = 0;
 		};
 		std::vector<PendingObject> objects;
 	};

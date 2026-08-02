@@ -87,12 +87,15 @@ private:
 	void RebuildGrid();
 	void RebuildAxis();
 	void RebuildPointLightDebugSpheres();
+	void ClearEntityBoundingBoxes();
 	// Small formatting helper used by the log window.
 	std::string SeverityPrefix(Severity severity) const;
 
 	class Axis* m_axis = nullptr;
 	class Grid* m_grid = nullptr;
 	std::vector<class Line*> m_pointLightDebugSpheres;
+	std::vector<class Line*> m_entityBoundingBoxes;
+	std::vector<class Entity*> m_entityBoundingBoxObjects;
 	class Line* m_cameraCollisionSphere = nullptr;
 	std::vector<glm::vec3> m_pointLightDebugColors;
 	float m_axisLength = 1200.0f;
