@@ -10,6 +10,7 @@ layout (location = 5) in vec4 vWeights;
 uniform mat4 projection;
 uniform mat4 view;
 uniform mat4 model;
+uniform mat4 lightSpaceMatrix;
 uniform bool skinned;
 uniform mat4 finalBones[200];
 uniform vec3 viewPos;
@@ -20,6 +21,7 @@ out vec3 Normal;
 flat out ivec4 BoneIDs;
 out vec4 Weights;
 out vec3 ViewPos;
+out vec4 FragPosLightSpace;
 
 out mat3 TBN;
 
@@ -46,6 +48,7 @@ void main()
 
     // World-space position
     FragWorldPos = vec3(model * PosL);
+    FragPosLightSpace = lightSpaceMatrix * vec4(FragWorldPos, 1.0);
 
     // Transform normal to world space
     // For skinned meshes, apply bone transform first 

@@ -10,6 +10,7 @@ struct DirectionalLight {
 	glm::vec3 color = glm::vec3(1.0f);
 	float intensity = 1.0f;
 	float ambient = 0.5;
+	bool castsShadows = true;
 };
 
 struct PointLight {
@@ -23,6 +24,7 @@ struct PointLight {
 	float constant = 1.0f;
 	float linear = 0.004f;
 	float quadratic = 0.000004f;
+	bool castsShadows = false;
 
 	void SetRadius(float newRadius);
 };
@@ -36,12 +38,15 @@ public:
 	void ApplyToShader(const ShaderProgram* shader) const;
 	DirectionalLight& SunLight();
 	const DirectionalLight& SunLight() const;
+	bool ShadowsEnabled() const;
+	void SetShadowsEnabled(bool enabled);
 	PointLight& AddPointLight();
 	std::vector<PointLight>& PointLights();
 	const std::vector<PointLight>& PointLights() const;
 
 private:
 	DirectionalLight m_sun;
+	bool m_shadowsEnabled = true;
 	std::vector<PointLight> m_pointLights;
 };
 

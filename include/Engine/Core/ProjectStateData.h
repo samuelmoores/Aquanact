@@ -108,6 +108,8 @@ namespace ProjectStateData {
 			glm::vec3 color{ 1.0f };
 			float intensity = 1.0f;
 			float ambient = 0.2f;
+			bool shadowsEnabled = true;
+			bool castsShadows = true;
 		};
 		struct PointLightData {
 			glm::vec3 position{ 0.0f };
@@ -119,6 +121,7 @@ namespace ProjectStateData {
 			float constant = 1.0f;
 			float linear = 0.0f;
 			float quadratic = 0.0f;
+			bool castsShadows = false;
 		};
 		DirectionalLightData sunLight;
 		std::vector<PointLightData> pointLights;

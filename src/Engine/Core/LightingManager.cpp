@@ -59,6 +59,16 @@ const DirectionalLight& LightingManager::SunLight() const
 	return m_sun;
 }
 
+bool LightingManager::ShadowsEnabled() const
+{
+	return m_shadowsEnabled;
+}
+
+void LightingManager::SetShadowsEnabled(bool enabled)
+{
+	m_shadowsEnabled = enabled;
+}
+
 PointLight& LightingManager::AddPointLight()
 {
 	if (m_pointLights.size() >= static_cast<std::size_t>(MaxPointLights))

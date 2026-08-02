@@ -1112,6 +1112,12 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 		bool open = m_showLightingWindow;
 		if (ImGui::Begin("Lighting", &open, ImGuiWindowFlags_NoFocusOnAppearing))
 		{
+			bool shadowsEnabled = Root::Current().Render().Lights().ShadowsEnabled();
+			if (ImGui::Checkbox("Enable Shadows", &shadowsEnabled))
+			{
+				Root::Current().Render().Lights().SetShadowsEnabled(shadowsEnabled);
+			}
+			ImGui::Separator();
 			DirectionalLight& sunLight = Root::Current().Render().Lights().SunLight();
 			if (ImGui::CollapsingHeader("Sun Light", ImGuiTreeNodeFlags_DefaultOpen))
 			{
@@ -1119,12 +1125,14 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 				ImGui::ColorEdit3("Color", &sunLight.color.x);
 				ImGui::DragFloat("Intensity", &sunLight.intensity, 0.001f, 0.0f, 10.0f, "%.3f");
 				ImGui::DragFloat("Ambient", &sunLight.ambient, 0.001f, 0.00f, 1.00f, "%.3f");
+				ImGui::Checkbox("Casts Shadow", &sunLight.castsShadows);
 				if (ImGui::Button("Reset Sun"))
 				{
 					sunLight.direction = glm::vec3(-0.3f, -1.0f, 0.2f);
 					sunLight.color = glm::vec3(1.0f);
 					sunLight.intensity = 1.0f;
 					sunLight.ambient = 0.5f;
+					sunLight.castsShadows = true;
 				}
 			}
 			ImGui::SeparatorText("Point Lights");
@@ -1140,6 +1148,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 					ImGui::ColorEdit3("Color", &pointLight.color.x);
 					ImGui::DragFloat("Intensity", &pointLight.intensity, 0.01f, 0.0f, 50.0f, "%.2f");
 					ImGui::DragFloat("Ambient", &pointLight.ambient, 0.001f, 0.0f, 1.0f, "%.3f");
+					ImGui::Checkbox("Casts Shadow", &pointLight.castsShadows);
 					float radius = pointLight.radius;
 					if (ImGui::DragFloat("Radius", &radius, 5.0f, 0.001f, 5000.0f, "%.2f"))
 					{

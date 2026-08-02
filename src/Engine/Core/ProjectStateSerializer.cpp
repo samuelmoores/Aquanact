@@ -207,7 +207,7 @@ namespace ProjectStateSerializer {
 			}
 
 			const std::vector<std::string> fields = ProjectStateFormat::SplitFields(line);
-			if ((fields.size() >= 7 && fields[0] == "gamecamera") || (fields.size() == 3 && fields[0] == "editorview") || (fields.size() >= 3 && fields[0] == "debugwindows") || ((fields.size() == 8 || fields.size() == 9) && fields[0] == "sunlight") || ((fields.size() == 12 || fields.size() == 13 || fields.size() == 14) && fields[0] == "pointlight") || (fields.size() == 2 && fields[0] == "imguilayout"))
+			if ((fields.size() >= 7 && fields[0] == "gamecamera") || (fields.size() == 3 && fields[0] == "editorview") || (fields.size() >= 3 && fields[0] == "debugwindows") || ((fields.size() >= 8 && fields.size() <= 11) && fields[0] == "sunlight") || ((fields.size() >= 12 && fields.size() <= 15) && fields[0] == "pointlight") || (fields.size() == 2 && fields[0] == "imguilayout"))
 			{
 				if (fields.size() >= 7 && fields[0] == "gamecamera")
 				{
@@ -275,23 +275,31 @@ namespace ProjectStateSerializer {
 						renderState.showCameraCollisionDebug = readBool(14, renderState.showCameraCollisionDebug);
 						renderState.showPhysicsDiagnosticsWindow = readBool(15, renderState.showPhysicsDiagnosticsWindow);
 				}
-				else if ((fields.size() == 8 || fields.size() == 9) && fields[0] == "sunlight")
+				else if (fields.size() >= 8 && fields.size() <= 11 && fields[0] == "sunlight")
 				{
 					renderState.sunLight.direction = glm::vec3(std::stof(fields[1]), std::stof(fields[2]), std::stof(fields[3]));
 					renderState.sunLight.color = glm::vec3(std::stof(fields[4]), std::stof(fields[5]), std::stof(fields[6]));
 					renderState.sunLight.intensity = std::stof(fields[7]);
-					if (fields.size() == 9)
+					if (fields.size() >= 9)
 					{
 						renderState.sunLight.ambient = std::stof(fields[8]);
 					}
+					if (fields.size() >= 10)
+					{
+						renderState.sunLight.shadowsEnabled = fields[9] == "1" || fields[9] == "true" || fields[9] == "True";
+					}
+					if (fields.size() >= 11)
+					{
+						renderState.sunLight.castsShadows = fields[10] == "1" || fields[10] == "true" || fields[10] == "True";
+					}
 				}
-				else if ((fields.size() == 12 || fields.size() == 13 || fields.size() == 14) && fields[0] == "pointlight")
+				else if (fields.size() >= 12 && fields.size() <= 15 && fields[0] == "pointlight")
 				{
 					RenderStateData::PointLightData pointLight;
 					pointLight.position = glm::vec3(std::stof(fields[1]), std::stof(fields[2]), std::stof(fields[3]));
 					pointLight.color = glm::vec3(std::stof(fields[4]), std::stof(fields[5]), std::stof(fields[6]));
 					pointLight.intensity = std::stof(fields[7]);
-					if (fields.size() == 14)
+					if (fields.size() >= 14)
 					{
 						pointLight.ambient = std::stof(fields[8]);
 						pointLight.radius = std::stof(fields[9]);
@@ -299,6 +307,10 @@ namespace ProjectStateSerializer {
 						pointLight.constant = std::stof(fields[11]);
 						pointLight.linear = std::stof(fields[12]);
 						pointLight.quadratic = std::stof(fields[13]);
+						if (fields.size() >= 15)
+						{
+							pointLight.castsShadows = fields[14] == "1" || fields[14] == "true" || fields[14] == "True";
+						}
 					}
 					else
 					{
@@ -619,7 +631,9 @@ namespace ProjectStateSerializer {
 		contents += std::to_string(sunLight.direction.x) + ";" + std::to_string(sunLight.direction.y) + ";" + std::to_string(sunLight.direction.z) + ";";
 		contents += std::to_string(sunLight.color.x) + ";" + std::to_string(sunLight.color.y) + ";" + std::to_string(sunLight.color.z) + ";";
 		contents += std::to_string(sunLight.intensity) + ";";
-		contents += std::to_string(sunLight.ambient) + "\n";
+		contents += std::to_string(sunLight.ambient) + ";";
+		contents += (renderManager.Lights().ShadowsEnabled() ? "1;" : "0;");
+		contents += (sunLight.castsShadows ? "1\n" : "0\n");
 
 		for (const PointLight& pointLight : renderManager.Lights().PointLights())
 		{
@@ -632,7 +646,8 @@ namespace ProjectStateSerializer {
 			contents += std::to_string(pointLight.radiusFade) + ";";
 			contents += std::to_string(pointLight.constant) + ";";
 			contents += std::to_string(pointLight.linear) + ";";
-			contents += std::to_string(pointLight.quadratic) + "\n";
+			contents += std::to_string(pointLight.quadratic) + ";";
+			contents += (pointLight.castsShadows ? "1\n" : "0\n");
 		}
 	}
 }

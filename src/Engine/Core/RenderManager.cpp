@@ -158,6 +158,8 @@ void RenderManager::ApplyProjectState(const ProjectStateData::RenderStateData& r
 	m_lightingManager->SunLight().color = renderState.sunLight.color;
 	m_lightingManager->SunLight().intensity = renderState.sunLight.intensity;
 	m_lightingManager->SunLight().ambient = renderState.sunLight.ambient;
+	m_lightingManager->SunLight().castsShadows = renderState.sunLight.castsShadows;
+	m_lightingManager->SetShadowsEnabled(renderState.sunLight.shadowsEnabled);
 	m_lightingManager->PointLights().clear();
 	for (const auto& pointLightData : renderState.pointLights)
 	{
@@ -171,6 +173,7 @@ void RenderManager::ApplyProjectState(const ProjectStateData::RenderStateData& r
 		pointLight.constant = pointLightData.constant;
 		pointLight.linear = pointLightData.linear;
 		pointLight.quadratic = pointLightData.quadratic;
+		pointLight.castsShadows = pointLightData.castsShadows;
 	}
 }
 
@@ -377,6 +380,7 @@ void RenderManager::Flush(const Camera& camera)
 {
 	const auto flushStart = std::chrono::high_resolution_clock::now();
 	m_lastFrameCommandCount = m_commandCount;
+	m_device.RenderShadowMaps(m_commands, m_commandCount, *m_lightingManager);
 	for (std::size_t i = 0; i < m_commandCount; ++i) {
 		const RenderCommand& command = m_commands[i];
 		m_device.Draw(command, camera, *m_lightingManager);

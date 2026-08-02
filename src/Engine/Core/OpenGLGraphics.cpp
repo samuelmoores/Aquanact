@@ -80,11 +80,6 @@ void OpenGLGraphics::UpdateViewport()
 		return;
 	}
 
-	if (width == m_lastViewportWidth && height == m_lastViewportHeight)
-	{
-		return;
-	}
-
 	m_lastViewportWidth = width;
 	m_lastViewportHeight = height;
 	glViewport(0, 0, width, height);
