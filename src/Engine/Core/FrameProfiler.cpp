@@ -130,10 +130,6 @@ std::vector<FrameProfiler::Sample> FrameProfiler::Samples() const
 		sample.maximumMs = entry.second.maximumMs;
 		samples.push_back(std::move(sample));
 	}
-	std::sort(samples.begin(), samples.end(), [](const Sample& left, const Sample& right)
-	{
-		return left.currentMs > right.currentMs;
-	});
 	return samples;
 }
 

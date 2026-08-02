@@ -5,6 +5,7 @@
 #include "Engine/Core/Controller.h"
 #include "Engine/Core/Entity.h"
 #include "Engine/Core/FrontEndManager.h"
+#include "Engine/Core/FrameProfiler.h"
 #include "Engine/Core/Debug.h"
 #include "Engine/Core/Root.h"
 #include "Engine/UI/EngineGUI.h"
@@ -152,7 +153,7 @@ namespace ProjectStateSerializer {
 			}
 
 			const std::vector<std::string> fields = ProjectStateFormat::SplitFields(line);
-			if ((fields.size() == 7 && fields[0] == "gamecamera") || (fields.size() == 3 && fields[0] == "editorview") || (fields.size() == 3 && fields[0] == "debugwindows") || ((fields.size() == 8 || fields.size() == 9) && fields[0] == "sunlight") || ((fields.size() == 12 || fields.size() == 13 || fields.size() == 14) && fields[0] == "pointlight") || (fields.size() == 2 && fields[0] == "imguilayout"))
+			if ((fields.size() == 7 && fields[0] == "gamecamera") || (fields.size() == 3 && fields[0] == "editorview") || (fields.size() >= 3 && fields[0] == "debugwindows") || ((fields.size() == 8 || fields.size() == 9) && fields[0] == "sunlight") || ((fields.size() == 12 || fields.size() == 13 || fields.size() == 14) && fields[0] == "pointlight") || (fields.size() == 2 && fields[0] == "imguilayout"))
 			{
 				if (fields.size() == 7 && fields[0] == "gamecamera")
 				{
@@ -164,10 +165,24 @@ namespace ProjectStateSerializer {
 					renderState.editorShowAxis = fields[1] == "1" || fields[1] == "true" || fields[1] == "True";
 					renderState.editorShowGrid = fields[2] == "1" || fields[2] == "true" || fields[2] == "True";
 				}
-				else if (fields.size() == 3 && fields[0] == "debugwindows")
+				else if (fields.size() >= 3 && fields[0] == "debugwindows")
 				{
 					renderState.debugShowLogWindow = fields[1] == "1" || fields[1] == "true" || fields[1] == "True";
 					renderState.debugShowStatsWindow = fields[2] == "1" || fields[2] == "true" || fields[2] == "True";
+					const auto readBool = [&fields](std::size_t index, bool fallback)
+					{
+						if (index >= fields.size()) return fallback;
+						return fields[index] == "1" || fields[index] == "true" || fields[index] == "True";
+					};
+					renderState.showFileExplorer = readBool(3, renderState.showFileExplorer);
+					renderState.showLevelWindow = readBool(4, renderState.showLevelWindow);
+					renderState.showEntityWindow = readBool(5, renderState.showEntityWindow);
+					renderState.showLightingWindow = readBool(6, renderState.showLightingWindow);
+					renderState.showGameInputWindow = readBool(7, renderState.showGameInputWindow);
+					renderState.showGameplayDiagnosticsWindow = readBool(8, renderState.showGameplayDiagnosticsWindow);
+					renderState.showAnimationDiagnosticsWindow = readBool(9, renderState.showAnimationDiagnosticsWindow);
+					renderState.showGameGUIDiagnosticsWindow = readBool(10, renderState.showGameGUIDiagnosticsWindow);
+					renderState.profilerEnabled = readBool(11, renderState.profilerEnabled);
 				}
 				else if ((fields.size() == 8 || fields.size() == 9) && fields[0] == "sunlight")
 				{
@@ -401,6 +416,24 @@ namespace ProjectStateSerializer {
 		contents += Root::Current().Debugger().ShowLogWindow() ? "1" : "0";
 		contents += ";";
 		contents += Root::Current().Debugger().ShowStatsWindow() ? "1" : "0";
+		contents += ";";
+		contents += Root::Current().FrontEnd().EditorGUI().ShowFileExplorer() ? "1" : "0";
+		contents += ";";
+		contents += Root::Current().FrontEnd().EditorGUI().ShowLevelWindow() ? "1" : "0";
+		contents += ";";
+		contents += Root::Current().FrontEnd().EditorGUI().ShowEntityWindow() ? "1" : "0";
+		contents += ";";
+		contents += Root::Current().FrontEnd().EditorGUI().ShowLightingWindow() ? "1" : "0";
+		contents += ";";
+		contents += Root::Current().Debugger().ShowGameInputWindow() ? "1" : "0";
+		contents += ";";
+		contents += Root::Current().Debugger().ShowGameplayDiagnosticsWindow() ? "1" : "0";
+		contents += ";";
+		contents += Root::Current().Debugger().ShowAnimationDiagnosticsWindow() ? "1" : "0";
+		contents += ";";
+		contents += Root::Current().FrontEnd().RuntimeGUI().ShowDiagnosticsWindow() ? "1" : "0";
+		contents += ";";
+		contents += Root::Current().Profiler().IsEnabled() ? "1" : "0";
 		contents += "\n";
 
 		const DirectionalLight& sunLight = renderManager.Lights().SunLight();

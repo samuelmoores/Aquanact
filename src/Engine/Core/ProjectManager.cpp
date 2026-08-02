@@ -7,6 +7,7 @@
 #include "Engine/Core/FileSystem.h"
 #include "Engine/Core/SceneManager.h"
 #include "Engine/Core/ProjectStateSerializer.h"
+#include "Engine/Core/FrameProfiler.h"
 #include "Engine/Core/RenderManager.h"
 #include <fstream>
 #include <imgui.h>
@@ -212,6 +213,15 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 		SceneManager.ApplyProjectState(pendingLevels, pendingControllers, pendingComponents);
 		EnsureMainMenuLevel(SceneManager);
 		ApplyStartupLevel(SceneManager, startupLevelName, pendingLevels);
+		if (Root::Current().State().IsEditorMode())
+		{
+			const auto gameplayLevels = SceneManager.SceneNames(SceneManager::SceneKind::Level);
+			if (!gameplayLevels.empty())
+			{
+				SceneManager.SetActiveLevel(gameplayLevels.front());
+				SceneManager.SetStartupLevelName(gameplayLevels.front());
+			}
+		}
 		if (SceneManager.StartupLevelName().empty())
 		{
 			SceneManager.SetStartupLevelName("MainMenu");
@@ -220,6 +230,15 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 		Root::Current().FrontEnd().ApplyProjectState(renderState.editorShowAxis, renderState.editorShowGrid, pendingGameGUIAssets, pendingActiveGameGUIAsset, renderState.imguiLayout);
 		Root::Current().Debugger().SetShowLogWindow(renderState.debugShowLogWindow);
 		Root::Current().Debugger().SetShowStatsWindow(renderState.debugShowStatsWindow);
+		Root::Current().FrontEnd().EditorGUI().SetShowFileExplorer(renderState.showFileExplorer);
+		Root::Current().FrontEnd().EditorGUI().SetShowLevelWindow(renderState.showLevelWindow);
+		Root::Current().FrontEnd().EditorGUI().SetShowEntityWindow(renderState.showEntityWindow);
+		Root::Current().FrontEnd().EditorGUI().SetShowLightingWindow(renderState.showLightingWindow);
+		Root::Current().Debugger().SetShowGameInputWindow(renderState.showGameInputWindow);
+		Root::Current().Debugger().SetShowGameplayDiagnosticsWindow(renderState.showGameplayDiagnosticsWindow);
+		Root::Current().Debugger().SetShowAnimationDiagnosticsWindow(renderState.showAnimationDiagnosticsWindow);
+		Root::Current().FrontEnd().RuntimeGUI().SetShowDiagnosticsWindow(renderState.showGameGUIDiagnosticsWindow);
+		Root::Current().Profiler().SetEnabled(renderState.profilerEnabled);
 		m_currentProjectPath = path;
 	}
 	return loaded;

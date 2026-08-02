@@ -380,8 +380,26 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 		m_selectedLevelObjectIndex = -1;
 	}
 
+	bool pendingFileExplorer = m_showFileExplorer;
+	bool pendingLevelWindow = m_showLevelWindow;
+	bool pendingEntityWindow = m_showEntityWindow;
+	bool pendingLightingWindow = m_showLightingWindow;
+	bool fileExplorerToggleChanged = false;
+	bool levelWindowToggleChanged = false;
+	bool entityWindowToggleChanged = false;
+	bool lightingWindowToggleChanged = false;
 	if (ImGui::BeginMainMenuBar())
 	{
+		const auto ToggleMenuItem = [this](const char* label, bool& value)
+		{
+			const bool clicked = ImGui::Checkbox(label, &value);
+			if (clicked)
+			{
+				return true;
+			}
+			return false;
+		};
+
 		if (ImGui::BeginMenu("Aquanact"))
 		{
 			if (ImGui::MenuItem("Quit"))
@@ -409,13 +427,13 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 			{
 				fileManager.ImportSelected();
 			}
-			ImGui::Separator();
-			ImGui::MenuItem("Show File Explorer", nullptr, &m_showFileExplorer);
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("View"))
 		{
-			ImGui::MenuItem("Axis", nullptr, &m_showAxis);
+			ImGui::TextDisabled("Engine");
+			ImGui::Separator();
+			ToggleMenuItem("Axis", m_showAxis);
 			if (ImGui::BeginMenu("EngineCamera"))
 			{
 				float moveSpeed = Root::Current().Render().GetEngineCamera().MoveSpeed();
@@ -428,7 +446,9 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 			}
 			if (ImGui::BeginMenu("Grid"))
 			{
-				ImGui::MenuItem("Show Grid", nullptr, &m_showGrid);
+				if (ToggleMenuItem("Show Grid", m_showGrid))
+				{
+				}
 				float gridSize = Root::Current().Debugger().GridSize();
 				ImGui::SetNextItemWidth(140.0f);
 				bool sizeChanged = ImGui::DragFloat("Size", &gridSize, 1.0f, 1.0f, 10000.0f, "%.1f");
@@ -439,54 +459,33 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 				}
 				ImGui::EndMenu();
 			}
+			ImGui::Separator();
+			const bool fileExplorerClicked = ToggleMenuItem("File Explorer", pendingFileExplorer);
+			const bool levelWindowClicked = ToggleMenuItem("Scene Window", pendingLevelWindow);
+			const bool entityWindowClicked = ToggleMenuItem("Entity Window", pendingEntityWindow);
+			const bool lightingWindowClicked = ToggleMenuItem("Lighting Window", pendingLightingWindow);
+			fileExplorerToggleChanged |= fileExplorerClicked;
+			levelWindowToggleChanged |= levelWindowClicked;
+			entityWindowToggleChanged |= entityWindowClicked;
+			lightingWindowToggleChanged |= lightingWindowClicked;
+			bool showLogWindow = Root::Current().Debugger().ShowLogWindow();
+			bool showStatsWindow = Root::Current().Debugger().ShowStatsWindow();
+			if (ToggleMenuItem("Log Window", showLogWindow))
+			{
+				Root::Current().Debugger().SetShowLogWindow(showLogWindow);
+			}
+			if (ToggleMenuItem("Stats Window", showStatsWindow))
+			{
+				Root::Current().Debugger().SetShowStatsWindow(showStatsWindow);
+			}
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Lighting"))
 		{
-			ImGui::MenuItem("Show Lighting Window", nullptr, &m_showLightingWindow);
 			const bool canAddPointLight = Root::Current().Render().Lights().PointLights().size() < LightingManager::MaxPointLights;
 			if (ImGui::MenuItem("Add Point Light", nullptr, false, canAddPointLight))
 			{
 				Root::Current().Render().Lights().AddPointLight();
-			}
-			ImGui::EndMenu();
-		}
-		if (ImGui::BeginMenu("Debug"))
-		{
-			bool showLogWindow = Root::Current().Debugger().ShowLogWindow();
-			bool showStatsWindow = Root::Current().Debugger().ShowStatsWindow();
-			bool profilerEnabled = Root::Current().Profiler().IsEnabled();
-			bool showGameInput = Root::Current().Debugger().ShowGameInputWindow();
-			bool showGameplayDiagnostics = Root::Current().Debugger().ShowGameplayDiagnosticsWindow();
-			bool showAnimationDiagnostics = Root::Current().Debugger().ShowAnimationDiagnosticsWindow();
-			bool showGameGUIDiagnostics = Root::Current().FrontEnd().RuntimeGUI().ShowDiagnosticsWindow();
-			if (ImGui::MenuItem("Show Log Window", nullptr, &showLogWindow))
-			{
-				Root::Current().Debugger().SetShowLogWindow(showLogWindow);
-			}
-			if (ImGui::MenuItem("Show Stats Window", nullptr, &showStatsWindow))
-			{
-				Root::Current().Debugger().SetShowStatsWindow(showStatsWindow);
-			}
-			if (ImGui::MenuItem("Profiler", nullptr, &profilerEnabled))
-			{
-				Root::Current().Profiler().SetEnabled(profilerEnabled);
-			}
-			if (ImGui::MenuItem("Game Input", nullptr, &showGameInput))
-			{
-				Root::Current().Debugger().SetShowGameInputWindow(showGameInput);
-			}
-			if (ImGui::MenuItem("Gameplay Diagnostics", nullptr, &showGameplayDiagnostics))
-			{
-				Root::Current().Debugger().SetShowGameplayDiagnosticsWindow(showGameplayDiagnostics);
-			}
-			if (ImGui::MenuItem("Animation Diagnostics", nullptr, &showAnimationDiagnostics))
-			{
-				Root::Current().Debugger().SetShowAnimationDiagnosticsWindow(showAnimationDiagnostics);
-			}
-			if (ImGui::MenuItem("GameGUI Diagnostics", nullptr, &showGameGUIDiagnostics))
-			{
-				Root::Current().FrontEnd().RuntimeGUI().SetShowDiagnosticsWindow(showGameGUIDiagnostics);
 			}
 			ImGui::EndMenu();
 		}
@@ -548,7 +547,6 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 		}
 		if (ImGui::BeginMenu("Scene"))
 		{
-			ImGui::MenuItem("Show Scene Window", nullptr, &m_showLevelWindow);
 			if (ImGui::BeginMenu("Levels"))
 			{
 				const auto levelNames = SceneManager.SceneNames(SceneManager::SceneKind::Level);
@@ -611,11 +609,6 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 			}
 			ImGui::EndMenu();
 		}
-		if (ImGui::BeginMenu("Entity"))
-		{
-			ImGui::MenuItem("Show Entity Window", nullptr, &m_showEntityWindow);
-			ImGui::EndMenu();
-		}
 		ImGui::EndMainMenuBar();
 	}
 
@@ -626,7 +619,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 	if (m_showFileExplorer)
 	{
 		bool open = m_showFileExplorer;
-		if (ImGui::Begin("File Explorer", &open))
+		if (ImGui::Begin("File Explorer", &open, ImGuiWindowFlags_NoFocusOnAppearing))
 		{
 			if (ImGui::Button("Models"))
 			{
@@ -678,7 +671,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 		bool open = m_showLevelWindow;
 		const Scene* activeLevelForTitle = SceneManager.ActiveLevel();
 		const std::string levelWindowTitle = activeLevelForTitle ? activeLevelForTitle->Name() : "Scene";
-		if (ImGui::Begin(levelWindowTitle.c_str(), &open))
+		if (ImGui::Begin(levelWindowTitle.c_str(), &open, ImGuiWindowFlags_NoFocusOnAppearing))
 		{
 			if (activeLevelForTitle)
 			{
@@ -714,7 +707,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 	if (m_showEntityWindow)
 	{
 		bool open = m_showEntityWindow;
-		if (ImGui::Begin("Entity", &open))
+		if (ImGui::Begin("Entity", &open, ImGuiWindowFlags_NoFocusOnAppearing))
 		{
 			if (m_selectedLevelObjectIndex < 0 || m_selectedLevelObjectIndex >= static_cast<int>(objects.size()))
 			{
@@ -1012,7 +1005,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 	if (m_showLightingWindow)
 	{
 		bool open = m_showLightingWindow;
-		if (ImGui::Begin("Lighting", &open))
+		if (ImGui::Begin("Lighting", &open, ImGuiWindowFlags_NoFocusOnAppearing))
 		{
 			DirectionalLight& sunLight = Root::Current().Render().Lights().SunLight();
 			if (ImGui::CollapsingHeader("Sun Light", ImGuiTreeNodeFlags_DefaultOpen))
@@ -1054,6 +1047,25 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 		}
 		ImGui::End();
 		m_showLightingWindow = open;
+	}
+
+	// Apply menu changes after engine windows have been drawn. A window opened
+	// from the menu therefore cannot cover or close that menu in this frame.
+	if (fileExplorerToggleChanged)
+	{
+		m_showFileExplorer = pendingFileExplorer;
+	}
+	if (levelWindowToggleChanged)
+	{
+		m_showLevelWindow = pendingLevelWindow;
+	}
+	if (entityWindowToggleChanged)
+	{
+		m_showEntityWindow = pendingEntityWindow;
+	}
+	if (lightingWindowToggleChanged)
+	{
+		m_showLightingWindow = pendingLightingWindow;
 	}
 
 }

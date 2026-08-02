@@ -197,7 +197,7 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 
 	if (m_showLogWindow)
 	{
-		ImGui::Begin("Debug Log", &m_showLogWindow);
+		ImGui::Begin("Debug Log", &m_showLogWindow, ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoBringToFrontOnFocus);
 		if (ImGui::Button("Clear Logs"))
 		{
 			ClearLogs();
@@ -212,7 +212,7 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 
 	if (m_showStatsWindow)
 	{
-		ImGui::Begin("Debug Stats", &m_showStatsWindow);
+		ImGui::Begin("Debug Stats", &m_showStatsWindow, ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoBringToFrontOnFocus);
 		ImGui::Text("FPS: %.1f", m_lastFps);
 		const Scene* activeLevel = Root::Current().Levels().ActiveLevel();
 		ImGui::Text("Scene objects: %zu", activeLevel ? activeLevel->Objects().size() : 0);
@@ -271,19 +271,6 @@ void Debug::drawGameModeInput(const Input& input)
 	ImGui::Text("Mouse delta: %.2f, %.2f", mouse.x, mouse.y);
 	ImGui::Text("Delta time: %.4f", input.DeltaTime());
 	ImGui::Separator();
-	if (Root::Current().Profiler().IsEnabled())
-	{
-		ImGui::TextUnformatted("Frame profile:");
-		for (const FrameProfiler::Sample& sample : Root::Current().Profiler().Samples())
-		{
-			ImGui::Text(
-				"%-16s current %.3f ms | avg %.3f ms | max %.3f ms",
-				sample.name.c_str(),
-				sample.currentMs,
-				sample.averageMs,
-				sample.maximumMs);
-		}
-	}
 	ImGui::Separator();
 	ImGui::TextUnformatted("Recent logs:");
 	const std::size_t logCount = m_logMessages.size();
@@ -294,6 +281,26 @@ void Debug::drawGameModeInput(const Input& input)
 	}
 		ImGui::End();
 		m_showGameInputWindow = open;
+	}
+
+	if (Root::Current().Profiler().IsEnabled())
+	{
+		bool open = true;
+		ImGui::Begin("Profiler", &open, ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoBringToFrontOnFocus);
+		for (const FrameProfiler::Sample& sample : Root::Current().Profiler().Samples())
+		{
+			ImGui::Text(
+				"%-16s current %7.3f ms | avg %7.3f ms | max %7.3f ms",
+				sample.name.c_str(),
+				sample.currentMs,
+				sample.averageMs,
+				sample.maximumMs);
+		}
+		ImGui::End();
+		if (!open)
+		{
+			Root::Current().Profiler().SetEnabled(false);
+		}
 	}
 
 	if (m_showGameplayDiagnosticsWindow)

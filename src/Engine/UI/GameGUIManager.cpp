@@ -541,19 +541,50 @@ void GameGUIManager::DrawReturnButton()
 	{
 		Root::Current().FrontEnd().CaptureRuntimeLayout();
 		Root::Current().Levels().RestoreActiveLevelEditorTransforms();
+		const auto gameplayLevels = Root::Current().Levels().SceneNames(SceneManager::SceneKind::Level);
+		if (!gameplayLevels.empty())
+		{
+			Root::Current().Levels().SetActiveLevel(gameplayLevels.front());
+			Root::Current().Levels().SetStartupLevelName(gameplayLevels.front());
+		}
 		if (Root::Current().Projects().CurrentProjectPath().empty())
 		{
 			Root::Current().Debugger().LogMessage("Return to editor requested, but no project is currently loaded.");
 		}
-		else if (!Root::Current().Projects().LoadProject(Root::Current().Projects().CurrentProjectPath(), Root::Current().Levels()))
+		else
 		{
-			Root::Current().Debugger().LogMessage("Failed to reload the current project while returning to the editor.");
+			const auto projectPath = Root::Current().Projects().CurrentProjectPath();
+			if (!Root::Current().Projects().SaveProject(projectPath, Root::Current().Levels()))
+			{
+				Root::Current().Debugger().LogMessage("Failed to save diagnostic window state before returning to the editor.");
+			}
+			if (!Root::Current().Projects().LoadProject(projectPath, Root::Current().Levels()))
+			{
+				Root::Current().Debugger().LogMessage("Failed to reload the current project while returning to the editor.");
+			}
 		}
 		Root::Current().EditorLaunchedGameSession() = false;
 		Root::Current().State().SetMode(EngineMode::Editor);
 		Root::Current().Render().SetEditorMode();
 		LogAction("Return to editor requested");
 	}
+	ImGui::Separator();
+	ImGui::TextDisabled("Diagnostics");
+	bool showGameInput = Root::Current().Debugger().ShowGameInputWindow();
+	bool showGameplayDiagnostics = Root::Current().Debugger().ShowGameplayDiagnosticsWindow();
+	bool showAnimationDiagnostics = Root::Current().Debugger().ShowAnimationDiagnosticsWindow();
+	bool showGameGUIDiagnostics = Root::Current().FrontEnd().RuntimeGUI().ShowDiagnosticsWindow();
+	bool profilerEnabled = Root::Current().Profiler().IsEnabled();
+	ImGui::Checkbox("Game Input", &showGameInput);
+	ImGui::Checkbox("Gameplay Diagnostics", &showGameplayDiagnostics);
+	ImGui::Checkbox("Animation Diagnostics", &showAnimationDiagnostics);
+	ImGui::Checkbox("GameGUI Diagnostics", &showGameGUIDiagnostics);
+	ImGui::Checkbox("Profiler", &profilerEnabled);
+	Root::Current().Debugger().SetShowGameInputWindow(showGameInput);
+	Root::Current().Debugger().SetShowGameplayDiagnosticsWindow(showGameplayDiagnostics);
+	Root::Current().Debugger().SetShowAnimationDiagnosticsWindow(showAnimationDiagnostics);
+	Root::Current().FrontEnd().RuntimeGUI().SetShowDiagnosticsWindow(showGameGUIDiagnostics);
+	Root::Current().Profiler().SetEnabled(profilerEnabled);
 	ImGui::End();
 }
 

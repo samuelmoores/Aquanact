@@ -1,0 +1,158 @@
+Aquanact Profiler Report
+========================
+
+Purpose
+-------
+The profiler records elapsed wall-clock time for named scopes during one
+engine frame. It is enabled through the Diagnostics section of the Engine
+overlay while running a game from the editor.
+
+Important interpretation
+------------------------
+The rows are displayed in registration order. They are not sorted by cost.
+The parent rows Input, Gameplay, and Render contain work measured by their
+nested scopes, so their values must not be added to the child rows.
+
+The displayed timing format is aligned to three decimal places:
+
+    current  0.123 ms | avg  0.456 ms | max  1.234 ms
+
+Columns
+-------
+
+Input
+-----
+Meaning:
+Measures the complete input phase of Root::UpdateFrame(). This includes
+polling and updating the engine Input service for the current frame.
+
+Runtime is dictated by:
+src/Engine/Core/Root.cpp, Root::UpdateFrame(), the scope named "Input".
+The underlying work is performed by the Input update/polling code called in
+that phase and is affected by device/window event volume and input mappings.
+
+Gameplay
+--------
+Meaning:
+Measures the complete GameplayManager update phase.
+
+Runtime is dictated by:
+src/Engine/Core/Root.cpp, Root::UpdateFrame(), the scope named "Gameplay".
+The phase calls GameplayManager::Update() in
+src/Engine/Core/GameplayManager.cpp.
+
+Gameplay includes the Controllers and Animation scopes when those systems
+run. Therefore Controllers and Animation are diagnostic breakdowns of this
+row, not additional frame time to add to it.
+
+Controllers
+-----------
+Meaning:
+Measures controller and gameplay movement processing.
+
+Runtime is dictated by:
+src/Engine/Core/GameplayManager.cpp, GameplayManager::Update(), the scope
+named "Controllers".
+The cost changes with the number of active controllers, their component
+queries, input processing, collision checks, and controller movement work.
+
+Animation
+---------
+Meaning:
+Measures animation update and evaluation performed during gameplay.
+
+Runtime is dictated by:
+src/Engine/Core/GameplayManager.cpp, GameplayManager::Update(), the scope
+named "Animation".
+The cost changes with the number of animated entities, active clips, state
+transitions, key interpolation, and bone/node evaluation work.
+
+Render
+------
+Meaning:
+Measures the complete RenderManager loop for the frame.
+
+Runtime is dictated by:
+src/Engine/Core/Root.cpp, Root::UpdateFrame(), the scope named "Render".
+The phase calls RenderManager::Loop() in
+src/Engine/Core/RenderManager.cpp.
+
+Render includes RenderCommands, Camera, Flush, Frontend, and Present. These
+are breakdowns of the Render row and must not be added to it.
+
+RenderCommands
+--------------
+Meaning:
+Measures construction and submission of render commands for scene objects.
+
+Runtime is dictated by:
+src/Engine/Core/RenderManager.cpp, RenderManager::Loop(), the scope named
+"RenderCommands" around BuildRenderCommands().
+The cost changes with visible object count, mesh/material state, culling,
+component data, and editor versus game scene complexity.
+
+Camera
+------
+Meaning:
+Measures camera update work for the active camera.
+
+Runtime is dictated by:
+src/Engine/Core/RenderManager.cpp, RenderManager::Loop(), the scope named
+"Camera" around UpdateCameraPhase().
+The cost changes with camera mode, input, collision handling, and camera
+state calculations.
+
+Flush
+-----
+Meaning:
+Measures sending accumulated render commands through the graphics device.
+
+Runtime is dictated by:
+src/Engine/Core/RenderManager.cpp, RenderManager::Loop(), the scope named
+"Flush" around Flush().
+The cost changes with command count, draw calls, state changes, buffer
+uploads, texture/material changes, and graphics-device synchronization.
+
+Frontend
+--------
+Meaning:
+Measures engine, creator, runtime GameGUI, and diagnostic UI submission.
+
+Runtime is dictated by:
+src/Engine/Core/RenderManager.cpp, RenderManager::Loop(), the scope named
+"Frontend" around the frontend draw phase.
+The cost changes with the active editor/runtime UI, visible diagnostic
+windows, widget count, asset previews, and ImGui layout complexity.
+
+Present
+-------
+Meaning:
+Measures presenting the finished frame to the window system.
+
+Runtime is dictated by:
+src/Engine/Core/RenderManager.cpp, RenderManager::Loop(), the scope named
+"Present" around PresentFrame().
+The cost is affected by swap interval/VSync configuration, the frame cap,
+driver scheduling, compositor behavior, and graphics-device present latency.
+
+Profiler implementation
+-----------------------
+FrameProfiler::Scope starts timing in its constructor and records elapsed
+time in its destructor. Scope registration and accumulation are implemented
+in:
+
+src/Engine/Core/FrameProfiler.cpp
+include/Engine/Core/FrameProfiler.h
+
+FrameProfiler::Samples() returns samples in registration order so changing
+runtime costs do not cause the labels to move between rows.
+
+Recommended review process
+--------------------------
+1. Compare current, average, and maximum values.
+2. Use the parent rows to identify the expensive frame phase.
+3. Use the nested rows to identify the responsible subsystem.
+4. Repeat the measurement with diagnostics and the profiler disabled to
+   separate profiling/UI overhead from the engine workload.
+5. Investigate maximum values separately from averages because spikes often
+   indicate loading, synchronization, allocation, or visibility changes.

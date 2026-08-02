@@ -66,6 +66,15 @@ namespace ProjectStateData {
 		bool editorShowGrid = true;
 		bool debugShowLogWindow = false;
 		bool debugShowStatsWindow = false;
+		bool showFileExplorer = false;
+		bool showLevelWindow = true;
+		bool showEntityWindow = false;
+		bool showLightingWindow = false;
+		bool showGameInputWindow = true;
+		bool showGameplayDiagnosticsWindow = true;
+		bool showAnimationDiagnosticsWindow = true;
+		bool showGameGUIDiagnosticsWindow = true;
+		bool profilerEnabled = false;
 		struct DirectionalLightData {
 			glm::vec3 direction{ 0.0f, -1.0f, 0.0f };
 			glm::vec3 color{ 1.0f };
