@@ -88,10 +88,17 @@ namespace ProjectStateSerializer {
 
 						contents += ";" + ProjectStateFormat::EscapeField(transition.from);
 						contents += ";" + ProjectStateFormat::EscapeField(transition.to);
-						contents += ";" + std::to_string(transition.blendSeconds);
-						appendOperand(transition.condition.left);
-						contents += ";" + std::to_string(static_cast<int>(transition.condition.comparator));
-						appendOperand(transition.condition.right);
+					contents += ";" + std::to_string(transition.blendSeconds);
+					const auto& conditions = transition.conditions.empty()
+						? std::vector<AnimatorComponent::Condition>{ transition.condition }
+						: transition.conditions;
+					contents += ";" + std::to_string(conditions.size());
+					for (const auto& condition : conditions)
+					{
+						appendOperand(condition.left);
+						contents += ";" + std::to_string(static_cast<int>(condition.comparator));
+						appendOperand(condition.right);
+					}
 					}
 					contents += "\n";
 				}
@@ -335,7 +342,25 @@ namespace ProjectStateSerializer {
 					transition.from = ProjectStateFormat::UnescapeField(fields[index++]);
 					transition.to = ProjectStateFormat::UnescapeField(fields[index++]);
 					transition.blendSeconds = std::stof(fields[index++]);
-					if (projectVersion >= 11)
+					if (projectVersion >= 17)
+					{
+						const int conditionCount = std::stoi(fields[index++]);
+						for (int conditionIndex = 0; conditionIndex < conditionCount; ++conditionIndex)
+						{
+							ProjectStateData::PendingComponent::AnimatorConditionData condition;
+							condition.left.type = std::stoi(fields[index++]);
+							condition.left.constantValue = std::stof(fields[index++]);
+							condition.left.componentName = ProjectStateFormat::UnescapeField(fields[index++]);
+							condition.left.memberName = ProjectStateFormat::UnescapeField(fields[index++]);
+							condition.comparator = std::stoi(fields[index++]);
+							condition.right.type = std::stoi(fields[index++]);
+							condition.right.constantValue = std::stof(fields[index++]);
+							condition.right.componentName = ProjectStateFormat::UnescapeField(fields[index++]);
+							condition.right.memberName = ProjectStateFormat::UnescapeField(fields[index++]);
+							transition.conditions.push_back(std::move(condition));
+						}
+					}
+					else if (projectVersion >= 11)
 					{
 						transition.left.type = std::stoi(fields[index++]);
 						transition.left.constantValue = std::stof(fields[index++]);

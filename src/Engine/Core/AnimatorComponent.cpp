@@ -144,13 +144,31 @@ void AnimatorComponent::Update(Entity& owner, float dt)
 
 					float leftValue = 0.0f;
 					float rightValue = 0.0f;
-					bool operandsResolved = false;
-					const bool passed = TransitionConditionPasses(transition, owner, leftValue, rightValue, operandsResolved);
+					bool operandsResolved = true;
+					bool passed = true;
+					const std::vector<Condition>& conditions = transition.conditions.empty()
+						? std::vector<Condition>{ transition.condition }
+						: transition.conditions;
+					for (const Condition& condition : conditions)
+					{
+						float conditionLeftValue = 0.0f;
+						float conditionRightValue = 0.0f;
+						const bool leftResolved = ResolveOperand(condition.left, owner, conditionLeftValue);
+						const bool rightResolved = ResolveOperand(condition.right, owner, conditionRightValue);
+						const bool conditionResolved = leftResolved && rightResolved;
+						operandsResolved = operandsResolved && conditionResolved;
+						passed = passed && conditionResolved && Compare(conditionLeftValue, conditionRightValue, condition.comparator);
+						if (&condition == &conditions.front())
+						{
+							leftValue = conditionLeftValue;
+							rightValue = conditionRightValue;
+							m_lastTransitionLeftOperandText = OperandToString(condition.left);
+							m_lastTransitionRightOperandText = OperandToString(condition.right);
+							m_lastTransitionComparator = condition.comparator;
+						}
+					}
 					m_lastTransitionFrom = transition.from;
 					m_lastTransitionTo = transition.to;
-					m_lastTransitionLeftOperandText = OperandToString(transition.condition.left);
-					m_lastTransitionRightOperandText = OperandToString(transition.condition.right);
-					m_lastTransitionComparator = transition.condition.comparator;
 					m_lastTransitionLeftValue = leftValue;
 					m_lastTransitionRightValue = rightValue;
 					m_lastTransitionPassed = passed;
@@ -210,6 +228,11 @@ const std::vector<AnimatorComponent::State>& AnimatorComponent::States() const
 const std::vector<AnimatorComponent::Transition>& AnimatorComponent::Transitions() const
 {
 	return m_transitions;
+}
+
+const std::vector<AnimatorComponent::Condition>& AnimatorComponent::Conditions(const Transition& transition) const
+{
+	return transition.conditions;
 }
 
 const std::string& AnimatorComponent::InitialState() const
@@ -337,7 +360,48 @@ bool AnimatorComponent::AddTransition(std::string from, std::string to, float bl
 		return false;
 	}
 
-	m_transitions.push_back({ std::move(from), std::move(to), blendSeconds, std::move(condition) });
+	std::vector<Condition> conditions;
+	conditions.push_back(condition);
+	return AddTransition(std::move(from), std::move(to), blendSeconds, std::move(conditions));
+}
+
+bool AnimatorComponent::AddTransition(std::string from, std::string to, float blendSeconds, std::vector<Condition> conditions)
+{
+	if (!FindState(from) || !FindState(to) || blendSeconds < 0.0f || conditions.empty())
+	{
+		return false;
+	}
+
+	m_transitions.push_back({ std::move(from), std::move(to), blendSeconds, conditions.front(), std::move(conditions) });
+	return true;
+}
+
+bool AnimatorComponent::UpdateTransition(std::size_t index, std::string from, std::string to, float blendSeconds, Condition condition)
+{
+	std::vector<Condition> conditions;
+	conditions.push_back(condition);
+	return UpdateTransition(index, std::move(from), std::move(to), blendSeconds, std::move(conditions));
+}
+
+bool AnimatorComponent::UpdateTransition(std::size_t index, std::string from, std::string to, float blendSeconds, std::vector<Condition> conditions)
+{
+	if (index >= m_transitions.size() || !FindState(from) || !FindState(to) || blendSeconds < 0.0f || conditions.empty())
+	{
+		return false;
+	}
+
+	m_transitions[index] = { std::move(from), std::move(to), blendSeconds, conditions.front(), std::move(conditions) };
+	return true;
+}
+
+bool AnimatorComponent::RemoveTransition(std::size_t index)
+{
+	if (index >= m_transitions.size())
+	{
+		return false;
+	}
+
+	m_transitions.erase(m_transitions.begin() + static_cast<std::ptrdiff_t>(index));
 	return true;
 }
 

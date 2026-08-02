@@ -270,17 +270,39 @@ void SceneManager::ApplyProjectState(
 					}
 					for (const auto& transition : pendingComponent.animatorTransitions)
 					{
-						AnimatorComponent::Condition condition;
-						condition.left.type = static_cast<AnimatorComponent::OperandType>(transition.left.type);
-						condition.left.constantValue = transition.left.constantValue;
-						condition.left.componentName = transition.left.componentName;
-						condition.left.memberName = transition.left.memberName;
-						condition.comparator = static_cast<AnimatorComponent::Comparator>(transition.comparator);
-						condition.right.type = static_cast<AnimatorComponent::OperandType>(transition.right.type);
-						condition.right.constantValue = transition.right.constantValue;
-						condition.right.componentName = transition.right.componentName;
-						condition.right.memberName = transition.right.memberName;
-						animator->AddTransition(transition.from, transition.to, transition.blendSeconds, condition);
+						std::vector<AnimatorComponent::Condition> conditions;
+						if (!transition.conditions.empty())
+						{
+							for (const auto& conditionData : transition.conditions)
+							{
+								AnimatorComponent::Condition condition;
+								condition.left.type = static_cast<AnimatorComponent::OperandType>(conditionData.left.type);
+								condition.left.constantValue = conditionData.left.constantValue;
+								condition.left.componentName = conditionData.left.componentName;
+								condition.left.memberName = conditionData.left.memberName;
+								condition.comparator = static_cast<AnimatorComponent::Comparator>(conditionData.comparator);
+								condition.right.type = static_cast<AnimatorComponent::OperandType>(conditionData.right.type);
+								condition.right.constantValue = conditionData.right.constantValue;
+								condition.right.componentName = conditionData.right.componentName;
+								condition.right.memberName = conditionData.right.memberName;
+								conditions.push_back(std::move(condition));
+							}
+						}
+						else
+						{
+							AnimatorComponent::Condition condition;
+							condition.left.type = static_cast<AnimatorComponent::OperandType>(transition.left.type);
+							condition.left.constantValue = transition.left.constantValue;
+							condition.left.componentName = transition.left.componentName;
+							condition.left.memberName = transition.left.memberName;
+							condition.comparator = static_cast<AnimatorComponent::Comparator>(transition.comparator);
+							condition.right.type = static_cast<AnimatorComponent::OperandType>(transition.right.type);
+							condition.right.constantValue = transition.right.constantValue;
+							condition.right.componentName = transition.right.componentName;
+							condition.right.memberName = transition.right.memberName;
+							conditions.push_back(std::move(condition));
+						}
+						animator->AddTransition(transition.from, transition.to, transition.blendSeconds, std::move(conditions));
 					}
 				}
 			}

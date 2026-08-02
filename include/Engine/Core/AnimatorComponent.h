@@ -51,6 +51,7 @@ public:
 		std::string to;
 		float blendSeconds = 0.33f;
 		Condition condition;
+		std::vector<Condition> conditions;
 	};
 
 	AnimatorComponent(Mesh* mesh);
@@ -64,6 +65,7 @@ public:
 	const Animator* GetAnimator() const;
 	const std::vector<State>& States() const;
 	const std::vector<Transition>& Transitions() const;
+	const std::vector<Condition>& Conditions(const Transition& transition) const;
 	const std::string& InitialState() const;
 	const std::string& CurrentState() const;
 	const std::string& DesiredState() const;
@@ -83,6 +85,10 @@ public:
 	void SetDesiredState(const std::string& stateName);
 	bool AddState(std::string name, int clipIndex);
 	bool AddTransition(std::string from, std::string to, float blendSeconds, Condition condition = {});
+	bool AddTransition(std::string from, std::string to, float blendSeconds, std::vector<Condition> conditions);
+	bool UpdateTransition(std::size_t index, std::string from, std::string to, float blendSeconds, Condition condition = {});
+	bool UpdateTransition(std::size_t index, std::string from, std::string to, float blendSeconds, std::vector<Condition> conditions);
+	bool RemoveTransition(std::size_t index);
 	static const char* ComparatorToString(Comparator comparator);
 	static std::string OperandToString(const Operand& operand);
 

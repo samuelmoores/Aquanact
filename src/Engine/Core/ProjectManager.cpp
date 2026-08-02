@@ -139,7 +139,7 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const SceneM
 		return false;
 	}
 
-		std::string contents = "AquanactProject 16\n";
+		std::string contents = "AquanactProject 17\n";
 	AppendProjectStateSnapshot(contents, path, SceneManager);
 
 	const bool written = m_fileSystem->WriteTextFile(path, contents);
@@ -194,6 +194,10 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 	else if (header == "AquanactProject 16")
 	{
 		projectVersion = 16;
+	}
+	else if (header == "AquanactProject 17")
+	{
+		projectVersion = 17;
 	}
 	else
 	{

@@ -22,6 +22,17 @@ namespace ProjectStateData {
 			std::string name;
 			int clipIndex = -1;
 		};
+		struct AnimatorConditionData {
+			struct OperandData {
+				int type = 0;
+				float constantValue = 0.0f;
+				std::string componentName;
+				std::string memberName;
+			};
+			OperandData left;
+			int comparator = 0;
+			OperandData right;
+		};
 		struct AnimatorTransitionData {
 			struct OperandData {
 				int type = 0;
@@ -35,6 +46,7 @@ namespace ProjectStateData {
 			OperandData left;
 			int comparator = 0;
 			OperandData right;
+			std::vector<AnimatorConditionData> conditions;
 		};
 		std::vector<AnimatorStateData> animatorStates;
 		std::vector<AnimatorTransitionData> animatorTransitions;
