@@ -323,6 +323,9 @@ void EngineGUI::startUp(Window& window)
 	ImGui::CreateContext();
 	ImGuiIO& io = ImGui::GetIO();
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+	// Input owns the native GLFW cursor visibility. Prevent the ImGui backend
+	// from restoring or reshaping the Windows cursor during NewFrame().
+	io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
 
 	ImGui::StyleColorsDark();
 	ImGui_ImplGlfw_InitForOpenGL(window.GLFW(), true);

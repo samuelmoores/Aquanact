@@ -295,9 +295,20 @@ void GameGUIManager::UpdateControllerNavigation()
 	const bool dpadUpPressed = dpadUp && !m_previousDpadUp;
 	const bool dpadDownPressed = dpadDown && !m_previousDpadDown;
 	const bool acceptPressed = accept && !m_previousControllerAccept;
+	const bool mouseActivity = input.MouseActivitySerial() != m_lastMouseActivitySerial;
 	if (!connected && m_previousControllerConnected)
 	{
 		m_runtime->ClearControllerFocus();
+	}
+	if (mouseActivity)
+	{
+		m_runtime->ClearControllerFocus();
+		m_lastMouseActivitySerial = input.MouseActivitySerial();
+	}
+
+	if (connected && !mouseActivity && !m_previousControllerConnected)
+	{
+		m_runtime->FocusFirstControllerButton();
 	}
 
 	if (connected && (dpadUpPressed || dpadDownPressed || acceptPressed))
@@ -318,12 +329,6 @@ void GameGUIManager::UpdateControllerNavigation()
 		{
 			m_runtime->ActivateFocusedControllerButton();
 		}
-	}
-
-	if (input.MouseActivitySerial() != m_lastMouseActivitySerial)
-	{
-		m_runtime->ClearControllerFocus();
-		m_lastMouseActivitySerial = input.MouseActivitySerial();
 	}
 
 	m_previousControllerConnected = connected;
@@ -369,6 +374,14 @@ void GameGUIManager::LoadPreviewAsset(const GameGUIAsset& asset)
 	if (m_runtime)
 	{
 		m_runtime->LoadUIAsset(m_previewAsset);
+	}
+}
+
+void GameGUIManager::FocusFirstControllerButton()
+{
+	if (m_runtime)
+	{
+		m_runtime->FocusFirstControllerButton();
 	}
 }
 
@@ -862,6 +875,7 @@ void GameGUIManager::ApplyActiveAsset()
 		return;
 	}
 	m_runtime->LoadUIAsset(m_assets[static_cast<std::size_t>(m_activeAssetIndex)]);
+	m_previousControllerConnected = false;
 }
 
 void GameGUIManager::ApplyMode()

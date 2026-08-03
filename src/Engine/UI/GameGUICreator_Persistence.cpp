@@ -126,7 +126,14 @@ void GameGUICreator::LoadSelectedRoleGUI()
 
 void GameGUICreator::SyncRuntimePreview()
 {
-	Root::Current().FrontEnd().RuntimeGUI().LoadPreviewAsset(CurrentRoleGUI());
+	auto& runtimeGUI = Root::Current().FrontEnd().RuntimeGUI();
+	runtimeGUI.LoadPreviewAsset(CurrentRoleGUI());
+	if (IsMainMenuSelected())
+	{
+		// Give the creator preview an explicit highlighted button so the menu
+		// pointer is visible without requiring controller input.
+		runtimeGUI.FocusFirstControllerButton();
+	}
 }
 
 void GameGUICreator::PreviewSelectedGUI()

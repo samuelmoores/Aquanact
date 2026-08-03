@@ -463,6 +463,23 @@ void GameGUI::LoadUIAsset(const GameGUIAsset& asset)
 		}
 		return left->getName() < right->getName();
 	});
+
+	// Keep the navigation pointer separate from the asset so it does not affect
+	// layout editing or become an interactive widget in the menu.
+	m_menuPointer = m_gui->createWidget<MyGUI::TextBox>(
+		"TextBox", 0, 0, 40, 40, MyGUI::Align::Default, "Pointer", "__GameGUIMenuPointer");
+	if (m_menuPointer)
+	{
+		m_menuPointer->setCaption(">");
+		m_menuPointer->setFontHeight(32);
+		m_menuPointer->setTextColour(MyGUI::Colour::White);
+		m_menuPointer->setTextAlign(MyGUI::Align::Center);
+		m_menuPointer->setNeedMouseFocus(false);
+		m_menuPointer->setNeedKeyFocus(false);
+		m_menuPointer->setInheritsPick(false);
+		m_menuPointer->setVisible(false);
+		MyGUI::LayerManager::getInstance().upLayerItem(m_menuPointer);
+	}
 }
 
 void GameGUI::ClearUI()
@@ -478,6 +495,7 @@ void GameGUI::ClearUI()
 
 	if (!m_gui)
 	{
+		m_menuPointer = nullptr;
 		m_runtimeWidgets.clear();
 		m_controllerButtons.clear();
 		m_runtimeWidgetLookup.clear();
@@ -492,6 +510,11 @@ void GameGUI::ClearUI()
 			m_gui->destroyWidget(widget);
 		}
 	}
+	if (m_menuPointer)
+	{
+		m_gui->destroyWidget(m_menuPointer);
+	}
+	m_menuPointer = nullptr;
 	m_runtimeWidgets.clear();
 	m_controllerButtons.clear();
 	m_runtimeWidgetLookup.clear();
@@ -513,6 +536,8 @@ MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::
 			button->setAlpha(def.alpha);
 			button->setColour(ParseColour(def.highlightColor, MyGUI::Colour::White));
 			button->setStateSelected(false);
+			button->eventMouseSetFocus += MyGUI::newDelegate(this, &GameGUI::OnButtonMouseFocus);
+			button->eventMouseLostFocus += MyGUI::newDelegate(this, &GameGUI::OnButtonMouseLostFocus);
 			if (def.visible)
 			{
 				m_controllerButtons.push_back(button);
@@ -635,6 +660,7 @@ void GameGUI::FocusFirstControllerButton()
 
 	ClearControllerFocus();
 	m_focusedControllerButton = 0;
+	PositionMenuPointer(m_controllerButtons[0]);
 	m_controllerButtons[0]->_setMouseFocus(true);
 }
 
@@ -643,6 +669,10 @@ void GameGUI::ClearControllerFocus()
 	if (m_focusedControllerButton >= 0 && m_focusedControllerButton < static_cast<int>(m_controllerButtons.size()))
 	{
 		m_controllerButtons[static_cast<std::size_t>(m_focusedControllerButton)]->_setMouseFocus(false);
+	}
+	if (m_menuPointer)
+	{
+		m_menuPointer->setVisible(false);
 	}
 	m_focusedControllerButton = -1;
 }
@@ -668,6 +698,7 @@ void GameGUI::NavigateControllerButtons(int direction)
 	const int previous = m_focusedControllerButton;
 	m_focusedControllerButton = (previous + direction + count) % count;
 	m_controllerButtons[static_cast<std::size_t>(previous)]->_setMouseFocus(false);
+	PositionMenuPointer(m_controllerButtons[static_cast<std::size_t>(m_focusedControllerButton)]);
 	m_controllerButtons[static_cast<std::size_t>(m_focusedControllerButton)]->_setMouseFocus(true);
 }
 
@@ -677,6 +708,37 @@ void GameGUI::ActivateFocusedControllerButton()
 	{
 		OnWidgetClicked(m_controllerButtons[static_cast<std::size_t>(m_focusedControllerButton)]);
 	}
+}
+
+void GameGUI::OnButtonMouseFocus(MyGUI::Widget* sender, MyGUI::Widget*)
+{
+	PositionMenuPointer(sender);
+}
+
+void GameGUI::OnButtonMouseLostFocus(MyGUI::Widget* sender, MyGUI::Widget*)
+{
+	if (m_focusedControllerButton < 0 && m_menuPointer)
+	{
+		m_menuPointer->setVisible(false);
+	}
+}
+
+void GameGUI::PositionMenuPointer(MyGUI::Widget* button)
+{
+	if (!m_menuPointer || !button)
+	{
+		return;
+	}
+
+	const MyGUI::IntCoord buttonCoord = button->getAbsoluteCoord();
+	constexpr int pointerWidth = 40;
+	constexpr int pointerHeight = 40;
+	constexpr int gap = 24;
+	const int pointerX = std::max(0, buttonCoord.left - pointerWidth - gap);
+	const int pointerY = buttonCoord.top + (buttonCoord.height - pointerHeight) / 2;
+	m_menuPointer->setCoord(pointerX, pointerY, pointerWidth, pointerHeight);
+	m_menuPointer->setVisible(true);
+	MyGUI::LayerManager::getInstance().upLayerItem(m_menuPointer);
 }
 
 void GameGUI::BindWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* widget)

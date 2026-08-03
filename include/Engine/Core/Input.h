@@ -33,6 +33,13 @@ private:
 
 	void HandleMouseButton(int button, int action);
 	void HandleCursorPos(double xpos, double ypos);
+	void SetCursorMode(int mode);
+	void HideMouseCursor();
+	void UnhideMouseCursor();
+	void UpdateCursorMode(bool gameMode);
+	bool UpdateGameLook(bool gameMode);
+	void UpdateEditorLook(bool gameMode);
+	void UpdateMovement();
 
 	Window* m_window = nullptr;
 	GLFWmousebuttonfun m_previousMouseButtonCallback = nullptr;
@@ -46,5 +53,13 @@ private:
 	bool m_lookBecameActive = false;
 	bool m_windowFocused = false;
 	std::uint64_t m_mouseActivitySerial = 0;
+	std::uint64_t m_mouseMoveSerial = 0;
+	std::uint64_t m_lastMouseMoveSerial = 0;
+	glm::vec2 m_lastReportedCursorPos = glm::vec2(0.0f);
+	GLFWgamepadstate m_previousGamepadState{};
+	bool m_previousGamepadStateValid = false;
+	bool m_controllerActive = false;
+	bool m_controllerCursorHidden = false;
+	int m_cursorMode = GLFW_CURSOR_NORMAL;
 };
 

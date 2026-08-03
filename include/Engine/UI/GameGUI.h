@@ -8,7 +8,7 @@
 #include <MYGUI/MyGUI_OpenGLImageLoader.h>
 
 class Window;
-namespace MyGUI { class Button; class OpenGLPlatform; }
+namespace MyGUI { class Button; class TextBox; class OpenGLPlatform; }
 
 class GameGUIImageLoader final : public MyGUI::OpenGLImageLoader {
 public:
@@ -36,11 +36,15 @@ private:
 	MyGUI::Widget* CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* parent);
 	void BindWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* widget);
 	void OnWidgetClicked(MyGUI::Widget* sender);
+	void OnButtonMouseFocus(MyGUI::Widget* sender, MyGUI::Widget* oldFocus);
+	void OnButtonMouseLostFocus(MyGUI::Widget* sender, MyGUI::Widget* newFocus);
+	void PositionMenuPointer(MyGUI::Widget* button);
 	Window* m_window = nullptr;
 	MyGUI::OpenGLPlatform* m_platform = nullptr;
 	MyGUI::Gui* m_gui = nullptr;
 	GameGUIImageLoader m_imageLoader;
 	MyGUI::Button* m_testButton = nullptr;
+	MyGUI::TextBox* m_menuPointer = nullptr;
 	std::vector<MyGUI::Widget*> m_runtimeWidgets;
 	std::vector<MyGUI::Button*> m_controllerButtons;
 	std::unordered_map<std::string, MyGUI::Widget*> m_runtimeWidgetLookup;

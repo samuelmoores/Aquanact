@@ -23,6 +23,7 @@ public:
 	void ReloadAssetsFromDisk();
 	void LoadUIAsset(const GameGUIAsset& asset);
 	void LoadPreviewAsset(const GameGUIAsset& asset);
+	void FocusFirstControllerButton();
 	bool AddSceneAsset(const std::string& name);
 	void RemoveSceneAsset(std::size_t index);
 	void SetSceneAssets(const std::vector<std::string>& names);
