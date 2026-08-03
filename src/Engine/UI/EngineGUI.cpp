@@ -587,6 +587,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 		if (ImGui::MenuItem("Play Game"))
 		{
 			Root::Current().FrontEnd().Creator().SaveAllRoleGUIs();
+			Root::Current().FrontEnd().RuntimeGUI().ReloadAssetsFromDisk();
 			Root::Current().Render().GetGameCamera().CaptureEditorState();
 			if (projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", SceneManager))
 				{
@@ -609,6 +610,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 		if (ImGui::MenuItem("Play Scene")) 
 		{
 			Root::Current().FrontEnd().Creator().SaveAllRoleGUIs();
+			Root::Current().FrontEnd().RuntimeGUI().ReloadAssetsFromDisk();
 			Root::Current().Render().GetGameCamera().CaptureEditorState();
 			if (projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", SceneManager))
 				{

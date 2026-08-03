@@ -219,6 +219,13 @@ void GameGUIManager::startUp(Window& window)
 	// loading and level placement on top of that runtime instance.
 	m_runtime->startUp(window);
 
+	m_mode = UIMode::MainMenu;
+	ReloadAssetsFromDisk();
+	ApplyMode();
+}
+
+void GameGUIManager::ReloadAssetsFromDisk()
+{
 	m_assets.clear();
 	const std::filesystem::path assetDirectory = AssetDirectory();
 	std::error_code ec;
@@ -237,8 +244,8 @@ void GameGUIManager::startUp(Window& window)
 			m_assets.push_back(LoadAssetFile(entry.path()));
 		}
 	}
-	m_mode = UIMode::MainMenu;
-	ApplyMode();
+	m_previewActive = false;
+	m_activeAssetIndex = -1;
 }
 
 void GameGUIManager::shutDown()

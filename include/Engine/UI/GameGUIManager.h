@@ -19,6 +19,7 @@ public:
 	void BeginFrame();
 	void Draw();
 	void EndFrame();
+	void ReloadAssetsFromDisk();
 	void LoadUIAsset(const GameGUIAsset& asset);
 	void LoadPreviewAsset(const GameGUIAsset& asset);
 	bool AddSceneAsset(const std::string& name);

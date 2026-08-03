@@ -5,6 +5,7 @@
 #include "Engine/UI/GameGUIManager.h"
 #include "Engine/UI/GameGUICreatorHelpers.h"
 #include "Engine/Core/Root.h"
+#include "Engine/Core/FileSystem.h"
 #include "Engine/UI/EngineGUI.h"
 
 #include <algorithm>
@@ -23,10 +24,9 @@ void GameGUICreator::SaveAllRoleGUIs()
 void GameGUICreator::SaveSelectedRoleGUI()
 {
 	GameGUIAsset& asset = CurrentRoleGUI();
-	const std::filesystem::path assetPath = GUIPathFor(asset);
-	const std::filesystem::path directory = assetPath.parent_path();
-	std::error_code ec;
-	std::filesystem::create_directories(directory, ec);
+	const std::filesystem::path projectAssetPath = GUIPathFor(asset);
+	const std::filesystem::path executableAssetPath =
+		Root::Current().FileSystemRef().ExecutableDirectory() / "assets" / "gameGUI" / (asset.name + ".json");
 
 	std::ostringstream json;
 	json << "{\n";
@@ -63,16 +63,46 @@ void GameGUICreator::SaveSelectedRoleGUI()
 	json << "  ]\n";
 	json << "}\n";
 
-	std::ofstream file(assetPath, std::ios::trunc);
-	if (!file.is_open())
+	const auto writeAsset = [&json](const std::filesystem::path& assetPath) -> bool
 	{
-		Root::Current().Debugger().LogMessage("Failed to save GUI asset: " + assetPath.string());
-		return;
-	}
+		std::error_code ec;
+		std::filesystem::create_directories(assetPath.parent_path(), ec);
+		if (ec)
+		{
+			return false;
+		}
 
-	file << json.str();
-	asset.savedOnDisk = true;
-	Root::Current().Debugger().LogMessage("Saved GUI asset: " + assetPath.string());
+		std::ofstream file(assetPath, std::ios::trunc);
+		if (!file.is_open())
+		{
+			return false;
+		}
+		file << json.str();
+		return file.good();
+	};
+
+	const bool projectSaved = writeAsset(projectAssetPath);
+	const bool executableSaved = projectAssetPath == executableAssetPath
+		? projectSaved
+		: writeAsset(executableAssetPath);
+	asset.savedOnDisk = projectSaved && executableSaved;
+
+	if (!projectSaved)
+	{
+		Root::Current().Debugger().LogMessage("Failed to save project GUI asset: " + projectAssetPath.string());
+	}
+	else
+	{
+		Root::Current().Debugger().LogMessage("Saved project GUI asset: " + projectAssetPath.string());
+	}
+	if (!executableSaved)
+	{
+		Root::Current().Debugger().LogMessage("Failed to save executable GUI asset: " + executableAssetPath.string());
+	}
+	else if (projectAssetPath != executableAssetPath)
+	{
+		Root::Current().Debugger().LogMessage("Saved executable GUI asset: " + executableAssetPath.string());
+	}
 }
 
 void GameGUICreator::LoadSelectedRoleGUI()
