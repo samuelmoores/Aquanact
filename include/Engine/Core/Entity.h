@@ -16,7 +16,8 @@ class Controller;
 enum class PhysicsColliderShape
 {
 	Box = 0,
-	Capsule = 1
+	Capsule = 1,
+	Convex = 2
 };
 
 class Entity

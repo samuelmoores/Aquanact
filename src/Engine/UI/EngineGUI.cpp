@@ -969,13 +969,14 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 
 					if (ImGui::CollapsingHeader("Physics", ImGuiTreeNodeFlags_DefaultOpen))
 					{
-						const char* colliderShapes[] = { "Box", "Capsule" };
-						int colliderShape = object->GetPhysicsColliderShape() == PhysicsColliderShape::Capsule ? 1 : 0;
+						const char* colliderShapes[] = { "Box", "Capsule", "Convex" };
+						int colliderShape = object->GetPhysicsColliderShape() == PhysicsColliderShape::Capsule ? 1
+							: object->GetPhysicsColliderShape() == PhysicsColliderShape::Convex ? 2 : 0;
 						if (ImGui::Combo("Collider", &colliderShape, colliderShapes, IM_ARRAYSIZE(colliderShapes)))
 						{
 							object->SetPhysicsColliderShape(colliderShape == 1
 								? PhysicsColliderShape::Capsule
-								: PhysicsColliderShape::Box);
+								: colliderShape == 2 ? PhysicsColliderShape::Convex : PhysicsColliderShape::Box);
 						}
 						bool showBoundingBox = object->ShowPhysicsBoundingBox();
 						if (ImGui::Checkbox("Draw Bounding Volume", &showBoundingBox))
@@ -983,39 +984,6 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 							object->SetShowPhysicsBoundingBox(showBoundingBox);
 						}
 
-						if (Controller* controller = object->GetController())
-						{
-							ImGui::Separator();
-							ImGui::TextUnformatted("Movement Physics");
-
-			float groundAcceleration = controller->GroundAcceleration() / worldUnitsPerMeter;
-			ImGui::SetNextItemWidth(140.0f);
-			if (ImGui::InputFloat("Ground Acceleration (m/s^2)", &groundAcceleration, 0.0f, 0.0f, "%.2f"))
-			{
-				controller->SetGroundAcceleration(std::max(0.0f, groundAcceleration) * worldUnitsPerMeter);
-			}
-
-			float airAcceleration = controller->AirAcceleration() / worldUnitsPerMeter;
-			ImGui::SetNextItemWidth(140.0f);
-			if (ImGui::InputFloat("Air Acceleration (m/s^2)", &airAcceleration, 0.0f, 0.0f, "%.2f"))
-			{
-				controller->SetAirAcceleration(std::max(0.0f, airAcceleration) * worldUnitsPerMeter);
-			}
-
-			float groundFriction = controller->GroundFriction() / worldUnitsPerMeter;
-			ImGui::SetNextItemWidth(140.0f);
-			if (ImGui::InputFloat("Ground Friction (m/s^2)", &groundFriction, 0.0f, 0.0f, "%.2f"))
-			{
-				controller->SetGroundFriction(std::max(0.0f, groundFriction) * worldUnitsPerMeter);
-			}
-
-			float airDrag = controller->AirDrag();
-			ImGui::SetNextItemWidth(140.0f);
-			if (ImGui::InputFloat("Air Drag (1/s)", &airDrag, 0.0f, 0.0f, "%.3f"))
-							{
-								controller->SetAirDrag(std::max(0.0f, airDrag));
-							}
-						}
 					}
 
 					ImGui::Separator();
@@ -1310,6 +1278,8 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 		ui.initialStateName[0] = '\0';
 		ui.transitionFromState[0] = '\0';
 		ui.transitionToState[0] = '\0';
+		ui.transitionFilterFromState[0] = '\0';
+		ui.transitionFilterToState[0] = '\0';
 		if (!animator.States().empty())
 		{
 			std::strncpy(ui.initialStateName, animator.States().front().name.c_str(), sizeof(ui.initialStateName) - 1);
@@ -1349,9 +1319,53 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 
 		ImGui::Separator();
 		ImGui::TextUnformatted("Transitions");
-		for (std::size_t transitionIndex = 0; transitionIndex < animator.Transitions().size(); ++transitionIndex)
+		auto drawTransitionFilter = [](const char* id, const char* preview, char* selectedState, const std::vector<AnimatorComponent::State>& states)
+		{
+			if (!ImGui::BeginCombo(id, selectedState[0] != '\0' ? selectedState : preview))
+			{
+				return;
+			}
+
+			const bool anySelected = selectedState[0] == '\0';
+			if (ImGui::Selectable("<any>", anySelected))
+			{
+				selectedState[0] = '\0';
+			}
+			if (anySelected)
+			{
+				ImGui::SetItemDefaultFocus();
+			}
+			for (const auto& state : states)
+			{
+				const bool selected = std::strcmp(selectedState, state.name.c_str()) == 0;
+				if (ImGui::Selectable(state.name.c_str(), selected))
+				{
+					std::strncpy(selectedState, state.name.c_str(), 63);
+					selectedState[63] = '\0';
+				}
+				if (selected)
+				{
+					ImGui::SetItemDefaultFocus();
+				}
+			}
+			ImGui::EndCombo();
+		};
+
+		drawTransitionFilter("From##TransitionFilter", "<select from>", ui.transitionFilterFromState, animator.States());
+		ImGui::SameLine();
+		drawTransitionFilter("To##TransitionFilter", "<select to>", ui.transitionFilterToState, animator.States());
+
+		const bool hasTransitionFilter = ui.transitionFilterFromState[0] != '\0' || ui.transitionFilterToState[0] != '\0';
+		bool displayedTransition = false;
+		for (std::size_t transitionIndex = 0; hasTransitionFilter && transitionIndex < animator.Transitions().size(); ++transitionIndex)
 		{
 			const auto& transition = animator.Transitions()[transitionIndex];
+			if ((ui.transitionFilterFromState[0] != '\0' && transition.from != ui.transitionFilterFromState) ||
+				(ui.transitionFilterToState[0] != '\0' && transition.to != ui.transitionFilterToState))
+			{
+				continue;
+			}
+			displayedTransition = true;
 			bool editRequested = false;
 			ImGui::PushID(static_cast<int>(transitionIndex));
 			ImGui::Text("%s -> %s", transition.from.c_str(), transition.to.c_str());
@@ -1385,9 +1399,9 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 				ImGui::OpenPopup("Add Transition##AquanactAnimatorStateMachine");
 			}
 		}
-		if (animator.Transitions().empty())
+		if (hasTransitionFilter && !displayedTransition)
 		{
-			ImGui::TextUnformatted("<no transitions>");
+			ImGui::TextUnformatted("<no matching transitions>");
 		}
 
 		ImGui::Separator();

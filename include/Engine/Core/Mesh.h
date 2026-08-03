@@ -66,6 +66,8 @@ class Mesh {
 		const Skeleton& GetSkeleton() const;
 		Skeleton* GetSkeletonPtr();
 		const SubMeshMaterial& GetMaterial(int index) const;
+		const std::vector<Vertex3D>& Vertices() const { return m_vertices; }
+		const std::vector<uint32_t>& Faces() const { return m_faces; }
 		bool HasColorTexture(int index) const;
 		bool HasSpecularTexture(int index) const;
 		bool HasNormalTexture(int index) const;

@@ -91,7 +91,7 @@ namespace {
 				object->SetShowPhysicsBoundingBox(pendingObject.showPhysicsBoundingBox);
 				object->SetPhysicsColliderShape(pendingObject.physicsColliderShape == 1
 					? PhysicsColliderShape::Capsule
-					: PhysicsColliderShape::Box);
+					: pendingObject.physicsColliderShape == 2 ? PhysicsColliderShape::Convex : PhysicsColliderShape::Box);
 				object->SetDefaultPosition(object->Position());
 				object->SetDefaultRotation(object->Rotation());
 				Scene->AddObject(std::move(object));

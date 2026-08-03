@@ -182,7 +182,9 @@ namespace ProjectStateFormat {
 				contents += std::to_string(object->Id()) + ";";
 				contents += (object->IgnoreCameraCollision() ? "1;" : "0;");
 				contents += (object->ShowPhysicsBoundingBox() ? "1;" : "0;");
-				contents += (object->GetPhysicsColliderShape() == PhysicsColliderShape::Capsule ? "1\n" : "0\n");
+				const int colliderShape = object->GetPhysicsColliderShape() == PhysicsColliderShape::Capsule ? 1
+					: object->GetPhysicsColliderShape() == PhysicsColliderShape::Convex ? 2 : 0;
+				contents += std::to_string(colliderShape) + "\n";
 			}
 		}
 	}

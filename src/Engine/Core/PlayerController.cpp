@@ -78,12 +78,15 @@ void PlayerController::Update(Entity& owner, float dt)
 	const glm::vec3 normalizedMovement = glm::normalize(movement);
 	m_isMoving = true;
 
-	const float targetYaw = std::atan2(normalizedMovement.x, normalizedMovement.z);
-	const float currentYaw = owner.Rotation().y;
-	const float yawDelta = ShortestAngleDelta(currentYaw, targetYaw);
-	const float maxStep = std::max(0.0f, m_turnSpeed) * dt;
-	const float nextYaw = currentYaw + std::clamp(yawDelta, -maxStep, maxStep);
-	owner.SetRotation(glm::vec3(owner.Rotation().x, nextYaw, owner.Rotation().z));
+	if (m_grounded)
+	{
+		const float targetYaw = std::atan2(normalizedMovement.x, normalizedMovement.z);
+		const float currentYaw = owner.Rotation().y;
+		const float yawDelta = ShortestAngleDelta(currentYaw, targetYaw);
+		const float maxStep = std::max(0.0f, m_turnSpeed) * dt;
+		const float nextYaw = currentYaw + std::clamp(yawDelta, -maxStep, maxStep);
+		owner.SetRotation(glm::vec3(owner.Rotation().x, nextYaw, owner.Rotation().z));
+	}
 
 	const glm::vec3 desiredHorizontalVelocity = normalizedMovement * m_moveSpeed;
 	const glm::vec3 appliedDelta = MoveWithPhysics(owner, desiredHorizontalVelocity, dt);

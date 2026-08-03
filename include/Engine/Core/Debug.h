@@ -79,6 +79,9 @@ public:
 	void SetShowCameraCollisionDebug(bool show);
 	void DrawCameraCollisionDebug(const Camera& camera);
 	void SetPhysicsDiagnostics(const glm::vec3& cameraPosition, const glm::vec3& desiredPosition, const glm::vec3& resolvedPosition, float colliderRadius, int collisionCount, const glm::vec3& collisionNormal, float penetration, const std::string& collisionObject);
+	void RecordGroundedTransition(const std::string& objectName, bool grounded, bool rawGrounded,
+		bool mainGroundContact, bool probeGroundContact, const glm::vec3& collisionNormal,
+		const glm::vec3& position, const glm::vec3& velocity, float groundedLossTimer, float dt);
 	bool ShowPhysicsDiagnosticsWindow() const;
 	void SetShowPhysicsDiagnosticsWindow(bool show);
 
@@ -119,6 +122,9 @@ private:
 	float m_physicsPenetration = 0.0f;
 	int m_physicsCollisionCount = 0;
 	std::string m_physicsCollisionObject;
+	int m_groundedTrueCount = 0;
+	int m_groundedFalseCount = 0;
+	std::string m_lastGroundedTransition;
 	bool m_controllerOwnerBound = false;
 	std::string m_gameplayObjectName;
 	std::string m_activeLevelName;

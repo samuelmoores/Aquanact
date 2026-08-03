@@ -140,6 +140,40 @@ namespace {
 		}
 		return vertices;
 	}
+
+	std::vector<LineVertex3D> MakeWireConvexVertices(const Entity& object, const glm::vec3& color)
+	{
+		const Mesh* mesh = const_cast<Entity&>(object).GetMesh();
+		if (!mesh)
+		{
+			return {};
+		}
+
+		const auto& vertices = mesh->Vertices();
+		const auto& faces = mesh->Faces();
+		const glm::mat4 model = const_cast<Entity&>(object).BuildModelMatrix();
+		std::vector<LineVertex3D> result;
+		result.reserve(faces.size() * 2);
+		auto addLine = [&](const glm::vec3& a, const glm::vec3& b)
+		{
+			result.push_back({ a.x, a.y, a.z, color.r, color.g, color.b });
+			result.push_back({ b.x, b.y, b.z, color.r, color.g, color.b });
+		};
+		for (std::size_t i = 0; i + 2 < faces.size(); i += 3)
+		{
+			if (faces[i] >= vertices.size() || faces[i + 1] >= vertices.size() || faces[i + 2] >= vertices.size())
+			{
+				continue;
+			}
+			const glm::vec3 a = glm::vec3(model * glm::vec4(vertices[faces[i]].position, 1.0f));
+			const glm::vec3 b = glm::vec3(model * glm::vec4(vertices[faces[i + 1]].position, 1.0f));
+			const glm::vec3 c = glm::vec3(model * glm::vec4(vertices[faces[i + 2]].position, 1.0f));
+			addLine(a, b);
+			addLine(b, c);
+			addLine(c, a);
+		}
+		return result;
+	}
 }
 
 void Debug::startUp()
@@ -360,6 +394,10 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 			BuildVerticalCapsule(boxMin, boxMax, base, tip, radius);
 			box->SetVertices(MakeWireCapsuleVertices(base, tip, radius, debugColor));
 		}
+		else if (object->GetPhysicsColliderShape() == PhysicsColliderShape::Convex)
+		{
+			box->SetVertices(MakeWireConvexVertices(*object, debugColor));
+		}
 		else
 		{
 			box->SetBounds(boxMin, boxMax, debugColor);
@@ -469,6 +507,10 @@ void Debug::drawGameModeInput(const Input& input)
 		ImGui::Text("Last object: %s", m_physicsCollisionObject.empty() ? "<none>" : m_physicsCollisionObject.c_str());
 		ImGui::Text("Normal: %.3f, %.3f, %.3f", m_physicsCollisionNormal.x, m_physicsCollisionNormal.y, m_physicsCollisionNormal.z);
 		ImGui::Text("Penetration: %.3f", m_physicsPenetration);
+		ImGui::Separator();
+		ImGui::Text("IsGrounded true transitions: %d", m_groundedTrueCount);
+		ImGui::Text("IsGrounded false transitions: %d", m_groundedFalseCount);
+		ImGui::TextWrapped("Last grounded transition: %s", m_lastGroundedTransition.empty() ? "<none>" : m_lastGroundedTransition.c_str());
 		ImGui::End();
 		m_showPhysicsDiagnosticsWindow = open;
 	}
@@ -571,6 +613,34 @@ void Debug::SetPhysicsDiagnostics(const glm::vec3& cameraPosition, const glm::ve
 			" desiredY=" + std::to_string(desiredPosition.y) +
 			" resolvedY=" + std::to_string(resolvedPosition.y));
 	}
+}
+
+void Debug::RecordGroundedTransition(const std::string& objectName, bool grounded, bool rawGrounded,
+	bool mainGroundContact, bool probeGroundContact, const glm::vec3& collisionNormal,
+	const glm::vec3& position, const glm::vec3& velocity, float groundedLossTimer, float dt)
+{
+	if (grounded)
+	{
+		++m_groundedTrueCount;
+	}
+	else
+	{
+		++m_groundedFalseCount;
+	}
+
+	const std::string state = grounded ? "true" : "false";
+	m_lastGroundedTransition = "object: " + objectName +
+		"\nstate: " + state +
+		"\nraw grounded: " + (rawGrounded ? "true" : "false") +
+		"\nmain ground contact: " + (mainGroundContact ? "true" : "false") +
+		"\nprobe ground contact: " + (probeGroundContact ? "true" : "false") +
+		"\ncollision normal: (" + std::to_string(collisionNormal.x) + ", " +
+		std::to_string(collisionNormal.y) + ", " + std::to_string(collisionNormal.z) + ")" +
+		"\nposition: (" + std::to_string(position.x) + ", " + std::to_string(position.y) + ", " + std::to_string(position.z) + ")" +
+		"\nvelocity: (" + std::to_string(velocity.x) + ", " + std::to_string(velocity.y) + ", " + std::to_string(velocity.z) + ")" +
+		"\ngrounded loss timer: " + std::to_string(groundedLossTimer) +
+		"\ndt: " + std::to_string(dt);
+	LogTagged("Physics", "IsGrounded switched " + state + ": " + m_lastGroundedTransition);
 }
 
 void Debug::SetGameplayDiagnostics(const std::string& objectName, const glm::vec3& moveInput, float moveSpeed, float dt, const glm::vec3& delta, const glm::vec3& position)

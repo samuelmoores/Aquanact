@@ -1,5 +1,6 @@
 #pragma once
 #include <glm/glm.hpp>
+#include <vector>
 
 class Physics {
 public:
@@ -15,6 +16,11 @@ public:
 		bool hit = false;
 		glm::vec3 normal{ 0.0f };
 		float time = 1.0f;
+	};
+
+	struct ConvexPlane {
+		glm::vec3 normal{ 0.0f };
+		float distance = 0.0f;
 	};
 
 	static bool AABBOverlap(
@@ -68,5 +74,10 @@ public:
 		const glm::vec3& capBase, const glm::vec3& capTip, float radius,
 		const glm::vec3& movement,
 		const glm::vec3& boxMin, const glm::vec3& boxMax);
+
+	static SweepCollision GetConvexSweep(
+		const std::vector<ConvexPlane>& planes,
+		const glm::vec3& center,
+		const glm::vec3& movement);
 };
 

@@ -1,6 +1,7 @@
 #include "Engine/Core/Physics.h"
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
 
@@ -403,6 +404,88 @@ Physics::SweepCollision Physics::GetCapsuleAABBSweep(
 		return result;
 	}
 
+	return result;
+}
+
+Physics::SweepCollision Physics::GetConvexSweep(
+	const std::vector<ConvexPlane>& planes,
+	const glm::vec3& center,
+	const glm::vec3& movement)
+{
+	SweepCollision result;
+	if (planes.empty())
+	{
+		return result;
+	}
+
+	float enterTime = 0.0f;
+	float exitTime = 1.0f;
+	glm::vec3 enterNormal(0.0f);
+	bool startsInside = true;
+	for (const ConvexPlane& plane : planes)
+	{
+		const float gap = plane.distance - glm::dot(plane.normal, center);
+		if (gap < -0.001f)
+		{
+			startsInside = false;
+		}
+
+		const float normalMovement = glm::dot(plane.normal, movement);
+		if (std::abs(normalMovement) <= 1e-6f)
+		{
+			if (gap < 0.0f)
+			{
+				return result;
+			}
+			continue;
+		}
+
+		const float crossingTime = gap / normalMovement;
+		if (normalMovement < 0.0f)
+		{
+			if (crossingTime > enterTime)
+			{
+				enterTime = crossingTime;
+				enterNormal = plane.normal;
+			}
+		}
+		else
+		{
+			exitTime = std::min(exitTime, crossingTime);
+		}
+		if (enterTime > exitTime)
+		{
+			return result;
+		}
+	}
+
+	if (startsInside)
+	{
+		float closestGap = std::numeric_limits<float>::max();
+		for (const ConvexPlane& plane : planes)
+		{
+			const float gap = plane.distance - glm::dot(plane.normal, center);
+			if (gap < closestGap)
+			{
+				closestGap = gap;
+				enterNormal = plane.normal;
+			}
+		}
+		if (glm::dot(movement, enterNormal) < 0.0f)
+		{
+			result.hit = true;
+			result.normal = enterNormal;
+			result.time = 0.0f;
+		}
+		return result;
+	}
+
+	if (enterTime >= 0.0f && enterTime <= 1.0f && glm::dot(enterNormal, enterNormal) > 0.0f)
+	{
+		result.hit = true;
+		result.normal = enterNormal;
+		result.time = enterTime;
+	}
 	return result;
 }
 

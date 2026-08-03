@@ -207,10 +207,6 @@ void SceneManager::ApplyProjectState(
 					playerController->SetMoveSpeed(pendingController.moveSpeed);
 					playerController->SetMovementDeadzone(pendingController.movementDeadzone);
 					playerController->SetTurnSpeed(pendingController.turnSpeed);
-					playerController->SetGroundAcceleration(pendingController.groundAcceleration);
-					playerController->SetAirAcceleration(pendingController.airAcceleration);
-					playerController->SetGroundFriction(pendingController.groundFriction);
-					playerController->SetAirDrag(pendingController.airDrag);
 				}
 			}
 			else
@@ -223,10 +219,6 @@ void SceneManager::ApplyProjectState(
 				{
 					controller->SetMoveSpeed(pendingController.moveSpeed);
 					controller->SetMovementDeadzone(pendingController.movementDeadzone);
-					controller->SetGroundAcceleration(pendingController.groundAcceleration);
-					controller->SetAirAcceleration(pendingController.airAcceleration);
-					controller->SetGroundFriction(pendingController.groundFriction);
-					controller->SetAirDrag(pendingController.airDrag);
 				}
 			}
 		}
