@@ -228,6 +228,16 @@ bool Input::WindowFocused() const
 	return m_windowFocused;
 }
 
+bool Input::ControllerConnected(int joystick) const
+{
+	return glfwJoystickIsGamepad(joystick) == GLFW_TRUE;
+}
+
+std::uint64_t Input::MouseActivitySerial() const
+{
+	return m_mouseActivitySerial;
+}
+
 void Input::MouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 {
 	auto* input = static_cast<Input*>(glfwGetWindowUserPointer(window));
@@ -260,6 +270,7 @@ void Input::CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
 
 void Input::HandleMouseButton(int button, int action)
 {
+	++m_mouseActivitySerial;
 	if (!m_window || !Root::Current().State().IsGameMode())
 	{
 		return;
@@ -284,6 +295,7 @@ void Input::HandleMouseButton(int button, int action)
 
 void Input::HandleCursorPos(double xpos, double ypos)
 {
+	++m_mouseActivitySerial;
 	if (!m_window || !Root::Current().State().IsGameMode())
 	{
 		return;

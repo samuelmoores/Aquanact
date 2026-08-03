@@ -27,6 +27,11 @@ public:
 	void EndFrame();
 	void LoadUIAsset(const GameGUIAsset& asset);
 	void ClearUI();
+	void FocusFirstControllerButton();
+	void ClearControllerFocus();
+	bool HasControllerFocus() const;
+	void NavigateControllerButtons(int direction);
+	void ActivateFocusedControllerButton();
 private:
 	MyGUI::Widget* CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* parent);
 	void BindWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* widget);
@@ -37,8 +42,10 @@ private:
 	GameGUIImageLoader m_imageLoader;
 	MyGUI::Button* m_testButton = nullptr;
 	std::vector<MyGUI::Widget*> m_runtimeWidgets;
+	std::vector<MyGUI::Button*> m_controllerButtons;
 	std::unordered_map<std::string, MyGUI::Widget*> m_runtimeWidgetLookup;
 	GameGUIAsset m_loadedAsset;
+	int m_focusedControllerButton = -1;
 	bool m_initialized = false;
 };
 

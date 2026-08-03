@@ -271,10 +271,63 @@ void GameGUIManager::BeginFrame()
 
 void GameGUIManager::Draw()
 {
+	UpdateControllerNavigation();
 	if (m_runtime)
 	{
 		m_runtime->Draw();
 	}
+}
+
+void GameGUIManager::UpdateControllerNavigation()
+{
+	if (!m_runtime || !Root::Current().State().IsGameMode())
+	{
+		return;
+	}
+
+	const Input& input = Root::Current().InputRef();
+	const bool connected = input.ControllerConnected();
+	const bool dpadUp = input.ControllerButtonDown(GLFW_GAMEPAD_BUTTON_DPAD_UP);
+	const bool dpadDown = input.ControllerButtonDown(GLFW_GAMEPAD_BUTTON_DPAD_DOWN);
+	const bool accept = input.ControllerButtonDown(GLFW_GAMEPAD_BUTTON_A);
+	const bool dpadUpPressed = dpadUp && !m_previousDpadUp;
+	const bool dpadDownPressed = dpadDown && !m_previousDpadDown;
+	const bool acceptPressed = accept && !m_previousControllerAccept;
+	if (!connected && m_previousControllerConnected)
+	{
+		m_runtime->ClearControllerFocus();
+	}
+
+	if (connected && (dpadUpPressed || dpadDownPressed || acceptPressed))
+	{
+		if (!m_runtime->HasControllerFocus())
+		{
+			m_runtime->FocusFirstControllerButton();
+		}
+		if (dpadUpPressed)
+		{
+			m_runtime->NavigateControllerButtons(-1);
+		}
+		else if (dpadDownPressed)
+		{
+			m_runtime->NavigateControllerButtons(1);
+		}
+		if (acceptPressed)
+		{
+			m_runtime->ActivateFocusedControllerButton();
+		}
+	}
+
+	if (input.MouseActivitySerial() != m_lastMouseActivitySerial)
+	{
+		m_runtime->ClearControllerFocus();
+		m_lastMouseActivitySerial = input.MouseActivitySerial();
+	}
+
+	m_previousControllerConnected = connected;
+	m_previousDpadUp = dpadUp;
+	m_previousDpadDown = dpadDown;
+	m_previousControllerAccept = accept;
 }
 
 void GameGUIManager::EndFrame()

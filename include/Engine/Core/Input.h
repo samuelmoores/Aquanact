@@ -3,6 +3,7 @@
 #include "glm/glm.hpp"
 #define GLFW_INCLUDE_NONE
 #include "GLFW/glfw3.h"
+#include <cstdint>
 
 class Window;
 
@@ -19,6 +20,8 @@ public:
 	bool LookActive() const;
 	bool LookBecameActive() const;
 	bool WindowFocused() const;
+	bool ControllerConnected(int joystick = GLFW_JOYSTICK_1) const;
+	std::uint64_t MouseActivitySerial() const;
 	float DeltaTime() const;
 	bool KeyDown(int key) const;
 	bool ControllerButtonDown(int button, int joystick = GLFW_JOYSTICK_1) const;
@@ -42,5 +45,6 @@ private:
 	float m_deltaTime = 0.0f;
 	bool m_lookBecameActive = false;
 	bool m_windowFocused = false;
+	std::uint64_t m_mouseActivitySerial = 0;
 };
 

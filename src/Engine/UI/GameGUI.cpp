@@ -433,6 +433,26 @@ void GameGUI::LoadUIAsset(const GameGUIAsset& asset)
 			}
 		}
 	}
+
+	std::stable_sort(m_controllerButtons.begin(), m_controllerButtons.end(), [this](const MyGUI::Button* left, const MyGUI::Button* right)
+	{
+		const GameGUIWidgetDef* leftDef = FindWidgetDef(m_loadedAsset, left->getName());
+		const GameGUIWidgetDef* rightDef = FindWidgetDef(m_loadedAsset, right->getName());
+		const int leftY = leftDef ? leftDef->y : 0;
+		const int rightY = rightDef ? rightDef->y : 0;
+		if (leftY != rightY)
+		{
+			return leftY < rightY;
+		}
+
+		const int leftX = leftDef ? leftDef->x : 0;
+		const int rightX = rightDef ? rightDef->x : 0;
+		if (leftX != rightX)
+		{
+			return leftX < rightX;
+		}
+		return left->getName() < right->getName();
+	});
 }
 
 void GameGUI::ClearUI()
@@ -449,7 +469,9 @@ void GameGUI::ClearUI()
 	if (!m_gui)
 	{
 		m_runtimeWidgets.clear();
+		m_controllerButtons.clear();
 		m_runtimeWidgetLookup.clear();
+		m_focusedControllerButton = -1;
 		return;
 	}
 
@@ -461,7 +483,9 @@ void GameGUI::ClearUI()
 		}
 	}
 	m_runtimeWidgets.clear();
+	m_controllerButtons.clear();
 	m_runtimeWidgetLookup.clear();
+	m_focusedControllerButton = -1;
 }
 
 MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* parent)
@@ -479,6 +503,10 @@ MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::
 			button->setAlpha(def.alpha);
 			button->setColour(ParseColour(def.highlightColor, MyGUI::Colour::White));
 			button->setStateSelected(false);
+			if (def.visible)
+			{
+				m_controllerButtons.push_back(button);
+			}
 			MyGUI::TextBox* label = button->createWidget<MyGUI::TextBox>("TextBox", 0, 0, def.width, def.height, MyGUI::Align::Default, def.name + "_label");
 			if (label)
 			{
@@ -586,6 +614,59 @@ MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::
 	}
 
 	return nullptr;
+}
+
+void GameGUI::FocusFirstControllerButton()
+{
+	if (m_controllerButtons.empty())
+	{
+		return;
+	}
+
+	ClearControllerFocus();
+	m_focusedControllerButton = 0;
+	m_controllerButtons[0]->_setMouseFocus(true);
+}
+
+void GameGUI::ClearControllerFocus()
+{
+	if (m_focusedControllerButton >= 0 && m_focusedControllerButton < static_cast<int>(m_controllerButtons.size()))
+	{
+		m_controllerButtons[static_cast<std::size_t>(m_focusedControllerButton)]->_setMouseFocus(false);
+	}
+	m_focusedControllerButton = -1;
+}
+
+bool GameGUI::HasControllerFocus() const
+{
+	return m_focusedControllerButton >= 0 && m_focusedControllerButton < static_cast<int>(m_controllerButtons.size());
+}
+
+void GameGUI::NavigateControllerButtons(int direction)
+{
+	if (m_controllerButtons.empty() || direction == 0)
+	{
+		return;
+	}
+	if (!HasControllerFocus())
+	{
+		FocusFirstControllerButton();
+		return;
+	}
+
+	const int count = static_cast<int>(m_controllerButtons.size());
+	const int previous = m_focusedControllerButton;
+	m_focusedControllerButton = (previous + direction + count) % count;
+	m_controllerButtons[static_cast<std::size_t>(previous)]->_setMouseFocus(false);
+	m_controllerButtons[static_cast<std::size_t>(m_focusedControllerButton)]->_setMouseFocus(true);
+}
+
+void GameGUI::ActivateFocusedControllerButton()
+{
+	if (HasControllerFocus())
+	{
+		OnWidgetClicked(m_controllerButtons[static_cast<std::size_t>(m_focusedControllerButton)]);
+	}
 }
 
 void GameGUI::BindWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* widget)

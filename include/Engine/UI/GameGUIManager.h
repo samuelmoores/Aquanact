@@ -3,6 +3,7 @@
 #include "Engine/UI/GameGUIAsset.h"
 
 #include <memory>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -51,6 +52,7 @@ public:
 	std::string ActiveAssetName() const;
 	bool HasRuntime() const;
 private:
+	void UpdateControllerNavigation();
 	void ApplyActiveAsset();
 	void ApplyMode();
 	static const char* AssetNameForMode(UIMode mode);
@@ -69,4 +71,9 @@ private:
 	bool m_showEditorWindow = false;
 	bool m_showDiagnosticsWindow = true;
 	UIMode m_mode = UIMode::MainMenu;
+	bool m_previousControllerConnected = false;
+	bool m_previousDpadUp = false;
+	bool m_previousDpadDown = false;
+	bool m_previousControllerAccept = false;
+	std::uint64_t m_lastMouseActivitySerial = 0;
 };
