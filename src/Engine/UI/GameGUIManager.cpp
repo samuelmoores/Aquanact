@@ -187,6 +187,8 @@ namespace {
 			widget.fontSize = ReadIntField(readField("\"fontSize\":", widgetPos), 0);
 			widget.visible = readField("\"visible\":", widgetPos).find("true") != std::string::npos;
 			widget.alpha = ReadFloatField(readField("\"alpha\":", widgetPos), 1.0f);
+			widget.highlightColor = readField("\"highlightColor\":", widgetPos);
+			widget.clickedColor = readField("\"clickedColor\":", widgetPos);
 			widget.action = StringToAction(readField("\"action\":", widgetPos));
 			widget.launchLevel = readField("\"launchLevel\":", widgetPos);
 			widget.bindEntity = readField("\"bindEntity\":", widgetPos);

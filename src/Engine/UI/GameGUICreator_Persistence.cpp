@@ -52,6 +52,8 @@ void GameGUICreator::SaveSelectedRoleGUI()
 		json << "      \"fontSize\": " << widget.fontSize << ",\n";
 		json << "      \"visible\": " << (widget.visible ? "true" : "false") << ",\n";
 			json << "      \"alpha\": " << widget.alpha << ",\n";
+		json << "      \"highlightColor\": \"" << widget.highlightColor << "\",\n";
+		json << "      \"clickedColor\": \"" << widget.clickedColor << "\",\n";
 		json << "      \"action\": \"" << GameGUICreatorHelpers::ActionToString(widget.action) << "\",\n";
 		json << "      \"launchLevel\": \"" << widget.launchLevel << "\",\n";
 		json << "      \"bindEntity\": \"" << widget.bindEntity << "\",\n";

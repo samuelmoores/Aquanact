@@ -110,7 +110,6 @@ void GameGUICreator::DrawWidgetDetails()
 					OpenTexturePicker(TexturePickerTarget::SelectedWidgetTexture);
 				}
 			}
-
 			ImGui::Separator();
 			ImGui::TextUnformatted("Bindings");
 			if (ImGui::Button(widget.type == "ProgressBar" ? "Edit Binding" : "Add Binding"))

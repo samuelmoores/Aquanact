@@ -192,9 +192,19 @@ void* GameGUIImageLoader::loadImage(int& _width, int& _height, MyGUI::PixelForma
 		// mismatch was one reason the GUI assets were not behaving correctly.
 		_format = MyGUI::PixelFormat::R8G8B8A8;
 
-		const std::size_t byteCount = static_cast<std::size_t>(_width) * static_cast<std::size_t>(_height) * 4u;
+		const std::size_t pixelCount = static_cast<std::size_t>(_width) * static_cast<std::size_t>(_height);
+		const std::size_t byteCount = pixelCount * 4u;
 		unsigned char* pixels = new unsigned char[byteCount];
-		std::copy_n(image.getData(), byteCount, pixels);
+		const unsigned char* source = image.getData();
+		for (std::size_t pixel = 0; pixel < pixelCount; ++pixel)
+		{
+			// stb_image returns RGBA, while MyGUI's OpenGL R8G8B8A8 upload path
+			// expects BGRA data because it uses GL_BGRA as the source format.
+			pixels[pixel * 4u + 0u] = source[pixel * 4u + 2u];
+			pixels[pixel * 4u + 1u] = source[pixel * 4u + 1u];
+			pixels[pixel * 4u + 2u] = source[pixel * 4u + 0u];
+			pixels[pixel * 4u + 3u] = source[pixel * 4u + 3u];
+		}
 
 		return pixels;
 	}
