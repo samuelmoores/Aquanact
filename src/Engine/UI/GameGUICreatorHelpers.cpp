@@ -124,6 +124,16 @@ namespace GameGUICreatorHelpers {
 		std::ifstream file(assetPath);
 		if (!file.is_open()) { asset.savedOnDisk = false; return asset; }
 		std::string contents((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+		const auto readAssetField = [&contents](const std::string& key) -> std::string
+		{
+			const std::size_t keyPos = contents.find("\"" + key + "\"");
+			const std::size_t colon = keyPos == std::string::npos ? std::string::npos : contents.find(':', keyPos);
+			const std::size_t start = colon == std::string::npos ? std::string::npos : contents.find_first_not_of(" \t", colon + 1);
+			if (start == std::string::npos) return {};
+			if (contents[start] == '"') { const std::size_t end = contents.find('"', start + 1); return end == std::string::npos ? std::string{} : contents.substr(start + 1, end - start - 1); }
+			const std::size_t end = contents.find_first_of(",\r\n}", start);
+			return contents.substr(start, end - start);
+		};
 		const std::size_t namePos = contents.find("\"name\":");
 		if (namePos != std::string::npos)
 		{
@@ -134,6 +144,27 @@ namespace GameGUICreatorHelpers {
 				asset.name = contents.substr(firstQuote + 1, secondQuote - firstQuote - 1);
 			}
 		}
+		if (contents.find("\"navigationMode\": \"TextHighlight\"") != std::string::npos)
+		{
+			asset.navigationMode = GameGUIMenuNavigationMode::TextHighlight;
+		}
+		else if (contents.find("\"navigationMode\": \"Boxed\"") != std::string::npos)
+		{
+			asset.navigationMode = GameGUIMenuNavigationMode::Boxed;
+		}
+		const char* skins[] = { "WindowFrameSkin", "PanelSkin", "ButtonSkin", "ButtonEmptySkin", "TabPanelSkin", "ClientDefaultSkin" };
+		for (const char* skin : skins) if (contents.find(std::string("\"boxSkin\": \"") + skin + "\"") != std::string::npos) { asset.boxSkin = skin; break; }
+		const std::string pointerSkin = readAssetField("pointerSkin");
+		if (pointerSkin == "NavigationArrowRight1" || pointerSkin == "NavigationArrowRight2" || pointerSkin == "NavigationArrowRight3" || pointerSkin == "NavigationArrowRight4") asset.pointerSkin = pointerSkin;
+		asset.boxPadding = ReadIntField(readAssetField("boxPadding"), asset.boxPadding);
+		asset.boxOffsetX = ReadIntField(readAssetField("boxOffsetX"), asset.boxOffsetX);
+		asset.boxOffsetY = ReadIntField(readAssetField("boxOffsetY"), asset.boxOffsetY);
+		asset.pointerWidth = ReadIntField(readAssetField("pointerWidth"), asset.pointerWidth);
+		asset.pointerHeight = ReadIntField(readAssetField("pointerHeight"), asset.pointerHeight);
+		asset.pointerGap = ReadIntField(readAssetField("pointerGap"), asset.pointerGap);
+		try { asset.highlightR = std::stof(readAssetField("highlightR")); } catch (...) {}
+		try { asset.highlightG = std::stof(readAssetField("highlightG")); } catch (...) {}
+		try { asset.highlightB = std::stof(readAssetField("highlightB")); } catch (...) {}
 		std::size_t widgetPos = contents.find("\"type\": \"");
 		while (widgetPos != std::string::npos)
 		{
@@ -156,7 +187,17 @@ namespace GameGUICreatorHelpers {
 			widget.name = readField("\"name\":", widgetPos);
 			widget.parentName = readField("\"parent\":", widgetPos);
 			widget.skin = readField("\"skin\":", widgetPos);
+			widget.useSkin = readField("\"useSkin\":", widgetPos).find("false") == std::string::npos;
+			widget.uniformButtonSpacing = readField("\"uniformButtonSpacing\":", widgetPos).find("true") != std::string::npos;
+			widget.horizontalButtonLayout = readField("\"horizontalButtonLayout\":", widgetPos).find("true") != std::string::npos;
+			widget.panelPadding = ReadIntField(readField("\"panelPadding\":", widgetPos), 10);
+			widget.panelButtonWidth = ReadIntField(readField("\"panelButtonWidth\":", widgetPos), 100);
+			widget.panelButtonHeight = ReadIntField(readField("\"panelButtonHeight\":", widgetPos), 30);
+			widget.panelButtonTextColor = readField("\"panelButtonTextColor\":", widgetPos);
+			if (widget.panelButtonTextColor.empty()) widget.panelButtonTextColor = "0 0 0";
 			widget.text = readField("\"text\":", widgetPos);
+			widget.textColor = readField("\"textColor\":", widgetPos);
+			if (widget.textColor.empty()) widget.textColor = "0 0 0";
 			widget.texture = readField("\"texture\":", widgetPos);
 			widget.layer = readField("\"layer\":", widgetPos);
 			widget.x = ReadIntField(readField("\"x\":", widgetPos));
@@ -179,6 +220,13 @@ namespace GameGUICreatorHelpers {
 			widget.bindEvent = readField("\"bindEvent\":", widgetPos);
 			asset.widgets.push_back(widget);
 			widgetPos = contents.find("\"type\": \"", widgetPos + 1);
+		}
+		for (GameGUIWidgetDef& widget : asset.widgets)
+		{
+			if (widget.type != "Button" || widget.text.empty() || widget.name == widget.text) continue;
+			const std::string previousName = widget.name;
+			widget.name = widget.text;
+			for (GameGUIWidgetDef& other : asset.widgets) if (other.parentName == previousName) other.parentName = widget.name;
 		}
 		return asset;
 	}

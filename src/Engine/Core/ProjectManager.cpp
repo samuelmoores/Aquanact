@@ -231,9 +231,10 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 	std::vector<ProjectStateData::PendingComponent> pendingComponents;
 	std::vector<std::string> pendingGameGUIAssets;
 	std::string pendingActiveGameGUIAsset;
+	std::string pendingGameGUINavigationMode;
 	ProjectStateData::RenderStateData renderState;
 	std::string startupLevelName;
-	const bool loaded = ProjectStateSerializer::LoadLevelState(path, file, projectVersion, pendingLevels, pendingControllers, pendingComponents, pendingGameGUIAssets, pendingActiveGameGUIAsset, renderState, startupLevelName);
+	const bool loaded = ProjectStateSerializer::LoadLevelState(path, file, projectVersion, pendingLevels, pendingControllers, pendingComponents, pendingGameGUIAssets, pendingActiveGameGUIAsset, pendingGameGUINavigationMode, renderState, startupLevelName);
 	if (loaded) // broken boundary, no longer just I/O
 	{
 		MaterializePendingLevels(SceneManager, pendingLevels);
@@ -258,7 +259,7 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 		// pose and radius afterward so loading cannot replace that saved radius.
 		RestoreGameCameraTarget(SceneManager, renderState);
 		Root::Current().Render().ApplyProjectState(renderState);
-		Root::Current().FrontEnd().ApplyProjectState(renderState.editorShowAxis, renderState.editorShowGrid, pendingGameGUIAssets, pendingActiveGameGUIAsset, renderState.imguiLayout);
+		Root::Current().FrontEnd().ApplyProjectState(renderState.editorShowAxis, renderState.editorShowGrid, pendingGameGUIAssets, pendingActiveGameGUIAsset, pendingGameGUINavigationMode, renderState.imguiLayout);
 		Root::Current().Debugger().SetShowLogWindow(renderState.debugShowLogWindow);
 		Root::Current().Debugger().SetShowStatsWindow(renderState.debugShowStatsWindow);
 		Root::Current().FrontEnd().EditorGUI().SetShowFileExplorer(renderState.showFileExplorer);

@@ -378,6 +378,16 @@ void GameGUI::LoadUIAsset(const GameGUIAsset& asset)
 	}
 
 	ClearUI();
+	m_menuNavigationMode = asset.navigationMode;
+	m_boxSkin = asset.boxSkin;
+	m_pointerSkin = asset.pointerSkin;
+	m_boxPadding = asset.boxPadding;
+	m_boxOffsetX = asset.boxOffsetX;
+	m_boxOffsetY = asset.boxOffsetY;
+	m_pointerWidth = asset.pointerWidth;
+	m_pointerHeight = asset.pointerHeight;
+	m_pointerGap = asset.pointerGap;
+	m_highlightColour = MyGUI::Colour(asset.highlightR, asset.highlightG, asset.highlightB);
 	m_loadedAsset = asset;
 	m_runtimeWidgetLookup.clear();
 	std::unordered_map<std::string, MyGUI::Widget*> createdWidgets;
@@ -466,19 +476,24 @@ void GameGUI::LoadUIAsset(const GameGUIAsset& asset)
 
 	// Keep the navigation pointer separate from the asset so it does not affect
 	// layout editing or become an interactive widget in the menu.
-	m_menuPointer = m_gui->createWidget<MyGUI::TextBox>(
-		"TextBox", 0, 0, 40, 40, MyGUI::Align::Default, "Pointer", "__GameGUIMenuPointer");
+	m_menuPointer = m_gui->createWidget<MyGUI::Widget>(
+		m_pointerSkin, 0, 0, m_pointerWidth, m_pointerHeight, MyGUI::Align::Default, "Pointer", "__GameGUIMenuPointer");
 	if (m_menuPointer)
 	{
-		m_menuPointer->setCaption(">");
-		m_menuPointer->setFontHeight(32);
-		m_menuPointer->setTextColour(MyGUI::Colour::White);
-		m_menuPointer->setTextAlign(MyGUI::Align::Center);
 		m_menuPointer->setNeedMouseFocus(false);
 		m_menuPointer->setNeedKeyFocus(false);
 		m_menuPointer->setInheritsPick(false);
 		m_menuPointer->setVisible(false);
 		MyGUI::LayerManager::getInstance().upLayerItem(m_menuPointer);
+	}
+	// WindowFrameSkin supplies only the themed border; its center remains transparent.
+	m_menuBox = m_gui->createWidget<MyGUI::Widget>(m_boxSkin, 0, 0, 100, 30, MyGUI::Align::Default, "Back", "__GameGUIMenuBox");
+	if (m_menuBox)
+	{
+		m_menuBox->setNeedMouseFocus(false);
+		m_menuBox->setNeedKeyFocus(false);
+		m_menuBox->setInheritsPick(false);
+		m_menuBox->setVisible(false);
 	}
 }
 
@@ -496,9 +511,12 @@ void GameGUI::ClearUI()
 	if (!m_gui)
 	{
 		m_menuPointer = nullptr;
+		m_menuBox = nullptr;
 		m_runtimeWidgets.clear();
 		m_controllerButtons.clear();
 		m_runtimeWidgetLookup.clear();
+		m_buttonDefaultTextColours.clear();
+		m_buttonLabels.clear();
 		m_focusedControllerButton = -1;
 		return;
 	}
@@ -514,7 +532,14 @@ void GameGUI::ClearUI()
 	{
 		m_gui->destroyWidget(m_menuPointer);
 	}
+	if (m_menuBox)
+	{
+		m_gui->destroyWidget(m_menuBox);
+	}
 	m_menuPointer = nullptr;
+	m_menuBox = nullptr;
+	m_buttonDefaultTextColours.clear();
+	m_buttonLabels.clear();
 	m_runtimeWidgets.clear();
 	m_controllerButtons.clear();
 	m_runtimeWidgetLookup.clear();
@@ -523,15 +548,37 @@ void GameGUI::ClearUI()
 
 MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* parent)
 {
+	if (def.type == "Panel")
+	{
+		const std::string skin = def.useSkin ? (def.skin.empty() ? "PanelSkin" : def.skin) : "PanelEmpty";
+		MyGUI::Widget* panel = parent ?
+			parent->createWidget<MyGUI::Widget>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.name) :
+			m_gui->createWidget<MyGUI::Widget>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.layer, def.name);
+		if (panel)
+		{
+			panel->setVisible(def.visible);
+			panel->setAlpha(def.alpha);
+			panel->setNeedMouseFocus(false);
+			// The panel itself does not take focus, but its child buttons must
+			// remain pickable for mouse hover and click events.
+			panel->setInheritsPick(true);
+			if (!parent) MyGUI::LayerManager::getInstance().upLayerItem(panel);
+		}
+		return panel;
+	}
 	if (def.type == "Button")
 	{
-		const std::string skin = def.skin.empty() ? "Button" : def.skin;
+		// ButtonEmptySkin contains only MyGUI's text layer, so disabling the
+		// button image preserves its caption, text colour, and interaction.
+		const std::string skin = !def.useSkin ? "ButtonEmptySkin" : (def.skin.empty() ? "Button" : def.skin);
 		MyGUI::Button* button = parent ?
 			parent->createWidget<MyGUI::Button>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.name) :
 			m_gui->createWidget<MyGUI::Button>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.layer, def.name);
 		if (button)
 		{
-			button->setCaption(def.text.empty() ? def.name : def.text);
+			button->setCaption("");
+			button->setTextColour(ParseColour(def.textColor, MyGUI::Colour::Black));
+			m_buttonDefaultTextColours[button] = button->getTextColour();
 			button->setVisible(def.visible);
 			button->setAlpha(def.alpha);
 			button->setColour(ParseColour(def.highlightColor, MyGUI::Colour::White));
@@ -542,21 +589,17 @@ MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::
 			{
 				m_controllerButtons.push_back(button);
 			}
-			MyGUI::TextBox* label = button->createWidget<MyGUI::TextBox>("TextBox", 0, 0, def.width, def.height, MyGUI::Align::Default, def.name + "_label");
+			MyGUI::TextBox* label = button->createWidget<MyGUI::TextBox>("TextBox", 0, 0, def.width, def.height, MyGUI::Align::Stretch, def.name + "_label");
 			if (label)
 			{
-				label->setCaption(def.text);
-				if (def.fontSize > 0)
-				{
-					label->setFontHeight(def.fontSize);
-				}
+				label->setCaption(def.text.empty() ? def.name : def.text);
+				label->setTextColour(m_buttonDefaultTextColours[button]);
+				label->setTextAlign(MyGUI::Align::Center);
+				if (def.fontSize > 0) label->setFontHeight(def.fontSize);
 				label->setNeedMouseFocus(false);
 				label->setNeedKeyFocus(false);
 				label->setInheritsPick(false);
-				label->setTextAlign(MyGUI::Align::Center);
-				label->setTextColour(MyGUI::Colour::Black);
-				label->setVisible(def.visible);
-				label->setAlpha(def.alpha);
+				m_buttonLabels[button] = label;
 			}
 			// Button clicks are routed back into GameGUI so we can attach small
 			// built-in behaviors without hardcoding them into the widget assets.
@@ -668,11 +711,9 @@ void GameGUI::ClearControllerFocus()
 {
 	if (m_focusedControllerButton >= 0 && m_focusedControllerButton < static_cast<int>(m_controllerButtons.size()))
 	{
-		m_controllerButtons[static_cast<std::size_t>(m_focusedControllerButton)]->_setMouseFocus(false);
-	}
-	if (m_menuPointer)
-	{
-		m_menuPointer->setVisible(false);
+		MyGUI::Button* button = m_controllerButtons[static_cast<std::size_t>(m_focusedControllerButton)];
+		button->_setMouseFocus(false);
+		ApplyTextHighlight(button, false);
 	}
 	m_focusedControllerButton = -1;
 }
@@ -698,6 +739,7 @@ void GameGUI::NavigateControllerButtons(int direction)
 	const int previous = m_focusedControllerButton;
 	m_focusedControllerButton = (previous + direction + count) % count;
 	m_controllerButtons[static_cast<std::size_t>(previous)]->_setMouseFocus(false);
+	ApplyTextHighlight(m_controllerButtons[static_cast<std::size_t>(previous)], false);
 	PositionMenuPointer(m_controllerButtons[static_cast<std::size_t>(m_focusedControllerButton)]);
 	m_controllerButtons[static_cast<std::size_t>(m_focusedControllerButton)]->_setMouseFocus(true);
 }
@@ -715,9 +757,14 @@ void GameGUI::OnButtonMouseFocus(MyGUI::Widget* sender, MyGUI::Widget*)
 	PositionMenuPointer(sender);
 }
 
-void GameGUI::OnButtonMouseLostFocus(MyGUI::Widget* sender, MyGUI::Widget*)
+void GameGUI::OnButtonMouseLostFocus(MyGUI::Widget* sender, MyGUI::Widget* newFocus)
 {
-	if (m_focusedControllerButton < 0 && m_menuPointer)
+	if (auto* button = dynamic_cast<MyGUI::Button*>(sender))
+	{
+		ApplyTextHighlight(button, false);
+	}
+	// Moving directly to another menu button should keep the pointer visible.
+	if (m_focusedControllerButton < 0 && !dynamic_cast<MyGUI::Button*>(newFocus) && m_menuPointer)
 	{
 		m_menuPointer->setVisible(false);
 	}
@@ -725,20 +772,139 @@ void GameGUI::OnButtonMouseLostFocus(MyGUI::Widget* sender, MyGUI::Widget*)
 
 void GameGUI::PositionMenuPointer(MyGUI::Widget* button)
 {
-	if (!m_menuPointer || !button)
+	MyGUI::Button* menuButton = dynamic_cast<MyGUI::Button*>(button);
+	if (!menuButton)
+	{
+		return;
+	}
+	ApplyTextHighlight(menuButton, true);
+	if (m_menuPointer)
+	{
+		m_menuPointer->setVisible(false);
+	}
+	if (m_menuBox)
+	{
+		m_menuBox->setVisible(false);
+	}
+	if (m_menuNavigationMode == MenuNavigationMode::TextHighlight)
+	{
+		return;
+	}
+	const MyGUI::IntCoord buttonCoord = menuButton->getAbsoluteCoord();
+	if (m_menuNavigationMode == MenuNavigationMode::Boxed)
+	{
+		if (m_menuBox)
+		{
+			m_menuBox->setCoord(buttonCoord.left - m_boxPadding + m_boxOffsetX,
+				buttonCoord.top - m_boxPadding + m_boxOffsetY,
+				buttonCoord.width + m_boxPadding * 2,
+				buttonCoord.height + m_boxPadding * 2);
+			m_menuBox->setVisible(true);
+		}
+		return;
+	}
+	if (!m_menuPointer)
 	{
 		return;
 	}
 
-	const MyGUI::IntCoord buttonCoord = button->getAbsoluteCoord();
-	constexpr int pointerWidth = 40;
-	constexpr int pointerHeight = 40;
-	constexpr int gap = 24;
+	const int pointerWidth = m_pointerWidth;
+	const int pointerHeight = m_pointerHeight;
+	const int gap = m_pointerGap;
 	const int pointerX = std::max(0, buttonCoord.left - pointerWidth - gap);
 	const int pointerY = buttonCoord.top + (buttonCoord.height - pointerHeight) / 2;
 	m_menuPointer->setCoord(pointerX, pointerY, pointerWidth, pointerHeight);
 	m_menuPointer->setVisible(true);
 	MyGUI::LayerManager::getInstance().upLayerItem(m_menuPointer);
+}
+
+void GameGUI::ApplyTextHighlight(MyGUI::Button* button, bool highlighted)
+{
+	if (!button || m_menuNavigationMode != MenuNavigationMode::TextHighlight)
+	{
+		return;
+	}
+	const auto it = m_buttonDefaultTextColours.find(button);
+	if (it == m_buttonDefaultTextColours.end())
+	{
+		return;
+	}
+	button->setTextColour(highlighted ? m_highlightColour : it->second);
+	const auto label = m_buttonLabels.find(button);
+	if (label != m_buttonLabels.end() && label->second)
+	{
+		label->second->setTextColour(highlighted ? m_highlightColour : it->second);
+	}
+}
+
+void GameGUI::SetMenuNavigationMode(MenuNavigationMode mode)
+{
+	if (m_menuNavigationMode == mode)
+	{
+		return;
+	}
+	if (m_focusedControllerButton >= 0 && m_focusedControllerButton < static_cast<int>(m_controllerButtons.size()))
+	{
+		ApplyTextHighlight(m_controllerButtons[static_cast<std::size_t>(m_focusedControllerButton)], false);
+	}
+	m_menuNavigationMode = mode;
+	if (m_focusedControllerButton >= 0 && m_focusedControllerButton < static_cast<int>(m_controllerButtons.size()))
+	{
+		PositionMenuPointer(m_controllerButtons[static_cast<std::size_t>(m_focusedControllerButton)]);
+	}
+}
+
+void GameGUI::SetBoxStyle(int padding, int offsetX, int offsetY)
+{
+	m_boxPadding = std::max(0, padding);
+	m_boxOffsetX = offsetX;
+	m_boxOffsetY = offsetY;
+	if (m_focusedControllerButton >= 0 && m_focusedControllerButton < static_cast<int>(m_controllerButtons.size()) && m_menuNavigationMode == MenuNavigationMode::Boxed)
+	{
+		PositionMenuPointer(m_controllerButtons[static_cast<std::size_t>(m_focusedControllerButton)]);
+	}
+}
+
+void GameGUI::SetBoxSkin(const std::string& skin)
+{
+	if (!m_gui || skin.empty() || skin == m_boxSkin)
+	{
+		return;
+	}
+	m_boxSkin = skin;
+	if (m_menuBox)
+	{
+		m_gui->destroyWidget(m_menuBox);
+	}
+	m_menuBox = m_gui->createWidget<MyGUI::Widget>(m_boxSkin, 0, 0, 100, 30, MyGUI::Align::Default, "Back", "__GameGUIMenuBox");
+	if (m_menuBox)
+	{
+		m_menuBox->setNeedMouseFocus(false);
+		m_menuBox->setNeedKeyFocus(false);
+		m_menuBox->setInheritsPick(false);
+		m_menuBox->setVisible(false);
+	}
+	if (m_focusedControllerButton >= 0 && m_focusedControllerButton < static_cast<int>(m_controllerButtons.size()) && m_menuNavigationMode == MenuNavigationMode::Boxed)
+	{
+		PositionMenuPointer(m_controllerButtons[static_cast<std::size_t>(m_focusedControllerButton)]);
+	}
+}
+void GameGUI::SetPointerStyle(int width, int height, int gap) { m_pointerWidth = std::max(8, width); m_pointerHeight = std::max(8, height); m_pointerGap = std::max(0, gap); }
+void GameGUI::SetHighlightColour(float r, float g, float b) { m_highlightColour = MyGUI::Colour(r, g, b); }
+void GameGUI::SetPointerSkin(const std::string& skin)
+{
+	if (skin.empty() || skin == m_pointerSkin) return;
+	m_pointerSkin = skin;
+	if (!m_gui) return;
+	if (m_menuPointer) m_gui->destroyWidget(m_menuPointer);
+	m_menuPointer = m_gui->createWidget<MyGUI::Widget>(m_pointerSkin, 0, 0, m_pointerWidth, m_pointerHeight, MyGUI::Align::Default, "Pointer", "__GameGUIMenuPointer");
+	if (m_menuPointer)
+	{
+		m_menuPointer->setNeedMouseFocus(false);
+		m_menuPointer->setNeedKeyFocus(false);
+		m_menuPointer->setInheritsPick(false);
+		m_menuPointer->setVisible(false);
+	}
 }
 
 void GameGUI::BindWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* widget)

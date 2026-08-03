@@ -24,6 +24,12 @@ public:
 	void LoadUIAsset(const GameGUIAsset& asset);
 	void LoadPreviewAsset(const GameGUIAsset& asset);
 	void FocusFirstControllerButton();
+	void SetMenuNavigationMode(GameGUIMenuNavigationMode mode);
+	void SetBoxStyle(int padding, int offsetX, int offsetY);
+	void SetBoxSkin(const std::string& skin);
+	void SetPointerStyle(int width, int height, int gap);
+	void SetHighlightColour(float r, float g, float b);
+	void SetPointerSkin(const std::string& skin);
 	bool AddSceneAsset(const std::string& name);
 	void RemoveSceneAsset(std::size_t index);
 	void SetSceneAssets(const std::vector<std::string>& names);
@@ -46,7 +52,7 @@ public:
 	void RecordClick(const std::string& message);
 	void RecordButtonClick(const std::string& assetName, const std::string& widgetName, GameGUIActionType action);
 	void AppendProjectState(std::string& contents) const;
-	void ApplyProjectState(const std::vector<std::string>& sceneAssets, const std::string& activeAssetName);
+	void ApplyProjectState(const std::vector<std::string>& sceneAssets, const std::string& activeAssetName, const std::string& navigationMode = {});
 	void ClearUI();
 	std::size_t LoadedAssetCount() const;
 	std::size_t PlacedAssetCount() const;
@@ -77,4 +83,5 @@ private:
 	bool m_previousDpadDown = false;
 	bool m_previousControllerAccept = false;
 	std::uint64_t m_lastMouseActivitySerial = 0;
+	GameGUIMenuNavigationMode m_menuNavigationMode = GameGUIMenuNavigationMode::Pointer;
 };

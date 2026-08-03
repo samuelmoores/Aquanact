@@ -191,8 +191,9 @@ namespace ProjectStateSerializer {
 		std::vector<PendingLevel>& pendingLevels,
 		std::vector<PendingController>& pendingControllers,
 		std::vector<PendingComponent>& pendingComponents,
-		std::vector<std::string>& pendingGameGUIAssets,
-		std::string& pendingActiveGameGUIAsset,
+	std::vector<std::string>& pendingGameGUIAssets,
+	std::string& pendingActiveGameGUIAsset,
+	std::string& pendingGameGUINavigationMode,
 		RenderStateData& renderState,
 		std::string& startupLevelName)
 	{
@@ -368,6 +369,12 @@ namespace ProjectStateSerializer {
 			if (fields.size() == 2 && fields[0] == "gameguiactive")
 			{
 				pendingActiveGameGUIAsset = ProjectStateFormat::UnescapeField(fields[1]);
+				continue;
+			}
+
+			if (fields.size() == 2 && fields[0] == "gameguinavigationmode")
+			{
+				pendingGameGUINavigationMode = ProjectStateFormat::UnescapeField(fields[1]);
 				continue;
 			}
 

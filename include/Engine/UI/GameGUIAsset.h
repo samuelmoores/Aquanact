@@ -10,13 +10,28 @@ enum class GameGUIActionType
 	NewGame,
 };
 
+enum class GameGUIMenuNavigationMode
+{
+	Pointer,
+	TextHighlight,
+	Boxed,
+};
+
 struct GameGUIWidgetDef
 {
 	std::string type;
 	std::string name;
 	std::string parentName;
 	std::string skin;
+	bool useSkin = true;
+	bool uniformButtonSpacing = false;
+	bool horizontalButtonLayout = false;
+	int panelPadding = 10;
+	int panelButtonWidth = 100;
+	int panelButtonHeight = 30;
+	std::string panelButtonTextColor = "0 0 0";
 	std::string text;
+	std::string textColor = "0 0 0";
 	std::string texture;
 	std::string layer = "Main";
 	int x = 0;
@@ -43,6 +58,18 @@ struct GameGUIWidgetDef
 struct GameGUIAsset
 {
 	std::string name = "UntitledGameGUI";
+	GameGUIMenuNavigationMode navigationMode = GameGUIMenuNavigationMode::Pointer;
+	std::string boxSkin = "WindowFrameSkin";
+	std::string pointerSkin = "NavigationArrowRight1";
+	int boxPadding = 8;
+	int boxOffsetX = 0;
+	int boxOffsetY = 0;
+	int pointerWidth = 40;
+	int pointerHeight = 40;
+	int pointerGap = 24;
+	float highlightR = 1.0f;
+	float highlightG = 1.0f;
+	float highlightB = 0.0f;
 	std::vector<GameGUIWidgetDef> widgets;
 	bool savedOnDisk = false;
 };

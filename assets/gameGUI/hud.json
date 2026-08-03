@@ -1,5 +1,17 @@
 {
   "name": "hud",
+  "navigationMode": "Pointer",
+  "boxSkin": "ButtonSkin",
+  "pointerSkin": "NavigationArrowRight4",
+  "boxPadding": 8,
+  "boxOffsetX": 0,
+  "boxOffsetY": 0,
+  "pointerWidth": 19,
+  "pointerHeight": 19,
+  "pointerGap": 4,
+  "highlightR": 1,
+  "highlightG": 1,
+  "highlightB": 1,
   "widgets": [
   ]
 }

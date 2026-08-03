@@ -30,6 +30,7 @@ namespace ProjectStateSerializer {
 		std::vector<ProjectStateData::PendingComponent>& pendingComponents,
 		std::vector<std::string>& pendingGameGUIAssets,
 		std::string& pendingActiveGameGUIAsset,
+		std::string& pendingGameGUINavigationMode,
 		ProjectStateData::RenderStateData& renderState,
 		std::string& startupLevelName);
 	void AppendRenderState(std::string& contents, const FrontEndManager& frontEndManager, const RenderManager& renderManager);

@@ -123,6 +123,7 @@ void GameGUICreator::startUp(Window& window)
 	}
 	m_selectedGUI = GUIRole::MainMenu;
 	m_selectedWidgetIndex = m_assets[GUIIndex(m_selectedGUI)].widgets.empty() ? -1 : 0;
+	LoadNavigationSettingsFromAsset();
 	m_initialized = true;
 }
 
@@ -149,6 +150,16 @@ bool GameGUICreator::IsMainMenuSelected() const
 	return m_selectedGUI == GUIRole::MainMenu;
 }
 
+void GameGUICreator::SetMenuNavigationMode(MenuNavigationMode mode)
+{
+	m_menuNavigationMode = mode;
+	if (!m_assets.empty()) CurrentRoleGUI().navigationMode = mode;
+	if (m_initialized)
+	{
+		SyncRuntimePreview();
+	}
+}
+
 std::string GameGUICreator::SelectedGUIAssetName() const
 {
 	return GUIAssetName(GUIIndex(m_selectedGUI));
@@ -165,10 +176,33 @@ bool GameGUICreator::SelectGUIAsset(const std::string& assetName)
 
 		m_selectedGUI = static_cast<GUIRole>(i);
 		m_selectedWidgetIndex = m_assets[i].widgets.empty() ? -1 : 0;
+		LoadNavigationSettingsFromAsset();
 		return true;
 	}
 
 	return false;
+}
+
+void GameGUICreator::LoadNavigationSettingsFromAsset()
+{
+	if (m_assets.empty()) return;
+	const GameGUIAsset& asset = CurrentRoleGUI();
+	m_menuNavigationMode = asset.navigationMode;
+	m_boxPadding = asset.boxPadding;
+	m_boxOffsetX = asset.boxOffsetX;
+	m_boxOffsetY = asset.boxOffsetY;
+	m_pointerWidth = asset.pointerWidth;
+	m_pointerHeight = asset.pointerHeight;
+	m_pointerGap = asset.pointerGap;
+	m_highlightR = asset.highlightR;
+	m_highlightG = asset.highlightG;
+	m_highlightB = asset.highlightB;
+	const std::string boxSkins[] = { "WindowFrameSkin", "PanelSkin", "ButtonSkin", "ButtonEmptySkin", "TabPanelSkin", "ClientDefaultSkin" };
+	m_boxSkinIndex = 0;
+	for (int i = 0; i < 6; ++i) if (asset.boxSkin == boxSkins[i]) { m_boxSkinIndex = i; break; }
+	const std::string pointerSkins[] = { "NavigationArrowRight1", "NavigationArrowRight2", "NavigationArrowRight3", "NavigationArrowRight4" };
+	m_pointerSkinIndex = 0;
+	for (int i = 0; i < 4; ++i) if (asset.pointerSkin == pointerSkins[i]) { m_pointerSkinIndex = i; break; }
 }
 
 GameGUIAsset& GameGUICreator::CurrentRoleGUI()
@@ -229,9 +263,16 @@ void GameGUICreator::AddButtonWidget()
 	widget.text = widget.name;
 	widget.texture = m_newWidgetTexture;
 	widget.layer = "Main";
+	widget.parentName = m_newButtonParentPanel;
 	widget.action = m_newWidgetAction;
 	widget.launchLevel = m_newWidgetLaunchLevel;
 	asset.widgets.push_back(widget);
+	if (!m_newButtonParentPanel.empty())
+	{
+		auto panel = std::find_if(asset.widgets.begin(), asset.widgets.end(), [this](const GameGUIWidgetDef& candidate) { return candidate.type == "Panel" && candidate.name == m_newButtonParentPanel; });
+		if (panel != asset.widgets.end()) ApplyPanelButtonLayout(*panel);
+	}
+	m_newButtonParentPanel.clear();
 	m_selectedWidgetIndex = static_cast<int>(asset.widgets.size() - 1);
 	SaveSelectedRoleGUI();
 }
@@ -270,6 +311,56 @@ void GameGUICreator::AddProgressBarWidget()
 	SaveSelectedRoleGUI();
 }
 
+void GameGUICreator::AddPanelWidget()
+{
+	GameGUIAsset& asset = CurrentRoleGUI();
+	GameGUIWidgetDef panel;
+	panel.type = "Panel";
+	panel.name = m_newWidgetName[0] != '\0' ? m_newWidgetName : "Panel";
+	panel.skin = "PanelSkin";
+	panel.layer = "Main";
+	panel.width = 300;
+	panel.height = 300;
+	asset.widgets.push_back(panel);
+	m_selectedWidgetIndex = static_cast<int>(asset.widgets.size() - 1);
+	SaveSelectedRoleGUI();
+}
+
+void GameGUICreator::ApplyPanelButtonLayout(GameGUIWidgetDef& panel)
+{
+	GameGUIAsset& asset = CurrentRoleGUI();
+	std::vector<GameGUIWidgetDef*> buttons;
+	for (GameGUIWidgetDef& widget : asset.widgets)
+	{
+		if (widget.type == "Button" && widget.parentName == panel.name) buttons.push_back(&widget);
+	}
+	for (GameGUIWidgetDef* button : buttons)
+	{
+		button->width = std::max(1, panel.panelButtonWidth);
+		button->height = std::max(1, panel.panelButtonHeight);
+		button->textColor = panel.panelButtonTextColor;
+	}
+	if (!panel.uniformButtonSpacing || buttons.empty()) return;
+
+	const int padding = std::max(0, panel.panelPadding);
+	if (panel.horizontalButtonLayout)
+	{
+		int totalWidth = 0;
+		for (const GameGUIWidgetDef* button : buttons) totalWidth += button->width;
+		const int gap = buttons.size() > 1 ? std::max(0, (panel.width - padding * 2 - totalWidth) / static_cast<int>(buttons.size() - 1)) : 0;
+		int x = padding;
+		for (GameGUIWidgetDef* button : buttons) { button->x = x; button->y = (panel.height - button->height) / 2; x += button->width + gap; }
+	}
+	else
+	{
+		int totalHeight = 0;
+		for (const GameGUIWidgetDef* button : buttons) totalHeight += button->height;
+		const int gap = buttons.size() > 1 ? std::max(0, (panel.height - padding * 2 - totalHeight) / static_cast<int>(buttons.size() - 1)) : 0;
+		int y = padding;
+		for (GameGUIWidgetDef* button : buttons) { button->x = (panel.width - button->width) / 2; button->y = y; y += button->height + gap; }
+	}
+}
+
 void GameGUICreator::DeleteSelectedWidget()
 {
 	GameGUIAsset& asset = CurrentRoleGUI();
@@ -278,6 +369,8 @@ void GameGUICreator::DeleteSelectedWidget()
 		return;
 	}
 
+	const std::string deletedName = asset.widgets[static_cast<std::size_t>(m_selectedWidgetIndex)].name;
+	for (GameGUIWidgetDef& widget : asset.widgets) if (widget.parentName == deletedName) widget.parentName.clear();
 	asset.widgets.erase(asset.widgets.begin() + static_cast<std::ptrdiff_t>(m_selectedWidgetIndex));
 	if (asset.widgets.empty())
 	{

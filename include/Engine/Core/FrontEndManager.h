@@ -41,6 +41,7 @@ public:
 		bool editorShowGrid,
 		const std::vector<std::string>& sceneAssets,
 		const std::string& activeAssetName,
+		const std::string& gameGUINavigationMode,
 		const std::string& imguiLayout);
 
 	void SetMode(FrontEndMode mode);

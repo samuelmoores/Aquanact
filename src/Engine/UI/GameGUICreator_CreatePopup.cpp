@@ -39,10 +39,10 @@ void GameGUICreator::DrawCreateWidgetPopup()
 		return;
 	}
 
-	const char* widgetKind = m_newWidgetIsProgressBar ? "Create a progress bar widget:" : (m_newWidgetIsImage ? "Create an image widget:" : "Create a button widget:");
+	const char* widgetKind = m_newWidgetIsPanel ? "Create a panel widget:" : m_newWidgetIsProgressBar ? "Create a progress bar widget:" : (m_newWidgetIsImage ? "Create an image widget:" : "Create a button widget:");
 	ImGui::TextUnformatted(widgetKind);
 	ImGui::InputText("Name", m_newWidgetName, sizeof(m_newWidgetName));
-	if (!m_newWidgetIsProgressBar)
+	if (!m_newWidgetIsProgressBar && !m_newWidgetIsPanel)
 	{
 		ImGui::InputText("Texture", m_newWidgetTexture, sizeof(m_newWidgetTexture));
 		ImGui::SameLine();
@@ -159,7 +159,7 @@ void GameGUICreator::DrawCreateWidgetPopup()
 		}
 		ImGui::EndDisabled();
 	}
-	else
+	else if (!m_newWidgetIsPanel)
 	{
 		ImGui::Separator();
 		ImGui::TextUnformatted("Binding");
@@ -229,6 +229,10 @@ void GameGUICreator::DrawCreateWidgetPopup()
 		else if (m_newWidgetIsImage)
 		{
 			AddImageWidget();
+		}
+		else if (m_newWidgetIsPanel)
+		{
+			AddPanelWidget();
 		}
 		else
 		{

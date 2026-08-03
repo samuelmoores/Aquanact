@@ -190,6 +190,7 @@ void FrontEndManager::ApplyProjectState(
 	bool editorShowGrid,
 	const std::vector<std::string>& sceneAssets,
 	const std::string& activeAssetName,
+	const std::string& gameGUINavigationMode,
 	const std::string& imguiLayout)
 {
 	if (m_engineGUI)
@@ -199,7 +200,7 @@ void FrontEndManager::ApplyProjectState(
 	}
 	if (m_gameGUI)
 	{
-		m_gameGUI->ApplyProjectState(sceneAssets, activeAssetName);
+		m_gameGUI->ApplyProjectState(sceneAssets, activeAssetName, gameGUINavigationMode);
 	}
 	if (!imguiLayout.empty())
 	{
