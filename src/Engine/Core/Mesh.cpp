@@ -277,6 +277,20 @@ bool Mesh::HasNormalTexture(int index) const
 		m_textureNormal[index] != 0;
 }
 
+bool Mesh::HasColorTexture(int index) const
+{
+	return index >= 0 &&
+		index < static_cast<int>(m_textureColor.size()) &&
+		m_textureColor[index] != 0;
+}
+
+bool Mesh::HasSpecularTexture(int index) const
+{
+	return index >= 0 &&
+		index < static_cast<int>(m_textureSpecular.size()) &&
+		m_textureSpecular[index] != 0;
+}
+
 uint32_t Mesh::FacesOffset(int index) const
 {
 	if (index < 0 || index >= static_cast<int>(m_faceOffsets.size()))

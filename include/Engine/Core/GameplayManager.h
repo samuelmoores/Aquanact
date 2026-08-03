@@ -30,10 +30,11 @@ public:
 	bool IsPaused() const;
 	GameState State() const;
 	std::size_t ControllerCount() const;
+	float PhysicsInterpolationAlpha() const;
 
 private:
 	SceneManager* m_levelManager = nullptr;
 	GameState m_state = GameState::MainMenu;
-	float m_controllerAccumulator = 0.0f;
+	float m_physicsAccumulator = 0.0f;
 };
 

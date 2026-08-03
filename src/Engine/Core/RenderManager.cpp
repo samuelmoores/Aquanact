@@ -1,6 +1,7 @@
 #include "Engine/Core/RenderManager.h"
 #include "Engine/Core/FrontEndManager.h"
 #include "Engine/Core/Root.h"
+#include "Engine/Core/GameplayManager.h"
 #include "Engine/Core/Debug.h"
 #include "Engine/Core/EngineCamera.h"
 #include "Engine/Core/GameCamera.h"
@@ -252,6 +253,9 @@ void RenderManager::BuildRenderCommands(FrontEndManager& frontEndManager, SceneM
 	const Scene* activeLevel = SceneManager.ActiveLevel();
 	static const std::vector<std::unique_ptr<Entity>> emptyObjects;
 	const auto& objects = activeLevel ? activeLevel->Objects() : emptyObjects;
+	const float interpolationAlpha = engineState.IsGameMode()
+		? Root::Current().Gameplay().PhysicsInterpolationAlpha()
+		: 1.0f;
 	for (const auto& object : objects)
 	{
 		if (!object || !object->GetMesh() || !object->GetShader())
@@ -263,7 +267,7 @@ void RenderManager::BuildRenderCommands(FrontEndManager& frontEndManager, SceneM
 		Submit(RenderCommand{
 			object->GetMesh(),
 			object->GetShader(),
-			object->BuildModelMatrix(),
+			object->BuildRenderModelMatrix(interpolationAlpha),
 			object->skinned()
 		});
 	}

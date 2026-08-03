@@ -39,7 +39,7 @@ void GameplayManager::startUp(SceneManager& SceneManager, FrontEndManager& front
 {
 	m_levelManager = &SceneManager;
 	m_state = GameState::MainMenu;
-	m_controllerAccumulator = 0.0f;
+	m_physicsAccumulator = 0.0f;
 	if (m_levelManager)
 	{
 		// If the runtime UI is already initialized, set it to a known boot
@@ -57,7 +57,7 @@ void GameplayManager::shutDown()
 {
 	m_levelManager = nullptr;
 	m_state = GameState::MainMenu;
-	m_controllerAccumulator = 0.0f;
+	m_physicsAccumulator = 0.0f;
 }
 
 void GameplayManager::BootMainMenu(FrontEndManager& frontEndManager, Debug& debug)
@@ -214,10 +214,17 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 	// turn directly into a large movement or rotation delta.
 	constexpr float fixedControllerStep = 1.0f / 120.0f;
 	constexpr int maxControllerSteps = 8;
-	m_controllerAccumulator += std::clamp(dt, 0.0f, 0.25f);
+	m_physicsAccumulator += std::clamp(dt, 0.0f, 0.25f);
 	int controllerSteps = 0;
-	while (m_controllerAccumulator >= fixedControllerStep && controllerSteps < maxControllerSteps)
+	while (m_physicsAccumulator >= fixedControllerStep && controllerSteps < maxControllerSteps)
 	{
+		for (const auto& object : activeLevel->Objects())
+		{
+			if (object)
+			{
+				object->CapturePhysicsState();
+			}
+		}
 		for (const auto& object : activeLevel->Objects())
 		{
 			if (object)
@@ -226,14 +233,14 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 				object->UpdateControllers(fixedControllerStep);
 			}
 		}
-		m_controllerAccumulator -= fixedControllerStep;
+		m_physicsAccumulator -= fixedControllerStep;
 		++controllerSteps;
 	}
-	if (controllerSteps == maxControllerSteps && m_controllerAccumulator >= fixedControllerStep)
+	if (controllerSteps == maxControllerSteps && m_physicsAccumulator >= fixedControllerStep)
 	{
 		// Drop excessive backlog instead of allowing a stalled frame to create an
 		// unbounded catch-up loop and freeze the application.
-		m_controllerAccumulator = 0.0f;
+		m_physicsAccumulator = 0.0f;
 	}
 
 	// Animation and other non-controller components remain frame-rate driven.
@@ -272,6 +279,12 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 		}
 	}
 
+}
+
+float GameplayManager::PhysicsInterpolationAlpha() const
+{
+	constexpr float fixedPhysicsStep = 1.0f / 120.0f;
+	return std::clamp(m_physicsAccumulator / fixedPhysicsStep, 0.0f, 1.0f);
 }
 
 void GameplayManager::SetPaused(bool paused, FrontEndManager& frontEndManager, Debug& debug)

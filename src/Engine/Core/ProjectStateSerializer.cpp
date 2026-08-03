@@ -92,13 +92,21 @@ namespace ProjectStateSerializer {
 					AppendComponentLine(contents, projectPath, object, "playercontroller");
 					contents += ";" + std::to_string(playerController->MoveSpeed());
 					contents += ";" + std::to_string(playerController->TurnSpeed());
-					contents += ";" + std::to_string(playerController->MovementDeadzone()) + "\n";
+					contents += ";" + std::to_string(playerController->MovementDeadzone());
+					contents += ";" + std::to_string(playerController->GroundAcceleration());
+					contents += ";" + std::to_string(playerController->AirAcceleration());
+					contents += ";" + std::to_string(playerController->GroundFriction());
+					contents += ";" + std::to_string(playerController->AirDrag()) + "\n";
 				}
 				else if (const Controller* controller = dynamic_cast<const Controller*>(component))
 				{
 					AppendComponentLine(contents, projectPath, object, "controller");
 					contents += ";" + std::to_string(controller->MoveSpeed());
-					contents += ";" + std::to_string(controller->MovementDeadzone()) + "\n";
+					contents += ";" + std::to_string(controller->MovementDeadzone());
+					contents += ";" + std::to_string(controller->GroundAcceleration());
+					contents += ";" + std::to_string(controller->AirAcceleration());
+					contents += ";" + std::to_string(controller->GroundFriction());
+					contents += ";" + std::to_string(controller->AirDrag()) + "\n";
 				}
 				else if (const PlayerHealth* playerHealth = dynamic_cast<const PlayerHealth*>(component))
 				{
@@ -404,6 +412,23 @@ namespace ProjectStateSerializer {
 						if (fields.size() > deadzoneIndex)
 						{
 							controller.movementDeadzone = std::stof(fields[deadzoneIndex]);
+						}
+						const std::size_t physicsIndex = deadzoneIndex + 1;
+						if (fields.size() > physicsIndex)
+						{
+							controller.groundAcceleration = std::stof(fields[physicsIndex]);
+						}
+						if (fields.size() > physicsIndex + 1)
+						{
+							controller.airAcceleration = std::stof(fields[physicsIndex + 1]);
+						}
+						if (fields.size() > physicsIndex + 2)
+						{
+							controller.groundFriction = std::stof(fields[physicsIndex + 2]);
+						}
+						if (fields.size() > physicsIndex + 3)
+						{
+							controller.airDrag = std::stof(fields[physicsIndex + 3]);
 						}
 					}
 					pendingControllers.push_back(std::move(controller));

@@ -35,6 +35,8 @@ in vec4 FragPosLightSpace;
 uniform sampler2D baseTexture;
 uniform sampler2D specularTexture;
 uniform sampler2D normalTexture;
+uniform bool hasBaseTexture;
+uniform bool hasSpecularTexture;
 uniform bool hasNormalTexture;
 uniform DirectionalLight sunLight;
 uniform int pointLightCount;
@@ -178,8 +180,8 @@ void main()
 	}
 
 	vec3 viewDirection = normalize(ViewPos - FragWorldPos);
-	vec3 baseColor = texture(baseTexture, TexCoord).rgb;
-	vec3 specularStrength = texture(specularTexture, TexCoord).rgb;
+	vec3 baseColor = hasBaseTexture ? texture(baseTexture, TexCoord).rgb : vec3(0.20);
+	vec3 specularStrength = hasSpecularTexture ? texture(specularTexture, TexCoord).rgb : vec3(0.0);
 
 	vec3 litColor = CalculateDirectionalLight(baseColor, specularStrength, vertexNormal, viewDirection);
 	

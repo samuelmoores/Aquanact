@@ -7,8 +7,11 @@ in vec2 TexCoord;
 
 // Uniform from application: the texture sampler.
 uniform sampler2D baseTexture;
+uniform bool hasBaseTexture;
 
 void main() {
     // Sample the texture image at the fragment's texture coordinate.
-    FragColor = texture(baseTexture, TexCoord);
+    FragColor = hasBaseTexture
+        ? texture(baseTexture, TexCoord)
+        : vec4(0.20, 0.20, 0.20, 1.0);
 }

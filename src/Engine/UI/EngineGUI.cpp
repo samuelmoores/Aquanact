@@ -38,6 +38,8 @@
 #include <string>
 
 namespace {
+	constexpr float worldUnitsPerMeter = 100.0f;
+
 	std::string InputBindingLabel(const InputBinding& binding)
 	{
 		if (binding.type == InputBindingType::Key)
@@ -979,6 +981,40 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 						if (ImGui::Checkbox("Draw Bounding Volume", &showBoundingBox))
 						{
 							object->SetShowPhysicsBoundingBox(showBoundingBox);
+						}
+
+						if (Controller* controller = object->GetController())
+						{
+							ImGui::Separator();
+							ImGui::TextUnformatted("Movement Physics");
+
+			float groundAcceleration = controller->GroundAcceleration() / worldUnitsPerMeter;
+			ImGui::SetNextItemWidth(140.0f);
+			if (ImGui::InputFloat("Ground Acceleration (m/s^2)", &groundAcceleration, 0.0f, 0.0f, "%.2f"))
+			{
+				controller->SetGroundAcceleration(std::max(0.0f, groundAcceleration) * worldUnitsPerMeter);
+			}
+
+			float airAcceleration = controller->AirAcceleration() / worldUnitsPerMeter;
+			ImGui::SetNextItemWidth(140.0f);
+			if (ImGui::InputFloat("Air Acceleration (m/s^2)", &airAcceleration, 0.0f, 0.0f, "%.2f"))
+			{
+				controller->SetAirAcceleration(std::max(0.0f, airAcceleration) * worldUnitsPerMeter);
+			}
+
+			float groundFriction = controller->GroundFriction() / worldUnitsPerMeter;
+			ImGui::SetNextItemWidth(140.0f);
+			if (ImGui::InputFloat("Ground Friction (m/s^2)", &groundFriction, 0.0f, 0.0f, "%.2f"))
+			{
+				controller->SetGroundFriction(std::max(0.0f, groundFriction) * worldUnitsPerMeter);
+			}
+
+			float airDrag = controller->AirDrag();
+			ImGui::SetNextItemWidth(140.0f);
+			if (ImGui::InputFloat("Air Drag (1/s)", &airDrag, 0.0f, 0.0f, "%.3f"))
+							{
+								controller->SetAirDrag(std::max(0.0f, airDrag));
+							}
 						}
 					}
 

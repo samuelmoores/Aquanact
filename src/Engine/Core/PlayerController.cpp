@@ -27,8 +27,9 @@ float PlayerController::ShortestAngleDelta(float from, float to)
 	return WrapAngle(to - from);
 }
 
-void PlayerController::startUp(Entity&)
+void PlayerController::startUp(Entity& owner)
 {
+	Controller::startUp(owner);
 }
 
 void PlayerController::Update(Entity& owner, float dt)
@@ -69,7 +70,8 @@ void PlayerController::Update(Entity& owner, float dt)
 	if (glm::length(movement) <= m_movementDeadzone)
 	{
 		m_isMoving = false;
-		Root::Current().Debugger().SetGameplayDiagnostics(owner.Name(), moveInput, m_moveSpeed, dt, glm::vec3(0.0f), owner.Position());
+		const glm::vec3 appliedDelta = MoveWithPhysics(owner, glm::vec3(0.0f), dt);
+		Root::Current().Debugger().SetGameplayDiagnostics(owner.Name(), moveInput, m_moveSpeed, dt, appliedDelta, owner.Position());
 		return;
 	}
 
@@ -83,7 +85,7 @@ void PlayerController::Update(Entity& owner, float dt)
 	const float nextYaw = currentYaw + std::clamp(yawDelta, -maxStep, maxStep);
 	owner.SetRotation(glm::vec3(owner.Rotation().x, nextYaw, owner.Rotation().z));
 
-	const glm::vec3 delta = normalizedMovement * m_moveSpeed * dt;
-	const glm::vec3 appliedDelta = MoveWithCollision(owner, delta);
+	const glm::vec3 desiredHorizontalVelocity = normalizedMovement * m_moveSpeed;
+	const glm::vec3 appliedDelta = MoveWithPhysics(owner, desiredHorizontalVelocity, dt);
 	Root::Current().Debugger().SetGameplayDiagnostics(owner.Name(), moveInput, m_moveSpeed, dt, appliedDelta, owner.Position());
 }

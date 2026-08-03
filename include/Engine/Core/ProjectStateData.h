@@ -12,6 +12,10 @@ namespace ProjectStateData {
 		float moveSpeed = 50.0f;
 		float movementDeadzone = 0.01f;
 		float turnSpeed = 8.0f;
+		float groundAcceleration = 4000.0f;
+		float airAcceleration = 800.0f;
+		float groundFriction = 5000.0f;
+		float airDrag = 0.1f;
 		std::string levelName;
 		bool playerControlled = false;
 	};

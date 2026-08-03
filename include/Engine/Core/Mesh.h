@@ -66,6 +66,8 @@ class Mesh {
 		const Skeleton& GetSkeleton() const;
 		Skeleton* GetSkeletonPtr();
 		const SubMeshMaterial& GetMaterial(int index) const;
+		bool HasColorTexture(int index) const;
+		bool HasSpecularTexture(int index) const;
 		bool HasNormalTexture(int index) const;
 		uint32_t FacesOffset(int index) const;
 		void SetAmbientColor(int index, glm::vec3 color);
