@@ -25,11 +25,16 @@ struct GameGUIWidgetDef
 	std::string skin;
 	bool useSkin = true;
 	bool uniformButtonSpacing = false;
+	bool panelButtonUseSkin = true;
+	std::string panelButtonSkin = "MultiListButtonSkin";
+	float panelButtonScale = 1.0f;
 	bool horizontalButtonLayout = false;
 	int panelPadding = 10;
 	int panelButtonWidth = 100;
 	int panelButtonHeight = 30;
 	std::string panelButtonTextColor = "0 0 0";
+	std::string panelButtonFontName;
+	int panelButtonFontSize = 10;
 	std::string text;
 	std::string textColor = "0 0 0";
 	std::string texture;
@@ -43,6 +48,7 @@ struct GameGUIWidgetDef
 	int defaultTextureWidth = 100;
 	int defaultTextureHeight = 30;
 	int fontSize = 0;
+	std::string fontName;
 	bool visible = true;
 	float alpha = 1.0f;
 	std::string highlightColor;
@@ -70,6 +76,9 @@ struct GameGUIAsset
 	float highlightR = 1.0f;
 	float highlightG = 1.0f;
 	float highlightB = 0.0f;
+	float selectedR = 1.0f;
+	float selectedG = 1.0f;
+	float selectedB = 1.0f;
 	std::vector<GameGUIWidgetDef> widgets;
 	bool savedOnDisk = false;
 };

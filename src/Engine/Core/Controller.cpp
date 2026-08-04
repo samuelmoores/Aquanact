@@ -221,6 +221,17 @@ glm::vec3 Controller::MoveWithCollision(Entity& owner, const glm::vec3& delta,
 				continue;
 			}
 
+			// Reject distant colliders before constructing convex planes or
+			// running a narrow-phase sweep. This keeps movement cost local.
+			const glm::vec3 sweptMin = glm::min(currentMin, currentMin + remainingMovement);
+			const glm::vec3 sweptMax = glm::max(currentMax, currentMax + remainingMovement);
+			if (sweptMax.x < boxMin.x || sweptMin.x > boxMax.x ||
+				sweptMax.y < boxMin.y || sweptMin.y > boxMax.y ||
+				sweptMax.z < boxMin.z || sweptMin.z > boxMax.z)
+			{
+				continue;
+			}
+
 			Physics::SweepCollision hit;
 			if (object->GetPhysicsColliderShape() == PhysicsColliderShape::Convex)
 			{

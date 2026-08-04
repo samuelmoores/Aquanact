@@ -209,8 +209,7 @@ void RenderManager::UpdateCameraPhase(const Input& input, const EngineState& eng
 	ApplyCameraMode(engineState);
 	if (engineState.IsGameMode())
 	{
-		constexpr float fixedCameraStep = 1.0f / 120.0f;
-		m_gameCamera->UpdateThirdPerson(input, fixedCameraStep);
+		m_gameCamera->UpdateThirdPerson(input, input.DeltaTime());
 	}
 	if (engineState.IsEditorMode())
 	{
@@ -253,9 +252,6 @@ void RenderManager::BuildRenderCommands(FrontEndManager& frontEndManager, SceneM
 	const Scene* activeLevel = SceneManager.ActiveLevel();
 	static const std::vector<std::unique_ptr<Entity>> emptyObjects;
 	const auto& objects = activeLevel ? activeLevel->Objects() : emptyObjects;
-	const float interpolationAlpha = engineState.IsGameMode()
-		? Root::Current().Gameplay().PhysicsInterpolationAlpha()
-		: 1.0f;
 	for (const auto& object : objects)
 	{
 		if (!object || !object->GetMesh() || !object->GetShader())
@@ -267,7 +263,7 @@ void RenderManager::BuildRenderCommands(FrontEndManager& frontEndManager, SceneM
 		Submit(RenderCommand{
 			object->GetMesh(),
 			object->GetShader(),
-			object->BuildRenderModelMatrix(interpolationAlpha),
+			object->BuildModelMatrix(),
 			object->skinned()
 		});
 	}
@@ -354,13 +350,15 @@ void RenderManager::Submit(const RenderCommand& command)
 		// first allocation, start with a small fixed minimum so tiny levels still work.
 		const std::size_t requiredCapacity = std::max<std::size_t>(previousCapacity == 0 ? 64 : previousCapacity * 2, m_commandCount + 1);
 
-		// Preserve a pointer to the old buffer before replacing the arena contents.
-		// The old commands are still valid for copying until the new buffer is filled.
-		RenderCommand* oldCommands = m_commands;
+		// Reserve() may delete the old arena buffer, so copy the live commands before
+		// growing it. Reading m_commands after Reserve() would be a use-after-free.
+		std::vector<RenderCommand> previousCommands;
+		previousCommands.reserve(m_commandCount);
+		for (std::size_t i = 0; i < m_commandCount; ++i)
+		{
+			previousCommands.push_back(m_commands[i]);
+		}
 
-		// Grow the arena if needed, but keep the allocations that were already made
-		// this frame. That is what makes this a true bump allocator: we only move the
-		// top of the arena forward and never compact individual allocations.
 		m_frameAllocator.Reserve(requiredCapacity * sizeof(RenderCommand));
 
 		// Allocate the new command buffer from the frame allocator and update the
@@ -372,7 +370,7 @@ void RenderManager::Submit(const RenderCommand& command)
 		// The render loop builds commands incrementally, so growth must preserve prior work.
 		for (std::size_t i = 0; i < m_commandCount; ++i)
 		{
-			m_commands[i] = oldCommands[i];
+			m_commands[i] = previousCommands[i];
 		}
 	}
 

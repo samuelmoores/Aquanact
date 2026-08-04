@@ -183,6 +183,9 @@ void GameCamera::UpdateThirdPerson(const Input& input, float dt)
 		return;
 	}
 
+	// Follow the same interpolated target pose used by rendering. Following the
+	// raw physics pose here makes the camera jump whenever the fixed-step
+	// accumulator performs zero or multiple controller updates in a frame.
 	const glm::vec3 targetPos = target->WorldCenterPosition();
 	if (!std::isfinite(targetPos.x) || !std::isfinite(targetPos.y) || !std::isfinite(targetPos.z))
 	{
@@ -240,6 +243,9 @@ void GameCamera::UpdateThirdPerson(const Input& input, float dt)
 		for (int iteration = 0; iteration < maxSlideIterations && glm::length(remainingMovement) > 0.0001f; ++iteration)
 		{
 			m_collider->SetPosition(resolvedPosition);
+			const glm::vec3 radius(m_collider->Radius());
+			const glm::vec3 sweptMin = glm::min(resolvedPosition, resolvedPosition + remainingMovement) - radius;
+			const glm::vec3 sweptMax = glm::max(resolvedPosition, resolvedPosition + remainingMovement) + radius;
 			Physics::SweepCollision earliestHit;
 			Entity* hitObject = nullptr;
 			for (const auto& object : activeLevel->Objects())
@@ -252,6 +258,12 @@ void GameCamera::UpdateThirdPerson(const Input& input, float dt)
 				glm::vec3 boxMin;
 				glm::vec3 boxMax;
 				if (!object->WorldAABB(boxMin, boxMax))
+				{
+					continue;
+				}
+				if (sweptMax.x < boxMin.x || sweptMin.x > boxMax.x ||
+					sweptMax.y < boxMin.y || sweptMin.y > boxMax.y ||
+					sweptMax.z < boxMin.z || sweptMin.z > boxMax.z)
 				{
 					continue;
 				}

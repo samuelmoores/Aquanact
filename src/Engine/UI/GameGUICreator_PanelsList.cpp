@@ -10,7 +10,7 @@
 
 void GameGUICreator::DrawWidgetList()
 {
-	ImGui::Begin("GameGUIs");
+	ImGui::Begin("GameGUIs", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 	for (std::size_t i = 0; i < m_assets.size(); ++i)
 	{
 		const bool selected = GUIIndex(m_selectedGUI) == i;
@@ -23,7 +23,7 @@ void GameGUICreator::DrawWidgetList()
 	}
 	ImGui::End();
 
-	ImGui::Begin("Widget List");
+	ImGui::Begin("Widget List", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 	if (!CurrentRoleGUI().widgets.empty())
 	{
 		GameGUIAsset& asset = CurrentRoleGUI();

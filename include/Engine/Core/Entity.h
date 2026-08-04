@@ -63,9 +63,7 @@ public:
 	void UpdateComponents(float dt);
 	void UpdateControllers(float dt);
 	void UpdateNonControllerComponents(float dt);
-	void CapturePhysicsState();
 	glm::mat4 BuildModelMatrix();
-	glm::mat4 BuildRenderModelMatrix(float interpolationAlpha) const;
 	void Rotate(glm::vec3 delta);
 	void Move(glm::vec3 delta);
 	void Translate(glm::vec3 delta);
@@ -105,8 +103,6 @@ protected:
 	glm::vec3 m_position{0.0f};
 	glm::vec3 m_rotation{0.0f};
 	glm::vec3 m_scale{1.0f};
-	glm::vec3 m_previousPhysicsPosition{0.0f};
-	glm::vec3 m_previousPhysicsRotation{0.0f};
 	glm::vec3 m_initialWorldCenter{0.0f};
 	glm::vec3 m_defaultPosition{0.0f};
 	glm::vec3 m_defaultRotation{0.0f};

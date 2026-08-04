@@ -197,6 +197,7 @@ void GameGUICreator::LoadNavigationSettingsFromAsset()
 	m_highlightR = asset.highlightR;
 	m_highlightG = asset.highlightG;
 	m_highlightB = asset.highlightB;
+	m_selectedR = asset.selectedR; m_selectedG = asset.selectedG; m_selectedB = asset.selectedB;
 	const std::string boxSkins[] = { "WindowFrameSkin", "PanelSkin", "ButtonSkin", "ButtonEmptySkin", "TabPanelSkin", "ClientDefaultSkin" };
 	m_boxSkinIndex = 0;
 	for (int i = 0; i < 6; ++i) if (asset.boxSkin == boxSkins[i]) { m_boxSkinIndex = i; break; }
@@ -329,6 +330,32 @@ void GameGUICreator::AddPanelWidget()
 void GameGUICreator::ApplyPanelButtonLayout(GameGUIWidgetDef& panel)
 {
 	GameGUIAsset& asset = CurrentRoleGUI();
+	panel.panelButtonSkin = "MultiListButtonSkin";
+	int nativeWidth = 29;
+	int nativeHeight = 26;
+	if (panel.panelButtonSkin == "CheckBoxSkin") { nativeWidth = 23; nativeHeight = 21; }
+	else if (panel.panelButtonSkin == "RadioButtonSkin") { nativeWidth = 21; nativeHeight = 20; }
+	else if (panel.panelButtonSkin == "ButtonCloseSkin") { nativeWidth = 18; nativeHeight = 17; }
+	else if (panel.panelButtonSkin == "EditBoxSkin") { nativeWidth = 29; nativeHeight = 26; }
+	else if (panel.panelButtonSkin == "MenuBarSkin") { nativeWidth = 27; nativeHeight = 26; }
+	else if (panel.panelButtonSkin == "MenuItemSkin") { nativeWidth = 25; nativeHeight = 20; }
+	else if (panel.panelButtonSkin == "ListBoxItemSkin") { nativeWidth = 43; nativeHeight = 10; }
+	else if (panel.panelButtonSkin == "ClientDefaultSkin") { nativeWidth = 66; nativeHeight = 59; }
+	else if (panel.panelButtonSkin == "ClientTileSkin") { nativeWidth = 34; nativeHeight = 18; }
+	else if (panel.panelButtonSkin == "ScrollPanelHSkin") { nativeWidth = 19; nativeHeight = 15; }
+	else if (panel.panelButtonSkin == "ScrollPanelVSkin") { nativeWidth = 15; nativeHeight = 19; }
+	else if (panel.panelButtonSkin == "PanelSkin") { nativeWidth = 23; nativeHeight = 22; }
+	else if (panel.panelButtonSkin == "CaptionEmptySkin" || panel.panelButtonSkin == "CaptionSkin" || panel.panelButtonSkin == "CaptionWithButtonSkin") { nativeWidth = 68; nativeHeight = 28; }
+	else if (panel.panelButtonSkin == "WindowFrameSkin") { nativeWidth = 23; nativeHeight = 20; }
+	else if (panel.panelButtonSkin == "TabHeaderButtonSkin") { nativeWidth = 52; nativeHeight = 23; }
+	else if (panel.panelButtonSkin == "TabPanelSkin") { nativeWidth = 43; nativeHeight = 39; }
+	else if (panel.panelButtonSkin == "MenuItemNormalSkin") { nativeWidth = 43; nativeHeight = 10; }
+	else if (panel.panelButtonSkin == "MultiListButtonSkin") { nativeWidth = 32; nativeHeight = 21; }
+	if (panel.panelButtonWidth <= 0 || panel.panelButtonHeight <= 0)
+	{
+		panel.panelButtonWidth = std::max(1, static_cast<int>(std::lround(nativeWidth * panel.panelButtonScale)));
+		panel.panelButtonHeight = std::max(1, static_cast<int>(std::lround(nativeHeight * panel.panelButtonScale)));
+	}
 	std::vector<GameGUIWidgetDef*> buttons;
 	for (GameGUIWidgetDef& widget : asset.widgets)
 	{
@@ -339,24 +366,36 @@ void GameGUICreator::ApplyPanelButtonLayout(GameGUIWidgetDef& panel)
 		button->width = std::max(1, panel.panelButtonWidth);
 		button->height = std::max(1, panel.panelButtonHeight);
 		button->textColor = panel.panelButtonTextColor;
+		button->fontName = panel.panelButtonFontName;
+		button->fontSize = panel.panelButtonFontSize;
 	}
 	if (!panel.uniformButtonSpacing || buttons.empty()) return;
 
-	const int padding = std::max(0, panel.panelPadding);
+	// Panel padding is a 0-100 spacing compression value. At 100, buttons touch;
+	// at 0, the available panel space is distributed between the buttons.
+	const float spacingFactor = 1.0f - std::clamp(static_cast<float>(panel.panelPadding) / 100.0f, 0.0f, 1.0f);
 	if (panel.horizontalButtonLayout)
 	{
 		int totalWidth = 0;
 		for (const GameGUIWidgetDef* button : buttons) totalWidth += button->width;
-		const int gap = buttons.size() > 1 ? std::max(0, (panel.width - padding * 2 - totalWidth) / static_cast<int>(buttons.size() - 1)) : 0;
-		int x = padding;
+		const int availableSpace = std::max(0, panel.width - totalWidth);
+		const int gap = panel.panelPadding >= 100
+			? -6
+			: buttons.size() > 1 ? static_cast<int>(std::lround((availableSpace / static_cast<float>(buttons.size() - 1)) * spacingFactor)) : 0;
+		const int groupWidth = totalWidth + gap * static_cast<int>(buttons.size() - 1);
+		int x = std::max(0, (panel.width - groupWidth) / 2);
 		for (GameGUIWidgetDef* button : buttons) { button->x = x; button->y = (panel.height - button->height) / 2; x += button->width + gap; }
 	}
 	else
 	{
 		int totalHeight = 0;
 		for (const GameGUIWidgetDef* button : buttons) totalHeight += button->height;
-		const int gap = buttons.size() > 1 ? std::max(0, (panel.height - padding * 2 - totalHeight) / static_cast<int>(buttons.size() - 1)) : 0;
-		int y = padding;
+		const int availableSpace = std::max(0, panel.height - totalHeight);
+		const int gap = panel.panelPadding >= 100
+			? -6
+			: buttons.size() > 1 ? static_cast<int>(std::lround((availableSpace / static_cast<float>(buttons.size() - 1)) * spacingFactor)) : 0;
+		const int groupHeight = totalHeight + gap * static_cast<int>(buttons.size() - 1);
+		int y = std::max(0, (panel.height - groupHeight) / 2);
 		for (GameGUIWidgetDef* button : buttons) { button->x = (panel.width - button->width) / 2; button->y = y; y += button->height + gap; }
 	}
 }

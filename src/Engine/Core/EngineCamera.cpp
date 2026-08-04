@@ -98,9 +98,7 @@ void EngineCamera::FlyControl(glm::vec2 mouseDiff, glm::vec3 moveInput, float dt
 
 void EngineCamera::UpdateFly(const Input& input)
 {
-	float now = static_cast<float>(glfwGetTime());
-	float dt = now - m_lastFlyTime;
-	m_lastFlyTime = now;
+	const float dt = input.DeltaTime();
 
 	if (input.LookBecameActive())
 	{

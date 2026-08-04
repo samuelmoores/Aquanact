@@ -1,0 +1,105 @@
+Aquanact Performance and Long-Session Investigation
+====================================================
+
+Date: 2026-08-03
+
+Symptoms reported
+-----------------
+The project became less smooth after being left open for several days. The
+on-screen counter continued to report approximately 120 FPS, while gameplay
+appeared to run at roughly 10-30 FPS. Restarting the project restored smooth
+performance.
+
+Investigation summary
+--------------------
+The symptoms were consistent with two separate issues:
+
+1. The FPS counter measured CPU frame-loop time only. It did not include
+   outstanding GPU work or guarantee that frames had actually been presented.
+   The CPU could therefore submit frames at 120 FPS while the GPU or display
+   compositor was presenting frames much more slowly.
+
+2. Render command buffer growth contained a use-after-free. RenderManager
+   saved a pointer to the old command buffer, called FrameAllocator::Reserve(),
+   and then read the old pointer after Reserve() had potentially deleted the
+   buffer. This occurs when more than the initial render-command capacity is
+   needed and can corrupt render data or cause unstable GPU behavior.
+
+Confirmed code defect and fix
+-----------------------------
+File: src/Engine/Core/RenderManager.cpp
+
+Before the fix, Submit() performed the following sequence:
+
+    oldCommands = m_commands
+    m_frameAllocator.Reserve(...)
+    copy from oldCommands
+
+FrameAllocator::Reserve() may delete the old allocation, making oldCommands
+invalid. The fix copies the active commands into a temporary vector before
+Reserve(), then copies them into the newly allocated command buffer.
+
+This removes the use-after-free and preserves previously submitted render
+commands when the buffer grows.
+
+FPS and GPU timing fix
+----------------------
+File: src/Engine/Core/Root.cpp
+
+When the profiler is enabled, the main loop now calls glFinish() after the
+render pass and before FrameProfiler::EndFrame(). This makes the profiler's
+frame time include outstanding GPU work, so the diagnostic FPS value is much
+less likely to report a high CPU submission rate while the GPU is falling
+behind.
+
+This synchronization is intentionally limited to profiler-enabled sessions
+because glFinish() can reduce throughput. It is diagnostic instrumentation,
+not recommended as normal release-mode frame pacing.
+
+Memory and lifecycle review
+---------------------------
+The following areas were reviewed:
+
+- GameGUI runtime widgets are destroyed by ClearUI().
+- Event listeners associated with GUI widgets are unsubscribed before widget
+  destruction.
+- The event system replaces an owner's existing subscription instead of
+  accumulating duplicate subscriptions.
+- The profiler keeps one entry per named scope and does not append data every
+  frame without bound.
+- The GUI action log is capped at 12 entries.
+- OpenGL shadow-map resources have explicit release paths.
+- FrameAllocator owns and releases its backing buffer.
+
+The GameGUI image loader allocates pixel data with new[]. The returned buffer is
+passed to MyGUI, whose image-loader contract is expected to transfer ownership
+to the caller/backend. No change was made there because adding a second delete
+could create a double-free. If long-session memory still grows after these
+fixes, MyGUI texture/resource counts should be measured directly.
+
+Validation
+----------
+The x64 Debug configuration was built successfully after the changes:
+
+    cmake --build out/build/x64-debug
+
+Both targets linked successfully:
+
+- AquanactEngine.exe
+- AquanactGame.exe
+
+Recommended long-session verification
+--------------------------------------
+Run a repeatable scene for several hours and record:
+
+- Process working set and private bytes.
+- GPU memory usage.
+- Render command count and frame allocator capacity.
+- Profiler Frame time with profiling enabled.
+- GPU usage and present latency using a GPU profiler if available.
+
+If memory remains flat but GPU memory or present latency rises, the issue is
+likely a graphics-resource or presentation problem rather than a CPU heap leak.
+If process memory rises continuously, capture allocation snapshots around UI
+reloads, scene reloads, and editor-to-game transitions.
+

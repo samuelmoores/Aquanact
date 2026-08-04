@@ -42,6 +42,8 @@ void GameGUICreator::SaveSelectedRoleGUI()
 	asset.highlightR = m_highlightR;
 	asset.highlightG = m_highlightG;
 	asset.highlightB = m_highlightB;
+	asset.selectedR = m_selectedR; asset.selectedG = m_selectedG; asset.selectedB = m_selectedB;
+	asset.selectedR = m_selectedR; asset.selectedG = m_selectedG; asset.selectedB = m_selectedB;
 	const std::filesystem::path projectAssetPath = GUIPathFor(asset);
 	const std::filesystem::path executableAssetPath =
 		Root::Current().FileSystemRef().ExecutableDirectory() / "assets" / "gameGUI" / (asset.name + ".json");
@@ -63,6 +65,12 @@ void GameGUICreator::SaveSelectedRoleGUI()
 	json << "  \"highlightR\": " << asset.highlightR << ",\n";
 	json << "  \"highlightG\": " << asset.highlightG << ",\n";
 	json << "  \"highlightB\": " << asset.highlightB << ",\n";
+	json << "  \"selectedR\": " << asset.selectedR << ",\n";
+	json << "  \"selectedG\": " << asset.selectedG << ",\n";
+	json << "  \"selectedB\": " << asset.selectedB << ",\n";
+	json << "  \"selectedR\": " << asset.selectedR << ",\n";
+	json << "  \"selectedG\": " << asset.selectedG << ",\n";
+	json << "  \"selectedB\": " << asset.selectedB << ",\n";
 	json << "  \"widgets\": [\n";
 	for (std::size_t i = 0; i < asset.widgets.size(); ++i)
 	{
@@ -74,11 +82,16 @@ void GameGUICreator::SaveSelectedRoleGUI()
 		json << "      \"skin\": \"" << widget.skin << "\",\n";
 		json << "      \"useSkin\": " << (widget.useSkin ? "true" : "false") << ",\n";
 		json << "      \"uniformButtonSpacing\": " << (widget.uniformButtonSpacing ? "true" : "false") << ",\n";
+		json << "      \"panelButtonUseSkin\": " << (widget.panelButtonUseSkin ? "true" : "false") << ",\n";
+		json << "      \"panelButtonSkin\": \"" << widget.panelButtonSkin << "\",\n";
+		json << "      \"panelButtonScale\": " << widget.panelButtonScale << ",\n";
 		json << "      \"horizontalButtonLayout\": " << (widget.horizontalButtonLayout ? "true" : "false") << ",\n";
 		json << "      \"panelPadding\": " << widget.panelPadding << ",\n";
 		json << "      \"panelButtonWidth\": " << widget.panelButtonWidth << ",\n";
 		json << "      \"panelButtonHeight\": " << widget.panelButtonHeight << ",\n";
 		json << "      \"panelButtonTextColor\": \"" << widget.panelButtonTextColor << "\",\n";
+		json << "      \"panelButtonFontName\": \"" << widget.panelButtonFontName << "\",\n";
+		json << "      \"panelButtonFontSize\": " << widget.panelButtonFontSize << ",\n";
 		json << "      \"text\": \"" << widget.text << "\",\n";
 		json << "      \"textColor\": \"" << widget.textColor << "\",\n";
 		json << "      \"texture\": \"" << widget.texture << "\",\n";
@@ -90,6 +103,7 @@ void GameGUICreator::SaveSelectedRoleGUI()
 		json << "      \"textureWidth\": " << widget.textureWidth << ",\n";
 		json << "      \"textureHeight\": " << widget.textureHeight << ",\n";
 		json << "      \"fontSize\": " << widget.fontSize << ",\n";
+		json << "      \"fontName\": \"" << widget.fontName << "\",\n";
 		json << "      \"visible\": " << (widget.visible ? "true" : "false") << ",\n";
 			json << "      \"alpha\": " << widget.alpha << ",\n";
 		json << "      \"highlightColor\": \"" << widget.highlightColor << "\",\n";

@@ -14,13 +14,13 @@
 
 void Input::SetCursorMode(int mode)
 {
-	if (!m_window || m_cursorMode == mode)
+	if (!m_window)
 	{
 		return;
 	}
 
-	std::cout << "setting cursor mode to: " << mode << std::endl;
-
+	// Always apply the native mode. ImGui or another GLFW client may have
+	// changed it behind our cached value while a level was loading.
 	glfwSetInputMode(m_window->GLFW(), GLFW_CURSOR, mode);
 	m_cursorMode = mode;
 }
@@ -29,6 +29,12 @@ void Input::HideMouseCursor()
 {
 	m_controllerCursorHidden = true;
 	SetCursorMode(GLFW_CURSOR_HIDDEN);
+}
+
+void Input::CaptureMouseCursor()
+{
+	m_controllerCursorHidden = true;
+	SetCursorMode(GLFW_CURSOR_DISABLED);
 }
 
 void Input::UnhideMouseCursor()
@@ -87,6 +93,39 @@ void Input::shutDown()
 	m_mouseDelta = glm::vec2(0.0f);
 }
 
+void Input::CaptureCursorForLevel()
+{
+	if (!m_window)
+	{
+		return;
+	}
+
+	// Level entry is an explicit gameplay boundary: reclaim keyboard/mouse
+	// focus even when the level was launched from a GUI button or editor view.
+	m_window->Focus();
+	m_windowFocused = true;
+	m_gameplayFocusActive = true;
+	// Cursor capture and camera-look activation are separate states. Level entry
+	// must enable both; otherwise UpdateGameLook() waits for a mouse click even
+	// though the window is already focused and the cursor is disabled.
+	m_lookActive = true;
+	m_lookBecameActive = true;
+	m_ignoreMouseDeltaOnce = true;
+	double x = 0.0;
+	double y = 0.0;
+	glfwGetCursorPos(m_window->GLFW(), &x, &y);
+	m_lastCursorPos = glm::vec2(static_cast<float>(x), static_cast<float>(y));
+	CaptureMouseCursor();
+}
+
+void Input::ReleaseCursorFocus()
+{
+	m_gameplayFocusActive = false;
+	m_lookActive = false;
+	m_ignoreMouseDeltaOnce = false;
+	UnhideMouseCursor();
+}
+
 void Input::Update()
 {
 	// Input cannot be updated until the window has been created.
@@ -98,7 +137,9 @@ void Input::Update()
 	// Calculate frame timing once for the rest of the engine.
 	static double lastTime = glfwGetTime();
 	const double now = glfwGetTime();
-	m_deltaTime = static_cast<float>(now - lastTime);
+	// A debugger pause, focus transition, or slow frame must not turn into one
+	// enormous simulation step and visibly teleport the player/camera.
+	m_deltaTime = std::clamp(static_cast<float>(now - lastTime), 0.0f, 1.0f / 30.0f);
 	lastTime = now;
 
 	// Refresh focus before updating cursor mode. This lets the cursor restore
@@ -183,7 +224,14 @@ void Input::UpdateCursorMode(bool gameMode)
 	if (!menuActive)
 	{
 		m_previousGamepadStateValid = false;
-		HideMouseCursor();
+		if (!m_gameplayFocusActive)
+		{
+			UnhideMouseCursor();
+			return;
+		}
+		// Gameplay needs captured input, not merely an invisible cursor. Disabled
+		// mode supplies continuous virtual cursor movement beyond window edges.
+		CaptureMouseCursor();
 		return;
 	}
 
@@ -257,7 +305,7 @@ bool Input::UpdateGameLook(bool gameMode)
 	const auto state = Root::Current().Gameplay().State();
 	const bool menuActive = state == GameplayManager::GameState::MainMenu || state == GameplayManager::GameState::Paused;
 	if (escapePressed) {
-		if (m_lookActive) { m_lookActive = false; m_ignoreMouseDeltaOnce = false; }
+		ReleaseCursorFocus();
 		return true;
 	}
 	if (m_lookActive) return true;
@@ -416,6 +464,16 @@ void Input::HandleMouseButton(int button, int action)
 	if (!m_window || !Root::Current().State().IsGameMode())
 	{
 		return;
+	}
+	if (ImGui::GetIO().WantCaptureMouse || ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow))
+	{
+		return;
+	}
+	if (action == GLFW_PRESS && Root::Current().Gameplay().State() == GameplayManager::GameState::Playing && !m_gameplayFocusActive)
+	{
+		m_gameplayFocusActive = true;
+		m_window->Focus();
+		CaptureMouseCursor();
 	}
 
 	double x = 0.0;

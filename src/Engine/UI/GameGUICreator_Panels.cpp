@@ -112,7 +112,7 @@ void GameGUICreator::Draw(const Camera&)
 
 	// Let ImGui fit this utility window to the controls it contains.
 	ImGui::SetNextWindowSize(ImVec2(0.0f, 0.0f), ImGuiCond_Always);
-	if (ImGui::Begin("Navigation Mode"))
+	if (ImGui::Begin("Navigation Mode", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 	{
 		ImGui::TextUnformatted("Choose how the active menu button is shown.");
 		ImGui::Separator();
@@ -187,14 +187,18 @@ void GameGUICreator::Draw(const Camera&)
 		else
 		{
 			GameGUIAsset& asset = CurrentRoleGUI();
-			const bool redChanged = ImGui::SliderFloat("Highlight red", &m_highlightR, 0.0f, 1.0f);
-			const bool greenChanged = ImGui::SliderFloat("Highlight green", &m_highlightG, 0.0f, 1.0f);
-			const bool blueChanged = ImGui::SliderFloat("Highlight blue", &m_highlightB, 0.0f, 1.0f);
-			if (redChanged || greenChanged || blueChanged)
+			float highlightColour[3] = { m_highlightR, m_highlightG, m_highlightB };
+			float selectedColour[3] = { m_selectedR, m_selectedG, m_selectedB };
+			const bool highlightChanged = ImGui::ColorEdit3("Highlight color", highlightColour);
+			const bool selectedChanged = ImGui::ColorEdit3("Selected color", selectedColour);
+			if (highlightChanged || selectedChanged)
 			{
+				m_highlightR = highlightColour[0]; m_highlightG = highlightColour[1]; m_highlightB = highlightColour[2];
+				m_selectedR = selectedColour[0]; m_selectedG = selectedColour[1]; m_selectedB = selectedColour[2];
 				asset.highlightR = m_highlightR;
 				asset.highlightG = m_highlightG;
 				asset.highlightB = m_highlightB;
+				asset.selectedR = m_selectedR; asset.selectedG = m_selectedG; asset.selectedB = m_selectedB;
 				SyncRuntimePreview();
 			}
 		}

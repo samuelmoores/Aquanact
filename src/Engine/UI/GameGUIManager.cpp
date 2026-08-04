@@ -178,6 +178,9 @@ namespace {
 		asset.highlightR = ReadFloatField(readAssetField("highlightR"), asset.highlightR);
 		asset.highlightG = ReadFloatField(readAssetField("highlightG"), asset.highlightG);
 		asset.highlightB = ReadFloatField(readAssetField("highlightB"), asset.highlightB);
+		asset.selectedR = ReadFloatField(readAssetField("selectedR"), asset.selectedR);
+		asset.selectedG = ReadFloatField(readAssetField("selectedG"), asset.selectedG);
+		asset.selectedB = ReadFloatField(readAssetField("selectedB"), asset.selectedB);
 
 		std::size_t widgetPos = contents.find("\"type\": \"");
 		while (widgetPos != std::string::npos)
@@ -210,12 +213,18 @@ namespace {
 			widget.skin = readField("\"skin\":", widgetPos);
 			widget.useSkin = readField("\"useSkin\":", widgetPos).find("false") == std::string::npos;
 			widget.uniformButtonSpacing = readField("\"uniformButtonSpacing\":", widgetPos).find("true") != std::string::npos;
+			widget.panelButtonUseSkin = readField("\"panelButtonUseSkin\":", widgetPos).find("false") == std::string::npos;
+			widget.panelButtonSkin = readField("\"panelButtonSkin\":", widgetPos);
+			if (widget.panelButtonSkin.empty()) widget.panelButtonSkin = "MultiListButtonSkin";
+			widget.panelButtonScale = std::max(0.1f, ReadFloatField(readField("\"panelButtonScale\":", widgetPos), 1.0f));
 			widget.horizontalButtonLayout = readField("\"horizontalButtonLayout\":", widgetPos).find("true") != std::string::npos;
 			widget.panelPadding = ReadIntField(readField("\"panelPadding\":", widgetPos), 10);
 			widget.panelButtonWidth = ReadIntField(readField("\"panelButtonWidth\":", widgetPos), 100);
 			widget.panelButtonHeight = ReadIntField(readField("\"panelButtonHeight\":", widgetPos), 30);
 			widget.panelButtonTextColor = readField("\"panelButtonTextColor\":", widgetPos);
 			if (widget.panelButtonTextColor.empty()) widget.panelButtonTextColor = "0 0 0";
+			widget.panelButtonFontName = readField("\"panelButtonFontName\":", widgetPos);
+			widget.panelButtonFontSize = std::max(1, ReadIntField(readField("\"panelButtonFontSize\":", widgetPos), 10));
 			widget.text = readField("\"text\":", widgetPos);
 			widget.textColor = readField("\"textColor\":", widgetPos);
 			if (widget.textColor.empty()) widget.textColor = "0 0 0";
@@ -226,6 +235,7 @@ namespace {
 			widget.width = ReadIntField(readField("\"width\":", widgetPos), 100);
 			widget.height = ReadIntField(readField("\"height\":", widgetPos), 30);
 			widget.fontSize = ReadIntField(readField("\"fontSize\":", widgetPos), 0);
+			widget.fontName = readField("\"fontName\":", widgetPos);
 			widget.visible = readField("\"visible\":", widgetPos).find("true") != std::string::npos;
 			widget.alpha = ReadFloatField(readField("\"alpha\":", widgetPos), 1.0f);
 			widget.highlightColor = readField("\"highlightColor\":", widgetPos);
@@ -564,7 +574,7 @@ const std::vector<std::string>& GameGUIManager::SceneAssets() const
 void GameGUIManager::DrawEditorWindow()
 {
 	bool open = m_showEditorWindow;
-	if (!ImGui::Begin("GameGUI", &open))
+	if (!ImGui::Begin("GameGUI", &open, ImGuiWindowFlags_AlwaysAutoResize))
 	{
 		ImGui::End();
 		m_showEditorWindow = open;
@@ -605,7 +615,7 @@ void GameGUIManager::DrawDiagnosticsWindow()
 		return;
 	}
 	bool open = m_showDiagnosticsWindow;
-	ImGui::Begin("GameGUIDiagnostics", &open);
+	ImGui::Begin("GameGUIDiagnostics", &open, ImGuiWindowFlags_AlwaysAutoResize);
 	ImGui::Text("Runtime wrapper: %s", m_runtime ? "ready" : "missing");
 	ImGui::Text("Loaded assets: %zu", m_assets.size());
 	ImGui::Text("Placed assets: %zu", m_sceneAssets.size());
@@ -685,7 +695,7 @@ void GameGUIManager::DrawReturnButton()
 		return;
 	}
 
-	ImGui::Begin("Engine");
+	ImGui::Begin("Engine", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 	ImGui::Text("FPS: %.1f", Root::Current().Profiler().SmoothedFps());
 	ImGui::Text("Frame: %.3f ms", Root::Current().Profiler().FrameMs());
 	if (ImGui::Button("Return"))

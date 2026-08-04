@@ -552,7 +552,21 @@ void Debug::drawGameModeInput(const Input& input)
 	ImGui::Text("Move speed: %.2f", m_gameplayMoveSpeed);
 	ImGui::Text("Delta time: %.4f", m_gameplayDt);
 	ImGui::Text("Applied delta: %.3f, %.3f, %.3f", m_gameplayDelta.x, m_gameplayDelta.y, m_gameplayDelta.z);
-	ImGui::Text("Position: %.3f, %.3f, %.3f", m_gameplayPosition.x, m_gameplayPosition.y, m_gameplayPosition.z);
+		ImGui::Text("Position: %.3f, %.3f, %.3f", m_gameplayPosition.x, m_gameplayPosition.y, m_gameplayPosition.z);
+		if (ImGui::Checkbox("Motion diagnostics", &m_showMotionDiagnostics))
+		{
+			// Keep the detailed motion readout opt-in because it is intentionally verbose.
+		}
+		if (m_showMotionDiagnostics)
+		{
+			const GameCamera& camera = Root::Current().Render().GetGameCamera();
+			ImGui::Separator();
+			ImGui::Text("Render dt: %.5f s (%.3f ms)", input.DeltaTime(), input.DeltaTime() * 1000.0f);
+			ImGui::Text("Input move: %.3f, %.3f, %.3f", input.MoveInput().x, input.MoveInput().y, input.MoveInput().z);
+			ImGui::Text("Applied movement: %.5f, %.5f, %.5f", m_gameplayDelta.x, m_gameplayDelta.y, m_gameplayDelta.z);
+			ImGui::Text("Player position: %.5f, %.5f, %.5f", m_gameplayPosition.x, m_gameplayPosition.y, m_gameplayPosition.z);
+			ImGui::Text("Camera position: %.5f, %.5f, %.5f", camera.GetPosition().x, camera.GetPosition().y, camera.GetPosition().z);
+		}
 		ImGui::End();
 		m_showGameplayDiagnosticsWindow = open;
 	}

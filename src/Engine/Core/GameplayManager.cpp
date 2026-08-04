@@ -7,6 +7,7 @@
 #include "Engine/Core/Scene.h"
 #include "Engine/Core/Root.h"
 #include "Engine/Core/FrameProfiler.h"
+#include "Engine/Core/Input.h"
 
 #include <algorithm>
 
@@ -39,7 +40,6 @@ void GameplayManager::startUp(SceneManager& SceneManager, FrontEndManager& front
 {
 	m_levelManager = &SceneManager;
 	m_state = GameState::MainMenu;
-	m_physicsAccumulator = 0.0f;
 	if (m_levelManager)
 	{
 		// If the runtime UI is already initialized, set it to a known boot
@@ -57,7 +57,6 @@ void GameplayManager::shutDown()
 {
 	m_levelManager = nullptr;
 	m_state = GameState::MainMenu;
-	m_physicsAccumulator = 0.0f;
 }
 
 void GameplayManager::BootMainMenu(FrontEndManager& frontEndManager, Debug& debug)
@@ -108,6 +107,7 @@ bool GameplayManager::BootPlayableLevel(FrontEndManager& frontEndManager, Debug&
 	m_levelManager->CaptureActiveLevelEditorTransforms();
 	playableLevel->FirstFrame();
 	m_state = GameState::Playing;
+	Root::Current().InputRef().CaptureCursorForLevel();
 	debug.LogMessage("GameplayManager::BootPlayableLevel() state=Playing Scene=" + playableLevel->Name());
 	SyncRuntimeUI(frontEndManager);
 	return true;
@@ -142,6 +142,7 @@ void GameplayManager::StartGameSession(FrontEndManager& frontEndManager, Debug& 
 		activeLevel->FirstFrame();
 	}
 	m_state = GameState::Playing;
+	Root::Current().InputRef().CaptureCursorForLevel();
 	debug.LogMessage("GameplayManager::StartGameSession() state=Playing");
 	SyncRuntimeUI(frontEndManager);
 }
@@ -210,46 +211,12 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 		engineState.IsGameMode() ? "Game" : "Editor");
 
 
-	// Controllers use a fixed simulation step so a long render frame cannot
-	// turn directly into a large movement or rotation delta.
-	constexpr float fixedControllerStep = 1.0f / 120.0f;
-	constexpr int maxControllerSteps = 8;
-	m_physicsAccumulator += std::clamp(dt, 0.0f, 0.25f);
-	int controllerSteps = 0;
-	while (m_physicsAccumulator >= fixedControllerStep && controllerSteps < maxControllerSteps)
-	{
-		for (const auto& object : activeLevel->Objects())
-		{
-			if (object)
-			{
-				object->CapturePhysicsState();
-			}
-		}
-		for (const auto& object : activeLevel->Objects())
-		{
-			if (object)
-			{
-				FrameProfiler::Scope controllerScope(Root::Current().Profiler(), "Controllers");
-				object->UpdateControllers(fixedControllerStep);
-			}
-		}
-		m_physicsAccumulator -= fixedControllerStep;
-		++controllerSteps;
-	}
-	if (controllerSteps == maxControllerSteps && m_physicsAccumulator >= fixedControllerStep)
-	{
-		// Drop excessive backlog instead of allowing a stalled frame to create an
-		// unbounded catch-up loop and freeze the application.
-		m_physicsAccumulator = 0.0f;
-	}
-
-	// Animation and other non-controller components remain frame-rate driven.
 	for (const auto& object : activeLevel->Objects())
 	{
 		if (object)
 		{
-			FrameProfiler::Scope animationScope(Root::Current().Profiler(), "Animation");
-			object->UpdateNonControllerComponents(dt);
+			FrameProfiler::Scope controllerScope(Root::Current().Profiler(), "Controllers");
+			object->UpdateComponents(dt);
 			if (AnimatorComponent* animator = object->GetAnimatorComponent())
 			{
 				std::string stateListText;
@@ -279,12 +246,6 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 		}
 	}
 
-}
-
-float GameplayManager::PhysicsInterpolationAlpha() const
-{
-	constexpr float fixedPhysicsStep = 1.0f / 120.0f;
-	return std::clamp(m_physicsAccumulator / fixedPhysicsStep, 0.0f, 1.0f);
 }
 
 void GameplayManager::SetPaused(bool paused, FrontEndManager& frontEndManager, Debug& debug)

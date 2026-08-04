@@ -13,6 +13,7 @@ public:
 
 	void startUp(Window& window);
 	void shutDown();
+	void CaptureCursorForLevel();
 	void Update();
 
 	glm::vec3 MoveInput() const;
@@ -35,7 +36,9 @@ private:
 	void HandleCursorPos(double xpos, double ypos);
 	void SetCursorMode(int mode);
 	void HideMouseCursor();
+	void CaptureMouseCursor();
 	void UnhideMouseCursor();
+	void ReleaseCursorFocus();
 	void UpdateCursorMode(bool gameMode);
 	bool UpdateGameLook(bool gameMode);
 	void UpdateEditorLook(bool gameMode);
@@ -60,6 +63,7 @@ private:
 	bool m_previousGamepadStateValid = false;
 	bool m_controllerActive = false;
 	bool m_controllerCursorHidden = false;
+	bool m_gameplayFocusActive = false;
 	int m_cursorMode = GLFW_CURSOR_NORMAL;
 };
 

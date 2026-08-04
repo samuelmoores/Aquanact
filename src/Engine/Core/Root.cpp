@@ -14,6 +14,7 @@
 #include "Engine/Core/Input.h"
 #include "Engine/Core/InputManager.h"
 #include "Engine/Core/FrameProfiler.h"
+#include "Engine/Core/GLHeaders.h"
 
 #include <chrono>
 #include <filesystem>
@@ -117,6 +118,7 @@ void Root::startUp(int argc, char** argv)
 	m_editorLaunchedGameSession = false;
 
 	m_window->startUp();
+	m_targetFrameRate = m_window->RefreshRate();
 	m_renderManager->startUp(*m_window);
 	m_frontEndManager->startUp(*m_window);
 	m_input->startUp(*m_window);
@@ -168,13 +170,21 @@ void Root::run()
 			m_renderManager->Loop(*m_frontEndManager, *m_fileManager, *m_levelManager, *m_projectManager, *m_debug, *m_input, *m_window, m_engineState);
 		}
 
+		// Make the displayed frame time include outstanding GPU work. Without this,
+		// the CPU can report 120 FPS while the GPU is still presenting frames much
+		// more slowly. This is intentionally only enabled when the profiler is on.
+		if (m_profiler->IsEnabled())
+		{
+			glFinish();
+		}
+
 		// Frame pacing is independent from optional profiler sampling.
 		if (m_frameCapEnabled && m_targetFrameRate > 0.0)
 		{
 			const auto targetFrameDuration = std::chrono::duration<double>(1.0 / m_targetFrameRate);
 			const auto targetFrameEnd = frameStart + targetFrameDuration;
-			// Windows sleep resolution can round an 8.33 ms wait up to roughly
-			// 16.6 ms. Yield in the final pacing loop instead of falling to 60 Hz.
+			// Windows sleep calls may overshoot an 8.33 ms frame and effectively
+			// turn a 120 Hz cap into 60 Hz. Yield until the precise deadline.
 			while (std::chrono::steady_clock::now() < targetFrameEnd)
 			{
 				std::this_thread::yield();

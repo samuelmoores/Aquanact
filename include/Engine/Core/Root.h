@@ -82,7 +82,7 @@ private:
 	std::unique_ptr<InputManager> m_inputManager;
 	std::unique_ptr<FrameProfiler> m_profiler;
 	bool m_frameCapEnabled = true;
-	double m_targetFrameRate = 120.0;
+	double m_targetFrameRate = 60.0;
 	EngineState m_engineState;
 	bool m_gameModeDebug = true;
 	bool m_editorLaunchedGameSession = false;

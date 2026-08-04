@@ -14,6 +14,8 @@ public:
 	bool ShouldClose() const;
 	void SwapBuffers();
 	void PollEvents();
+	void Focus();
+	double RefreshRate() const;
 
 private:
 	GLFWwindow* m_glfwWindow = nullptr;

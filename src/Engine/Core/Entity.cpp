@@ -192,12 +192,6 @@ void Entity::UpdateNonControllerComponents(float dt)
 	}
 }
 
-void Entity::CapturePhysicsState()
-{
-	m_previousPhysicsPosition = m_position;
-	m_previousPhysicsRotation = m_rotation;
-}
-
 void Entity::FirstFrameComponents()
 {
 	for (Component* component : OrderedComponents(*this))
@@ -207,7 +201,6 @@ void Entity::FirstFrameComponents()
 }
 void Entity::startUp()
 {
-	CapturePhysicsState();
 	for (Component* component : OrderedComponents(*this))
 	{
 		component->startUp(*this);
@@ -222,17 +215,6 @@ glm::mat4 Entity::BuildModelMatrix()
 	return glm::scale(m, m_scale);
 }
 
-glm::mat4 Entity::BuildRenderModelMatrix(float interpolationAlpha) const
-{
-	const float alpha = glm::clamp(interpolationAlpha, 0.0f, 1.0f);
-	const glm::vec3 position = glm::mix(m_previousPhysicsPosition, m_position, alpha);
-	const glm::vec3 rotation = glm::mix(m_previousPhysicsRotation, m_rotation, alpha);
-	auto m = glm::translate(glm::mat4(1), position);
-	m = glm::rotate(m, rotation[1], glm::vec3(0, 1, 0));
-	m = glm::rotate(m, rotation[0], glm::vec3(1, 0, 0));
-	m = glm::rotate(m, rotation[2], glm::vec3(0, 0, 1));
-	return glm::scale(m, m_scale);
-}
 void Entity::Rotate(glm::vec3 delta) { m_rotation += delta; }
 void Entity::Move(glm::vec3 delta) { m_position += delta; updateMeshAABB(delta); }
 void Entity::Translate(glm::vec3 delta) { m_position += delta; updateMeshAABB(delta); }

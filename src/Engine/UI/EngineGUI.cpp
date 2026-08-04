@@ -560,11 +560,6 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 			{
 				Root::Current().Debugger().SetShowStatsWindow(showStatsWindow);
 			}
-		bool showPhysicsDiagnosticsWindow = Root::Current().Debugger().ShowPhysicsDiagnosticsWindow();
-			if (ToggleMenuItem("Physics Diagnostics", showPhysicsDiagnosticsWindow))
-			{
-				Root::Current().Debugger().SetShowPhysicsDiagnosticsWindow(showPhysicsDiagnosticsWindow);
-			}
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Lighting"))
@@ -721,21 +716,11 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 	if (m_showFileExplorer)
 	{
 		bool open = m_showFileExplorer;
-		if (ImGui::Begin("File Explorer", &open, ImGuiWindowFlags_NoFocusOnAppearing))
+		if (ImGui::Begin("File Explorer", &open, ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_AlwaysAutoResize))
 		{
 			if (ImGui::Button("Models"))
 			{
 				fileManager.SetRootDirectory("C:/dev/Aquanact/assets/models");
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("Textures"))
-			{
-				fileManager.SetRootDirectory("C:/dev/Aquanact/assets/textures");
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("Projects"))
-			{
-				fileManager.SetRootDirectory("C:/dev/Aquanact/assets/projects");
 			}
 
 			if (fileManager.CanImportSelection())
@@ -773,6 +758,8 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 		bool open = m_showLevelWindow;
 		const Scene* activeLevelForTitle = SceneManager.ActiveLevel();
 		const std::string levelWindowTitle = activeLevelForTitle ? activeLevelForTitle->Name() : "Scene";
+		// The level list is intentionally the one auto-sizing exception: users
+		// need to resize it when a scene contains many entities.
 		if (ImGui::Begin(levelWindowTitle.c_str(), &open, ImGuiWindowFlags_NoFocusOnAppearing))
 		{
 			if (activeLevelForTitle)
@@ -809,7 +796,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 	if (m_showEntityWindow)
 	{
 		bool open = m_showEntityWindow;
-		if (ImGui::Begin("Entity", &open, ImGuiWindowFlags_NoFocusOnAppearing))
+		if (ImGui::Begin("Entity", &open, ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_AlwaysAutoResize))
 		{
 			if (m_selectedLevelObjectIndex < 0 || m_selectedLevelObjectIndex >= static_cast<int>(objects.size()))
 			{
@@ -1136,7 +1123,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 	if (m_showLightingWindow)
 	{
 		bool open = m_showLightingWindow;
-		if (ImGui::Begin("Lighting", &open, ImGuiWindowFlags_NoFocusOnAppearing))
+		if (ImGui::Begin("Lighting", &open, ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_AlwaysAutoResize))
 		{
 			bool shadowsEnabled = Root::Current().Render().Lights().ShadowsEnabled();
 			if (ImGui::Checkbox("Enable Shadows", &shadowsEnabled))

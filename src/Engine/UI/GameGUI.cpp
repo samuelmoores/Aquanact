@@ -388,6 +388,7 @@ void GameGUI::LoadUIAsset(const GameGUIAsset& asset)
 	m_pointerHeight = asset.pointerHeight;
 	m_pointerGap = asset.pointerGap;
 	m_highlightColour = MyGUI::Colour(asset.highlightR, asset.highlightG, asset.highlightB);
+	m_selectedColour = MyGUI::Colour(asset.selectedR, asset.selectedG, asset.selectedB);
 	m_loadedAsset = asset;
 	m_runtimeWidgetLookup.clear();
 	std::unordered_map<std::string, MyGUI::Widget*> createdWidgets;
@@ -570,10 +571,35 @@ MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::
 	{
 		// ButtonEmptySkin contains only MyGUI's text layer, so disabling the
 		// button image preserves its caption, text colour, and interaction.
-		const std::string skin = !def.useSkin ? "ButtonEmptySkin" : (def.skin.empty() ? "Button" : def.skin);
+		bool panelHidesButtonSkin = false;
+		if (!def.parentName.empty())
+		{
+			const auto parentIt = std::find_if(m_loadedAsset.widgets.begin(), m_loadedAsset.widgets.end(), [&def](const GameGUIWidgetDef& candidate)
+			{
+				return candidate.type == "Panel" && candidate.name == def.parentName;
+			});
+			panelHidesButtonSkin = parentIt != m_loadedAsset.widgets.end() && !parentIt->panelButtonUseSkin;
+		}
+		const std::string skin = !def.useSkin || panelHidesButtonSkin
+			? "ButtonEmptySkin"
+			: (!def.parentName.empty()
+				? ([&]()
+				{
+					const auto parentIt = std::find_if(m_loadedAsset.widgets.begin(), m_loadedAsset.widgets.end(), [&def](const GameGUIWidgetDef& candidate)
+					{
+						return candidate.type == "Panel" && candidate.name == def.parentName;
+					});
+					return parentIt != m_loadedAsset.widgets.end() && !parentIt->panelButtonSkin.empty()
+						? "MultiListButtonSkin" : (def.skin.empty() ? "MultiListButtonSkin" : def.skin);
+				})()
+				: (def.skin.empty() ? "ButtonSkin" : def.skin));
+		// Explicit widget dimensions are authoritative. The skin supplies the
+		// visual treatment, but must not replace the user's configured width/height.
+		const int buttonWidth = std::max(1, def.width);
+		const int buttonHeight = std::max(1, def.height);
 		MyGUI::Button* button = parent ?
-			parent->createWidget<MyGUI::Button>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.name) :
-			m_gui->createWidget<MyGUI::Button>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.layer, def.name);
+			parent->createWidget<MyGUI::Button>(skin, def.x, def.y, buttonWidth, buttonHeight, MyGUI::Align::Default, def.name) :
+			m_gui->createWidget<MyGUI::Button>(skin, def.x, def.y, buttonWidth, buttonHeight, MyGUI::Align::Default, def.layer, def.name);
 		if (button)
 		{
 			button->setCaption("");
@@ -589,16 +615,20 @@ MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::
 			{
 				m_controllerButtons.push_back(button);
 			}
-			MyGUI::TextBox* label = button->createWidget<MyGUI::TextBox>("TextBox", 0, 0, def.width, def.height, MyGUI::Align::Stretch, def.name + "_label");
+			MyGUI::TextBox* label = button->createWidget<MyGUI::TextBox>("TextBox", 0, 0, buttonWidth, buttonHeight, MyGUI::Align::Stretch, def.name + "_label");
 			if (label)
 			{
 				label->setCaption(def.text.empty() ? def.name : def.text);
 				label->setTextColour(m_buttonDefaultTextColours[button]);
 				label->setTextAlign(MyGUI::Align::Center);
 				if (def.fontSize > 0) label->setFontHeight(def.fontSize);
+				if (!def.fontName.empty()) label->setFontName(def.fontName);
 				label->setNeedMouseFocus(false);
 				label->setNeedKeyFocus(false);
 				label->setInheritsPick(false);
+				// The button skin is a child-rendered background. Promote the custom
+				// label after creation so its text is always rendered above that skin.
+				MyGUI::LayerManager::getInstance().upLayerItem(label);
 				m_buttonLabels[button] = label;
 			}
 			// Button clicks are routed back into GameGUI so we can attach small
@@ -829,11 +859,14 @@ void GameGUI::ApplyTextHighlight(MyGUI::Button* button, bool highlighted)
 	{
 		return;
 	}
-	button->setTextColour(highlighted ? m_highlightColour : it->second);
+	const MyGUI::Colour colour = highlighted
+		? (button->getStateSelected() ? m_selectedColour : m_highlightColour)
+		: it->second;
+	button->setTextColour(colour);
 	const auto label = m_buttonLabels.find(button);
 	if (label != m_buttonLabels.end() && label->second)
 	{
-		label->second->setTextColour(highlighted ? m_highlightColour : it->second);
+		label->second->setTextColour(colour);
 	}
 }
 

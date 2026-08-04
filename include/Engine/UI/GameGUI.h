@@ -70,6 +70,7 @@ private:
 	std::string m_pointerSkin = "NavigationArrowRight1";
 	int m_pointerWidth = 40, m_pointerHeight = 40, m_pointerGap = 24;
 	MyGUI::Colour m_highlightColour = MyGUI::Colour(1.0f, 1.0f, 0.0f);
+	MyGUI::Colour m_selectedColour = MyGUI::Colour(1.0f, 1.0f, 1.0f);
 	bool m_initialized = false;
 };
 
