@@ -1,4 +1,5 @@
 #include "Engine/UI/GameGUICreator.h"
+#include "Engine/UI/GameGUICreatorHelpers.h"
 
 #include "Engine/Core/Debug.h"
 #include "Engine/Core/FrontEndManager.h"
@@ -15,7 +16,7 @@ namespace {
 		{
 			return nullptr;
 		}
-		for (const auto& entity : scene->Entities())
+		for (const std::unique_ptr<Entity>& entity : scene->Entities())
 		{
 			if (entity && entity->Name() == name)
 			{
@@ -39,127 +40,37 @@ void GameGUICreator::DrawCreateWidgetPopup()
 		return;
 	}
 
-	const char* widgetKind = m_newWidgetIsPanel ? "Create a panel widget:" : m_newWidgetIsProgressBar ? "Create a progress bar widget:" : (m_newWidgetIsImage ? "Create an image widget:" : "Create a button widget:");
+	const char* widgetKind = "Create a button widget:";
+	if (m_newWidgetIsPanel)
+	{
+		widgetKind = "Create a panel widget:";
+	}
+	else if (m_newWidgetIsProgressBar)
+	{
+		widgetKind = "Create a progress bar widget:";
+	}
+	else if (m_newWidgetIsImage)
+	{
+		widgetKind = "Create an image widget:";
+	}
+
 	ImGui::TextUnformatted(widgetKind);
 	ImGui::InputText("Name", m_newWidgetName, sizeof(m_newWidgetName));
-	if (!m_newWidgetIsProgressBar && !m_newWidgetIsPanel)
+
+	// Panels only need a name; the texture field is for content widgets.
+	if (!m_newWidgetIsPanel)
 	{
-		ImGui::InputText("Texture", m_newWidgetTexture, sizeof(m_newWidgetTexture));
-		ImGui::SameLine();
-		if (ImGui::Button("Browse...##NewWidgetTexture"))
+		std::string texturePath = m_newWidgetTexture;
+		ImGui::TextUnformatted("Texture");
+		if (GameGUICreatorHelpers::DrawTextureCombo("##NewWidgetTexture", texturePath, false, "<No Texture>"))
 		{
-			OpenTexturePicker(TexturePickerTarget::NewWidgetTexture);
+			std::snprintf(m_newWidgetTexture, sizeof(m_newWidgetTexture), "%s", texturePath.c_str());
 		}
 	}
 
-	if (m_newWidgetIsImage || m_newWidgetIsProgressBar)
-	{
-		ImGui::TextUnformatted(m_newWidgetIsProgressBar ? "Configure the progress bar's binding:" : "Choose an image for the widget:");
-	}
-
-	if (m_newWidgetIsProgressBar)
-	{
-		Scene* activeLevel = Root::Current().Levels().ActiveLevel();
-		ImGui::Separator();
-		ImGui::TextUnformatted("Binding");
-
-		GameGUIWidgetDef& preview = m_pendingProgressBarWidget;
-		if (preview.name.empty())
-		{
-			preview.name = m_newWidgetName[0] != '\0' ? m_newWidgetName : "progress";
-		}
-		preview.texture = m_newWidgetTexture[0] != '\0' ? m_newWidgetTexture : "textures/example.png";
-		preview.type = "ProgressBar";
-		preview.layer = "Main";
-		preview.width = 256;
-		preview.height = 32;
-		preview.textureWidth = 256;
-		preview.textureHeight = 32;
-		preview.defaultTextureWidth = 256;
-		preview.defaultTextureHeight = 32;
-
-		const char* entityLabel = preview.bindEntity.empty() ? "<Select Entity>" : preview.bindEntity.c_str();
-		if (ImGui::BeginCombo("Entity", entityLabel))
-		{
-			if (activeLevel)
-			{
-				for (const auto& entity : activeLevel->Entities())
-				{
-					if (!entity)
-					{
-						continue;
-					}
-					const bool selected = preview.bindEntity == entity->Name();
-					if (ImGui::Selectable(entity->Name().c_str(), selected))
-					{
-						preview.bindEntity = entity->Name();
-						preview.bindComponent.clear();
-						preview.bindMember.clear();
-						preview.bindEvent.clear();
-					}
-					if (selected)
-					{
-						ImGui::SetItemDefaultFocus();
-					}
-				}
-			}
-			ImGui::EndCombo();
-		}
-
-		Entity* boundEntity = activeLevel ? FindEntity(activeLevel, preview.bindEntity) : nullptr;
-		ImGui::BeginDisabled(!boundEntity);
-		const char* componentLabel = preview.bindComponent.empty() ? "<Select Component>" : preview.bindComponent.c_str();
-		if (ImGui::BeginCombo("Component", componentLabel))
-		{
-			for (Component* component : boundEntity ? boundEntity->Components() : std::vector<Component*>{})
-			{
-				if (!component || component->GetBindableMembers().empty())
-				{
-					continue;
-				}
-				const bool selected = preview.bindComponent == component->Name();
-				if (ImGui::Selectable(component->Name(), selected))
-				{
-					preview.bindComponent = component->Name();
-					preview.bindMember.clear();
-				}
-				if (selected)
-				{
-					ImGui::SetItemDefaultFocus();
-				}
-			}
-			ImGui::EndCombo();
-		}
-		ImGui::EndDisabled();
-
-		Component* boundComponent = boundEntity ? boundEntity->GetComponentByName(preview.bindComponent) : nullptr;
-		ImGui::BeginDisabled(!boundComponent);
-		const char* memberLabel = preview.bindMember.empty() ? "<Select Value>" : preview.bindMember.c_str();
-		std::vector<BindableMember> bindableMembers = boundComponent ? boundComponent->GetBindableMembers() : std::vector<BindableMember>{};
-		if (ImGui::BeginCombo("Value", memberLabel))
-		{
-			for (const BindableMember& member : bindableMembers)
-			{
-				if (member.typeName != "int" && member.typeName != "float")
-				{
-					continue;
-				}
-				const bool selected = preview.bindMember == member.name;
-				const char* label = member.displayName.empty() ? member.name.c_str() : member.displayName.c_str();
-				if (ImGui::Selectable(label, selected))
-				{
-					preview.bindMember = member.name;
-				}
-				if (selected)
-				{
-					ImGui::SetItemDefaultFocus();
-				}
-			}
-			ImGui::EndCombo();
-		}
-		ImGui::EndDisabled();
-	}
-	else if (!m_newWidgetIsPanel)
+	// Panels, images, and progress bars stop at the shared fields above.
+	// Only button widgets expose binding controls in this popup.
+	if (!m_newWidgetIsPanel && !m_newWidgetIsImage && !m_newWidgetIsProgressBar)
 	{
 		ImGui::Separator();
 		ImGui::TextUnformatted("Binding");
@@ -183,10 +94,11 @@ void GameGUICreator::DrawCreateWidgetPopup()
 			ImGui::EndCombo();
 		}
 		m_newWidgetAction = action;
+
 		if (m_newWidgetAction == GameGUIActionType::NewGame)
 		{
-			SceneManager& sceneManager = Root::Current().Levels();
-			const auto levelNames = sceneManager.SceneNames(SceneManager::SceneKind::Level);
+			SceneManager& sceneManager = Root::Current().Scenes();
+			const std::vector<std::string> levelNames = sceneManager.SceneNames(SceneManager::SceneKind::Level);
 			const char* launchLabel = m_newWidgetLaunchLevel.empty() ? "<Select Level>" : m_newWidgetLaunchLevel.c_str();
 			if (ImGui::BeginCombo("Launch Level", launchLabel))
 			{
@@ -217,31 +129,34 @@ void GameGUICreator::DrawCreateWidgetPopup()
 
 	if (ImGui::Button("Create"))
 	{
-		if (m_newWidgetIsProgressBar)
+		// Dispatch to the specific creation path based on the popup mode.
+		if (m_newWidgetIsPanel)
 		{
-			if (m_pendingProgressBarWidget.name.empty())
-			{
-				m_pendingProgressBarWidget.name = m_newWidgetName[0] != '\0' ? m_newWidgetName : "progress";
-			}
+			AddPanelWidget();
+		}
+		else if (m_newWidgetIsProgressBar)
+		{
 			AddProgressBarWidget();
-			m_pendingProgressBarWidget = {};
 		}
 		else if (m_newWidgetIsImage)
 		{
 			AddImageWidget();
 		}
-		else if (m_newWidgetIsPanel)
-		{
-			AddPanelWidget();
-		}
 		else
 		{
 			AddButtonWidget();
 		}
+
 		SyncRuntimePreview();
-		Root::Current().Debugger().LogMessage(m_newWidgetIsProgressBar ? "Create Progress Bar requested" : (m_newWidgetIsImage ? "Create Image requested" : "Create Button requested"));
+		// Keep the log message aligned with the widget type that was just created.
+		const char* logMessage = m_newWidgetIsPanel ? "Create Panel requested"
+			: m_newWidgetIsProgressBar ? "Create Progress Bar requested"
+			: m_newWidgetIsImage ? "Create Image requested"
+			: "Create Button requested";
+		Root::Current().Debugger().LogMessage(logMessage);
 		ImGui::CloseCurrentPopup();
 	}
+
 	ImGui::SameLine();
 	if (ImGui::Button("Cancel"))
 	{

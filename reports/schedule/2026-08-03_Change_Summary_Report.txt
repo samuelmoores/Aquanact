@@ -1,0 +1,76 @@
+August 3, 2026 Change Summary Report
+Date: 2026-08-03
+
+Scope
+- Consolidated the work committed on August 3, 2026 across GameGUI, input handling, windowing, and related runtime/editor integration.
+- Focused on the actual code and asset changes that landed yesterday, not broader roadmap items.
+
+High-Level Summary
+- GameGUI gained a larger set of editor/runtime behaviors, including panel updates, persistence work, and controller-driven navigation support.
+- Input handling was expanded to support controller navigation and button navigation toggles.
+- Window, render, root, and debug plumbing were adjusted to support the updated runtime flow.
+- Several GameGUI assets were updated alongside code changes so the editor and runtime stay in sync.
+
+What Changed
+- `GameGUICreator` was expanded and split across more focused source files to support richer panel/detail workflows.
+- `GameGUI` and `GameGUIManager` were updated to handle button selection, navigation state, and runtime/editor interactions more consistently.
+- `Input` gained new controller and navigation-related behavior, including the button navigation toggle path.
+- `Window`, `Root`, `RenderManager`, and `Debug` received supporting updates tied to the new GUI/runtime flow.
+- `Entity`, `GameplayManager`, and `ProjectStateSerializer` had cleanup or integration changes where the GUI refactor required it.
+- `assets/gameGUI/hud.json` and `assets/gameGUI/mainmenu.json` were revised to match the new GUI behavior.
+- `assets/projects/project.aqua` was updated multiple times to keep the project state aligned with the new GUI and input work.
+
+Commit-Level Breakdown
+- `a4ac3fd` — GameGUI asset reload from disk on play in editor
+  - Added/reworked asset reload behavior for GUI data when entering play mode from the editor.
+  - Updated the persistence and editor path handling around GameGUI assets.
+
+- `cf97b9e` — menu navigation with controller
+  - Added controller-driven menu navigation support.
+  - Extended input and GUI handling so menus can be navigated without mouse-only interaction.
+
+- `6b29f2c` — MyGUI button color patch
+  - Adjusted button color behavior in GameGUI presentation.
+  - Included related persistence and manager updates to preserve the new UI state.
+
+- `4dea6be` — mouse controller button navigation toggle
+  - Added a toggle path for controller-based button navigation.
+  - Expanded input logic and GameGUI behavior to switch navigation modes cleanly.
+
+- `8a90e4d` — GameGUI panels and selected button choices
+  - Added richer panel behavior and selected-button choice handling.
+  - Expanded `GameGUI`, `GameGUICreator`, and `GameGUIManager` substantially.
+  - Updated project and GUI assets to reflect the new selection model.
+
+- `1df4867` — huge GameGUICreator update
+  - Continued the creator refactor and expanded details panels and persistence behavior.
+  - Added a new performance/memory investigation report file during the same workstream.
+  - Performed broad supporting updates across engine core, windowing, rendering, and GUI manager code.
+
+Files Most Affected
+- `include/Engine/Core/Input.h`
+- `src/Engine/Core/Input.cpp`
+- `include/Engine/UI/GameGUI.h`
+- `src/Engine/UI/GameGUI.cpp`
+- `include/Engine/UI/GameGUIManager.h`
+- `src/Engine/UI/GameGUIManager.cpp`
+- `include/Engine/UI/GameGUICreator.h`
+- `src/Engine/UI/GameGUICreator.cpp`
+- `src/Engine/UI/GameGUICreator_Panels.cpp`
+- `src/Engine/UI/GameGUICreator_PanelsDetails.cpp`
+- `src/Engine/UI/GameGUICreator_Persistence.cpp`
+- `src/Engine/Core/Window.h`
+- `src/Engine/Core/Window.cpp`
+- `src/Engine/Core/Root.cpp`
+- `src/Engine/Core/RenderManager.cpp`
+- `assets/gameGUI/hud.json`
+- `assets/gameGUI/mainmenu.json`
+- `assets/projects/project.aqua`
+
+Notes
+- The changes yesterday were concentrated in the GUI/editor input path rather than in unrelated gameplay systems.
+- The work is cumulative: later commits build on the earlier menu/controller and asset reload changes.
+- The new report at `reports/performance/2026-08-03_Performance_Memory_Leak_Investigation.txt` appears to be part of the same day’s work, but it is a separate deliverable and is not duplicated here.
+
+Verification
+- Reviewed the August 3 git history and commit stats to summarize the day’s changes.

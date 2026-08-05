@@ -27,49 +27,13 @@
 #include <MYGUI/MyGUI_PointerManager.h>
 #include <MYGUI/MyGUI_OpenGLImageLoader.h>
 #include <algorithm>
+#include <cmath>
 #include <fstream>
 #include <iostream>
 #include <unordered_map>
 #include "Engine/Core/Texture.h"
 
 namespace {
-	float ReadProgressPercent(const GameGUIWidgetDef& def)
-	{
-		if (def.bindEntity.empty() || def.bindComponent.empty() || def.bindMember.empty())
-		{
-			return 0.0f;
-		}
-
-		Scene* activeLevel = Root::Current().Levels().ActiveLevel();
-		if (!activeLevel)
-		{
-			return 0.0f;
-		}
-
-		for (const auto& entity : activeLevel->Entities())
-		{
-			if (!entity || entity->Name() != def.bindEntity)
-			{
-				continue;
-			}
-
-			Component* component = entity->GetComponentByName(def.bindComponent);
-			if (!component)
-			{
-				return 0.0f;
-			}
-
-			float value = 0.0f;
-			if (!component->TryGetBindableValue(def.bindMember, value))
-			{
-				return 0.0f;
-			}
-			return std::clamp(value, 0.0f, 100.0f) / 100.0f;
-		}
-
-		return 0.0f;
-	}
-
 	std::filesystem::path ResolveGameGUIImagePath(const std::string& filename)
 	{
 		const std::filesystem::path requestedPath(filename);
@@ -141,7 +105,7 @@ namespace {
 
 	Component* ResolveBoundComponent(const GameGUIWidgetDef& def)
 	{
-		Scene* activeLevel = Root::Current().Levels().ActiveLevel();
+		Scene* activeLevel = Root::Current().Scenes().ActiveLevel();
 		if (!activeLevel)
 		{
 			return nullptr;
@@ -318,32 +282,6 @@ void GameGUI::Draw()
 	if (!m_initialized)
 	{
 		return;
-	}
-
-	for (const GameGUIWidgetDef& widget : m_loadedAsset.widgets)
-	{
-		if (widget.type != "ProgressBar")
-		{
-			continue;
-		}
-
-		auto it = m_runtimeWidgetLookup.find(widget.name);
-		if (it == m_runtimeWidgetLookup.end())
-		{
-			continue;
-		}
-
-		auto* fillImage = dynamic_cast<MyGUI::ImageBox*>(it->second);
-		if (!fillImage)
-		{
-			continue;
-		}
-
-		const float percent = ReadProgressPercent(widget);
-		const int filledWidth = percent <= 0.0f
-			? 0
-			: std::max(1, static_cast<int>(std::lround(static_cast<float>(widget.width) * percent)));
-		fillImage->setSize(MyGUI::IntSize(filledWidth, widget.height));
 	}
 
 	// MyGUI needs a per-frame tick so internal widget state and input-driven updates
@@ -702,17 +640,18 @@ MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::
 	}
 	else if (def.type == "ProgressBar")
 	{
-		MyGUI::ImageBox* progress = parent ?
-			parent->createWidget<MyGUI::ImageBox>("ImageBox", def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.name) :
-			m_gui->createWidget<MyGUI::ImageBox>("ImageBox", def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.layer, def.name);
+		const std::string skin = def.skin.empty() ? "ProgressBar" : def.skin;
+		MyGUI::ProgressBar* progress = parent ?
+			parent->createWidget<MyGUI::ProgressBar>(skin, def.x, def.y, std::max(1, def.width), std::max(1, def.height), MyGUI::Align::Default, def.name) :
+			m_gui->createWidget<MyGUI::ProgressBar>(skin, def.x, def.y, std::max(1, def.width), std::max(1, def.height), MyGUI::Align::Default, def.layer, def.name);
 		if (progress)
 		{
-			if (!def.texture.empty())
-			{
-				progress->setImageTexture(def.texture);
-			}
 			progress->setVisible(def.visible);
 			progress->setAlpha(def.alpha);
+			progress->setNeedMouseFocus(false);
+			progress->setInheritsPick(false);
+			progress->setProgressRange(100);
+			progress->setProgressPosition(100);
 			if (!parent)
 			{
 				MyGUI::LayerManager::getInstance().upLayerItem(progress);
@@ -720,7 +659,6 @@ MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::
 			return progress;
 		}
 	}
-
 	return nullptr;
 }
 
@@ -940,6 +878,12 @@ void GameGUI::SetPointerSkin(const std::string& skin)
 	}
 }
 
+MyGUI::Widget* GameGUI::RuntimeWidget(const std::string& name) const
+{
+	auto it = m_runtimeWidgetLookup.find(name);
+	return it != m_runtimeWidgetLookup.end() ? it->second : nullptr;
+}
+
 void GameGUI::BindWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* widget)
 {
 	if (!widget || def.bindEntity.empty() || def.bindComponent.empty() || def.bindEvent.empty())
@@ -1027,7 +971,7 @@ void GameGUI::OnWidgetClicked(MyGUI::Widget* sender)
 			break;
 		}
 		Root::Current().FrontEnd().RuntimeGUI().HideAll();
-		Scene* targetScene = FindNamedLevel(Root::Current().Levels(), launchLevel);
+		Scene* targetScene = FindNamedLevel(Root::Current().Scenes(), launchLevel);
 		Root::Current().Debugger().LogMessage(
 			"GameGUI NewGame initial scene lookup: " +
 			std::string(targetScene ? targetScene->Name() : "<not found>"));
@@ -1036,12 +980,12 @@ void GameGUI::OnWidgetClicked(MyGUI::Widget* sender)
 		{
 			Root::Current().Debugger().LogMessage("GameGUI NewGame reloading project to retry scene lookup.");
 			std::cout << "GameGUI NewGame reloading project to retry scene lookup.\n";
-			if (!Root::Current().Projects().LoadProject(Root::Current().Projects().CurrentProjectPath(), Root::Current().Levels()))
+			if (!Root::Current().Projects().LoadProject(Root::Current().Projects().CurrentProjectPath(), Root::Current().Scenes()))
 			{
 				Root::Current().Debugger().LogMessage("GameGUI NewGame failed: could not reload the current project.");
 				break;
 			}
-			targetScene = FindNamedLevel(Root::Current().Levels(), launchLevel);
+			targetScene = FindNamedLevel(Root::Current().Scenes(), launchLevel);
 			Root::Current().Debugger().LogMessage(
 				"GameGUI NewGame post-reload scene lookup: " +
 				std::string(targetScene ? targetScene->Name() : "<not found>"));
@@ -1049,7 +993,7 @@ void GameGUI::OnWidgetClicked(MyGUI::Widget* sender)
 		}
 		if (!targetScene)
 		{
-			targetScene = FindPlayableScene(Root::Current().Levels());
+			targetScene = FindPlayableScene(Root::Current().Scenes());
 			Root::Current().Debugger().LogMessage(
 				"GameGUI NewGame fallback playable scene: " +
 				std::string(targetScene ? targetScene->Name() : "<not found>"));
@@ -1059,8 +1003,8 @@ void GameGUI::OnWidgetClicked(MyGUI::Widget* sender)
 		{
 			Root::Current().Debugger().LogMessage("GameGUI NewGame launching scene: " + targetScene->Name());
 			std::cout << "GameGUI NewGame launching scene: " << targetScene->Name() << '\n';
-			Root::Current().Levels().SetActiveLevel(targetScene->Name());
-			Root::Current().Levels().SetStartupLevelName(targetScene->Name());
+			Root::Current().Scenes().SetActiveLevel(targetScene->Name());
+			Root::Current().Scenes().SetStartupLevelName(targetScene->Name());
 		}
 		if (!Root::Current().Gameplay().BootPlayableLevel(Root::Current().FrontEnd(), Root::Current().Debugger()))
 		{

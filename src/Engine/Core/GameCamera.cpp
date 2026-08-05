@@ -208,7 +208,7 @@ void GameCamera::UpdateThirdPerson(const Input& input, float dt)
 	glm::vec3 lastCollisionNormal(0.0f);
 	float lastPenetration = 0.0f;
 	std::string lastCollisionObject;
-	const Scene* activeLevel = Root::Current().Levels().ActiveLevel();
+	const Scene* activeLevel = Root::Current().Scenes().ActiveLevel();
 	if (activeLevel)
 	{
 		const auto positionBlocked = [&](const glm::vec3& position)

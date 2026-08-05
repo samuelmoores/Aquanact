@@ -52,7 +52,7 @@ public:
 	EventManager& Events();
 	FileManager& Files();
 	FileSystem& FileSystemRef();
-	SceneManager& Levels();
+	SceneManager& Scenes();
 	ProjectManager& Projects();
 	GameplayManager& Gameplay();
 	Input& InputRef();
@@ -75,7 +75,7 @@ private:
 	std::unique_ptr<EventManager> m_eventManager;
 	std::unique_ptr<FileSystem> m_fileSystem;
 	std::unique_ptr<FileManager> m_fileManager;
-	std::unique_ptr<SceneManager> m_levelManager;
+	std::unique_ptr<SceneManager> m_sceneManager;
 	std::unique_ptr<ProjectManager> m_projectManager;
 	std::unique_ptr<GameplayManager> m_gameplayManager;
 	std::unique_ptr<Input> m_input;

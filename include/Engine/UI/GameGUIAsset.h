@@ -41,12 +41,12 @@ struct GameGUIWidgetDef
 	std::string layer = "Main";
 	int x = 0;
 	int y = 0;
-	int width = 100;
-	int height = 30;
-	int textureWidth = 100;
-	int textureHeight = 30;
-	int defaultTextureWidth = 100;
-	int defaultTextureHeight = 30;
+	int defaultWidth = 0;
+	int defaultHeight = 0;
+	int width = 0;
+	int height = 0;
+	int textureWidth = 0;
+	int textureHeight = 0;
 	int fontSize = 0;
 	std::string fontName;
 	bool visible = true;

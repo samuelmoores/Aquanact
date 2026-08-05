@@ -7,12 +7,9 @@ void GameGUICreatorModel::Reset()
 	selectedWidgetIndex = -1;
 	showCreateWidgetPopup = false;
 	showBindingPopup = false;
-	pendingProgressBarCreation = false;
-	pendingProgressBarBindingComplete = false;
 	showTexturePickerPopup = false;
 	newWidgetIsText = false;
 	newWidgetIsImage = false;
-	newWidgetIsProgressBar = false;
 	lockWidgetSize = false;
 	newWidgetName[0] = '\0';
 	newWidgetText[0] = '\0';
@@ -24,7 +21,6 @@ void GameGUICreatorModel::Reset()
 	bindingWidgetName.clear();
 	lockedWidgetSizeRatio = 1.0f;
 	newWidgetAction = GameGUIActionType::None;
-	pendingProgressBarWidget = {};
 	previousShowAxis = true;
 	previousShowGrid = true;
 	previousViewStateCaptured = false;

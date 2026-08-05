@@ -3,14 +3,24 @@
 #include "Engine/Core/Root.h"
 #include "Engine/Core/FileSystem.h"
 #include "Engine/Core/Scene.h"
+#include "Engine/Core/Component.h"
+#include "Engine/Core/StbImage.h"
 
+#include <imgui.h>
 #include <MYGUI/MyGUI_Colour.h>
 #include <algorithm>
 #include <cctype>
 #include <fstream>
 #include <iterator>
+#include <vector>
 
 namespace GameGUICreatorHelpers {
+	float ReadFloatField(const std::string& value, float fallback)
+	{
+		if (value.empty()) return fallback;
+		try { return std::stof(value); } catch (...) { return fallback; }
+	}
+
 	int ReadIntField(const std::string& value, int fallback)
 	{
 		if (value.empty()) return fallback;
@@ -109,11 +119,250 @@ namespace GameGUICreatorHelpers {
 		return extension == ".png" || extension == ".jpg" || extension == ".jpeg" || extension == ".bmp" || extension == ".tga";
 	}
 
+	std::filesystem::path ResolveTexturePath(const std::string& texturePath)
+	{
+		if (texturePath.empty())
+		{
+			return {};
+		}
+		std::filesystem::path path(texturePath);
+		if (path.is_absolute())
+		{
+			return path;
+		}
+		const std::filesystem::path sourceRoot = SourceRoot();
+		const std::filesystem::path assetsRoot = sourceRoot / "assets";
+		const std::string normalized = path.generic_string();
+		const std::string sourceRootName = sourceRoot.filename().generic_string();
+		if (!sourceRootName.empty() && normalized.rfind(sourceRootName, 0) == 0)
+		{
+			std::string remainder = normalized.substr(sourceRootName.size());
+			while (!remainder.empty() && (remainder.front() == '/' || remainder.front() == '\\'))
+			{
+				remainder.erase(remainder.begin());
+			}
+			if (!remainder.empty())
+			{
+				return (sourceRoot / std::filesystem::path(remainder)).lexically_normal();
+			}
+		}
+		if (normalized.rfind("assets/", 0) == 0 || normalized.rfind("assets\\", 0) == 0 || normalized == "assets")
+		{
+			return (sourceRoot / path).lexically_normal();
+		}
+		if (normalized.rfind("textures/", 0) == 0 || normalized.rfind("textures\\", 0) == 0 || normalized == "textures")
+		{
+			return (assetsRoot / path).lexically_normal();
+		}
+		return (sourceRoot / path).lexically_normal();
+	}
+
+	bool GetTextureDimensions(const std::filesystem::path& path, int& width, int& height)
+	{
+		try
+		{
+			StbImage image;
+			image.loadFromFile(path.generic_string());
+			width = std::max(1, image.getWidth());
+			height = std::max(1, image.getHeight());
+			return true;
+		}
+		catch (...)
+		{
+			return false;
+		}
+	}
+
+	bool RefreshTextureBaseline(GameGUIWidgetDef& widget, const std::string& texturePath, bool useProgressTexture)
+	{
+		if (texturePath.empty())
+		{
+			return false;
+		}
+
+		const std::filesystem::path resolvedPath = ResolveTexturePath(texturePath);
+		int width = 0;
+		int height = 0;
+		if (!GetTextureDimensions(resolvedPath, width, height))
+		{
+			return false;
+		}
+
+		widget.textureWidth = width;
+		widget.textureHeight = height;
+		widget.defaultWidth = width;
+		widget.defaultHeight = height;
+		if (!useProgressTexture)
+		{
+			widget.texture = texturePath;
+		}
+		return true;
+	}
+
 	std::string MakePortableTexturePath(const std::filesystem::path& absolutePath)
 	{
+		// Prefer storing a project-relative path when the texture lives under assets/.
 		std::error_code ec;
-		const std::filesystem::path relativeToAssets = Root::Current().FileSystemRef().Relative(absolutePath, SourceRoot() / "assets", ec);
-		return (!ec && !relativeToAssets.empty()) ? relativeToAssets.generic_string() : absolutePath.generic_string();
+		const std::filesystem::path assetsRoot = SourceRoot() / "assets";
+		const std::filesystem::path relativeToAssets = Root::Current().FileSystemRef().Relative(absolutePath, assetsRoot, ec);
+
+		// If the relative conversion succeeds, keep the shorter portable path in the asset file.
+		if (!ec && !relativeToAssets.empty())
+		{
+			return relativeToAssets.generic_string();
+		}
+
+		// Otherwise fall back to the original absolute path so the selection is still usable.
+		return absolutePath.generic_string();
+	}
+
+	namespace
+	{
+		std::vector<std::filesystem::path> EnumerateTextures()
+		{
+			std::vector<std::filesystem::path> textures;
+			std::error_code ec;
+			const std::filesystem::path root = TextureDirectory();
+
+			// If the texture root is missing, return an empty list instead of surfacing a filesystem error.
+			if (!std::filesystem::exists(root, ec) || ec)
+			{
+				return textures;
+			}
+
+			// Walk only the top-level texture folder so the dropdown shows a flat list.
+			for (const std::filesystem::directory_entry& entry : std::filesystem::directory_iterator(root, ec))
+			{
+				// Stop early if the filesystem iterator reports an error.
+				if (ec)
+				{
+					break;
+				}
+
+				// Only keep regular files with supported image extensions.
+				if (entry.is_regular_file() && IsSupportedTextureFile(entry.path()))
+				{
+					textures.push_back(entry.path());
+				}
+			}
+
+			// Alphabetical order keeps the combo stable and predictable for the user.
+			std::sort(textures.begin(), textures.end());
+			return textures;
+		}
+	}
+
+	bool DrawTextureCombo(const char* label, std::string& texturePath, bool allowEmpty, const char* emptyLabel)
+	{
+		// The collapsed label shows the current value when the combo is closed.
+		bool changed = false;
+		const char* currentLabel = texturePath.empty() ? (allowEmpty ? emptyLabel : "<MyGUI Default>") : texturePath.c_str();
+		if (ImGui::BeginCombo(label, currentLabel))
+		{
+			// When empty textures are allowed, expose an explicit "no texture" choice first.
+			if (allowEmpty && ImGui::Selectable(emptyLabel, texturePath.empty()))
+			{
+				texturePath.clear();
+				changed = true;
+			}
+
+			// EnumerateTextures() returns every supported texture under assets/textures.
+			// Each row stores the portable path so the asset can be reloaded later.
+			const std::vector<std::filesystem::path> textures = EnumerateTextures();
+
+			for (const std::filesystem::path& tex : textures)
+			{
+				const std::string portable = MakePortableTexturePath(tex);
+
+				// `selected` controls the highlight state for the currently active texture.
+				const bool selected = texturePath == portable;
+
+				if (ImGui::Selectable(portable.c_str(), selected))
+				{
+					// Clicking a texture updates the caller's string and reports that a change occurred.
+					texturePath = portable;
+					changed = true;
+				}
+			}
+			// EndCombo closes the dropdown and finalizes the widget for this frame.
+			ImGui::EndCombo();
+		}
+		return changed;
+	}
+
+	bool DrawProgressBindingControls(GameGUIWidgetDef& widget, Scene* scene)
+	{
+		bool changed = false;
+		if (!scene)
+		{
+			ImGui::TextDisabled("No active Scene is available.");
+			return false;
+		}
+		const char* entityLabel = widget.bindEntity.empty() ? "<Select Entity>" : widget.bindEntity.c_str();
+		if (ImGui::BeginCombo("Entity", entityLabel))
+		{
+			for (const auto& entity : scene->Entities())
+			{
+				if (!entity) continue;
+				const bool selected = widget.bindEntity == entity->Name();
+				if (ImGui::Selectable(entity->Name().c_str(), selected))
+				{
+					widget.bindEntity = entity->Name();
+					widget.bindComponent.clear();
+					widget.bindMember.clear();
+					widget.bindEvent.clear();
+					changed = true;
+				}
+				if (selected) ImGui::SetItemDefaultFocus();
+			}
+			ImGui::EndCombo();
+		}
+		Entity* boundEntity = FindEntity(scene, widget.bindEntity);
+		Component* boundComponent = boundEntity ? boundEntity->GetComponentByName(widget.bindComponent) : nullptr;
+		ImGui::BeginDisabled(!boundEntity);
+		const char* componentLabel = widget.bindComponent.empty() ? "<Select Component>" : widget.bindComponent.c_str();
+		if (ImGui::BeginCombo("Component", componentLabel))
+		{
+			for (Component* component : boundEntity ? boundEntity->Components() : std::vector<Component*>{})
+			{
+				if (!component || component->GetBindableMembers().empty()) continue;
+				const bool selected = widget.bindComponent == component->Name();
+				if (ImGui::Selectable(component->Name(), selected))
+				{
+					widget.bindComponent = component->Name();
+					widget.bindMember.clear();
+					widget.bindEvent.clear();
+					changed = true;
+				}
+				if (selected) ImGui::SetItemDefaultFocus();
+			}
+			ImGui::EndCombo();
+		}
+		ImGui::EndDisabled();
+		ImGui::BeginDisabled(!boundComponent);
+		const char* memberLabel = widget.bindMember.empty() ? "<Select Value>" : widget.bindMember.c_str();
+		std::vector<BindableMember> bindableMembers = boundComponent ? boundComponent->GetBindableMembers() : std::vector<BindableMember>{};
+		if (ImGui::BeginCombo("Value", memberLabel))
+		{
+			for (const BindableMember& member : bindableMembers)
+			{
+				if (member.typeName != "int" && member.typeName != "float")
+				{
+					continue;
+				}
+				const bool selected = widget.bindMember == member.name;
+				const char* label = member.displayName.empty() ? member.name.c_str() : member.displayName.c_str();
+				if (ImGui::Selectable(label, selected))
+				{
+					widget.bindMember = member.name;
+					changed = true;
+				}
+				if (selected) ImGui::SetItemDefaultFocus();
+			}
+			ImGui::EndCombo();
+		}
+		ImGui::EndDisabled();
+		return changed;
 	}
 
 	GameGUIAsset LoadAssetFile(const std::filesystem::path& assetPath)
@@ -189,6 +438,7 @@ namespace GameGUICreatorHelpers {
 			widget.skin = readField("\"skin\":", widgetPos);
 			widget.useSkin = readField("\"useSkin\":", widgetPos).find("false") == std::string::npos;
 			widget.uniformButtonSpacing = readField("\"uniformButtonSpacing\":", widgetPos).find("true") != std::string::npos;
+			widget.panelButtonUseSkin = readField("\"panelButtonUseSkin\":", widgetPos).find("false") == std::string::npos;
 			widget.horizontalButtonLayout = readField("\"horizontalButtonLayout\":", widgetPos).find("true") != std::string::npos;
 			widget.panelPadding = ReadIntField(readField("\"panelPadding\":", widgetPos), 10);
 			widget.panelButtonWidth = ReadIntField(readField("\"panelButtonWidth\":", widgetPos), 100);
@@ -199,13 +449,14 @@ namespace GameGUICreatorHelpers {
 			widget.textColor = readField("\"textColor\":", widgetPos);
 			if (widget.textColor.empty()) widget.textColor = "0 0 0";
 			widget.texture = readField("\"texture\":", widgetPos);
+			if (!widget.texture.empty() && RefreshTextureBaseline(widget, widget.texture, false))
+			{
+			}
 			widget.layer = readField("\"layer\":", widgetPos);
 			widget.x = ReadIntField(readField("\"x\":", widgetPos));
 			widget.y = ReadIntField(readField("\"y\":", widgetPos));
-			widget.width = ReadIntField(readField("\"width\":", widgetPos), 100);
-			widget.height = ReadIntField(readField("\"height\":", widgetPos), 30);
-			widget.defaultTextureWidth = widget.textureWidth;
-			widget.defaultTextureHeight = widget.textureHeight;
+			widget.width = ReadIntField(readField("\"width\":", widgetPos), widget.defaultWidth);
+			widget.height = ReadIntField(readField("\"height\":", widgetPos), widget.defaultHeight);
 			widget.fontSize = ReadIntField(readField("\"fontSize\":", widgetPos), 0);
 			widget.visible = ParseBoolField(readField("\"visible\":", widgetPos));
 			widget.alpha = 1.0f;

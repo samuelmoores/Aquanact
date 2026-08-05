@@ -7,6 +7,7 @@
 #include <vector>
 #include <MYGUI/MyGUI_OpenGLImageLoader.h>
 #include <MYGUI/MyGUI_Colour.h>
+#include <MYGUI/MyGUI_ProgressBar.h>
 
 class Window;
 namespace MyGUI { class Button; class ImageBox; class TextBox; class Widget; class OpenGLPlatform; }
@@ -40,6 +41,7 @@ public:
 	void SetPointerStyle(int width, int height, int gap);
 	void SetHighlightColour(float r, float g, float b);
 	void SetPointerSkin(const std::string& skin);
+	MyGUI::Widget* RuntimeWidget(const std::string& name) const;
 private:
 	MyGUI::Widget* CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* parent);
 	void BindWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* widget);

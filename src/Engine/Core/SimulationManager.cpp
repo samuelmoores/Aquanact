@@ -16,6 +16,6 @@ void SimulationManager::run(Window& window, Input& input, GameplayManager& gamep
 			gameplayManager.Update(input.DeltaTime(), Root::Current().FrontEnd(), Root::Current().Debugger(), engineState);
 		}
 
-		renderManager.Loop(Root::Current().FrontEnd(), Root::Current().Files(), Root::Current().Levels(), Root::Current().Projects(), Root::Current().Debugger(), input, window, engineState);
+		renderManager.Loop(Root::Current().FrontEnd(), Root::Current().Files(), Root::Current().Scenes(), Root::Current().Projects(), Root::Current().Debugger(), input, window, engineState);
 	}
 }

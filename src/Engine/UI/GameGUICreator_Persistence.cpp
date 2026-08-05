@@ -23,7 +23,7 @@ void GameGUICreator::SaveAllRoleGUIs()
 
 void GameGUICreator::SaveSelectedRoleGUI()
 {
-	GameGUIAsset& asset = CurrentRoleGUI();
+	GameGUIAsset& asset = CurrentGameGUI();
 	for (GameGUIWidgetDef& widget : asset.widgets)
 	{
 		if (widget.type != "Button" || widget.text.empty() || widget.name == widget.text) continue;
@@ -163,7 +163,7 @@ void GameGUICreator::SaveSelectedRoleGUI()
 
 void GameGUICreator::LoadSelectedRoleGUI()
 {
-	GameGUIAsset& asset = CurrentRoleGUI();
+	GameGUIAsset& asset = CurrentGameGUI();
 	asset.widgets.clear();
 	const std::filesystem::path assetPath = GUIPathFor(asset);
 	std::ifstream file(assetPath);
@@ -188,7 +188,8 @@ void GameGUICreator::LoadSelectedRoleGUI()
 void GameGUICreator::SyncRuntimePreview()
 {
 	auto& runtimeGUI = Root::Current().FrontEnd().RuntimeGUI();
-	runtimeGUI.LoadPreviewAsset(CurrentRoleGUI());
+	GameGUIAsset previewAsset = CurrentGameGUI();
+	runtimeGUI.LoadPreviewAsset(previewAsset);
 	if (IsMainMenuSelected())
 	{
 		// Give the creator preview an explicit highlighted button so the menu

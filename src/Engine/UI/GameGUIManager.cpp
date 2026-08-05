@@ -1,6 +1,7 @@
 #include "Engine/UI/GameGUIManager.h"
 
 #include "Engine/UI/GameGUI.h"
+#include "Engine/UI/GameGUICreatorHelpers.h"
 #include "Engine/Core/FrontEndManager.h"
 #include "Engine/Core/Root.h"
 #include "Engine/Core/Debug.h"
@@ -12,6 +13,7 @@
 #include "Engine/Core/FileSystem.h"
 
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <imgui.h>
@@ -229,11 +231,19 @@ namespace {
 			widget.textColor = readField("\"textColor\":", widgetPos);
 			if (widget.textColor.empty()) widget.textColor = "0 0 0";
 			widget.texture = readField("\"texture\":", widgetPos);
+			if (!widget.texture.empty())
+			{
+				GameGUICreatorHelpers::RefreshTextureBaseline(widget, widget.texture, false);
+			}
+			widget.textureWidth = ReadIntField(readField("\"textureWidth\":", widgetPos), widget.textureWidth);
+			widget.textureHeight = ReadIntField(readField("\"textureHeight\":", widgetPos), widget.textureHeight);
+			if (widget.defaultWidth <= 0) widget.defaultWidth = widget.textureWidth;
+			if (widget.defaultHeight <= 0) widget.defaultHeight = widget.textureHeight;
 			widget.layer = readField("\"layer\":", widgetPos);
 			widget.x = ReadIntField(readField("\"x\":", widgetPos));
 			widget.y = ReadIntField(readField("\"y\":", widgetPos));
-			widget.width = ReadIntField(readField("\"width\":", widgetPos), 100);
-			widget.height = ReadIntField(readField("\"height\":", widgetPos), 30);
+			widget.width = ReadIntField(readField("\"width\":", widgetPos), widget.defaultWidth);
+			widget.height = ReadIntField(readField("\"height\":", widgetPos), widget.defaultHeight);
 			widget.fontSize = ReadIntField(readField("\"fontSize\":", widgetPos), 0);
 			widget.fontName = readField("\"fontName\":", widgetPos);
 			widget.visible = readField("\"visible\":", widgetPos).find("true") != std::string::npos;
@@ -701,12 +711,12 @@ void GameGUIManager::DrawReturnButton()
 	if (ImGui::Button("Return"))
 	{
 		Root::Current().FrontEnd().CaptureRuntimeLayout();
-		Root::Current().Levels().RestoreActiveLevelEditorTransforms();
-		const auto gameplayLevels = Root::Current().Levels().SceneNames(SceneManager::SceneKind::Level);
+		Root::Current().Scenes().RestoreActiveLevelEditorTransforms();
+		const auto gameplayLevels = Root::Current().Scenes().SceneNames(SceneManager::SceneKind::Level);
 		if (!gameplayLevels.empty())
 		{
-			Root::Current().Levels().SetActiveLevel(gameplayLevels.front());
-			Root::Current().Levels().SetStartupLevelName(gameplayLevels.front());
+			Root::Current().Scenes().SetActiveLevel(gameplayLevels.front());
+			Root::Current().Scenes().SetStartupLevelName(gameplayLevels.front());
 		}
 		if (Root::Current().Projects().CurrentProjectPath().empty())
 		{
@@ -716,12 +726,12 @@ void GameGUIManager::DrawReturnButton()
 		{
 			const auto projectPath = Root::Current().Projects().CurrentProjectPath();
 			Root::Current().Render().GetGameCamera().RestoreEditorState();
-			if (!Root::Current().Projects().SaveProject(projectPath, Root::Current().Levels()))
+			if (!Root::Current().Projects().SaveProject(projectPath, Root::Current().Scenes()))
 			{
 				Root::Current().Debugger().LogMessage("Failed to save diagnostic window state before returning to the editor.");
 			}
 			Root::Current().Render().GetGameCamera().SetTarget(nullptr);
-			if (!Root::Current().Projects().LoadProject(projectPath, Root::Current().Levels()))
+			if (!Root::Current().Projects().LoadProject(projectPath, Root::Current().Scenes()))
 			{
 				Root::Current().Debugger().LogMessage("Failed to reload the current project while returning to the editor.");
 			}
@@ -933,6 +943,11 @@ void GameGUIManager::ClearUI()
 	{
 		m_runtime->ClearUI();
 	}
+}
+
+GameGUI* GameGUIManager::Runtime() const
+{
+	return m_runtime.get();
 }
 
 std::size_t GameGUIManager::LoadedAssetCount() const

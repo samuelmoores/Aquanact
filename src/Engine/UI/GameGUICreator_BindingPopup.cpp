@@ -40,22 +40,14 @@ void GameGUICreator::DrawBindingPopup()
 		return;
 	}
 
-	GameGUIAsset& asset = CurrentRoleGUI();
+	GameGUIAsset& asset = CurrentGameGUI();
 	GameGUIWidgetDef* widget = nullptr;
-	GameGUIWidgetDef* draft = m_pendingProgressBarCreation ? &m_pendingProgressBarWidget : nullptr;
-	if (draft)
+	for (GameGUIWidgetDef& candidate : asset.widgets)
 	{
-		widget = draft;
-	}
-	else
-	{
-		for (GameGUIWidgetDef& candidate : asset.widgets)
+		if (candidate.name == m_bindingWidgetName)
 		{
-			if (candidate.name == m_bindingWidgetName)
-			{
-				widget = &candidate;
-				break;
-			}
+			widget = &candidate;
+			break;
 		}
 	}
 
@@ -76,7 +68,7 @@ void GameGUICreator::DrawBindingPopup()
 	ImGui::Text("Type: %s", widget->type.empty() ? "<Unknown>" : widget->type.c_str());
 	ImGui::Separator();
 
-	Scene* activeLevel = Root::Current().Levels().ActiveLevel();
+	Scene* activeLevel = Root::Current().Scenes().ActiveLevel();
 	if (!activeLevel)
 	{
 		ImGui::TextDisabled("No active Scene is available.");
@@ -126,14 +118,7 @@ void GameGUICreator::DrawBindingPopup()
 			{
 				continue;
 			}
-			if (widget->type == "ProgressBar")
-			{
-				if (component->GetBindableMembers().empty())
-				{
-					continue;
-				}
-			}
-			else if (component->GetBindableEvents().empty())
+			if (component->GetBindableEvents().empty())
 			{
 				continue;
 			}
@@ -155,69 +140,32 @@ void GameGUICreator::DrawBindingPopup()
 	ImGui::EndDisabled();
 
 	Component* boundComponent = boundEntity ? boundEntity->GetComponentByName(widget->bindComponent) : nullptr;
-	if (widget->type == "ProgressBar")
+	ImGui::BeginDisabled(!boundComponent);
+	const char* eventLabel = widget->bindEvent.empty() ? "<Select Event>" : widget->bindEvent.c_str();
+	std::vector<BindableEvent> bindableEvents = boundComponent ? boundComponent->GetBindableEvents() : std::vector<BindableEvent>{};
+	if (ImGui::BeginCombo("Event", eventLabel))
 	{
-		ImGui::BeginDisabled(!boundComponent);
-		const char* memberLabel = widget->bindMember.empty() ? "<Select Member>" : widget->bindMember.c_str();
-		std::vector<BindableMember> bindableMembers = boundComponent ? boundComponent->GetBindableMembers() : std::vector<BindableMember>{};
-		if (ImGui::BeginCombo("Member", memberLabel))
+		for (const BindableEvent& event : bindableEvents)
 		{
-			for (const BindableMember& member : bindableMembers)
+			const bool selected = widget->bindEvent == event.name;
+			const char* label = event.displayName.empty() ? event.name.c_str() : event.displayName.c_str();
+			if (ImGui::Selectable(label, selected))
 			{
-				if (member.typeName != "int" && member.typeName != "float")
-				{
-					continue;
-				}
-				const bool selected = widget->bindMember == member.name;
-				const char* label = member.displayName.empty() ? member.name.c_str() : member.displayName.c_str();
-				if (ImGui::Selectable(label, selected))
-				{
-					widget->bindMember = member.name;
-					SyncRuntimePreview();
-				}
-				if (selected)
-				{
-					ImGui::SetItemDefaultFocus();
-				}
+				widget->bindEvent = event.name;
+				SyncRuntimePreview();
 			}
-			ImGui::EndCombo();
-		}
-		ImGui::EndDisabled();
-	}
-	else
-	{
-		ImGui::BeginDisabled(!boundComponent);
-		const char* eventLabel = widget->bindEvent.empty() ? "<Select Event>" : widget->bindEvent.c_str();
-		std::vector<BindableEvent> bindableEvents = boundComponent ? boundComponent->GetBindableEvents() : std::vector<BindableEvent>{};
-		if (ImGui::BeginCombo("Event", eventLabel))
-		{
-			for (const BindableEvent& event : bindableEvents)
+			if (selected)
 			{
-				const bool selected = widget->bindEvent == event.name;
-				const char* label = event.displayName.empty() ? event.name.c_str() : event.displayName.c_str();
-				if (ImGui::Selectable(label, selected))
-				{
-					widget->bindEvent = event.name;
-					SyncRuntimePreview();
-				}
-				if (selected)
-				{
-					ImGui::SetItemDefaultFocus();
-				}
+				ImGui::SetItemDefaultFocus();
 			}
-			ImGui::EndCombo();
 		}
-		ImGui::EndDisabled();
+		ImGui::EndCombo();
 	}
+	ImGui::EndDisabled();
 
 	if (ImGui::Button("Close"))
 	{
-		if (m_pendingProgressBarCreation)
-		{
-			m_pendingProgressBarBindingComplete = true;
-			m_showTexturePickerPopup = true;
-		}
-		m_bindingWidgetName.clear();
+	m_bindingWidgetName.clear();
 		ImGui::CloseCurrentPopup();
 	}
 

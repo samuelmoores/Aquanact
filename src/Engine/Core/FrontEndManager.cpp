@@ -117,7 +117,7 @@ void FrontEndManager::DrawCreatorGUI(const Camera& camera)
 {
 	if (IsEditorMode() && m_mode == FrontEndMode::GameGUICreator && m_uiCreator)
 	{
-		m_uiCreator->Draw(camera);
+		m_creatorView.Draw(*m_uiCreator, camera);
 	}
 }
 

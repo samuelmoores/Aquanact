@@ -29,12 +29,9 @@ public:
 	int selectedWidgetIndex = -1;
 	bool showCreateWidgetPopup = false;
 	bool showBindingPopup = false;
-	bool pendingProgressBarCreation = false;
-	bool pendingProgressBarBindingComplete = false;
 	bool showTexturePickerPopup = false;
 	bool newWidgetIsText = false;
 	bool newWidgetIsImage = false;
-	bool newWidgetIsProgressBar = false;
 	bool lockWidgetSize = false;
 	char newWidgetName[64] = { 0 };
 	char newWidgetText[128] = { 0 };
@@ -46,7 +43,6 @@ public:
 	std::string bindingWidgetName;
 	float lockedWidgetSizeRatio = 1.0f;
 	GameGUIActionType newWidgetAction = GameGUIActionType::None;
-	GameGUIWidgetDef pendingProgressBarWidget;
 	bool previousShowAxis = true;
 	bool previousShowGrid = true;
 	bool previousViewStateCaptured = false;

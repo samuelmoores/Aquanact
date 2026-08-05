@@ -1,0 +1,105 @@
+GameGUICreator Backend Programmer Doc
+=====================================
+
+Scope
+-----
+Source Files: `include/Engine/Core/Root.h`, `include/Engine/Core/RenderManager.h`, `include/Engine/Core/GameplayManager.h`, `include/Engine/Core/SceneManager.h`, `include/Engine/Core/ProjectManager.h`, `include/Engine/Core/ProjectStateSerializer.h`, `src/Engine/Core/*.cpp`
+
+This document covers the backend/runtime stack that feeds data to the frontend and owns simulation, rendering, world state, and persistence.
+
+Backend Stack
+-------------
+1. `Root`
+   - Owns the application-level service graph.
+   - Creates and stores the major runtime systems: window, render, frontend, debug, events, file access, scenes, project persistence, gameplay, input, and profiling.
+   - Owns engine mode and the top-level start/run/shutdown lifecycle.
+   - Is the bootstrap boundary, not a place for feature logic.
+
+2. `RenderManager`
+   - Owns the render loop, render command queue, camera selection, lighting, frame allocator, and graphics device.
+   - Draws editor and runtime frames.
+   - Integrates with `FrontEndManager` for UI passes and with `SceneManager` for world rendering data.
+   - Applies project render state and manages per-frame GPU-facing work.
+
+3. `GameplayManager`
+   - Owns gameplay flow state: `MainMenu`, `Playing`, and `Paused`.
+   - Starts sessions, boots main menu or playable levels, and updates simulation state each frame.
+   - Syncs runtime UI state through `FrontEndManager` when gameplay mode changes.
+   - Should remain the flow controller, not the owner of world storage or rendering.
+
+4. `SceneManager`
+   - Owns scene and level storage.
+   - Creates levels and cutscenes, tracks the active level, and restores editor transform snapshots.
+   - Applies project state to the runtime scene graph.
+   - Is the world container and scene lifecycle manager.
+
+5. `ProjectManager`
+   - Owns project save/load entry points and the current project path.
+   - Uses `FileSystem` for disk access.
+   - Delegates format details to `ProjectStateSerializer` and object reconstruction to the relevant runtime managers.
+   - Should stay focused on project I/O and not on gameplay policy.
+
+6. `ProjectStateSerializer`
+   - Encodes and decodes project state, level state, render state, and asset references.
+   - Converts data between disk format and runtime-friendly state buckets.
+   - Handles portable source-path encoding and resolution.
+   - Should stay format-oriented, not orchestration-oriented.
+
+Backend Responsibilities
+------------------------
+- Keep application bootstrapping in `Root`.
+- Keep rendering in `RenderManager` and GPU-specific work behind the graphics device boundary.
+- Keep gameplay flow in `GameplayManager`.
+- Keep world/scene ownership in `SceneManager`.
+- Keep project save/load entry points in `ProjectManager`.
+- Keep serialization and field encoding logic in `ProjectStateSerializer`.
+
+Data Flow
+---------
+1. Startup:
+   - `Root::startUp()` builds the service graph.
+   - `SceneManager::startUp()` prepares world storage.
+   - `ProjectManager` loads or restores project data through the serializer.
+   - `RenderManager` initializes cameras, lighting, and the graphics device.
+   - `GameplayManager` boots the initial gameplay state.
+
+2. Frame Loop:
+   - `Input` and engine state feed `GameplayManager::Update()`.
+   - `RenderManager::Loop()` collects renderable data, updates camera state, draws the world, and presents the frame.
+   - `FrontEndManager` receives the UI draw phase from the renderer.
+   - `Debug` and profiling remain cross-cutting support systems.
+
+3. Project Save/Load:
+   - `ProjectManager::SaveProject()` gathers state from `SceneManager` and related runtime systems.
+   - `ProjectManager::LoadProject()` reconstructs state by parsing serialized data and applying it to the scene/runtime managers.
+   - `ProjectStateSerializer` owns the field format, escaping, and path conversion rules.
+
+4. Runtime State Transfer:
+   - `SceneManager` owns the active level and editor snapshots.
+   - `RenderManager` owns active camera and lighting state.
+   - `GameplayManager` owns the simulation gate and pause state.
+   - `FrontEndManager` receives UI-specific restoration and mode state, but should not become the owner of backend policy.
+
+Current Boundary Risks
+----------------------
+- `Root` is still the main ownership hub, so adding more bootstrap logic here will increase coupling quickly.
+- `RenderManager` carries camera, lighting, command building, UI drawing, and frame timing in one class.
+- `GameplayManager` still reaches into frontend state, which makes the gameplay/UI boundary softer than it should be.
+- `SceneManager` and `ProjectManager` are close to each other, so reconstruction and world ownership need to stay explicit.
+- `ProjectStateSerializer` is broad because it serializes several categories of runtime state, not only project metadata.
+
+Implementation Notes
+--------------------
+- Keep mode checks out of lower-level systems unless they are strictly required for frame behavior.
+- Keep scene ownership separate from rendering and UI state.
+- Keep save/load code in the project layer and avoid spreading serialization helpers into gameplay or frontend classes.
+- Keep render state application isolated so the backend can remain the source of truth for cameras, lighting, and draw submission.
+
+Useful Files
+------------
+- [Root.h](../../include/Engine/Core/Root.h)
+- [RenderManager.h](../../include/Engine/Core/RenderManager.h)
+- [GameplayManager.h](../../include/Engine/Core/GameplayManager.h)
+- [SceneManager.h](../../include/Engine/Core/SceneManager.h)
+- [ProjectManager.h](../../include/Engine/Core/ProjectManager.h)
+- [ProjectStateSerializer.h](../../include/Engine/Core/ProjectStateSerializer.h)

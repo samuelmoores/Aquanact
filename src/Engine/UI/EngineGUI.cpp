@@ -1204,7 +1204,7 @@ void EngineGUI::DrawCameraWindow()
 		return;
 	}
 
-	Scene* activeLevel = Root::Current().Levels().ActiveLevel();
+	Scene* activeLevel = Root::Current().Scenes().ActiveLevel();
 	static const std::vector<std::unique_ptr<Entity>> emptyObjects;
 	const auto& objects = activeLevel ? activeLevel->Objects() : emptyObjects;
 
@@ -2092,16 +2092,16 @@ void EngineGUI::DrawNewLevelPopup()
 			{
 				m_newLevelStatusMessage = "Enter a valid scene name.";
 			}
-			else if (Root::Current().Levels().FindLevel(levelName))
+			else if (Root::Current().Scenes().FindLevel(levelName))
 			{
 				m_newLevelStatusMessage = "Scene already exists.";
 			}
 			else
 			{
-				Scene* Scene = Root::Current().Levels().CreateLevel(levelName);
+				Scene* Scene = Root::Current().Scenes().CreateLevel(levelName);
 				if (Scene)
 				{
-					Root::Current().Levels().SetActiveLevel(levelName);
+					Root::Current().Scenes().SetActiveLevel(levelName);
 					m_newLevelStatusMessage = "Created scene " + levelName + ".";
 				}
 				else

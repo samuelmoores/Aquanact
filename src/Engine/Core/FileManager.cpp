@@ -118,11 +118,11 @@ bool FileManager::ImportSelected()
 	{
 		auto importedObject = std::make_unique<Entity>(absolutePath.string().c_str());
 		importedObject->SetIgnoreCameraCollision(false);
-		if (!Root::Current().Levels().ActiveLevel())
+		if (!Root::Current().Scenes().ActiveLevel())
 		{
-			Root::Current().Levels().CreateLevel("Default");
+			Root::Current().Scenes().CreateLevel("Default");
 		}
-		Root::Current().Levels().ActiveLevel()->AddObject(std::move(importedObject));
+		Root::Current().Scenes().ActiveLevel()->AddObject(std::move(importedObject));
 		Root::Current().Debugger().LogMessage("Imported FBX: " + absolutePath.string());
 		return true;
 	}

@@ -5,6 +5,7 @@
 #include <memory>
 #include <cstdint>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 class Window;
@@ -54,6 +55,7 @@ public:
 	void AppendProjectState(std::string& contents) const;
 	void ApplyProjectState(const std::vector<std::string>& sceneAssets, const std::string& activeAssetName, const std::string& navigationMode = {});
 	void ClearUI();
+	GameGUI* Runtime() const;
 	std::size_t LoadedAssetCount() const;
 	std::size_t PlacedAssetCount() const;
 	std::string ActiveAssetName() const;

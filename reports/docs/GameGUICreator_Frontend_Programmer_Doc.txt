@@ -1,0 +1,95 @@
+GameGUICreator Frontend Programmer Doc
+=====================================
+
+Scope
+-----
+Source Files: `include/Engine/Core/FrontEndManager.h`, `include/Engine/UI/EngineGUI.h`, `include/Engine/UI/GameGUIManager.h`, `include/Engine/UI/GameGUI.h`, `include/Engine/UI/GameGUICreator.h`, `src/Engine/Core/FrontEndManager.cpp`, `src/Engine/UI/*.cpp`
+
+This document covers the editor-facing frontend stack used to inspect, author, preview, and switch between UI experiences.
+
+Frontend Stack
+--------------
+1. `FrontEndManager`
+   - Owns the three frontend surfaces:
+     - `EngineGUI` for editor tooling and diagnostics
+     - `GameGUIManager` for runtime UI presentation
+     - `GameGUICreator` for UI authoring
+   - Switches between `EngineEditor` and `GameGUICreator` modes.
+   - Acts as the integration point for startup, frame begin/end, and layout restoration.
+   - Receives project state and pushes it into the active frontend surfaces.
+
+2. `EngineGUI`
+   - Editor-only overlay and tool window host.
+   - Handles UI for scene inspection, level/entity editing, lighting, camera tools, input maps, and code/level creation helpers.
+   - Bridges editor actions back into scene and project systems.
+   - Should be treated as the tool surface, not the owner of world or persistence policy.
+
+3. `GameGUIManager`
+   - Owns runtime UI assets and the active runtime UI mode.
+   - Loads, unloads, activates, and previews `GameGUIAsset` data.
+   - Tracks scene asset membership for the active runtime UI set.
+   - Manages editor/runtime UI windows, diagnostics logging, and project-state serialization hooks for UI state.
+
+4. `GameGUI`
+   - Runtime MyGUI wrapper that builds and draws widgets from `GameGUIAsset`.
+   - Owns the MyGUI platform, GUI instance, image loader, and runtime widget lookup tables.
+   - Handles controller navigation, button activation, style application, and widget binding callbacks.
+   - Should remain focused on rendering and interaction, not on editor policy or asset discovery.
+
+5. `GameGUICreator`
+   - Authoring tool for `MainMenu` and `HUD` UI assets.
+   - Scans the asset directory, loads current GUI assets, and drives creation/editing workflows.
+   - Handles widget creation, widget detail editing, texture selection, binding setup, preview sync, and asset save/load.
+   - Manages editor preview state so authoring changes can be pushed into the runtime preview path.
+
+Frontend Responsibilities
+-------------------------
+- Keep editor UI, runtime UI, and UI authoring separated at the class boundary.
+- Keep `FrontEndManager` as the router, not the policy engine.
+- Keep `GameGUI` focused on MyGUI integration and widget rendering.
+- Keep `GameGUIManager` focused on runtime UI asset lifecycle and presentation state.
+- Keep `GameGUICreator` focused on authoring workflows and previewing assets.
+
+Data Flow
+---------
+1. Startup:
+   - `FrontEndManager::startUp()` creates the frontend surfaces.
+   - `GameGUIManager` and `GameGUICreator` load runtime and authoring assets from disk.
+   - `EngineGUI` initializes editor-side tools and overlays.
+
+2. Frame Update:
+   - `FrontEndManager::BeginFrame()` starts frontend UI work.
+   - The active surface draws based on engine mode and UI mode.
+   - `FrontEndManager::EndFrame()` closes the frame and preserves layout state.
+
+3. Project Restore:
+   - `FrontEndManager::ApplyProjectState()` restores editor toggles, scene asset placement, runtime navigation mode, and ImGui layout.
+   - `GameGUIManager::ApplyProjectState()` restores runtime UI asset placement and active UI asset.
+   - `GameGUICreator` restores creator state for the selected asset and navigation style.
+
+4. Preview Loop:
+   - `GameGUICreator::PreviewSelectedGUI()` pushes the current authoring asset into runtime preview.
+   - `GameGUIManager::LoadPreviewAsset()` stages the preview content.
+   - `GameGUI` renders the preview using the same runtime widget path as gameplay.
+
+Current Boundary Risks
+----------------------
+- `FrontEndManager` still coordinates several surfaces and can become a policy hub if more state moves into it.
+- `GameGUIManager` mixes runtime UI presentation with asset loading, diagnostics, and project-state helpers.
+- `GameGUICreator` owns many editor workflow states in one class, which makes it dense but still understandable because it is the tool surface.
+- `EngineGUI` can absorb too many unrelated editor utilities if future tools are added without a tighter split.
+
+Implementation Notes
+--------------------
+- Prefer adding new frontend behavior to the most specific surface instead of `FrontEndManager`.
+- Prefer preview-specific state to stay in `GameGUICreator` and runtime-specific state to stay in `GameGUIManager`.
+- Prefer project restoration to be handled by the caller, with frontend classes only applying the state they own.
+- Prefer MyGUI widget construction and callback wiring to stay inside `GameGUI`.
+
+Useful Files
+------------
+- [FrontEndManager.h](../../include/Engine/Core/FrontEndManager.h)
+- [EngineGUI.h](../../include/Engine/UI/EngineGUI.h)
+- [GameGUIManager.h](../../include/Engine/UI/GameGUIManager.h)
+- [GameGUI.h](../../include/Engine/UI/GameGUI.h)
+- [GameGUICreator.h](../../include/Engine/UI/GameGUICreator.h)

@@ -180,7 +180,7 @@ glm::vec3 Controller::MoveWithCollision(Entity& owner, const glm::vec3& delta,
 		return glm::vec3(0.0f);
 	}
 
-	Scene* activeLevel = Root::Current().Levels().ActiveLevel();
+	Scene* activeLevel = Root::Current().Scenes().ActiveLevel();
 	glm::vec3 startMin;
 	glm::vec3 startMax;
 	if (!activeLevel || !owner.WorldAABB(startMin, startMax))

@@ -76,7 +76,7 @@ Debug& Root::Debugger() { return *m_debug; }
 EventManager& Root::Events() { return *m_eventManager; }
 FileManager& Root::Files() { return *m_fileManager; }
 FileSystem& Root::FileSystemRef() { return *m_fileSystem; }
-SceneManager& Root::Levels() { return *m_levelManager; }
+SceneManager& Root::Scenes() { return *m_sceneManager; }
 ProjectManager& Root::Projects() { return *m_projectManager; }
 GameplayManager& Root::Gameplay() { return *m_gameplayManager; }
 Input& Root::InputRef() { return *m_input; }
@@ -95,7 +95,7 @@ void Root::InitializeOwnedSystems()
 	m_eventManager = std::make_unique<EventManager>();
 	m_fileSystem = std::make_unique<FileSystem>();
 	m_fileManager = std::make_unique<FileManager>(*m_fileSystem);
-	m_levelManager = std::make_unique<SceneManager>();
+	m_sceneManager = std::make_unique<SceneManager>();
 	m_projectManager = std::make_unique<ProjectManager>(*m_fileSystem);
 	m_gameplayManager = std::make_unique<GameplayManager>();
 	m_input = std::make_unique<Input>();
@@ -125,7 +125,7 @@ void Root::startUp(int argc, char** argv)
 	m_inputManager->startUp(*m_input);
 	m_debug->startUp();
 	m_fileManager->startUp();
-	m_projectManager->LoadProject(DefaultProjectPath(), *m_levelManager);
+	m_projectManager->LoadProject(DefaultProjectPath(), *m_sceneManager);
 
 	StartInitialSession();
 	m_started = true;
@@ -141,7 +141,7 @@ void Root::StartInitialSession()
 {
 	if (m_engineState.IsGameMode())
 	{
-		m_gameplayManager->startUp(*m_levelManager, *m_frontEndManager, *m_debug, m_engineState);
+		m_gameplayManager->startUp(*m_sceneManager, *m_frontEndManager, *m_debug, m_engineState);
 		m_gameplayManager->BootMainMenu(*m_frontEndManager, *m_debug);
 	}
 	else
@@ -167,7 +167,7 @@ void Root::run()
 		}
 		{
 			FrameProfiler::Scope scope(*m_profiler, "Render");
-			m_renderManager->Loop(*m_frontEndManager, *m_fileManager, *m_levelManager, *m_projectManager, *m_debug, *m_input, *m_window, m_engineState);
+			m_renderManager->Loop(*m_frontEndManager, *m_fileManager, *m_sceneManager, *m_projectManager, *m_debug, *m_input, *m_window, m_engineState);
 		}
 
 		// Make the displayed frame time include outstanding GPU work. Without this,

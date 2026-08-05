@@ -3,6 +3,7 @@
 #include "Engine/UI/EngineGUI.h"
 #include "Engine/UI/GameGUIManager.h"
 #include "Engine/UI/GameGUICreator.h"
+#include "Engine/UI/GameGUICreatorView.h"
 
 #include <memory>
 #include <string>
@@ -63,6 +64,7 @@ private:
 	std::unique_ptr<EngineGUI> m_engineGUI;
 	std::unique_ptr<GameGUIManager> m_gameGUI;
 	std::unique_ptr<GameGUICreator> m_uiCreator;
+	GameGUICreatorView m_creatorView;
 	std::string m_lastCreatorAssetName = "MainMenu";
 	std::string m_runtimeImguiLayout;
 	FrontEndMode m_mode = FrontEndMode::EngineEditor;

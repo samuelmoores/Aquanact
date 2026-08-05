@@ -346,7 +346,7 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 		sphere->draw(view, model);
 	}
 
-	const Scene* activeLevel = Root::Current().Levels().ActiveLevel();
+	const Scene* activeLevel = Root::Current().Scenes().ActiveLevel();
 	std::vector<Entity*> currentBoundingBoxObjects;
 	if (activeLevel)
 	{
@@ -425,7 +425,7 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 	{
 		ImGui::Begin("Debug Stats", &m_showStatsWindow, ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoBringToFrontOnFocus);
 		ImGui::Text("FPS: %.1f", m_lastFps);
-		const Scene* activeLevel = Root::Current().Levels().ActiveLevel();
+		const Scene* activeLevel = Root::Current().Scenes().ActiveLevel();
 		ImGui::Text("Scene objects: %zu", activeLevel ? activeLevel->Objects().size() : 0);
 		ImGui::Separator();
 		ImGui::Text("Render commands: %zu", Root::Current().Render().LastFrameCommandCount());
@@ -471,7 +471,7 @@ void Debug::drawGameModeInput(const Input& input)
 		Root::Current().FrontEnd().RuntimeGUI().Mode() == GameGUIManager::UIMode::PauseMenu ? "PauseMenu" :
 		Root::Current().FrontEnd().RuntimeGUI().Mode() == GameGUIManager::UIMode::PlayerUI ? "PlayerUI" :
 		Root::Current().FrontEnd().RuntimeGUI().Mode() == GameGUIManager::UIMode::Custom ? "Custom" : "Unknown");
-	const Scene* activeLevel = Root::Current().Levels().ActiveLevel();
+	const Scene* activeLevel = Root::Current().Scenes().ActiveLevel();
 	ImGui::Text("Active Scene: %s", activeLevel ? activeLevel->Name().c_str() : "<none>");
 	ImGui::Text("Active Scene objects: %zu", activeLevel ? activeLevel->Objects().size() : 0);
 	ImGui::Text("Controller components: %zu", Root::Current().Gameplay().ControllerCount());
