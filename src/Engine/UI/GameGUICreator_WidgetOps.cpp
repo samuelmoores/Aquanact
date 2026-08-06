@@ -48,11 +48,7 @@ void GameGUICreator::AddImageWidget()
 	}
 	assert(widget.defaultWidth > 0 && widget.defaultHeight > 0);
 	{
-		int framebufferWidth = 0;
-		int framebufferHeight = 0;
-		Root::Current().WindowRef().GetFramebufferSize(framebufferWidth, framebufferHeight);
-		widget.x = std::max(0, (framebufferWidth - widget.width) / 2);
-		widget.y = std::max(0, (framebufferHeight - widget.height) / 2);
+		CenterWidget(widget);
 	}
 	asset.widgets.push_back(widget);
 	m_selectedWidgetIndex = static_cast<int>(asset.widgets.size() - 1);
@@ -106,6 +102,37 @@ void GameGUICreator::AddPanelWidget()
 	asset.widgets.push_back(panel);
 	m_selectedWidgetIndex = static_cast<int>(asset.widgets.size() - 1);
 	SaveSelectedRoleGUI();
+}
+
+void GameGUICreator::AddTextWidget()
+{
+	GameGUIAsset& asset = CurrentGameGUI();
+	GameGUIWidgetDef widget;
+	widget.type = "Text";
+	widget.name = m_newWidgetName[0] != '\0' ? m_newWidgetName : "Text";
+	widget.text = widget.name;
+	widget.width =         500;
+	widget.height =        100;
+	widget.defaultWidth = widget.width;
+	widget.defaultHeight = widget.height;
+	widget.fontSize = 30;
+
+	widget.layer = "Main";
+
+	CenterWidget(widget);
+
+	asset.widgets.push_back(widget);
+	m_selectedWidgetIndex = static_cast<int>(asset.widgets.size() - 1);
+	SaveSelectedRoleGUI();
+}
+
+void GameGUICreator::CenterWidget(GameGUIWidgetDef& widget)
+{
+	int framebufferWidth = 0;
+	int framebufferHeight = 0;
+	Root::Current().WindowRef().GetFramebufferSize(framebufferWidth, framebufferHeight);
+	widget.x = std::max(0, (framebufferWidth - widget.width) / 2);
+	widget.y = std::max(0, (framebufferHeight - widget.height) / 2);
 }
 
 void GameGUICreator::ApplyPanelButtonLayout(GameGUIWidgetDef& panel)

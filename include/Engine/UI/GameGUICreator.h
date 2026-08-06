@@ -10,6 +10,7 @@ class Camera;
 class GameGUICreator {
 public:
 	using MenuNavigationMode = GameGUIMenuNavigationMode;
+	enum class NewWidgetType { Button, Panel, Image, ProgressBar, Text };
 	GameGUICreator() = default;
 
 	// Lifecycle and frame flow
@@ -54,10 +55,24 @@ private:
 	void AddImageWidget();
 	void AddProgressBarWidget();
 	void AddPanelWidget();
+	void AddTextWidget();
+	void CenterWidget(GameGUIWidgetDef& widget);
 	void ApplyPanelButtonLayout(GameGUIWidgetDef& panel);
 	void DeleteSelectedWidget();
 	// Popup and detail rendering helpers.
 	void DrawCreateWidgetPopup();
+	void DrawCreateWidgetPopupHeader(const char* title);
+	void DrawCreateWidgetPopupFooter();
+	void DrawCreateWidgetNameField();
+	void DrawCreateWidgetTextureField();
+	void DrawCreateActionField();
+	void DrawCreateLaunchLevelField();
+	void OpenCreateWidgetPopup(NewWidgetType type);
+	void DrawCreateButtonPopup();
+	void DrawCreatePanelPopup();
+	void DrawCreateImagePopup();
+	void DrawCreateProgressBarPopup(); 
+	void DrawCreateTextPopup();
 	void DrawBindingPopup();
 	void DrawButtonWidgetDetails(GameGUIAsset& asset, GameGUIWidgetDef& widget);
 	void DrawPanelWidgetDetails(GameGUIAsset& asset, GameGUIWidgetDef& widget);
@@ -88,9 +103,7 @@ private:
 	bool m_showWidgetDetailsWindow = true;
 
 	// Widget creation defaults and edit buffers.
-	bool m_newWidgetIsImage = false;
-	bool m_newWidgetIsPanel = false;
-	bool m_newWidgetIsProgressBar = false;
+	NewWidgetType m_newWidgetType = NewWidgetType::Button;
 	bool m_lockWidgetSize = false;
 	char m_newWidgetName[64] = { 0 };
 	char m_newWidgetTexture[256] = { 0 };

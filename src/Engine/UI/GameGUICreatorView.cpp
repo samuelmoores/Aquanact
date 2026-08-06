@@ -262,48 +262,33 @@ void GameGUICreatorView::Draw(GameGUICreator& creator, const Camera&)
 			}
 			ImGui::EndMenu();
 		}
-		if (ImGui::BeginMenu("Create"))
-		{
-			if (ImGui::MenuItem("Create Button"))
+			if (ImGui::BeginMenu("Create"))
 			{
-				creator.m_showCreateWidgetPopup = true;
-				creator.m_newWidgetIsImage = false;
-				creator.m_newWidgetIsPanel = false;
-				creator.m_newButtonParentPanel.clear();
-				creator.m_newWidgetAction = GameGUIActionType::None;
-				creator.m_newWidgetLaunchLevel.clear();
-				creator.m_newWidgetName[0] = '\0';
-				creator.m_newWidgetTexture[0] = '\0';
+				if (ImGui::MenuItem("Create Button"))
+				{
+					creator.OpenCreateWidgetPopup(GameGUICreator::NewWidgetType::Button);
+					creator.m_newButtonParentPanel.clear();
+				}
+				if (ImGui::MenuItem("Create Image"))
+				{
+					creator.OpenCreateWidgetPopup(GameGUICreator::NewWidgetType::Image);
+					std::snprintf(creator.m_newWidgetTexture, sizeof(creator.m_newWidgetTexture), "textures/example.png");
+				}
+				if (ImGui::MenuItem("Create Progress Bar"))
+				{
+					creator.OpenCreateWidgetPopup(GameGUICreator::NewWidgetType::ProgressBar);
+					std::snprintf(creator.m_newWidgetTexture, sizeof(creator.m_newWidgetTexture), "textures/progress_fill.png");
+				}
+				if (ImGui::MenuItem("Create Panel"))
+				{
+					creator.OpenCreateWidgetPopup(GameGUICreator::NewWidgetType::Panel);
+				}
+				if (ImGui::MenuItem("Create Text"))
+				{
+					creator.OpenCreateWidgetPopup(GameGUICreator::NewWidgetType::Text);
+				}
+				ImGui::EndMenu();
 			}
-			if (ImGui::MenuItem("Create Image"))
-			{
-				creator.m_showCreateWidgetPopup = true;
-				creator.m_newWidgetIsImage = true;
-				creator.m_newWidgetIsProgressBar = false;
-				creator.m_newWidgetIsPanel = false;
-				creator.m_newWidgetName[0] = '\0';
-				std::snprintf(creator.m_newWidgetTexture, sizeof(creator.m_newWidgetTexture), "textures/example.png");
-			}
-			if (ImGui::MenuItem("Create Progress Bar"))
-			{
-				creator.m_showCreateWidgetPopup = true;
-				creator.m_newWidgetIsImage = false;
-				creator.m_newWidgetIsProgressBar = true;
-				creator.m_newWidgetIsPanel = false;
-				creator.m_newWidgetName[0] = '\0';
-				std::snprintf(creator.m_newWidgetTexture, sizeof(creator.m_newWidgetTexture), "textures/progress_fill.png");
-			}
-			if (ImGui::MenuItem("Create Panel"))
-			{
-				creator.m_showCreateWidgetPopup = true;
-				creator.m_newWidgetIsImage = false;
-				creator.m_newWidgetIsProgressBar = false;
-				creator.m_newWidgetIsPanel = true;
-				creator.m_newWidgetName[0] = '\0';
-				creator.m_newWidgetTexture[0] = '\0';
-			}
-			ImGui::EndMenu();
-		}
 		ImGui::EndMainMenuBar();
 	}
 

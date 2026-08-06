@@ -29,13 +29,7 @@ void GameGUICreator::DrawPanelWidgetDetails(GameGUIAsset& asset, GameGUIWidgetDe
 	{
 		// Reuse the create popup to add a child button under this panel.
 		m_newButtonParentPanel = widget.name;
-		m_showCreateWidgetPopup = true;
-		m_newWidgetIsImage = false;
-		m_newWidgetIsPanel = false;
-		m_newWidgetAction = GameGUIActionType::None;
-		m_newWidgetLaunchLevel.clear();
-		m_newWidgetName[0] = '\0';
-		m_newWidgetTexture[0] = '\0';
+		OpenCreateWidgetPopup(NewWidgetType::Button);
 	}
 
 	// Renaming a panel must preserve the parent relationship for any nested child widgets.
