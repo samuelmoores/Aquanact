@@ -34,6 +34,7 @@
 #include <cctype>
 #include <cstring>
 #include <cstdint>
+#include <functional>
 #include <sstream>
 #include <string>
 
@@ -311,6 +312,7 @@ namespace {
 	}
 }
 
+// Lifecycle
 void EngineGUI::startUp(Window& window)
 {
 	if (m_initialized)
@@ -318,6 +320,7 @@ void EngineGUI::startUp(Window& window)
 		return;
 	}
 
+	// Set up ImGui once and keep a pointer to the host window for later menu actions.
 	m_window = &window;
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
@@ -334,6 +337,8 @@ void EngineGUI::startUp(Window& window)
 
 	try
 	{
+		// Load the boot image used during the first frame so the editor does not
+		// appear empty while the rest of the frontend is initializing.
 		StbImage bootImage;
 		const std::filesystem::path bootImageRoot =
 #ifdef AQUANACT_GAME
@@ -346,6 +351,7 @@ void EngineGUI::startUp(Window& window)
 		m_bootTextureWidth = bootImage.getWidth();
 		m_bootTextureHeight = bootImage.getHeight();
 
+		// Upload the image into an OpenGL texture for the splash frame.
 		glGenTextures(1, &m_bootTexture);
 		glBindTexture(GL_TEXTURE_2D, m_bootTexture);
 		GLint previousUnpackAlignment = 4;
@@ -370,6 +376,7 @@ void EngineGUI::startUp(Window& window)
 	}
 	catch (const std::exception& ex)
 	{
+		// A missing splash image should not block the editor from starting.
 		Root::Current().Debugger().LogMessage("Boot image failed to load: " + std::string(ex.what()));
 		if (m_bootTexture != 0)
 		{
@@ -426,6 +433,7 @@ void EngineGUI::shutDown()
 		return;
 	}
 
+	// Release the temporary splash texture before shutting down ImGui.
 	if (m_bootTexture != 0)
 	{
 		glDeleteTextures(1, &m_bootTexture);
@@ -449,9 +457,12 @@ void EngineGUI::BeginFrame()
 
 void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& SceneManager, ProjectManager& projectManager)
 {
+	// Keep local copies of the visibility flags so menu interaction and window
+	// drawing happen against a stable snapshot during this frame.
 	Scene* activeLevel = SceneManager.ActiveLevel();
 	static const std::vector<std::unique_ptr<Entity>> emptyObjects;
-	const auto& objects = activeLevel ? activeLevel->Objects() : emptyObjects;
+	const std::vector<std::unique_ptr<Entity>>& objects = activeLevel ? activeLevel->Objects() : emptyObjects;
+
 	if (m_selectedLevelObjectIndex >= static_cast<int>(objects.size()))
 	{
 		m_selectedLevelObjectIndex = -1;
@@ -465,9 +476,12 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 	bool levelWindowToggleChanged = false;
 	bool entityWindowToggleChanged = false;
 	bool lightingWindowToggleChanged = false;
+
+	// ************ Top Menu **********************
 	if (ImGui::BeginMainMenuBar())
 	{
-		const auto ToggleMenuItem = [this](const char* label, bool& value)
+		// Small helper so menu checkboxes stay consistent with the stored state.
+		const std::function<bool(const char*, bool&)> ToggleMenuItem = [](const char* label, bool& value)
 		{
 			const bool clicked = ImGui::Checkbox(label, &value);
 			if (clicked)
@@ -477,8 +491,10 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 			return false;
 		};
 
+		// ---- Aquanact ------
 		if (ImGui::BeginMenu("Aquanact"))
 		{
+			// Project-level app actions.
 			if (ImGui::MenuItem("Input Map"))
 			{
 				m_showInputMapWindow = true;
@@ -492,8 +508,11 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 			}
 			ImGui::EndMenu();
 		}
+
+		// ---- File ------
 		if (ImGui::BeginMenu("File"))
 		{
+			// Project I/O.
 			if (ImGui::MenuItem("Save Project"))
 			{
 				projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", SceneManager);
@@ -502,6 +521,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 			{
 				projectManager.LoadProject("C:/dev/Aquanact/assets/projects/project.aqua", SceneManager);
 			}
+
 			ImGui::Separator();
 			const bool canImport = fileManager.CanImportSelection();
 			if (ImGui::MenuItem("Import Selected", nullptr, false, canImport))
@@ -510,12 +530,17 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 			}
 			ImGui::EndMenu();
 		}
+
+		// ---- View ------
 		if (ImGui::BeginMenu("View"))
 		{
+			// Editor windows and debug overlays.
 			ImGui::TextDisabled("Engine");
 			ImGui::Separator();
+
 			ToggleMenuItem("Axis", m_showAxis);
 			ToggleMenuItem("Camera Window", m_showCameraWindow);
+
 			if (ImGui::BeginMenu("EngineCamera"))
 			{
 				float moveSpeed = Root::Current().Render().GetEngineCamera().MoveSpeed();
@@ -542,16 +567,23 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 				ImGui::EndMenu();
 			}
 			ImGui::Separator();
+
+			// clicked toggles
 			const bool fileExplorerClicked = ToggleMenuItem("File Explorer", pendingFileExplorer);
 			const bool levelWindowClicked = ToggleMenuItem("Scene Window", pendingLevelWindow);
 			const bool entityWindowClicked = ToggleMenuItem("Entity Window", pendingEntityWindow);
 			const bool lightingWindowClicked = ToggleMenuItem("Lighting Window", pendingLightingWindow);
+
+			// changed toggles
 			fileExplorerToggleChanged |= fileExplorerClicked;
 			levelWindowToggleChanged |= levelWindowClicked;
 			entityWindowToggleChanged |= entityWindowClicked;
 			lightingWindowToggleChanged |= lightingWindowClicked;
+
+			// debug windows
 			bool showLogWindow = Root::Current().Debugger().ShowLogWindow();
 			bool showStatsWindow = Root::Current().Debugger().ShowStatsWindow();
+
 			if (ToggleMenuItem("Log Window", showLogWindow))
 			{
 				Root::Current().Debugger().SetShowLogWindow(showLogWindow);
@@ -560,44 +592,56 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 			{
 				Root::Current().Debugger().SetShowStatsWindow(showStatsWindow);
 			}
-			ImGui::EndMenu();
+			ImGui::EndMenu(); // view
 		}
+
+		// ---- Lighting ------
 		if (ImGui::BeginMenu("Lighting"))
 		{
+			// Scene lighting actions.
 			const bool canAddPointLight = Root::Current().Render().Lights().PointLights().size() < LightingManager::MaxPointLights;
+
 			if (ImGui::MenuItem("Add Point Light", nullptr, false, canAddPointLight))
 			{
 				Root::Current().Render().Lights().AddPointLight();
 			}
 			ImGui::EndMenu();
 		}
+
+		// ---- Game ------
 		if (ImGui::BeginMenu("Game"))
 		{
+			// Runtime and packaging actions.
 			if (ImGui::BeginMenu("Camera"))
 			{
 				const bool thirdPerson = Root::Current().Render().CameraModeValue() == RenderManager::CameraMode::ThirdPerson;
+
 				if (ImGui::MenuItem("Third Person", nullptr, thirdPerson))
 				{
 					Root::Current().Render().SetCameraMode(RenderManager::CameraMode::ThirdPerson);
 				}
 				ImGui::EndMenu();
 			}
-		if (ImGui::MenuItem("Play Game"))
-		{
-			Root::Current().FrontEnd().Creator().SaveAllRoleGUIs();
-			Root::Current().FrontEnd().RuntimeGUI().ReloadAssetsFromDisk();
-			Root::Current().Render().GetGameCamera().CaptureEditorState();
-			if (projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", SceneManager))
+
+			if (ImGui::MenuItem("Play Game"))
+			{
+				Root::Current().FrontEnd().Creator().SaveAllRoleGUIs();
+				Root::Current().FrontEnd().RuntimeGUI().ReloadAssetsFromDisk();
+				Root::Current().Render().GetGameCamera().CaptureEditorState();
+
+				if (projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", SceneManager))
 				{
 					Root::Current().FrontEnd().RestoreRuntimeLayout();
 					Root::Current().State().SetMode(EngineMode::Game);
 					Root::Current().EditorLaunchedGameSession() = true;
 					Root::Current().Render().SetGameMode();
+
 					Root::Current().Gameplay().startUp(
 						SceneManager,
 						Root::Current().FrontEnd(),
 						Root::Current().Debugger(),
 						Root::Current().State());
+
 					Root::Current().Gameplay().BootMainMenu(Root::Current().FrontEnd(), Root::Current().Debugger());
 				}
 				else
@@ -605,12 +649,12 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 					Root::Current().Debugger().LogMessage("Play Game aborted because project autosave failed.");
 				}
 			}
-		if (ImGui::MenuItem("Play Scene")) 
-		{
-			Root::Current().FrontEnd().Creator().SaveAllRoleGUIs();
-			Root::Current().FrontEnd().RuntimeGUI().ReloadAssetsFromDisk();
-			Root::Current().Render().GetGameCamera().CaptureEditorState();
-			if (projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", SceneManager))
+			if (ImGui::MenuItem("Play Scene")) 
+			{
+				Root::Current().FrontEnd().Creator().SaveAllRoleGUIs();
+				Root::Current().FrontEnd().RuntimeGUI().ReloadAssetsFromDisk();
+				Root::Current().Render().GetGameCamera().CaptureEditorState();
+				if (projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", SceneManager))
 				{
 					Root::Current().FrontEnd().RestoreRuntimeLayout();
 					Root::Current().State().SetMode(EngineMode::Game);
@@ -638,14 +682,18 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 			{
 				m_buildGamePopupRequested = true;
 			}
-			ImGui::EndMenu();
+			ImGui::EndMenu(); //game
 		}
+
+		// ---- Scene ------
 		if (ImGui::BeginMenu("Scene"))
 		{
+			// Scene switching and scene creation.
 			if (ImGui::BeginMenu("Levels"))
 			{
-				const auto levelNames = SceneManager.SceneNames(SceneManager::SceneKind::Level);
-				for (const auto& levelName : levelNames)
+				const std::vector<std::string> levelNames = SceneManager.SceneNames(SceneManager::SceneKind::Level);
+
+				for (const std::string& levelName : levelNames)
 				{
 					const Scene* Scene = SceneManager.FindLevel(levelName);
 					const bool active = SceneManager.ActiveLevel() == Scene;
@@ -655,16 +703,19 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 						SceneManager.SetStartupLevelName(levelName);
 					}
 				}
+
 				if (levelNames.empty())
 				{
 					ImGui::MenuItem("No gameplay scenes created.", nullptr, false, false);
 				}
+
 				ImGui::EndMenu();
 			}
+
 			if (ImGui::BeginMenu("Cutscenes"))
 			{
-				const auto cutsceneNames = SceneManager.SceneNames(SceneManager::SceneKind::Cutscene);
-				for (const auto& cutsceneName : cutsceneNames)
+				const std::vector<std::string> cutsceneNames = SceneManager.SceneNames(SceneManager::SceneKind::Cutscene);
+				for (const std::string& cutsceneName : cutsceneNames)
 				{
 					const Scene* cutscene = SceneManager.FindLevel(cutsceneName);
 					const bool active = SceneManager.ActiveLevel() == cutscene;
@@ -678,24 +729,33 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 				{
 					ImGui::MenuItem("No cutscenes created.", nullptr, false, false);
 				}
+
 				ImGui::EndMenu();
 			}
+
 			if (ImGui::MenuItem("New Scene"))
 			{
 				m_newLevelPopupRequested = true;
 			}
-			ImGui::EndMenu();
+
+			ImGui::EndMenu(); // scene
 		}
+
+		// ---- Code ------
 		if (ImGui::BeginMenu("Code"))
 		{
+			// Gameplay class generation.
 			if (ImGui::MenuItem("Add Code File"))
 			{
 				m_addCodeFilePopupRequested = true;
 			}
 			ImGui::EndMenu();
 		}
+
+		// ---- UI ------
 		if (ImGui::BeginMenu("UI"))
 		{
+			// Tooling and editor helpers.
 			if (ImGui::MenuItem("GameGUI Creator"))
 			{
 				Root::Current().FrontEnd().OpenGameGUICreator();
@@ -704,6 +764,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 			}
 			ImGui::EndMenu();
 		}
+
 		ImGui::EndMainMenuBar();
 	}
 
@@ -713,6 +774,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 	DrawInputMapWindow();
 	DrawCameraWindow();
 
+	// Keep the file explorer responsive to the selected directory and import actions.
 	if (m_showFileExplorer)
 	{
 		bool open = m_showFileExplorer;
@@ -732,7 +794,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 			}
 
 			ImGui::Separator();
-			for (const auto& entry : fileManager.Entries())
+			for (const std::filesystem::directory_entry& entry : fileManager.Entries())
 			{
 				if (entry.is_directory())
 				{
@@ -755,6 +817,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 
 	if (m_showLevelWindow)
 	{
+		// The scene window focuses on selecting an entity, not resizing the window.
 		bool open = m_showLevelWindow;
 		const Scene* activeLevelForTitle = SceneManager.ActiveLevel();
 		const std::string levelWindowTitle = activeLevelForTitle ? activeLevelForTitle->Name() : "Scene";
@@ -764,10 +827,10 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 		{
 			if (activeLevelForTitle)
 			{
-				const auto& levelObjects = activeLevelForTitle->Objects();
+				const std::vector<std::unique_ptr<Entity>>& levelObjects = activeLevelForTitle->Objects();
 				for (std::size_t i = 0; i < levelObjects.size(); ++i)
 				{
-					const auto& object = levelObjects[i];
+					const std::unique_ptr<Entity>& object = levelObjects[i];
 					const std::string label = object ? object->Name() : std::string("<null>");
 					const std::string visibleLabel = label.empty() ? "<unnamed>" : label;
 					const std::string selectableId = visibleLabel + "##LevelObject" + std::to_string(i);
@@ -795,6 +858,8 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 
 	if (m_showEntityWindow)
 	{
+		// The entity inspector is intentionally large because it exposes many
+		// nested controls for transform, physics, and component editing.
 		bool open = m_showEntityWindow;
 		if (ImGui::Begin("Entity", &open, ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_AlwaysAutoResize))
 		{
@@ -804,16 +869,14 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 			}
 			else
 			{
-				auto& object = objects[static_cast<std::size_t>(m_selectedLevelObjectIndex)];
+				const std::unique_ptr<Entity>& object = objects[static_cast<std::size_t>(m_selectedLevelObjectIndex)];
 				if (!object)
 				{
 					ImGui::TextUnformatted("Selected object is null.");
 				}
-					else
-					{
-						const bool activeSceneIsCutscene = SceneManager.SceneKindFor(activeLevel->Name()) == SceneManager::SceneKind::Cutscene;
-						const glm::vec3 worldCenterPosition = object->WorldCenterPosition();
-						const glm::vec3 defaultWorldCenterPosition = object->InitialWorldCenterPosition();
+				else
+				{
+					const bool activeSceneIsCutscene = SceneManager.SceneKindFor(activeLevel->Name()) == SceneManager::SceneKind::Cutscene;
 
 					bool deleteEntity = false;
 					if (ImGui::Button("Delete"))
@@ -877,6 +940,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 						ImGui::EndCombo();
 					}
 
+					// Confirm destructive actions inside a modal popup.
 					if (ImGui::BeginPopupModal("Delete Entity##Confirm", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 					{
 						ImGui::Text("Delete %s from the scene?", object->Name().empty() ? "<unnamed>" : object->Name().c_str());
@@ -961,6 +1025,8 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 
 					if (ImGui::CollapsingHeader("Physics", ImGuiTreeNodeFlags_DefaultOpen))
 					{
+						// Physics controls are grouped because they are only relevant when
+						// editing collision and debug visualization.
 						const char* colliderShapes[] = { "Box", "Capsule", "Convex" };
 						int colliderShape = object->GetPhysicsColliderShape() == PhysicsColliderShape::Capsule ? 1
 							: object->GetPhysicsColliderShape() == PhysicsColliderShape::Convex ? 2 : 0;
@@ -982,6 +1048,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 					ImGui::TextUnformatted("Components");
 					ImGui::Separator();
 					std::vector<Component*> components = object->Components();
+					// Each attached component gets its own collapsible block and removal flow.
 					for (std::size_t componentIndex = 0; componentIndex < components.size(); ++componentIndex)
 					{
 						Component* component = components[componentIndex];
@@ -1025,6 +1092,8 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 
 						if (AnimatorComponent* animator = dynamic_cast<AnimatorComponent*>(component))
 						{
+							// Animator gets a dedicated popup because its state machine editing
+							// needs more context than a simple inline control.
 							if (ImGui::Button("Open State Machine"))
 							{
 								m_animatorStateMachinePopupRequested = true;
@@ -1122,6 +1191,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 
 	if (m_showLightingWindow)
 	{
+		// Lighting controls are separated so they can be opened without the entity inspector.
 		bool open = m_showLightingWindow;
 		if (ImGui::Begin("Lighting", &open, ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_AlwaysAutoResize))
 		{
@@ -1197,6 +1267,94 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 
 }
 
+void EngineGUI::EndFrame()
+{
+	ImGui::Render();
+	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+}
+
+// Visibility Flags
+bool EngineGUI::ShowAxis() const
+{
+	return m_showAxis;
+}
+
+bool EngineGUI::ShowGrid() const
+{
+	return m_showGrid;
+}
+
+bool EngineGUI::ShowLevelWindow() const
+{
+	return m_showLevelWindow;
+}
+
+bool EngineGUI::ShowEntityWindow() const
+{
+	return m_showEntityWindow;
+}
+
+bool EngineGUI::ShowLightingWindow() const
+{
+	return m_showLightingWindow;
+}
+
+bool EngineGUI::ShowFileExplorer() const
+{
+	return m_showFileExplorer;
+}
+
+bool EngineGUI::ShowInputMapWindow() const
+{
+	return m_showInputMapWindow;
+}
+
+bool EngineGUI::ShowCameraWindow() const
+{
+	return m_showCameraWindow;
+}
+
+void EngineGUI::SetShowAxis(bool showAxis)
+{
+	m_showAxis = showAxis;
+}
+
+void EngineGUI::SetShowGrid(bool showGrid)
+{
+	m_showGrid = showGrid;
+}
+
+void EngineGUI::SetShowLevelWindow(bool showLevelWindow)
+{
+	m_showLevelWindow = showLevelWindow;
+}
+
+void EngineGUI::SetShowEntityWindow(bool showEntityWindow)
+{
+	m_showEntityWindow = showEntityWindow;
+}
+
+void EngineGUI::SetShowLightingWindow(bool showLightingWindow)
+{
+	m_showLightingWindow = showLightingWindow;
+}
+
+void EngineGUI::SetShowFileExplorer(bool showFileExplorer)
+{
+	m_showFileExplorer = showFileExplorer;
+}
+
+void EngineGUI::SetShowInputMapWindow(bool showInputMapWindow)
+{
+	m_showInputMapWindow = showInputMapWindow;
+}
+
+void EngineGUI::SetShowCameraWindow(bool showCameraWindow)
+{
+	m_showCameraWindow = showCameraWindow;
+}
+
+// Popup and window drawing helpers
 void EngineGUI::DrawCameraWindow()
 {
 	if (!m_showCameraWindow)
@@ -1204,9 +1362,10 @@ void EngineGUI::DrawCameraWindow()
 		return;
 	}
 
+	// The camera window edits the runtime camera target and collision settings.
 	Scene* activeLevel = Root::Current().Scenes().ActiveLevel();
 	static const std::vector<std::unique_ptr<Entity>> emptyObjects;
-	const auto& objects = activeLevel ? activeLevel->Objects() : emptyObjects;
+	const std::vector<std::unique_ptr<Entity>>& objects = activeLevel ? activeLevel->Objects() : emptyObjects;
 
 	bool open = m_showCameraWindow;
 	if (ImGui::Begin("Camera", &open, ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize))
@@ -1216,7 +1375,7 @@ void EngineGUI::DrawCameraWindow()
 
 		if (ImGui::BeginCombo("##CameraTarget", camera.Target() ? camera.Target()->Name().c_str() : "<select entity>"))
 		{
-			for (const auto& object : objects)
+			for (const std::unique_ptr<Entity>& object : objects)
 			{
 				if (!object)
 				{
@@ -1262,9 +1421,11 @@ void EngineGUI::DrawCameraWindow()
 
 void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 {
+	// Keep UI state per animator so reopening the popup preserves edits.
 	AnimatorStateMachineUiState& ui = m_animatorUiState[&animator];
 	const std::vector<AnimatorBindingSource> bindingSources = AnimatorBindingSources(animator.Owner());
 
+	// Seed the editor with sensible defaults when the animator changes or has no state yet.
 	if (!ui.initialized || animator.States().empty())
 	{
 		ui.initialStateName[0] = '\0';
@@ -1289,10 +1450,11 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 
 	if (ImGui::BeginPopupModal("State Machine##AquanactAnimatorStateMachine", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 	{
+		// Initial animation selection.
 		ImGui::TextUnformatted("Initial animation");
 		if (ImGui::BeginCombo("##InitialAnimation", ui.initialStateName[0] != '\0' ? ui.initialStateName : "<select animation>"))
 		{
-			for (const auto& state : animator.States())
+			for (const AnimatorComponent::State& state : animator.States())
 			{
 				const bool selected = std::strcmp(ui.initialStateName, state.name.c_str()) == 0;
 				if (ImGui::Selectable(state.name.c_str(), selected))
@@ -1311,7 +1473,9 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 
 		ImGui::Separator();
 		ImGui::TextUnformatted("Transitions");
-		auto drawTransitionFilter = [](const char* id, const char* preview, char* selectedState, const std::vector<AnimatorComponent::State>& states)
+		// Two optional filters keep the transition list manageable in larger graphs.
+		const std::function<void(const char*, const char*, char*, const std::vector<AnimatorComponent::State>&)> drawTransitionFilter =
+			[](const char* id, const char* preview, char* selectedState, const std::vector<AnimatorComponent::State>& states)
 		{
 			if (!ImGui::BeginCombo(id, selectedState[0] != '\0' ? selectedState : preview))
 			{
@@ -1327,7 +1491,7 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 			{
 				ImGui::SetItemDefaultFocus();
 			}
-			for (const auto& state : states)
+			for (const AnimatorComponent::State& state : states)
 			{
 				const bool selected = std::strcmp(selectedState, state.name.c_str()) == 0;
 				if (ImGui::Selectable(state.name.c_str(), selected))
@@ -1349,9 +1513,10 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 
 		const bool hasTransitionFilter = ui.transitionFilterFromState[0] != '\0' || ui.transitionFilterToState[0] != '\0';
 		bool displayedTransition = false;
+		// Show the filtered transition list and let the user edit or delete entries in place.
 		for (std::size_t transitionIndex = 0; hasTransitionFilter && transitionIndex < animator.Transitions().size(); ++transitionIndex)
 		{
-			const auto& transition = animator.Transitions()[transitionIndex];
+			const AnimatorComponent::Transition& transition = animator.Transitions()[transitionIndex];
 			if ((ui.transitionFilterFromState[0] != '\0' && transition.from != ui.transitionFilterFromState) ||
 				(ui.transitionFilterToState[0] != '\0' && transition.to != ui.transitionFilterToState))
 			{
@@ -1399,6 +1564,7 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 		ImGui::Separator();
 		if (ImGui::Button("Create Transition"))
 		{
+			// Reset the inline editor so a fresh transition starts from clean defaults.
 			ui.editingTransitionIndex = -1;
 			ui.addTransitionPopupInitialized = false;
 			ImGui::OpenPopup("Add Transition##AquanactAnimatorStateMachine");
@@ -1406,6 +1572,7 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 
 		if (ImGui::BeginPopupModal("Add Transition##AquanactAnimatorStateMachine", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 		{
+			// Initialize the add/edit popup only once per open cycle.
 			if (!ui.addTransitionPopupInitialized)
 			{
 				if (!animator.States().empty())
@@ -1429,7 +1596,7 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 			ImGui::TextUnformatted("From");
 			if (ImGui::BeginCombo("##TransitionFrom", ui.transitionFromState[0] != '\0' ? ui.transitionFromState : "<from>"))
 			{
-				for (const auto& state : animator.States())
+				for (const AnimatorComponent::State& state : animator.States())
 				{
 					const bool selected = std::strcmp(ui.transitionFromState, state.name.c_str()) == 0;
 					if (ImGui::Selectable(state.name.c_str(), selected))
@@ -1448,7 +1615,7 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 			ImGui::TextUnformatted("To");
 			if (ImGui::BeginCombo("##TransitionTo", ui.transitionToState[0] != '\0' ? ui.transitionToState : "<to>"))
 			{
-				for (const auto& state : animator.States())
+				for (const AnimatorComponent::State& state : animator.States())
 				{
 					const bool selected = std::strcmp(ui.transitionToState, state.name.c_str()) == 0;
 					if (ImGui::Selectable(state.name.c_str(), selected))
@@ -1468,18 +1635,23 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 			ImGui::InputFloat("Blend Seconds", &ui.transitionBlendSeconds, 0.0f, 0.0f, "%.2f");
 			ImGui::Separator();
 
-			const auto isBooleanBinding = [&bindingSources](const AnimatorComponent::Operand& operand)
+			// Keep the predicate explicit so the popup logic reads as "is this binding boolean?"
+			const std::function<bool(const AnimatorComponent::Operand&)> isBooleanBinding =
+				[&bindingSources](const AnimatorComponent::Operand& operand) -> bool
 			{
+
 				if (operand.type != AnimatorComponent::OperandType::Binding)
 				{
 					return false;
 				}
+
 				for (const AnimatorBindingSource& source : bindingSources)
 				{
 					if (source.componentName != operand.componentName)
 					{
 						continue;
 					}
+
 					for (const BindableMember& member : source.members)
 					{
 						if (member.name == operand.memberName)
@@ -1488,9 +1660,11 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 						}
 					}
 				}
+
 				return false;
 			};
 
+			// Each condition is edited as a full left/op/right triplet.
 			for (std::size_t conditionIndex = 0; conditionIndex < ui.conditions.size(); ++conditionIndex)
 			{
 				AnimatorComponent::Condition& condition = ui.conditions[conditionIndex];
@@ -1562,6 +1736,7 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 
 			if (ImGui::Button("Create"))
 			{
+				// Reuse the same popup for both insertion and update.
 				if (ui.editingTransitionIndex >= 0)
 				{
 					animator.UpdateTransition(static_cast<std::size_t>(ui.editingTransitionIndex), ui.transitionFromState, ui.transitionToState, ui.transitionBlendSeconds, ui.conditions);
@@ -1595,6 +1770,7 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 	}
 	else if (m_animatorStateMachinePopupRequested && !ImGui::IsPopupOpen("State Machine##AquanactAnimatorStateMachine"))
 	{
+		// If the popup was requested but closed externally, clear the cached state.
 		m_animatorStateMachinePopupRequested = false;
 		m_animatorUiState.erase(&animator);
 	}
@@ -1608,12 +1784,14 @@ void EngineGUI::DrawBuildGamePopup()
 
 	if (m_buildGamePopupRequested)
 	{
+		// Defer opening until the next frame so the popup state stays stable.
 		ImGui::OpenPopup("Build Game##AquanactBuildGame");
 		m_buildGamePopupRequested = false;
 	}
 
 	if (ImGui::BeginPopupModal("Build Game##AquanactBuildGame", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 	{
+		// Let the user choose an output folder, then invoke the build system on demand.
 		ImGui::TextUnformatted("Build the packaged game to this folder:");
 		ImGui::InputText("Output", buildPath, sizeof(buildPath));
 
@@ -1713,9 +1891,11 @@ std::string EngineGUI::MakeSourceTemplate(const std::string& className)
 
 void EngineGUI::CreateGameCodeFile(const std::string& className)
 {
+	// Generated code belongs in the game include/source folders.
 	const std::filesystem::path headerPath = GameIncludeRoot() / (className + ".h");
 	const std::filesystem::path sourcePath = GameSourceRoot() / (className + ".cpp");
 
+	// Create parent directories if they do not already exist.
 	const std::filesystem::path headerDir = headerPath.parent_path();
 	const std::filesystem::path sourceDir = sourcePath.parent_path();
 	std::error_code ec;
@@ -1725,6 +1905,7 @@ void EngineGUI::CreateGameCodeFile(const std::string& className)
 	const bool headerWritten = Root::Current().FileSystemRef().WriteTextFile(headerPath, MakeHeaderTemplate(className));
 	const bool sourceWritten = Root::Current().FileSystemRef().WriteTextFile(sourcePath, MakeSourceTemplate(className));
 
+	// Report one success/failure message back to the popup.
 	if (headerWritten && sourceWritten)
 	{
 		m_addCodeFileStatusMessage = "Created " + headerPath.string() + " and " + sourcePath.string();
@@ -1735,24 +1916,83 @@ void EngineGUI::CreateGameCodeFile(const std::string& className)
 	}
 }
 
+void EngineGUI::CreateEntity()
+{
+}
+
+void EngineGUI::UpdateEntity(Entity* entity)
+{
+}
+
 void EngineGUI::DrawAddCodeFilePopup()
 {
+
 	if (m_addCodeFilePopupRequested)
 	{
+		// Clear stale text so each open starts fresh.
 		ImGui::OpenPopup("Add Code File##AquanactAddCodeFile");
 		m_addCodeFilePopupRequested = false;
 		m_addCodeFileCreated = false;
 		m_addCodeFileStatusMessage.clear();
 	}
 
+	Entity* newEntity    = nullptr;
+	Entity* updateEntity = nullptr;
+
 	if (ImGui::BeginPopupModal("Add Code File##AquanactAddCodeFile", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 	{
+		// Normalize the class name before generating files so the output is valid C++.
 		ImGui::TextUnformatted("Create a new gameplay class:");
 		ImGui::InputText("Class Name", m_newCodeFileName, sizeof(m_newCodeFileName));
 
-		if (ImGui::Button("Create"))
+		//actually get the names of the entitys
+		//get the scene manager
+		Scene* activeScene = Root::Current().Scenes().ActiveLevel();
+		const std::vector<std::unique_ptr<Entity>>& entities = activeScene->Objects();
+		std::vector<std::string> entityNames;
+		entityNames.push_back("none");
+
+		for (int i = 0; i < entities.size(); i++)
+		{
+			const std::unique_ptr<Entity>& entity = entities[i];
+			// how can I add the entity name to the items array?
+			entityNames.push_back(entity->Name());
+		}
+		
+		static int select_index = 0;
+		const char* default_item = entityNames[select_index].c_str();
+		
+
+		// Combo box
+		if (ImGui::BeginCombo("Entity", default_item))
+		{
+			// loop through each item in dropdown
+			for (int i = 0; i < entityNames.size(); i++)
+			{
+				//check which is selected
+				const bool is_selected = (select_index == i);
+
+				//if the current one is selected
+				if (ImGui::Selectable(entityNames[i].c_str(), is_selected))
+				{
+					select_index = i;
+				}
+
+				// select it
+				if (is_selected)
+				{
+					updateEntity = entities[i].get();
+					ImGui::SetItemDefaultFocus();
+				}
+			}
+
+			ImGui::EndCombo();
+		}
+
+		if (ImGui::Button("Create and Build"))
 		{
 			const std::string className = NormalizeGameClassName(m_newCodeFileName);
+
 			if (className.empty())
 			{
 				m_addCodeFileStatusMessage = "Enter a valid class name.";
@@ -1761,9 +2001,20 @@ void EngineGUI::DrawAddCodeFilePopup()
 			{
 				std::strncpy(m_newCodeFileName, className.c_str(), sizeof(m_newCodeFileName) - 1);
 				m_newCodeFileName[sizeof(m_newCodeFileName) - 1] = '\0';
+
 				CreateGameCodeFile(className);
+
+				//TODO: how to start a new build?
+
+				if (select_index > 0)
+					UpdateEntity(updateEntity); // add created class as component to entity in scene
+				else
+					CreateEntity(); // add new entity to scene with created class as component
+
 				m_addCodeFileCreated = true;
 			}
+
+			ImGui::CloseCurrentPopup();
 		}
 
 		ImGui::SameLine();
@@ -1782,92 +2033,6 @@ void EngineGUI::DrawAddCodeFilePopup()
 	}
 }
 
-void EngineGUI::EndFrame()
-{
-	ImGui::Render();
-	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-}
-
-bool EngineGUI::ShowAxis() const
-{
-	return m_showAxis;
-}
-
-bool EngineGUI::ShowGrid() const
-{
-	return m_showGrid;
-}
-
-bool EngineGUI::ShowLevelWindow() const
-{
-	return m_showLevelWindow;
-}
-
-bool EngineGUI::ShowEntityWindow() const
-{
-	return m_showEntityWindow;
-}
-
-bool EngineGUI::ShowLightingWindow() const
-{
-	return m_showLightingWindow;
-}
-
-bool EngineGUI::ShowFileExplorer() const
-{
-	return m_showFileExplorer;
-}
-
-bool EngineGUI::ShowInputMapWindow() const
-{
-	return m_showInputMapWindow;
-}
-
-bool EngineGUI::ShowCameraWindow() const
-{
-	return m_showCameraWindow;
-}
-
-void EngineGUI::SetShowAxis(bool showAxis)
-{
-	m_showAxis = showAxis;
-}
-
-void EngineGUI::SetShowGrid(bool showGrid)
-{
-	m_showGrid = showGrid;
-}
-
-void EngineGUI::SetShowLevelWindow(bool showLevelWindow)
-{
-	m_showLevelWindow = showLevelWindow;
-}
-
-void EngineGUI::SetShowEntityWindow(bool showEntityWindow)
-{
-	m_showEntityWindow = showEntityWindow;
-}
-
-void EngineGUI::SetShowLightingWindow(bool showLightingWindow)
-{
-	m_showLightingWindow = showLightingWindow;
-}
-
-void EngineGUI::SetShowFileExplorer(bool showFileExplorer)
-{
-	m_showFileExplorer = showFileExplorer;
-}
-
-void EngineGUI::SetShowInputMapWindow(bool showInputMapWindow)
-{
-	m_showInputMapWindow = showInputMapWindow;
-}
-
-void EngineGUI::SetShowCameraWindow(bool showCameraWindow)
-{
-	m_showCameraWindow = showCameraWindow;
-}
-
 void EngineGUI::DrawInputMapWindow()
 {
 	if (!m_showInputMapWindow)
@@ -1875,8 +2040,11 @@ void EngineGUI::DrawInputMapWindow()
 		return;
 	}
 
+	// The input map editor currently focuses on the "Move" action and rewrites
+	// the binding set in place when the user changes a control.
 	InputManager& inputManager = Root::Current().InputActions();
-	auto findBinding = [](std::vector<InputBinding>& bindings, InputBindingType type, int code, InputStick stick = InputStick::Left) -> InputBinding*
+	const std::function<InputBinding*(std::vector<InputBinding>&, InputBindingType, int, InputStick)> findBinding =
+		[](std::vector<InputBinding>& bindings, InputBindingType type, int code, InputStick stick) -> InputBinding*
 	{
 		for (InputBinding& binding : bindings)
 		{
@@ -1888,7 +2056,8 @@ void EngineGUI::DrawInputMapWindow()
 		return nullptr;
 	};
 
-	auto ensureBinding = [](std::vector<InputBinding>& bindings, InputBinding binding)
+	const std::function<void(std::vector<InputBinding>&, InputBinding)> ensureBinding =
+		[](std::vector<InputBinding>& bindings, InputBinding binding)
 	{
 		for (InputBinding& existing : bindings)
 		{
@@ -1904,19 +2073,22 @@ void EngineGUI::DrawInputMapWindow()
 	bool open = m_showInputMapWindow;
 	if (ImGui::Begin("Input Map", &open, ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize))
 	{
-		const auto bindingIt = inputManager.Bindings().find("Move");
+		// Use the concrete iterator type returned by the binding map instead of guessing one.
+		const decltype(inputManager.Bindings().find("Move")) bindingIt = inputManager.Bindings().find("Move");
 		if (bindingIt != inputManager.Bindings().end())
 		{
 			std::vector<InputBinding> editedBindings = bindingIt->second;
 			bool bindingsChanged = false;
 
-			auto drawKeyboardBinding = [&](const char* label, int keyCode, const glm::vec2& vector)
+			// Keyboard bindings are edited through a shared helper to keep the four directions consistent.
+			const std::function<void(const char*, int, const glm::vec2&)> drawKeyboardBinding =
+				[&](const char* label, int keyCode, const glm::vec2& vector)
 			{
-				InputBinding* binding = findBinding(editedBindings, InputBindingType::Key, keyCode);
+				InputBinding* binding = findBinding(editedBindings, InputBindingType::Key, keyCode, InputStick::Left);
 				if (!binding)
 				{
 					ensureBinding(editedBindings, { InputBindingType::Key, keyCode, GLFW_JOYSTICK_1, 1.0f, vector });
-					binding = findBinding(editedBindings, InputBindingType::Key, keyCode);
+					binding = findBinding(editedBindings, InputBindingType::Key, keyCode, InputStick::Left);
 				}
 
 				if (!binding)
@@ -1963,6 +2135,7 @@ void EngineGUI::DrawInputMapWindow()
 			ImGui::Separator();
 			static const char* controllerModes[] = { "Digital", "Analog" };
 			int controllerMode = findBinding(editedBindings, InputBindingType::ControllerStick, 0, InputStick::Left) ? 1 : 0;
+			// Switching between digital D-pad and analog stick rewrites the controller entries.
 			if (ImGui::Combo("##MoveControllerMode", &controllerMode, controllerModes, IM_ARRAYSIZE(controllerModes)))
 			{
 				editedBindings.erase(std::remove_if(editedBindings.begin(), editedBindings.end(), [](const InputBinding& binding)
@@ -1996,11 +2169,11 @@ void EngineGUI::DrawInputMapWindow()
 
 				for (int i = 0; i < 4; ++i)
 				{
-					InputBinding* binding = findBinding(editedBindings, InputBindingType::ControllerDigital, options[i].code);
+					InputBinding* binding = findBinding(editedBindings, InputBindingType::ControllerDigital, options[i].code, InputStick::Left);
 					if (!binding)
 					{
 						ensureBinding(editedBindings, options[i]);
-						binding = findBinding(editedBindings, InputBindingType::ControllerDigital, options[i].code);
+						binding = findBinding(editedBindings, InputBindingType::ControllerDigital, options[i].code, InputStick::Left);
 					}
 
 					if (!binding)
@@ -2075,6 +2248,7 @@ void EngineGUI::DrawNewLevelPopup()
 {
 	if (m_newLevelPopupRequested)
 	{
+		// Clear the previous result so the popup reads like a fresh workflow.
 		ImGui::OpenPopup("New Scene##AquanactNewLevel");
 		m_newLevelPopupRequested = false;
 		m_newLevelStatusMessage.clear();
@@ -2082,6 +2256,7 @@ void EngineGUI::DrawNewLevelPopup()
 
 	if (ImGui::BeginPopupModal("New Scene##AquanactNewLevel", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 	{
+		// Create a new scene only after sanitizing the user-provided name.
 		ImGui::TextUnformatted("Create a new scene:");
 		ImGui::InputText("Name", m_newLevelName, sizeof(m_newLevelName));
 
@@ -2098,8 +2273,8 @@ void EngineGUI::DrawNewLevelPopup()
 			}
 			else
 			{
-				Scene* Scene = Root::Current().Scenes().CreateLevel(levelName);
-				if (Scene)
+				Scene* newScene = Root::Current().Scenes().CreateLevel(levelName);
+				if (newScene)
 				{
 					Root::Current().Scenes().SetActiveLevel(levelName);
 					m_newLevelStatusMessage = "Created scene " + levelName + ".";
@@ -2146,9 +2321,3 @@ std::string EngineGUI::NormalizeLevelName(const std::string& input)
 	}
 	return output;
 }
-
-
-
-
-
-
