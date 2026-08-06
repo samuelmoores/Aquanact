@@ -67,29 +67,15 @@ void GameGUICreator::DrawButtonWidgetDetails(GameGUIAsset& asset, GameGUIWidgetD
 			m_dimensionRequestHeight = widget.height;
 		}
 
-		int requestedButtonSize[2] = { m_dimensionRequestWidth, m_dimensionRequestHeight };
-		if (ImGui::DragInt2("Button dimensions", requestedButtonSize, 1.0f, 1, 4000))
+		// Treat the stored position as the image center in the editor.
+		int buttonPosition[2] = { widget.x + widget.width / 2, widget.y + widget.height / 2 };
+		if (ImGui::DragInt2("Position", buttonPosition, 1.0f))
 		{
-			m_dimensionRequestWidth = requestedButtonSize[0];
-			m_dimensionRequestHeight = requestedButtonSize[1];
-			widget.width = std::max(1, m_dimensionRequestWidth);
-			widget.height = std::max(1, m_dimensionRequestHeight);
+			widget.x = buttonPosition[0] - widget.width / 2;
+			widget.y = buttonPosition[1] - widget.height / 2;
 			SyncRuntimePreview();
-			SaveSelectedRoleGUI();
 		}
 
-		if (ImGui::Button("Set dimensions"))
-		{
-			constexpr float skinWidth = 32.0f;
-			constexpr float skinHeight = 21.0f;
-			const float scaleX = static_cast<float>(std::max(1, requestedButtonSize[0])) / skinWidth;
-			const float scaleY = static_cast<float>(std::max(1, requestedButtonSize[1])) / skinHeight;
-			const float scale = std::max(0.1f, std::min(scaleX, scaleY));
-			widget.width = std::max(1, static_cast<int>(std::lround(skinWidth * scale)));
-			widget.height = std::max(1, static_cast<int>(std::lround(skinHeight * scale)));
-			SyncRuntimePreview();
-			SaveSelectedRoleGUI();
-		}
 
 		float textColour[3] = { 0.0f, 0.0f, 0.0f };
 		std::sscanf(widget.textColor.c_str(), "%f %f %f", &textColour[0], &textColour[1], &textColour[2]);
@@ -131,5 +117,11 @@ void GameGUICreator::DrawButtonWidgetDetails(GameGUIAsset& asset, GameGUIWidgetD
 			}
 		}
 		ImGui::EndCombo();
+	}
+
+	if (ImGui::Button("Delete"))
+	{
+		DeleteSelectedWidget();
+		SyncRuntimePreview();
 	}
 }

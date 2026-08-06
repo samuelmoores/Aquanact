@@ -159,16 +159,21 @@ void GameGUICreator::ApplyPanelButtonLayout(GameGUIWidgetDef& panel)
 	else if (panel.panelButtonSkin == "TabPanelSkin") { nativeWidth = 43; nativeHeight = 39; }
 	else if (panel.panelButtonSkin == "MenuItemNormalSkin") { nativeWidth = 43; nativeHeight = 10; }
 	else if (panel.panelButtonSkin == "MultiListButtonSkin") { nativeWidth = 32; nativeHeight = 21; }
+
 	if (panel.panelButtonWidth <= 0 || panel.panelButtonHeight <= 0)
 	{
 		panel.panelButtonWidth = std::max(1, static_cast<int>(std::lround(nativeWidth * panel.panelButtonScale)));
 		panel.panelButtonHeight = std::max(1, static_cast<int>(std::lround(nativeHeight * panel.panelButtonScale)));
 	}
+
 	std::vector<GameGUIWidgetDef*> buttons;
+
 	for (GameGUIWidgetDef& widget : asset.widgets)
 	{
-		if (widget.type == "Button" && widget.parentName == panel.name) buttons.push_back(&widget);
+		if (widget.type == "Button" && widget.parentName == panel.name) 
+			buttons.push_back(&widget);
 	}
+
 	for (GameGUIWidgetDef* button : buttons)
 	{
 		button->width = std::max(1, panel.panelButtonWidth);
@@ -177,9 +182,12 @@ void GameGUICreator::ApplyPanelButtonLayout(GameGUIWidgetDef& panel)
 		button->fontName = panel.panelButtonFontName;
 		button->fontSize = panel.panelButtonFontSize;
 	}
-	if (!panel.uniformButtonSpacing || buttons.empty()) return;
+
+	if (!panel.uniformButtonSpacing || buttons.empty()) 
+		return;
 
 	const float spacingFactor = 1.0f - std::clamp(static_cast<float>(panel.panelPadding) / 100.0f, 0.0f, 1.0f);
+
 	if (panel.horizontalButtonLayout)
 	{
 		int totalWidth = 0;
@@ -195,14 +203,24 @@ void GameGUICreator::ApplyPanelButtonLayout(GameGUIWidgetDef& panel)
 	else
 	{
 		int totalHeight = 0;
-		for (const GameGUIWidgetDef* button : buttons) totalHeight += button->height;
+		for (const GameGUIWidgetDef* button : buttons) 
+			totalHeight += button->height;
+
 		const int availableSpace = std::max(0, panel.height - totalHeight);
+
 		const int gap = panel.panelPadding >= 100
 			? -6
 			: buttons.size() > 1 ? static_cast<int>(std::lround((availableSpace / static_cast<float>(buttons.size() - 1)) * spacingFactor)) : 0;
+
 		const int groupHeight = totalHeight + gap * static_cast<int>(buttons.size() - 1);
+
 		int y = std::max(0, (panel.height - groupHeight) / 2);
-		for (GameGUIWidgetDef* button : buttons) { button->x = (panel.width - button->width) / 2; button->y = y; y += button->height + gap; }
+
+		for (GameGUIWidgetDef* button : buttons) 
+		{ 
+			button->x = (panel.width - button->width) / 2; 
+			button->y = y; y += button->height + gap; 
+		}
 	}
 }
 
