@@ -126,6 +126,7 @@ void Root::startUp(int argc, char** argv)
 	m_debug->startUp();
 	m_fileManager->startUp();
 	m_projectManager->LoadProject(DefaultProjectPath(), *m_sceneManager);
+	m_sceneManager->startUp();
 
 	StartInitialSession();
 	m_started = true;

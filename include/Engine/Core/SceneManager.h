@@ -23,29 +23,39 @@ public:
 	SceneManager() = default;
 	~SceneManager();
 
+	// Lifecycle and state reset
 	Scene* startUp();
 	void Clear();
+
+	// Scene creation and lookup
 	Scene* CreateLevel(std::string name);
 	Scene* CreateCutscene(std::string name);
 	Scene* FindLevel(const std::string& name) const;
 	bool SetActiveLevel(const std::string& name);
-	void SetStartupLevelName(std::string name);
-	const std::string& StartupLevelName() const;
 	void SetSceneKind(const std::string& name, SceneKind kind);
 	SceneKind SceneKindFor(const std::string& name) const;
 	bool IsMainMenuScene(const std::string& name) const;
 	std::vector<std::string> SceneNames(SceneKind kind) const;
+
+	// Project state serialization
 	void AppendProjectState(std::string& contents) const;
 	void ApplyProjectState(const std::string& startupLevelName);
 	void ApplyProjectState(
 		const std::vector<ProjectStateData::PendingLevel>& pendingLevels,
 		const std::vector<ProjectStateData::PendingController>& pendingControllers,
 		const std::vector<ProjectStateData::PendingComponent>& pendingComponents);
+
+	// Active scene access and editor helpers
 	Scene* ActiveLevel();
 	const Scene* ActiveLevel() const;
 	void ResetActiveLevelEntitiesToDefaultPosition();
 	void CaptureActiveLevelEditorTransforms();
 	void RestoreActiveLevelEditorTransforms();
+
+	// Startup configuration
+	void SetStartupLevelName(std::string name);
+	const std::string& StartupLevelName() const;
+
 	const std::vector<std::unique_ptr<Scene>>& Levels() const { return m_levels; }
 
 private:
@@ -62,8 +72,3 @@ private:
 	std::unordered_map<Entity*, EditorTransformSnapshot> m_editorTransformSnapshots;
 	std::string m_startupLevelName;
 };
-
-
-
-
-

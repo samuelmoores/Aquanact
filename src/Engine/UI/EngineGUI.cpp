@@ -1918,10 +1918,45 @@ void EngineGUI::CreateGameCodeFile(const std::string& className)
 
 void EngineGUI::CreateEntity()
 {
+
 }
 
 void EngineGUI::UpdateEntity(Entity* entity)
 {
+
+}
+
+void EngineGUI::StartRebuild()
+{
+	// TODO
+}
+
+void EngineGUI::OnRebuildFinished()
+{
+	//TODO
+}
+
+void EngineGUI::SaveNewClassConfiguration(NewClassConfiguration& configuration)
+{
+	std::string filename = "NewClassConfiguration";
+
+	// Open the text file for writing
+	std::ofstream outFile(filename);
+
+	// Check if the file opened successfully
+	if (!outFile)
+	{
+		std::cerr << "Error: Could not open file " << filename << " for writing.\n";
+		return;
+	}
+
+	// std::boolalpha forces bools to print as "true"/"false" instead of 1/0
+	outFile << "ClassName: " << configuration.className << "\n";
+	outFile << "AttachToExistingEntity: " << std::boolalpha << configuration.attachToExistingEntity << "\n";
+	outFile << "CreateNewEntity: " << std::boolalpha << configuration.createNewEntity << "\n";
+	outFile << "TargetEntityName: " << configuration.targetEntityName << "\n";
+
+	// File closes automatically when outFile goes out of scope
 }
 
 void EngineGUI::DrawAddCodeFilePopup()
@@ -1962,7 +1997,6 @@ void EngineGUI::DrawAddCodeFilePopup()
 		static int select_index = 0;
 		const char* default_item = entityNames[select_index].c_str();
 		
-
 		// Combo box
 		if (ImGui::BeginCombo("Entity", default_item))
 		{
@@ -2002,16 +2036,25 @@ void EngineGUI::DrawAddCodeFilePopup()
 				std::strncpy(m_newCodeFileName, className.c_str(), sizeof(m_newCodeFileName) - 1);
 				m_newCodeFileName[sizeof(m_newCodeFileName) - 1] = '\0';
 
+				// start create and build sequence
+
+				//step one
+				//TODO: check if class already exists
 				CreateGameCodeFile(className);
 
-				//TODO: how to start a new build?
+				//step 2: save bools to disk, new component -> new entity or existing entity
+				NewClassConfiguration configuration;
+				configuration.className = className;
+				configuration.attachToExistingEntity = (updateEntity != nullptr);
+				configuration.targetEntityName = updateEntity ? updateEntity->Name() : "";
+				configuration.createNewEntity = (updateEntity == nullptr);
 
-				if (select_index > 0)
-					UpdateEntity(updateEntity); // add created class as component to entity in scene
-				else
-					CreateEntity(); // add new entity to scene with created class as component
+				SaveNewClassConfiguration(configuration);
 
-				m_addCodeFileCreated = true;
+				//step 3: stop program
+				glfwSetWindowShouldClose(m_window->GLFW(), GLFW_TRUE);
+
+				//step 4: make sure SceneManager checks the bools on startup
 			}
 
 			ImGui::CloseCurrentPopup();

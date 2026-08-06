@@ -1,5 +1,6 @@
 #include "Engine/Core/SceneManager.h"
 
+#include "Engine/Core/Root.h"
 #include "Engine/Core/AnimatorComponent.h"
 #include "Engine/Core/Controller.h"
 #include "Engine/Core/Entity.h"
@@ -9,9 +10,85 @@
 #include "Game/PlayerHealth.h"
 
 #include <algorithm>
+#include <functional>
+
+#include <fstream>
+#include <iostream>
+#include <string>
+#include <sstream>
+#include <memory>
+
+struct NewClassConfiguration
+{
+	std::string className;
+	bool attachToExistingEntity = false;
+	bool createNewEntity = false;
+	std::string targetEntityName;
+};
+
+// Helper function to trim spaces and remove the prefix (e.g., "ClassName: ")
+std::string extractValue(const std::string& line, const std::string& prefix)
+{
+	if (line.rfind(prefix, 0) == 0) // Checks if line starts with prefix
+	{
+		return line.substr(prefix.length());
+	}
+	return "";
+}
+
+NewClassConfiguration loadConfiguration(const std::string& filename)
+{
+	std::ifstream inFile(filename);
+	NewClassConfiguration config;
+
+	if (!inFile)
+	{
+		std::cerr << "Error: Could not open file " << filename << " for reading.\n";
+		return config;
+	}
+
+	std::string line;
+
+	// Local variables corresponding to each line in the text file
+	std::string localClassName = "";
+	std::string localAttachStr = "";
+	std::string localCreateStr = "";
+	std::string localTargetName = "";
+
+	// Read the file line by line
+	while (std::getline(inFile, line))
+	{
+		if (line.rfind("ClassName: ", 0) == 0)
+		{
+			localClassName = extractValue(line, "ClassName: ");
+		}
+		else if (line.rfind("AttachToExistingEntity: ", 0) == 0)
+		{
+			localAttachStr = extractValue(line, "AttachToExistingEntity: ");
+		}
+		else if (line.rfind("CreateNewEntity: ", 0) == 0)
+		{
+			localCreateStr = extractValue(line, "CreateNewEntity: ");
+		}
+		else if (line.rfind("TargetEntityName: ", 0) == 0)
+		{
+			localTargetName = extractValue(line, "TargetEntityName: ");
+		}
+	}
+
+	// Convert local text variables to the final struct types
+	config.className = localClassName;
+	config.attachToExistingEntity = (localAttachStr == "true");
+	config.createNewEntity = (localCreateStr == "true");
+	config.targetEntityName = localTargetName;
+
+	return config;
+}
 
 namespace
 {
+	// Match a serialized component target either by stable entity id or by source path
+	// when older project data does not yet have ids.
 	bool MatchesComponentOwner(const Entity& object, unsigned int entityId, const std::filesystem::path& sourcePath)
 	{
 		return entityId != 0
@@ -20,19 +97,13 @@ namespace
 	}
 }
 
-void SceneManager::Clear()
-{
-	m_levels.clear();
-	m_sceneKinds.clear();
-	m_activeLevel = nullptr;
-	m_editorTransformSnapshots.clear();
-	m_startupLevelName.clear();
-}
-
 SceneManager::~SceneManager() = default;
 
+// Lifecycle and state reset
 Scene* SceneManager::startUp()
 {
+	// Choose the active scene from startup config first, then fall back to the first
+	// created scene if the configured one does not exist.
 	if (!m_activeLevel)
 	{
 		if (!m_startupLevelName.empty())
@@ -47,15 +118,43 @@ Scene* SceneManager::startUp()
 
 	if (m_activeLevel)
 	{
+		// Scene startup is delegated to the currently active scene.
 		m_activeLevel->startUp();
+	}
+
+	// check for new game code
+	// load congiguration
+	NewClassConfiguration configuration = loadConfiguration("NewClassConfiguration");
+
+	// add new entity or update existing
+	if (configuration.createNewEntity)
+	{
+		// Create entity
+		auto newEntity = std::make_unique<Entity>();
+		newEntity.get()->SetName(configuration.className);
+		Root::Current().Scenes().ActiveLevel()->AddObject(std::move(newEntity));
+
+		// Add component
 	}
 
 	return m_activeLevel;
 }
 
+void SceneManager::Clear()
+{
+	// Reset all scene-manager state to a fresh startup baseline.
+	m_levels.clear();
+	m_sceneKinds.clear();
+	m_activeLevel = nullptr;
+	m_editorTransformSnapshots.clear();
+	m_startupLevelName.clear();
+}
+
+//Scene creation and lookup
 Scene* SceneManager::CreateLevel(std::string name)
 {
-	auto level = std::make_unique<Scene>(std::move(name));
+	// Levels and cutscenes share the same storage; only the recorded kind differs.
+	std::unique_ptr<Scene> level = std::make_unique<Scene>(std::move(name));
 	Scene* rawLevel = level.get();
 	m_levels.push_back(std::move(level));
 	m_sceneKinds[rawLevel->Name()] = SceneKind::Level;
@@ -68,7 +167,7 @@ Scene* SceneManager::CreateLevel(std::string name)
 
 Scene* SceneManager::CreateCutscene(std::string name)
 {
-	auto level = std::make_unique<Scene>(std::move(name));
+	std::unique_ptr<Scene> level = std::make_unique<Scene>(std::move(name));
 	Scene* rawLevel = level.get();
 	m_levels.push_back(std::move(level));
 	m_sceneKinds[rawLevel->Name()] = SceneKind::Cutscene;
@@ -81,7 +180,7 @@ Scene* SceneManager::CreateCutscene(std::string name)
 
 Scene* SceneManager::FindLevel(const std::string& name) const
 {
-	for (const auto& level : m_levels)
+	for (const std::unique_ptr<Scene>& level : m_levels)
 	{
 		if (level && level->Name() == name)
 		{
@@ -110,7 +209,7 @@ void SceneManager::SetSceneKind(const std::string& name, SceneKind kind)
 
 SceneManager::SceneKind SceneManager::SceneKindFor(const std::string& name) const
 {
-	const auto it = m_sceneKinds.find(name);
+	const std::unordered_map<std::string, SceneKind>::const_iterator it = m_sceneKinds.find(name);
 	if (it != m_sceneKinds.end())
 	{
 		return it->second;
@@ -126,7 +225,7 @@ bool SceneManager::IsMainMenuScene(const std::string& name) const
 std::vector<std::string> SceneManager::SceneNames(SceneKind kind) const
 {
 	std::vector<std::string> names;
-	for (const auto& level : m_levels)
+	for (const std::unique_ptr<Scene>& level : m_levels)
 	{
 		if (level && SceneKindFor(level->Name()) == kind)
 		{
@@ -136,18 +235,10 @@ std::vector<std::string> SceneManager::SceneNames(SceneKind kind) const
 	return names;
 }
 
-void SceneManager::SetStartupLevelName(std::string name)
-{
-	m_startupLevelName = std::move(name);
-}
-
-const std::string& SceneManager::StartupLevelName() const
-{
-	return m_startupLevelName;
-}
-
+// Project state serialization
 void SceneManager::AppendProjectState(std::string& contents) const
 {
+	// Only persist startup state when it has been configured.
 	if (m_startupLevelName.empty())
 	{
 		return;
@@ -168,7 +259,8 @@ void SceneManager::ApplyProjectState(
 	const std::vector<ProjectStateData::PendingController>& pendingControllers,
 	const std::vector<ProjectStateData::PendingComponent>& pendingComponents)
 {
-	auto findOrCreateLevel = [this](const std::string& levelName) -> Scene*
+	// Project restore needs to resolve level references before applying component data.
+	const std::function<Scene*(const std::string&)> findOrCreateLevel = [this](const std::string& levelName) -> Scene*
 	{
 		if (Scene* level = FindLevel(levelName))
 		{
@@ -177,7 +269,7 @@ void SceneManager::ApplyProjectState(
 		return CreateLevel(levelName);
 	};
 
-	for (const auto& pendingController : pendingControllers)
+	for (const ProjectStateData::PendingController& pendingController : pendingControllers)
 	{
 		Scene* level = findOrCreateLevel(pendingController.levelName);
 		if (!level)
@@ -185,7 +277,7 @@ void SceneManager::ApplyProjectState(
 			continue;
 		}
 
-		for (const auto& object : level->Objects())
+		for (const std::unique_ptr<Entity>& object : level->Objects())
 		{
 			if (!object || !MatchesComponentOwner(*object, pendingController.entityId, pendingController.sourcePath))
 			{
@@ -224,7 +316,7 @@ void SceneManager::ApplyProjectState(
 		}
 	}
 
-	for (const auto& pendingComponent : pendingComponents)
+	for (const ProjectStateData::PendingComponent& pendingComponent : pendingComponents)
 	{
 		Scene* level = findOrCreateLevel(pendingComponent.levelName);
 		if (!level)
@@ -232,7 +324,7 @@ void SceneManager::ApplyProjectState(
 			continue;
 		}
 
-		for (const auto& object : level->Objects())
+		for (const std::unique_ptr<Entity>& object : level->Objects())
 		{
 			if (!object || !MatchesComponentOwner(*object, pendingComponent.entityId, pendingComponent.sourcePath))
 			{
@@ -277,16 +369,17 @@ void SceneManager::ApplyProjectState(
 				if (AnimatorComponent* animator = object->GetComponent<AnimatorComponent>())
 				{
 					animator->SetInitialState(pendingComponent.initialState);
-					for (const auto& state : pendingComponent.animatorStates)
+					for (const ProjectStateData::PendingComponent::AnimatorStateData& state : pendingComponent.animatorStates)
 					{
 						animator->AddState(state.name, state.clipIndex);
 					}
-					for (const auto& transition : pendingComponent.animatorTransitions)
+					for (const ProjectStateData::PendingComponent::AnimatorTransitionData& transition : pendingComponent.animatorTransitions)
 					{
 						std::vector<AnimatorComponent::Condition> conditions;
 						if (!transition.conditions.empty())
 						{
-							for (const auto& conditionData : transition.conditions)
+							// Convert serialized animator conditions back into live AnimatorComponent conditions.
+							for (const ProjectStateData::PendingComponent::AnimatorConditionData& conditionData : transition.conditions)
 							{
 								AnimatorComponent::Condition condition;
 								condition.left.type = static_cast<AnimatorComponent::OperandType>(conditionData.left.type);
@@ -325,7 +418,8 @@ void SceneManager::ApplyProjectState(
 	if (!pendingLevels.empty())
 	{
 		const Scene* activeLevel = nullptr;
-		for (const auto& pendingLevel : pendingLevels)
+		// Rebuild the scene kind map first, then re-activate the saved scene.
+		for (const ProjectStateData::PendingLevel& pendingLevel : pendingLevels)
 		{
 			if (pendingLevel.active)
 			{
@@ -337,7 +431,7 @@ void SceneManager::ApplyProjectState(
 		{
 			activeLevel = m_levels.front().get();
 		}
-		for (const auto& pendingLevel : pendingLevels)
+		for (const ProjectStateData::PendingLevel& pendingLevel : pendingLevels)
 		{
 			SetSceneKind(pendingLevel.name, pendingLevel.isCutscene ? SceneKind::Cutscene : SceneKind::Level);
 		}
@@ -345,6 +439,7 @@ void SceneManager::ApplyProjectState(
 	}
 }
 
+// Active scene access and other editor helpers
 Scene* SceneManager::ActiveLevel()
 {
 	return m_activeLevel;
@@ -362,7 +457,7 @@ void SceneManager::ResetActiveLevelEntitiesToDefaultPosition()
 		return;
 	}
 
-	for (const auto& object : m_activeLevel->Objects())
+	for (const std::unique_ptr<Entity>& object : m_activeLevel->Objects())
 	{
 		if (object)
 		{
@@ -373,13 +468,15 @@ void SceneManager::ResetActiveLevelEntitiesToDefaultPosition()
 
 void SceneManager::CaptureActiveLevelEditorTransforms()
 {
+	// Snapshot the current editor transform state so it can be restored after
+	// gameplay/runtime edits are applied.
 	m_editorTransformSnapshots.clear();
 	if (!m_activeLevel)
 	{
 		return;
 	}
 
-	for (const auto& object : m_activeLevel->Objects())
+	for (const std::unique_ptr<Entity>& object : m_activeLevel->Objects())
 	{
 		if (object)
 		{
@@ -399,14 +496,14 @@ void SceneManager::RestoreActiveLevelEditorTransforms()
 		return;
 	}
 
-	for (const auto& object : m_activeLevel->Objects())
+	for (const std::unique_ptr<Entity>& object : m_activeLevel->Objects())
 	{
 		if (!object)
 		{
 			continue;
 		}
 
-		const auto it = m_editorTransformSnapshots.find(object.get());
+		const std::unordered_map<Entity*, EditorTransformSnapshot>::const_iterator it = m_editorTransformSnapshots.find(object.get());
 		if (it == m_editorTransformSnapshots.end())
 		{
 			continue;
@@ -418,4 +515,15 @@ void SceneManager::RestoreActiveLevelEditorTransforms()
 	}
 
 	m_editorTransformSnapshots.clear();
+}
+
+// Startupconfigurations
+void SceneManager::SetStartupLevelName(std::string name)
+{
+	m_startupLevelName = std::move(name);
+}
+
+const std::string& SceneManager::StartupLevelName() const
+{
+	return m_startupLevelName;
 }

@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <fstream>
 
 class Window; 
 class Camera; 
@@ -58,6 +59,21 @@ private:
 	void CreateEntity();
 	void UpdateEntity(Entity* entity);
 
+	// ***** game code ***********
+
+	struct NewClassConfiguration
+	{
+		std::string className;
+		bool attachToExistingEntity = false;
+		bool createNewEntity = false;
+		std::string targetEntityName;
+	};
+
+	// New code helpers
+	void StartRebuild();
+	void OnRebuildFinished();
+	void SaveNewClassConfiguration(NewClassConfiguration& configuration);
+
 	// ***************
 	// *** Members ***
 	// ***************
@@ -109,6 +125,16 @@ private:
 
 	// Animator UI state cache
 	std::unordered_map<AnimatorComponent*, AnimatorStateMachineUiState> m_animatorUiState;
+
+	// New code state
+	Entity* m_pendingEntity;
+	std::string m_pendingClassName;
+	bool m_pendingAttachToExistingEntity;
+	bool m_rebuildRequested;
+	bool m_rebuildInProgress;
+	bool m_rebuildSucceeded;
+	bool m_buildInProgress;
+
 };
 
 
