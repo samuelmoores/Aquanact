@@ -56,6 +56,7 @@ public:
 	const T* GetComponent() const;
 	template<typename T, typename... Args>
 	T* AddComponent(Args&&... args);
+	Component* AddComponent(std::unique_ptr<Component> component);
 	bool RemoveComponent(Component* component);
 	template<typename T>
 	bool RemoveComponent();

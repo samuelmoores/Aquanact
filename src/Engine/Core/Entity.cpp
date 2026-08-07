@@ -118,6 +118,19 @@ std::vector<const Component*> Entity::Components() const
 	}
 	return components;
 }
+
+Component* Entity::AddComponent(std::unique_ptr<Component> component)
+{
+	if (!component)
+	{
+		return nullptr;
+	}
+
+	component->SetOwner(this);
+	Component* raw = component.get();
+	m_components.push_back(std::move(component));
+	return raw;
+}
 Component* Entity::GetComponentByName(const std::string& name)
 {
 	for (auto& component : m_components)

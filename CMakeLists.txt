@@ -25,6 +25,8 @@ endif()
 # Record the vcpkg triplet so the build can log which package target it was compiled against.
 set(AQUANACT_VCPKG_TARGET_TRIPLET "${VCPKG_TARGET_TRIPLET}")
 
+include("${CMAKE_SOURCE_DIR}/generated/GameSources.cmake")
+
 set(SOURCES
     "src/Engine/Core/main.cpp"
     "include/Engine/Core/ShaderProgram.h" "src/Engine/Core/ShaderProgram.cpp"
@@ -75,11 +77,10 @@ set(SOURCES
     "include/Engine/Core/Controller.h" "src/Engine/Core/Controller.cpp"
     "include/Engine/Core/PlayerController.h" "src/Engine/Core/PlayerController.cpp"
     "include/Engine/Core/Component.h" "src/Engine/Core/Component.cpp"
+    "include/Engine/Core/ComponentFactory.h" "src/Engine/Core/ComponentFactory.cpp"
     "include/Engine/Core/Entity.h" "src/Engine/Core/Entity.cpp"
     "include/Engine/Core/EntityRegistry.h" "src/Engine/Core/EntityRegistry.cpp"
     "include/Engine/Core/EventManager.h" "src/Engine/Core/EventManager.cpp"
-    "include/Game/Enemy.h" "src/Game/Enemy.cpp"
-    "include/Game/PlayerHealth.h" "src/Game/PlayerHealth.cpp"
     "include/Engine/Core/Window.h" "src/Engine/Core/Window.cpp"
     "include/Engine/Core/Input.h" "src/Engine/Core/Input.cpp"
     "include/Engine/Core/InputManager.h" "src/Engine/Core/InputManager.cpp"
@@ -100,7 +101,7 @@ set(SOURCES
     "include/Engine/Core/AquanactBuildSystem.h" "src/Engine/Core/AquanactBuildSystem.cpp"
 )
 
-add_executable (AquanactEngine ${SOURCES} "include/Engine/Core/LightingManager.h" "src/Engine/Core/LightingManager.cpp")
+add_executable (AquanactEngine ${SOURCES} ${GAME_SOURCES} "include/Engine/Core/LightingManager.h" "src/Engine/Core/LightingManager.cpp" "src/Engine/UI/GameGUICreator_DetailsProgressBar.cpp")
 target_compile_definitions(AquanactEngine PRIVATE AQUANACT_EDITOR)
 target_compile_definitions(AquanactEngine PRIVATE AQUANACT_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
 target_compile_definitions(AquanactEngine PRIVATE MYGUI_STATIC)
@@ -110,7 +111,7 @@ target_compile_definitions(AquanactEngine PRIVATE AQUANACT_MYGUI_OPENGL_LIBRARY=
 target_compile_definitions(AquanactEngine PRIVATE AQUANACT_FREETYPE_LIBRARY="freetype")
 target_compile_features(AquanactEngine PRIVATE cxx_std_20)
 
-add_executable (AquanactGame WIN32 ${SOURCES} "include/Engine/Core/LightingManager.h" "src/Engine/Core/LightingManager.cpp")
+add_executable (AquanactGame WIN32 ${SOURCES} ${GAME_SOURCES} "include/Engine/Core/LightingManager.h" "src/Engine/Core/LightingManager.cpp" "src/Engine/UI/GameGUICreator_DetailsProgressBar.cpp")
 target_compile_definitions(AquanactGame PRIVATE AQUANACT_GAME)
 target_compile_definitions(AquanactGame PRIVATE AQUANACT_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
 target_compile_definitions(AquanactGame PRIVATE MYGUI_STATIC)
@@ -177,9 +178,10 @@ target_link_libraries(AquanactGame PRIVATE imgui::imgui)
 # ourselves.
 find_path(MYGUI_INCLUDE_DIR
     NAMES MyGUI.h
-    PATH_SUFFIXES MYGUI
+    PATH_SUFFIXES MyGUI
     REQUIRED
 )
+get_filename_component(MYGUI_INCLUDE_DIR "${MYGUI_INCLUDE_DIR}" DIRECTORY)
 
 find_library(MYGUI_ENGINE_LIBRARY_DEBUG
     NAMES MyGUIEngineStatic_d
@@ -203,6 +205,7 @@ find_package(freetype CONFIG REQUIRED)
 
 target_include_directories(AquanactEngine PRIVATE ${MYGUI_INCLUDE_DIR})
 target_include_directories(AquanactGame PRIVATE ${MYGUI_INCLUDE_DIR})
+target_include_directories(AquanactBuildTool PRIVATE ${MYGUI_INCLUDE_DIR})
 target_link_libraries(AquanactEngine PRIVATE
     debug ${MYGUI_ENGINE_LIBRARY_DEBUG} optimized ${MYGUI_ENGINE_LIBRARY_RELEASE}
     debug ${MYGUI_OPENGL_LIBRARY_DEBUG} optimized ${MYGUI_OPENGL_LIBRARY_RELEASE}

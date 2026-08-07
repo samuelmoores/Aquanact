@@ -1,7 +1,7 @@
 #include "Engine/Core/SceneManager.h"
 
-#include "Engine/Core/Root.h"
 #include "Engine/Core/AnimatorComponent.h"
+#include "Engine/Core/ComponentFactory.h"
 #include "Engine/Core/Controller.h"
 #include "Engine/Core/Entity.h"
 #include "Engine/Core/PlayerController.h"
@@ -9,13 +9,8 @@
 #include "Game/Enemy.h"
 #include "Game/PlayerHealth.h"
 
-#include <algorithm>
-#include <functional>
-
 #include <fstream>
 #include <iostream>
-#include <string>
-#include <sstream>
 #include <memory>
 
 struct NewClassConfiguration
@@ -102,6 +97,68 @@ SceneManager::~SceneManager() = default;
 // Lifecycle and state reset
 Scene* SceneManager::startUp()
 {
+
+	// check for new game code
+	// load congiguration
+	NewClassConfiguration configuration = loadConfiguration("NewClassConfiguration");
+
+	Scene* activeLevel = m_activeLevel;
+	if (!activeLevel)
+	{
+		return m_activeLevel;
+	}
+
+	auto attachComponent = [&](Entity& entity) -> bool
+	{
+		if (Component* existing = entity.GetComponentByName(configuration.className))
+		{
+			(void)existing;
+			return true;
+		}
+
+		std::unique_ptr<Component> component = ComponentFactory::Instance().Create(configuration.className, entity);
+		if (!component)
+		{
+			std::cerr << "Error: Unknown component type '" << configuration.className << "'.\n";
+			return false;
+		}
+
+		entity.AddComponent(std::move(component));
+		return true;
+	};
+
+	// add new entity or update existing
+	if (configuration.createNewEntity)
+	{
+		// Create entity
+		auto newEntity = std::make_unique<Entity>();
+		newEntity.get()->SetName(configuration.className);
+		Entity* entity = activeLevel->AddObject(std::move(newEntity));
+
+		if (entity)
+		{
+			attachComponent(*entity);
+		}
+	}
+	else if (configuration.attachToExistingEntity && !configuration.targetEntityName.empty())
+	{
+		for (const std::unique_ptr<Entity>& entity : activeLevel->Objects())
+		{
+			if (!entity || entity->Name() != configuration.targetEntityName)
+			{
+				continue;
+			}
+
+			attachComponent(*entity);
+			break;
+		}
+	}
+
+	std::error_code removeEc;
+	std::filesystem::remove("NewClassConfiguration", removeEc);
+
+	// ************ start up the active scene *************
+
 	// Choose the active scene from startup config first, then fall back to the first
 	// created scene if the configured one does not exist.
 	if (!m_activeLevel)
@@ -120,21 +177,6 @@ Scene* SceneManager::startUp()
 	{
 		// Scene startup is delegated to the currently active scene.
 		m_activeLevel->startUp();
-	}
-
-	// check for new game code
-	// load congiguration
-	NewClassConfiguration configuration = loadConfiguration("NewClassConfiguration");
-
-	// add new entity or update existing
-	if (configuration.createNewEntity)
-	{
-		// Create entity
-		auto newEntity = std::make_unique<Entity>();
-		newEntity.get()->SetName(configuration.className);
-		Root::Current().Scenes().ActiveLevel()->AddObject(std::move(newEntity));
-
-		// Add component
 	}
 
 	return m_activeLevel;

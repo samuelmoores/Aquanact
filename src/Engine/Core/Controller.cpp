@@ -1,4 +1,5 @@
 #include "Engine/Core/Controller.h"
+#include "Engine/Core/ComponentFactory.h"
 
 #include "Engine/Core/Debug.h"
 #include "Engine/Core/Entity.h"
@@ -11,6 +12,15 @@
 
 namespace
 {
+	const bool registeredController = []()
+	{
+		ComponentFactory::Instance().Register("Controller", [](Entity&) -> std::unique_ptr<Component>
+		{
+			return std::unique_ptr<Component>(new Controller());
+		});
+		return true;
+	}();
+
 	// Imported assets and movement settings use centimeters as world units.
 	constexpr float worldUnitsPerMeter = 100.0f;
 	constexpr float gravity = -9.81f * worldUnitsPerMeter;

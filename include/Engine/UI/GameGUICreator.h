@@ -78,6 +78,7 @@ private:
 	void DrawPanelWidgetDetails(GameGUIAsset& asset, GameGUIWidgetDef& widget);
 	void DrawImageWidgetDetails(GameGUIAsset& asset, GameGUIWidgetDef& widget);
 	void DrawTextWidgetDetails(GameGUIAsset& asset, GameGUIWidgetDef& widget);
+	void DrawProgressBarWidgetDetails(GameGUICreator& creator, GameGUIAsset& asset, GameGUIWidgetDef& widget);
 
 	// ************************
 	// ******* Members ********

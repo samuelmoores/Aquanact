@@ -17,6 +17,7 @@
 #include "Engine/Core/Camera.h"
 #include "Engine/Core/GameCamera.h"
 #include "Engine/Core/Entity.h"
+#include "Engine/Core/ComponentFactory.h"
 #include "Engine/Core/Controller.h"
 #include "Engine/Core/PlayerController.h"
 #include "Engine/Core/AnimatorComponent.h"
@@ -887,52 +888,48 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 					ImGui::SetNextItemWidth(120.0f);
 					if (ImGui::BeginCombo("##AddComponent", "Add Component"))
 					{
-						const bool hasController = object->GetComponent<Controller>() != nullptr;
-						const bool hasPlayerHealth = object->GetComponent<PlayerHealth>() != nullptr;
-						const bool hasEnemy = object->GetComponent<Enemy>() != nullptr;
-						const bool hasAnimator = object->GetComponent<AnimatorComponent>() != nullptr;
-
-						ImGui::BeginDisabled(hasController || activeSceneIsCutscene);
-						if (ImGui::Selectable("PlayerController"))
+						const std::vector<std::string> componentNames = ComponentFactory::Instance().Names();
+						std::vector<std::string> attachedNames;
+						attachedNames.reserve(object->Components().size());
+						for (Component* component : object->Components())
 						{
-							object->AddComponent<PlayerController>();
+							if (component)
+							{
+								attachedNames.push_back(component->Name());
+							}
 						}
-						ImGui::EndDisabled();
 
-						ImGui::BeginDisabled(hasController || activeSceneIsCutscene);
-						if (ImGui::Selectable("Controller"))
+						for (const std::string& componentName : componentNames)
 						{
-							object->AddComponent<Controller>();
-						}
-						ImGui::EndDisabled();
+							const bool alreadyAttached = std::find(attachedNames.begin(), attachedNames.end(), componentName) != attachedNames.end();
+							const bool canAttachAnimator = componentName == "AnimatorComponent"
+								? object->GetMesh() != nullptr && object->GetMesh()->Skinned()
+								: true;
+							const bool disabled = activeSceneIsCutscene || alreadyAttached || !canAttachAnimator;
 
-						ImGui::BeginDisabled(hasPlayerHealth || activeSceneIsCutscene);
-						if (ImGui::Selectable("PlayerHealth"))
-						{
-							object->AddComponent<PlayerHealth>();
+							ImGui::BeginDisabled(disabled);
+							if (ImGui::Selectable(componentName.c_str()))
+							{
+								std::unique_ptr<Component> component = ComponentFactory::Instance().Create(componentName, *object);
+								if (component)
+								{
+									object->AddComponent(std::move(component));
+								}
+							}
+							ImGui::EndDisabled();
 						}
-						ImGui::EndDisabled();
-
-						ImGui::BeginDisabled(hasEnemy || activeSceneIsCutscene);
-						if (ImGui::Selectable("Enemy"))
-						{
-							object->AddComponent<Enemy>();
-						}
-						ImGui::EndDisabled();
-
-						ImGui::BeginDisabled(hasAnimator || object->GetMesh() == nullptr || !object->GetMesh()->Skinned() || activeSceneIsCutscene);
-						if (ImGui::Selectable("Animator"))
-						{
-							object->AddComponent<AnimatorComponent>(object->GetMesh());
-						}
-						ImGui::EndDisabled();
 
 						if (activeSceneIsCutscene)
 						{
 							ImGui::Separator();
 							ImGui::TextDisabled("Cutscenes cannot receive gameplay components.");
 						}
-						else if (hasController && hasPlayerHealth && hasEnemy && hasAnimator)
+						else if (componentNames.empty())
+						{
+							ImGui::Separator();
+							ImGui::TextDisabled("No component types are registered.");
+						}
+						else if (attachedNames.size() >= componentNames.size())
 						{
 							ImGui::Separator();
 							ImGui::TextDisabled("All components are already attached.");
@@ -1851,21 +1848,20 @@ std::string EngineGUI::MakeHeaderTemplate(const std::string& className)
 {
 	return
 		"#pragma once\n\n"
-		"#include \"Engine/Entity.h\"\n\n"
-		"// Generated gameplay class. Start here if you want to add game behavior.\n"
+		"#include \"Engine/Core/Component.h\"\n\n"
+		"// Generated gameplay component. Start here if you want to add game behavior.\n"
 		"//\n"
-		"// This class inherits from Entity, so it must implement:\n"
-		"// - TypeName()\n"
-		"// - GetBindableMembers()\n"
-		"//\n"
-		"// TypeName() tells the engine/editor what this gameplay type is called.\n"
-		"// GetBindableMembers() tells the engine/editor which variables or\n"
-		"// functions are available for UI binding later.\n"
-		"class " + className + " final : public Entity\n"
+		"// This class inherits from Component, so it must implement:\n"
+		"// - Name()\n"
+		"// - any lifecycle or binding hooks you need\n"
+		"class " + className + " final : public Component\n"
 		"{\n"
 		"public:\n"
-		"\texplicit " + className + "(std::string name = \"" + className + "\");\n\n"
-		"\tconst char* TypeName() const override;\n"
+		"\t" + className + "() = default;\n\n"
+		"\tconst char* Name() const override { return \"" + className + "\"; }\n"
+		"\tvoid startUp(Entity&) override;\n"
+		"\tvoid Update(Entity&, float) override {}\n"
+		"\tvoid FirstFrame(Entity&) override {}\n"
 		"\tstd::vector<BindableMember> GetBindableMembers() const override;\n"
 		"};\n";
 }
@@ -1874,14 +1870,22 @@ std::string EngineGUI::MakeSourceTemplate(const std::string& className)
 {
 	return
 		"#include \"Game/" + className + ".h\"\n\n"
-		"#include <utility>\n\n"
-		"" + className + "::" + className + "(std::string name)\n"
-		"\t: Entity(std::move(name))\n"
+		"#include \"Engine/Core/ComponentFactory.h\"\n"
+		"#include \"Engine/Core/Entity.h\"\n\n"
+		"#include <memory>\n\n"
+		"namespace\n"
 		"{\n"
+		"\tconst bool registered" + className + " = []()\n"
+		"\t{\n"
+		"\t\tComponentFactory::Instance().Register(\"" + className + "\", [](Entity&) -> std::unique_ptr<Component>\n"
+		"\t\t{\n"
+		"\t\t\treturn std::unique_ptr<Component>(new " + className + "());\n"
+		"\t\t});\n"
+		"\t\treturn true;\n"
+		"\t}();\n"
 		"}\n\n"
-		"const char* " + className + "::TypeName() const\n"
+		"void " + className + "::startUp(Entity&)\n"
 		"{\n"
-		"\treturn \"" + className + "\";\n"
 		"}\n\n"
 		"std::vector<BindableMember> " + className + "::GetBindableMembers() const\n"
 		"{\n"
@@ -1894,6 +1898,8 @@ void EngineGUI::CreateGameCodeFile(const std::string& className)
 	// Generated code belongs in the game include/source folders.
 	const std::filesystem::path headerPath = GameIncludeRoot() / (className + ".h");
 	const std::filesystem::path sourcePath = GameSourceRoot() / (className + ".cpp");
+	const std::filesystem::path generatedDir = SourceRoot() / "generated";
+	const std::filesystem::path generatedSourcesPath = generatedDir / "GameSources.cmake";
 
 	// Create parent directories if they do not already exist.
 	const std::filesystem::path headerDir = headerPath.parent_path();
@@ -1904,11 +1910,34 @@ void EngineGUI::CreateGameCodeFile(const std::string& className)
 
 	const bool headerWritten = Root::Current().FileSystemRef().WriteTextFile(headerPath, MakeHeaderTemplate(className));
 	const bool sourceWritten = Root::Current().FileSystemRef().WriteTextFile(sourcePath, MakeSourceTemplate(className));
-
-	// Report one success/failure message back to the popup.
+	bool sourcesListWritten = false;
 	if (headerWritten && sourceWritten)
 	{
-		m_addCodeFileStatusMessage = "Created " + headerPath.string() + " and " + sourcePath.string();
+		std::vector<std::string> gameSourceFiles = {
+			"Enemy.cpp",
+			"GameManager.cpp",
+			"PlayerHealth.cpp",
+			className + ".cpp"
+		};
+		std::sort(gameSourceFiles.begin(), gameSourceFiles.end());
+		gameSourceFiles.erase(std::unique(gameSourceFiles.begin(), gameSourceFiles.end()), gameSourceFiles.end());
+
+		std::string sourcesListContents = "set(GAME_SOURCES\n";
+		for (const std::string& fileName : gameSourceFiles)
+		{
+			sourcesListContents += "    \"${CMAKE_SOURCE_DIR}/src/Game/" + fileName + "\"\n";
+		}
+		sourcesListContents += ")\n";
+
+		std::error_code generatedEc;
+		std::filesystem::create_directories(generatedDir, generatedEc);
+		sourcesListWritten = Root::Current().FileSystemRef().WriteTextFile(generatedSourcesPath, sourcesListContents);
+	}
+
+	// Report one success/failure message back to the popup.
+	if (headerWritten && sourceWritten && sourcesListWritten)
+	{
+		m_addCodeFileStatusMessage = "Created " + headerPath.string() + ", " + sourcePath.string() + " and updated " + generatedSourcesPath.string();
 	}
 	else
 	{

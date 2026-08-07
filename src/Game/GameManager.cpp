@@ -1,15 +1,23 @@
 #include "Game/GameManager.h"
 
-#include <utility>
+#include "Engine/Core/ComponentFactory.h"
+#include "Engine/Core/Entity.h"
+#include <memory>
 
-GameManager::GameManager(std::string name)
-	: Entity(std::move(name))
+namespace
 {
+	const bool registeredGameManager = []()
+	{
+		ComponentFactory::Instance().Register("GameManager", [](Entity&) -> std::unique_ptr<Component>
+		{
+			return std::unique_ptr<Component>(new GameManager());
+		});
+		return true;
+	}();
 }
 
-const char* GameManager::TypeName() const
+void GameManager::startUp(Entity&)
 {
-	return "GameManager";
 }
 
 std::vector<BindableMember> GameManager::GetBindableMembers() const

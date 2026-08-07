@@ -487,37 +487,52 @@ void GameGUI::ClearUI()
 
 MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* parent)
 {
+	// Each branch below is intentionally self-contained because the widget type
+	// decides which MyGUI class to instantiate and which fields are meaningful.
 	if (def.type == "Panel")
 	{
+		// Helper candidate: resolve the effective panel skin in one place.
 		const std::string skin = def.useSkin ? (def.skin.empty() ? "PanelSkin" : def.skin) : "PanelEmpty";
+
+		// Helper candidate: create either a root-level panel or a child panel.
 		MyGUI::Widget* panel = parent ?
 			parent->createWidget<MyGUI::Widget>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.name) :
 			m_gui->createWidget<MyGUI::Widget>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.layer, def.name);
+
 		if (panel)
 		{
+			// Panels mostly act as containers; they inherit pick behavior so child
+			// widgets can still receive mouse interaction.
 			panel->setVisible(def.visible);
 			panel->setAlpha(def.alpha);
 			panel->setNeedMouseFocus(false);
-			// The panel itself does not take focus, but its child buttons must
-			// remain pickable for mouse hover and click events.
 			panel->setInheritsPick(true);
-			if (!parent) MyGUI::LayerManager::getInstance().upLayerItem(panel);
+			if (!parent)
+			{
+				// Root widgets need to be promoted to the top layer explicitly.
+				MyGUI::LayerManager::getInstance().upLayerItem(panel);
+			}
 		}
+
 		return panel;
 	}
+
 	if (def.type == "Button")
 	{
-		// ButtonEmptySkin contains only MyGUI's text layer, so disabling the
-		// button image preserves its caption, text colour, and interaction.
+		// Helper candidate: determine whether a panel-owned button should hide its
+		// own skin and reuse the parent panel's visual treatment.
 		bool panelHidesButtonSkin = false;
 		if (!def.parentName.empty())
 		{
+			// Look up the owning panel once so we can reuse its layout rules.
 			const auto parentIt = std::find_if(m_loadedAsset.widgets.begin(), m_loadedAsset.widgets.end(), [&def](const GameGUIWidgetDef& candidate)
 			{
 				return candidate.type == "Panel" && candidate.name == def.parentName;
 			});
 			panelHidesButtonSkin = parentIt != m_loadedAsset.widgets.end() && !parentIt->panelButtonUseSkin;
 		}
+
+		// Helper candidate: resolve the final button skin after panel overrides.
 		const std::string skin = !def.useSkin || panelHidesButtonSkin
 			? "ButtonEmptySkin"
 			: (!def.parentName.empty()
@@ -531,15 +546,21 @@ MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::
 						? "MultiListButtonSkin" : (def.skin.empty() ? "MultiListButtonSkin" : def.skin);
 				})()
 				: (def.skin.empty() ? "ButtonSkin" : def.skin));
-		// Explicit widget dimensions are authoritative. The skin supplies the
-		// visual treatment, but must not replace the user's configured width/height.
+
+		// The widget's explicit width/height are authoritative. The skin is only
+		// the visual template and should not change the authored dimensions.
 		const int buttonWidth = std::max(1, def.width);
 		const int buttonHeight = std::max(1, def.height);
+
+		// Helper candidate: create either a root-level button or a child button.
 		MyGUI::Button* button = parent ?
 			parent->createWidget<MyGUI::Button>(skin, def.x, def.y, buttonWidth, buttonHeight, MyGUI::Align::Default, def.name) :
 			m_gui->createWidget<MyGUI::Button>(skin, def.x, def.y, buttonWidth, buttonHeight, MyGUI::Align::Default, def.layer, def.name);
+
 		if (button)
 		{
+			// The visible caption is rendered through a nested TextBox so we clear
+			// the button's own caption and manage the label ourselves.
 			button->setCaption("");
 			button->setTextColour(ParseColour(def.textColor, MyGUI::Colour::Black));
 			m_buttonDefaultTextColours[button] = button->getTextColour();
@@ -553,6 +574,9 @@ MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::
 			{
 				m_controllerButtons.push_back(button);
 			}
+
+			// Helper candidate: build and position the label widget used to display
+			// the button text with the configured font and colour.
 			MyGUI::TextBox* label = button->createWidget<MyGUI::TextBox>("TextBox", 0, 0, buttonWidth, buttonHeight, MyGUI::Align::Stretch, def.name + "_label");
 			if (label)
 			{
@@ -564,17 +588,17 @@ MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::
 				label->setNeedMouseFocus(false);
 				label->setNeedKeyFocus(false);
 				label->setInheritsPick(false);
-				// The button skin is a child-rendered background. Promote the custom
-				// label after creation so its text is always rendered above that skin.
 				MyGUI::LayerManager::getInstance().upLayerItem(label);
 				m_buttonLabels[button] = label;
 			}
-			// Button clicks are routed back into GameGUI so we can attach small
-			// built-in behaviors without hardcoding them into the widget assets.
+
+			// Button clicks are routed back into GameGUI so built-in behaviors stay
+			// data-driven and are not baked into the asset file.
 			button->eventMouseButtonClick += MyGUI::newDelegate(this, &GameGUI::OnWidgetClicked);
 			Root::Current().Debugger().LogMessage(std::string("GameGUI click handler bound for widget: ") + def.name);
 			if (!parent)
 			{
+				// Root buttons also need to be promoted to the top layer.
 				MyGUI::LayerManager::getInstance().upLayerItem(button);
 			}
 			Root::Current().Debugger().LogMessage(
@@ -585,12 +609,17 @@ MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::
 			return button;
 		}
 	}
+
 	else if (def.type == "TextBox" || def.type == "Text")
 	{
+		// Helper candidate: resolve the final text widget skin before creation.
 		const std::string skin = def.skin.empty() ? "TextBox" : def.skin;
+
+		// Helper candidate: create either a root-level text widget or a child widget.
 		MyGUI::TextBox* text = parent ?
 			parent->createWidget<MyGUI::TextBox>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.name) :
 			m_gui->createWidget<MyGUI::TextBox>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.layer, def.name);
+
 		if (text)
 		{
 			text->setCaption(def.text);
@@ -612,14 +641,20 @@ MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::
 			return text;
 		}
 	}
+
 	else if (def.type == "ImageBox" || def.type == "Image")
 	{
+		// Helper candidate: resolve the final image widget skin before creation.
 		const std::string skin = def.skin.empty() ? "ImageBox" : def.skin;
+
+		// Helper candidate: create either a root-level image or a child image.
 		MyGUI::ImageBox* image = parent ?
 			parent->createWidget<MyGUI::ImageBox>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.name) :
 			m_gui->createWidget<MyGUI::ImageBox>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.layer, def.name);
+
 		if (image)
 		{
+			// Image widgets only need their texture and simple visibility/opacity state.
 			if (!def.texture.empty())
 			{
 				image->setImageTexture(def.texture);
@@ -638,27 +673,51 @@ MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::
 			return image;
 		}
 	}
+
 	else if (def.type == "ProgressBar")
 	{
+		// Helper candidate: resolve the final progress-bar skin before creation.
 		const std::string skin = def.skin.empty() ? "ProgressBar" : def.skin;
-		MyGUI::ProgressBar* progress = parent ?
-			parent->createWidget<MyGUI::ProgressBar>(skin, def.x, def.y, std::max(1, def.width), std::max(1, def.height), MyGUI::Align::Default, def.name) :
-			m_gui->createWidget<MyGUI::ProgressBar>(skin, def.x, def.y, std::max(1, def.width), std::max(1, def.height), MyGUI::Align::Default, def.layer, def.name);
+
+		// Helper candidate: create either a root-level progress bar or a child bar.
+		MyGUI::ProgressBar* progress = parent ? parent->createWidget<MyGUI::ProgressBar>(
+				skin, 
+				def.x, 
+				def.y, 
+				std::max(1, def.width), 
+				std::max(1, def.height), 
+				MyGUI::Align::Default, 
+				def.name
+			) : m_gui->createWidget<MyGUI::ProgressBar>(
+				skin, 
+				def.x, 
+				def.y, 
+				std::max(1, def.width), 
+				std::max(1, def.height), 
+				MyGUI::Align::Default, 
+				def.layer,
+				def.name);
+
 		if (progress)
 		{
+			// Progress bars are interactive displays, not input widgets.
 			progress->setVisible(def.visible);
 			progress->setAlpha(def.alpha);
 			progress->setNeedMouseFocus(false);
 			progress->setInheritsPick(false);
+
+			// The creator/runtime currently treats the bar as a 0-100 range display.
 			progress->setProgressRange(100);
 			progress->setProgressPosition(100);
 			if (!parent)
 			{
+				// Root progress bars need to be promoted to the top layer explicitly.
 				MyGUI::LayerManager::getInstance().upLayerItem(progress);
 			}
 			return progress;
 		}
 	}
+
 	return nullptr;
 }
 
@@ -886,11 +945,13 @@ MyGUI::Widget* GameGUI::RuntimeWidget(const std::string& name) const
 
 void GameGUI::BindWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* widget)
 {
+	// check if the widget cant be bound
 	if (!widget || def.bindEntity.empty() || def.bindComponent.empty() || def.bindEvent.empty())
 	{
 		return;
 	}
 
+	//
 	auto* textWidget = dynamic_cast<MyGUI::TextBox*>(widget);
 	if (!textWidget)
 	{

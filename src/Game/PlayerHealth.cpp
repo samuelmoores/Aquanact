@@ -1,10 +1,23 @@
 #include "Game/PlayerHealth.h"
 
 #include "Engine/Core/EventManager.h"
+#include "Engine/Core/ComponentFactory.h"
 #include "Engine/Core/Root.h"
 #include "Engine/Core/Entity.h"
 
 #include <iostream>
+
+namespace
+{
+	const bool registeredPlayerHealth = []()
+	{
+		ComponentFactory::Instance().Register("PlayerHealth", [](Entity&) -> std::unique_ptr<Component>
+		{
+			return std::unique_ptr<Component>(new PlayerHealth());
+		});
+		return true;
+	}();
+}
 
 std::string PlayerHealth::GetHealthText() const
 {
@@ -84,4 +97,5 @@ void PlayerHealth::startUp(Entity&)
 
 void PlayerHealth::FirstFrame(Entity&)
 {
+	
 }
