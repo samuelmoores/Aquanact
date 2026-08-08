@@ -70,12 +70,14 @@ void PlayerHealth::SetHealth(int health)
 	{
 		m_health = 0;
 	}
+	DispatchBindableValueChanged("Health");
 	DispatchBindableEvent("HealthChanged");
 }
 
 void PlayerHealth::SetMaxHealth(int maxHealth)
 {
 	m_maxHealth = maxHealth;
+	DispatchBindableValueChanged("MaxHealth");
 	DispatchBindableEvent("HealthChanged");
 }
 

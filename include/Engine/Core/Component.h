@@ -42,9 +42,11 @@ public:
 	void SetOwner(Entity* owner) { m_owner = owner; }
 	Entity* Owner() const { return m_owner; }
 	std::string BindableEventChannel(const std::string& eventName) const;
+	std::string BindableValueChannel(const std::string& memberName) const;
 
 protected:
 	void DispatchBindableEvent(const std::string& eventName) const;
+	void DispatchBindableValueChanged(const std::string& memberName) const;
 
 private:
 	Entity* m_owner = nullptr;

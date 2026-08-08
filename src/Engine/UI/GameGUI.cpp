@@ -29,7 +29,10 @@
 #include <algorithm>
 #include <cmath>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
+#include <sstream>
+#include <functional>
 #include <unordered_map>
 #include "Engine/Core/Texture.h"
 
@@ -136,6 +139,416 @@ namespace {
 			return fallback;
 		}
 	}
+
+	template<typename TWidget>
+	TWidget* CreateGuiWidget(MyGUI::Gui* gui, MyGUI::Widget* parent, const std::string& skin, int x, int y, int width, int height, const std::string& layer, const std::string& name)
+	{
+		if (parent)
+		{
+			return parent->createWidget<TWidget>(skin, x, y, width, height, MyGUI::Align::Default, name);
+		}
+		return gui->createWidget<TWidget>(skin, x, y, width, height, MyGUI::Align::Default, layer, name);
+	}
+
+	void FinalizeWidget(MyGUI::Widget* widget, bool visible, float alpha, bool promoteToTopLayer, bool allowMouseFocus, bool inheritPick)
+	{
+		if (!widget)
+		{
+			return;
+		}
+
+		widget->setVisible(visible);
+		widget->setAlpha(alpha);
+		widget->setNeedMouseFocus(allowMouseFocus);
+		widget->setInheritsPick(inheritPick);
+		if (promoteToTopLayer)
+		{
+			MyGUI::LayerManager::getInstance().upLayerItem(widget);
+		}
+	}
+
+	void LogWidgetCreated(const GameGUIWidgetDef& def)
+	{
+		Root::Current().Debugger().LogMessage(
+			std::string("GameGUI widget created: name='") + def.name +
+			"', type='" + def.type +
+			"', skin='" + def.skin +
+			"', layer='" + def.layer + "'");
+	}
+
+	std::string FormatBindableValue(float value)
+	{
+		if (std::fabs(value - std::round(value)) < 0.0001f)
+		{
+			return std::to_string(static_cast<int>(std::lround(value)));
+		}
+
+		std::ostringstream stream;
+		stream << std::fixed << std::setprecision(2) << value;
+		std::string formatted = stream.str();
+		while (!formatted.empty() && formatted.back() == '0')
+		{
+			formatted.pop_back();
+		}
+		if (!formatted.empty() && formatted.back() == '.')
+		{
+			formatted.pop_back();
+		}
+		return formatted;
+	}
+
+}
+
+void GameGUI::ConfigureProgressBar(MyGUI::ProgressBar* progress)
+{
+	// The current runtime treats progress bars as a normalized 0-100 display.
+	progress->setProgressRange(100);
+	progress->setProgressPosition(100);
+}
+
+void GameGUI::SetButtonVisualState(MyGUI::Button* button, const GameGUIWidgetDef& def)
+{
+	// Button chrome is driven separately from the nested text label.
+	button->setCaption("");
+	button->setTextColour(ParseColour(def.textColor, MyGUI::Colour::Black));
+	m_buttonDefaultTextColours[button] = button->getTextColour();
+	button->setColour(ParseColour(def.highlightColor, MyGUI::Colour::White));
+	button->setStateSelected(false);
+}
+
+void GameGUI::SetButtonFocusState(MyGUI::Button* button, const GameGUIWidgetDef& def)
+{
+	// Only visible buttons participate in controller focus navigation.
+	button->eventMouseSetFocus += MyGUI::newDelegate(this, &GameGUI::OnButtonMouseFocus);
+	button->eventMouseLostFocus += MyGUI::newDelegate(this, &GameGUI::OnButtonMouseLostFocus);
+	if (def.visible)
+	{
+		m_controllerButtons.push_back(button);
+	}
+}
+
+void GameGUI::SetButtonLabel(MyGUI::Button* button, const GameGUIWidgetDef& def, int buttonWidth, int buttonHeight)
+{
+	// The label is a nested widget so we can control text and skin separately.
+	MyGUI::TextBox* label = button->createWidget<MyGUI::TextBox>("TextBox", 0, 0, buttonWidth, buttonHeight, MyGUI::Align::Stretch, def.name + "_label");
+	if (!label)
+	{
+		return;
+	}
+
+	label->setCaption(def.text.empty() ? def.name : def.text);
+	label->setTextColour(button->getTextColour());
+	label->setTextAlign(MyGUI::Align::Center);
+	if (def.fontSize > 0)
+	{
+		label->setFontHeight(def.fontSize);
+	}
+	if (!def.fontName.empty())
+	{
+		label->setFontName(def.fontName);
+	}
+	label->setNeedMouseFocus(false);
+	label->setNeedKeyFocus(false);
+	label->setInheritsPick(false);
+	MyGUI::LayerManager::getInstance().upLayerItem(label);
+	label->setTextColour(m_buttonDefaultTextColours[button]);
+	m_buttonLabels[button] = label;
+}
+
+void GameGUI::HookButtonClick(MyGUI::Button* button, const GameGUIWidgetDef& def)
+{
+	// Clicks route back into GameGUI so widget data stays declarative.
+	button->eventMouseButtonClick += MyGUI::newDelegate(this, &GameGUI::OnWidgetClicked);
+	Root::Current().Debugger().LogMessage(std::string("GameGUI click handler bound for widget: ") + def.name);
+}
+
+void GameGUI::FinalizeAndLogWidget(MyGUI::Widget* widget, const GameGUIWidgetDef& def, bool promoteToTopLayer, bool allowMouseFocus, bool inheritPick)
+{
+	// Most widgets share the same final visibility and layering step.
+	FinalizeWidget(widget, def.visible, def.alpha, promoteToTopLayer, allowMouseFocus, inheritPick);
+	LogWidgetCreated(def);
+}
+
+void GameGUI::BindValueWidgetRefresh(const GameGUIWidgetDef& def, MyGUI::Widget* widget, const std::function<void(float)>& applyValue)
+{
+	// Value widgets subscribe to the shared member-value channel exposed by the component.
+	Component* component = ResolveBoundComponent(def);
+	if (!component)
+	{
+		Root::Current().Debugger().LogMessage(
+			"GameGUI value binding could not resolve component: " +
+			def.bindEntity + "." + def.bindComponent);
+		return;
+	}
+
+	float value = 0.0f;
+	if (!component->TryGetBindableValue(def.bindMember, value))
+	{
+		Root::Current().Debugger().LogMessage(
+			"GameGUI value binding could not resolve member: " +
+			def.bindEntity + "." + def.bindComponent + "." + def.bindMember);
+		return;
+	}
+
+	applyValue(value);
+
+	const std::string valueChannel = component->BindableValueChannel(def.bindMember);
+	Root::Current().Events().GetEvent(valueChannel).Subscribe(widget, [widget, binding = def, applyValue]()
+	{
+		Component* currentComponent = ResolveBoundComponent(binding);
+		if (!currentComponent)
+		{
+			return;
+		}
+
+		float currentValue = 0.0f;
+		if (!currentComponent->TryGetBindableValue(binding.bindMember, currentValue))
+		{
+			return;
+		}
+
+		applyValue(currentValue);
+	});
+	Root::Current().Debugger().LogMessage("GameGUI bound value widget '" + def.name + "' to " + valueChannel);
+}
+
+void GameGUI::BindTextWidgetValue(const GameGUIWidgetDef& def, MyGUI::TextBox* textWidget)
+{
+	BindValueWidgetRefresh(def, textWidget, [textWidget](float currentValue)
+	{
+		textWidget->setCaption(FormatBindableValue(currentValue));
+	});
+}
+
+void GameGUI::BindTextWidgetEvent(const GameGUIWidgetDef& def, MyGUI::TextBox* textWidget)
+{
+	Component* component = ResolveBoundComponent(def);
+	if (!component)
+	{
+		Root::Current().Debugger().LogMessage(
+			"GameGUI binding could not resolve component: " +
+			def.bindEntity + "." + def.bindComponent);
+		return;
+	}
+
+	const std::vector<BindableEvent> bindableEvents = component->GetBindableEvents();
+	const bool exposesEvent = std::any_of(bindableEvents.begin(), bindableEvents.end(), [&def](const BindableEvent& event)
+	{
+		return event.name == def.bindEvent;
+	});
+	if (!exposesEvent)
+	{
+		Root::Current().Debugger().LogMessage(
+			"GameGUI binding event is not exposed by component: " +
+			def.bindEntity + "." + def.bindComponent + "." + def.bindEvent);
+		return;
+	}
+
+	textWidget->setCaption(component->GetBindableEventText(def.bindEvent));
+	const std::string channel = component->BindableEventChannel(def.bindEvent);
+	Root::Current().Events().GetEvent(channel).Subscribe(textWidget, [textWidget, binding = def]()
+	{
+		Component* currentComponent = ResolveBoundComponent(binding);
+		if (!currentComponent)
+		{
+			return;
+		}
+
+		textWidget->setCaption(currentComponent->GetBindableEventText(binding.bindEvent));
+	});
+	Root::Current().Debugger().LogMessage("GameGUI bound widget '" + def.name + "' to " + channel);
+}
+
+void GameGUI::BindTextWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::TextBox* textWidget)
+{
+	// Text widgets can be driven by a value, an event caption, or both.
+	if (!textWidget)
+	{
+		return;
+	}
+
+	const bool hasValueBinding = !def.bindMember.empty();
+	const bool hasEventBinding = !def.bindEvent.empty();
+
+	if (hasValueBinding)
+	{
+		BindTextWidgetValue(def, textWidget);
+	}
+	if (hasEventBinding)
+	{
+		BindTextWidgetEvent(def, textWidget);
+		return;
+	}
+
+	if (!hasValueBinding)
+	{
+		Root::Current().Debugger().LogMessage("GameGUI binding ignored for unsupported widget: " + def.name);
+	}
+}
+
+void GameGUI::BindProgressBarFromDef(const GameGUIWidgetDef& def, MyGUI::ProgressBar* progress)
+{
+	if (!progress || def.bindEntity.empty() || def.bindComponent.empty() || def.bindMember.empty())
+	{
+		return;
+	}
+	// Progress bars normalize the numeric member to the 0-100 range.
+	BindValueWidgetRefresh(def, progress, [progress](float currentValue)
+	{
+		const float clamped = std::clamp(currentValue, 0.0f, 100.0f);
+		progress->setProgressPosition(static_cast<int>(std::lround(clamped)));
+	});
+
+	Component* component = ResolveBoundComponent(def);
+	if (!component || def.bindMember != "Health")
+	{
+		return;
+	}
+
+	float maxValue = 0.0f;
+	if (!component->TryGetBindableValue("MaxHealth", maxValue) || maxValue <= 0.0f)
+	{
+		return;
+	}
+
+	float currentValue = 0.0f;
+	if (!component->TryGetBindableValue("Health", currentValue))
+	{
+		return;
+	}
+
+	const auto applyNormalizedValue = [progress, maxValue](float healthValue)
+	{
+		const float normalized = std::clamp((healthValue / maxValue) * 100.0f, 0.0f, 100.0f);
+		progress->setProgressPosition(static_cast<int>(std::lround(normalized)));
+	};
+
+	applyNormalizedValue(currentValue);
+	const std::string normalizedChannel = component->BindableValueChannel("Health");
+	Root::Current().Events().GetEvent(normalizedChannel).Subscribe(progress, [progress, binding = def, applyNormalizedValue]()
+	{
+		Component* currentComponent = ResolveBoundComponent(binding);
+		if (!currentComponent)
+		{
+			return;
+		}
+
+		float healthValue = 0.0f;
+		float maxHealthValue = 0.0f;
+		if (!currentComponent->TryGetBindableValue("Health", healthValue) || !currentComponent->TryGetBindableValue("MaxHealth", maxHealthValue) || maxHealthValue <= 0.0f)
+		{
+			return;
+		}
+
+		applyNormalizedValue(healthValue);
+	});
+	Root::Current().Debugger().LogMessage("GameGUI bound normalized progress bar '" + def.name + "' to " + normalizedChannel);
+}
+
+MyGUI::Widget* GameGUI::CreatePanelWidget(const GameGUIWidgetDef& def, MyGUI::Widget* parent)
+{
+	// Panels are containers, so they are mostly about layout and pick behavior.
+	const std::string skin = def.useSkin ? (def.skin.empty() ? "PanelSkin" : def.skin) : "PanelEmpty";
+	MyGUI::Widget* panel = CreateGuiWidget<MyGUI::Widget>(m_gui, parent, skin, def.x, def.y, def.width, def.height, def.layer, def.name);
+	FinalizeAndLogWidget(panel, def, parent == nullptr, false, true);
+	return panel;
+}
+
+std::string GameGUI::ResolveButtonSkin(const GameGUIWidgetDef& def) const
+{
+	const GameGUIWidgetDef* parentPanel = FindWidgetDef(m_loadedAsset, def.parentName);
+	const bool panelHidesButtonSkin = parentPanel && !parentPanel->panelButtonUseSkin;
+	if (!def.useSkin || panelHidesButtonSkin)
+	{
+		return "ButtonEmptySkin";
+	}
+
+	if (parentPanel)
+	{
+		return parentPanel->panelButtonSkin.empty() ? "MultiListButtonSkin" : parentPanel->panelButtonSkin;
+	}
+
+	return def.skin.empty() ? "ButtonSkin" : def.skin;
+}
+
+MyGUI::Button* GameGUI::CreateButtonWidget(const GameGUIWidgetDef& def, MyGUI::Widget* parent)
+{
+	// Buttons use a nested TextBox for caption rendering so the visual skin can
+	// stay separate from the editable text content.
+	const std::string skin = ResolveButtonSkin(def);
+	const int buttonWidth = std::max(1, def.width);
+	const int buttonHeight = std::max(1, def.height);
+	MyGUI::Button* button = CreateGuiWidget<MyGUI::Button>(m_gui, parent, skin, def.x, def.y, buttonWidth, buttonHeight, def.layer, def.name);
+
+	if (!button)
+	{
+		return nullptr;
+	}
+
+	SetButtonVisualState(button, def);
+	SetButtonFocusState(button, def);
+	SetButtonLabel(button, def, buttonWidth, buttonHeight);
+	HookButtonClick(button, def);
+	// Button widgets are interactive, so they keep mouse focus and pick behavior.
+	FinalizeAndLogWidget(button, def, parent == nullptr, true, true);
+	return button;
+}
+
+MyGUI::TextBox* GameGUI::CreateTextWidget(const GameGUIWidgetDef& def, MyGUI::Widget* parent)
+{
+	const std::string skin = def.skin.empty() ? "TextBox" : def.skin;
+	MyGUI::TextBox* text = CreateGuiWidget<MyGUI::TextBox>(m_gui, parent, skin, def.x, def.y, def.width, def.height, def.layer, def.name);
+
+	if (!text)
+	{
+		return nullptr;
+	}
+
+	text->setCaption(def.text);
+	if (def.fontSize > 0)
+	{
+		text->setFontHeight(def.fontSize);
+	}
+	FinalizeAndLogWidget(text, def, parent == nullptr, false, true);
+	return text;
+}
+
+MyGUI::ImageBox* GameGUI::CreateImageWidget(const GameGUIWidgetDef& def, MyGUI::Widget* parent)
+{
+	const std::string skin = def.skin.empty() ? "ImageBox" : def.skin;
+	MyGUI::ImageBox* image = CreateGuiWidget<MyGUI::ImageBox>(m_gui, parent, skin, def.x, def.y, def.width, def.height, def.layer, def.name);
+
+	if (!image)
+	{
+		return nullptr;
+	}
+
+	if (!def.texture.empty())
+	{
+		image->setImageTexture(def.texture);
+	}
+	FinalizeAndLogWidget(image, def, parent == nullptr, false, true);
+	return image;
+}
+
+MyGUI::ProgressBar* GameGUI::CreateProgressBarWidget(const GameGUIWidgetDef& def, MyGUI::Widget* parent)
+{
+	const std::string skin = def.skin.empty() ? "ProgressBar" : def.skin;
+	MyGUI::ProgressBar* progress = CreateGuiWidget<MyGUI::ProgressBar>(m_gui, parent, skin, def.x, def.y, std::max(1, def.width), std::max(1, def.height), def.layer, def.name);
+
+	if (!progress)
+	{
+		return nullptr;
+	}
+
+	// Progress bars use the same shared finalization path, but without mouse focus.
+	ConfigureProgressBar(progress);
+	FinalizeAndLogWidget(progress, def, parent == nullptr, false, false);
+	if (!parent)
+	{
+		MyGUI::LayerManager::getInstance().upLayerItem(progress);
+	}
+	return progress;
 }
 
 void* GameGUIImageLoader::loadImage(int& _width, int& _height, MyGUI::PixelFormat& _format, const std::string& _filename)
@@ -383,7 +796,7 @@ void GameGUI::LoadUIAsset(const GameGUIAsset& asset)
 
 	for (const GameGUIWidgetDef& widget : m_loadedAsset.widgets)
 	{
-		if (!widget.bindEvent.empty())
+		if (!widget.bindMember.empty() || !widget.bindEvent.empty())
 		{
 			auto it = m_runtimeWidgetLookup.find(widget.name);
 			if (it != m_runtimeWidgetLookup.end())
@@ -487,237 +900,26 @@ void GameGUI::ClearUI()
 
 MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* parent)
 {
-	// Each branch below is intentionally self-contained because the widget type
-	// decides which MyGUI class to instantiate and which fields are meaningful.
 	if (def.type == "Panel")
 	{
-		// Helper candidate: resolve the effective panel skin in one place.
-		const std::string skin = def.useSkin ? (def.skin.empty() ? "PanelSkin" : def.skin) : "PanelEmpty";
-
-		// Helper candidate: create either a root-level panel or a child panel.
-		MyGUI::Widget* panel = parent ?
-			parent->createWidget<MyGUI::Widget>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.name) :
-			m_gui->createWidget<MyGUI::Widget>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.layer, def.name);
-
-		if (panel)
-		{
-			// Panels mostly act as containers; they inherit pick behavior so child
-			// widgets can still receive mouse interaction.
-			panel->setVisible(def.visible);
-			panel->setAlpha(def.alpha);
-			panel->setNeedMouseFocus(false);
-			panel->setInheritsPick(true);
-			if (!parent)
-			{
-				// Root widgets need to be promoted to the top layer explicitly.
-				MyGUI::LayerManager::getInstance().upLayerItem(panel);
-			}
-		}
-
-		return panel;
+		return CreatePanelWidget(def, parent);
 	}
-
 	if (def.type == "Button")
 	{
-		// Helper candidate: determine whether a panel-owned button should hide its
-		// own skin and reuse the parent panel's visual treatment.
-		bool panelHidesButtonSkin = false;
-		if (!def.parentName.empty())
-		{
-			// Look up the owning panel once so we can reuse its layout rules.
-			const auto parentIt = std::find_if(m_loadedAsset.widgets.begin(), m_loadedAsset.widgets.end(), [&def](const GameGUIWidgetDef& candidate)
-			{
-				return candidate.type == "Panel" && candidate.name == def.parentName;
-			});
-			panelHidesButtonSkin = parentIt != m_loadedAsset.widgets.end() && !parentIt->panelButtonUseSkin;
-		}
-
-		// Helper candidate: resolve the final button skin after panel overrides.
-		const std::string skin = !def.useSkin || panelHidesButtonSkin
-			? "ButtonEmptySkin"
-			: (!def.parentName.empty()
-				? ([&]()
-				{
-					const auto parentIt = std::find_if(m_loadedAsset.widgets.begin(), m_loadedAsset.widgets.end(), [&def](const GameGUIWidgetDef& candidate)
-					{
-						return candidate.type == "Panel" && candidate.name == def.parentName;
-					});
-					return parentIt != m_loadedAsset.widgets.end() && !parentIt->panelButtonSkin.empty()
-						? "MultiListButtonSkin" : (def.skin.empty() ? "MultiListButtonSkin" : def.skin);
-				})()
-				: (def.skin.empty() ? "ButtonSkin" : def.skin));
-
-		// The widget's explicit width/height are authoritative. The skin is only
-		// the visual template and should not change the authored dimensions.
-		const int buttonWidth = std::max(1, def.width);
-		const int buttonHeight = std::max(1, def.height);
-
-		// Helper candidate: create either a root-level button or a child button.
-		MyGUI::Button* button = parent ?
-			parent->createWidget<MyGUI::Button>(skin, def.x, def.y, buttonWidth, buttonHeight, MyGUI::Align::Default, def.name) :
-			m_gui->createWidget<MyGUI::Button>(skin, def.x, def.y, buttonWidth, buttonHeight, MyGUI::Align::Default, def.layer, def.name);
-
-		if (button)
-		{
-			// The visible caption is rendered through a nested TextBox so we clear
-			// the button's own caption and manage the label ourselves.
-			button->setCaption("");
-			button->setTextColour(ParseColour(def.textColor, MyGUI::Colour::Black));
-			m_buttonDefaultTextColours[button] = button->getTextColour();
-			button->setVisible(def.visible);
-			button->setAlpha(def.alpha);
-			button->setColour(ParseColour(def.highlightColor, MyGUI::Colour::White));
-			button->setStateSelected(false);
-			button->eventMouseSetFocus += MyGUI::newDelegate(this, &GameGUI::OnButtonMouseFocus);
-			button->eventMouseLostFocus += MyGUI::newDelegate(this, &GameGUI::OnButtonMouseLostFocus);
-			if (def.visible)
-			{
-				m_controllerButtons.push_back(button);
-			}
-
-			// Helper candidate: build and position the label widget used to display
-			// the button text with the configured font and colour.
-			MyGUI::TextBox* label = button->createWidget<MyGUI::TextBox>("TextBox", 0, 0, buttonWidth, buttonHeight, MyGUI::Align::Stretch, def.name + "_label");
-			if (label)
-			{
-				label->setCaption(def.text.empty() ? def.name : def.text);
-				label->setTextColour(m_buttonDefaultTextColours[button]);
-				label->setTextAlign(MyGUI::Align::Center);
-				if (def.fontSize > 0) label->setFontHeight(def.fontSize);
-				if (!def.fontName.empty()) label->setFontName(def.fontName);
-				label->setNeedMouseFocus(false);
-				label->setNeedKeyFocus(false);
-				label->setInheritsPick(false);
-				MyGUI::LayerManager::getInstance().upLayerItem(label);
-				m_buttonLabels[button] = label;
-			}
-
-			// Button clicks are routed back into GameGUI so built-in behaviors stay
-			// data-driven and are not baked into the asset file.
-			button->eventMouseButtonClick += MyGUI::newDelegate(this, &GameGUI::OnWidgetClicked);
-			Root::Current().Debugger().LogMessage(std::string("GameGUI click handler bound for widget: ") + def.name);
-			if (!parent)
-			{
-				// Root buttons also need to be promoted to the top layer.
-				MyGUI::LayerManager::getInstance().upLayerItem(button);
-			}
-			Root::Current().Debugger().LogMessage(
-				std::string("GameGUI widget created: name='") + def.name +
-				"', type='" + def.type +
-				"', skin='" + def.skin +
-				"', layer='" + def.layer + "'");
-			return button;
-		}
+		return CreateButtonWidget(def, parent);
 	}
-
-	else if (def.type == "TextBox" || def.type == "Text")
+	if (def.type == "TextBox" || def.type == "Text")
 	{
-		// Helper candidate: resolve the final text widget skin before creation.
-		const std::string skin = def.skin.empty() ? "TextBox" : def.skin;
-
-		// Helper candidate: create either a root-level text widget or a child widget.
-		MyGUI::TextBox* text = parent ?
-			parent->createWidget<MyGUI::TextBox>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.name) :
-			m_gui->createWidget<MyGUI::TextBox>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.layer, def.name);
-
-		if (text)
-		{
-			text->setCaption(def.text);
-			if (def.fontSize > 0)
-			{
-				text->setFontHeight(def.fontSize);
-			}
-			text->setVisible(def.visible);
-			text->setAlpha(def.alpha);
-			if (!parent)
-			{
-				MyGUI::LayerManager::getInstance().upLayerItem(text);
-			}
-			Root::Current().Debugger().LogMessage(
-				std::string("GameGUI widget created: name='") + def.name +
-				"', type='" + def.type +
-				"', skin='" + def.skin +
-				"', layer='" + def.layer + "'");
-			return text;
-		}
+		return CreateTextWidget(def, parent);
 	}
-
-	else if (def.type == "ImageBox" || def.type == "Image")
+	if (def.type == "ImageBox" || def.type == "Image")
 	{
-		// Helper candidate: resolve the final image widget skin before creation.
-		const std::string skin = def.skin.empty() ? "ImageBox" : def.skin;
-
-		// Helper candidate: create either a root-level image or a child image.
-		MyGUI::ImageBox* image = parent ?
-			parent->createWidget<MyGUI::ImageBox>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.name) :
-			m_gui->createWidget<MyGUI::ImageBox>(skin, def.x, def.y, def.width, def.height, MyGUI::Align::Default, def.layer, def.name);
-
-		if (image)
-		{
-			// Image widgets only need their texture and simple visibility/opacity state.
-			if (!def.texture.empty())
-			{
-				image->setImageTexture(def.texture);
-			}
-			image->setVisible(def.visible);
-			image->setAlpha(def.alpha);
-			if (!parent)
-			{
-				MyGUI::LayerManager::getInstance().upLayerItem(image);
-			}
-			Root::Current().Debugger().LogMessage(
-				std::string("GameGUI widget created: name='") + def.name +
-				"', type='" + def.type +
-				"', skin='" + def.skin +
-				"', layer='" + def.layer + "'");
-			return image;
-		}
+		return CreateImageWidget(def, parent);
 	}
-
-	else if (def.type == "ProgressBar")
+	if (def.type == "ProgressBar")
 	{
-		// Helper candidate: resolve the final progress-bar skin before creation.
-		const std::string skin = def.skin.empty() ? "ProgressBar" : def.skin;
-
-		// Helper candidate: create either a root-level progress bar or a child bar.
-		MyGUI::ProgressBar* progress = parent ? parent->createWidget<MyGUI::ProgressBar>(
-				skin, 
-				def.x, 
-				def.y, 
-				std::max(1, def.width), 
-				std::max(1, def.height), 
-				MyGUI::Align::Default, 
-				def.name
-			) : m_gui->createWidget<MyGUI::ProgressBar>(
-				skin, 
-				def.x, 
-				def.y, 
-				std::max(1, def.width), 
-				std::max(1, def.height), 
-				MyGUI::Align::Default, 
-				def.layer,
-				def.name);
-
-		if (progress)
-		{
-			// Progress bars are interactive displays, not input widgets.
-			progress->setVisible(def.visible);
-			progress->setAlpha(def.alpha);
-			progress->setNeedMouseFocus(false);
-			progress->setInheritsPick(false);
-
-			// The creator/runtime currently treats the bar as a 0-100 range display.
-			progress->setProgressRange(100);
-			progress->setProgressPosition(100);
-			if (!parent)
-			{
-				// Root progress bars need to be promoted to the top layer explicitly.
-				MyGUI::LayerManager::getInstance().upLayerItem(progress);
-			}
-			return progress;
-		}
+		return CreateProgressBarWidget(def, parent);
 	}
-
 	return nullptr;
 }
 
@@ -945,55 +1147,31 @@ MyGUI::Widget* GameGUI::RuntimeWidget(const std::string& name) const
 
 void GameGUI::BindWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* widget)
 {
-	// check if the widget cant be bound
-	if (!widget || def.bindEntity.empty() || def.bindComponent.empty() || def.bindEvent.empty())
+	// Check whether any binding data exists before we inspect the widget type.
+	if (!widget || def.bindEntity.empty() || def.bindComponent.empty())
 	{
 		return;
 	}
 
-	//
+	if (auto* progress = dynamic_cast<MyGUI::ProgressBar*>(widget))
+	{
+		BindProgressBarFromDef(def, progress);
+		return;
+	}
+
 	auto* textWidget = dynamic_cast<MyGUI::TextBox*>(widget);
 	if (!textWidget)
 	{
-		Root::Current().Debugger().LogMessage("GameGUI binding ignored for non-text widget: " + def.name);
 		return;
 	}
 
-	Component* component = ResolveBoundComponent(def);
-	if (!component)
+	if (def.bindMember.empty() && def.bindEvent.empty())
 	{
-		Root::Current().Debugger().LogMessage(
-			"GameGUI binding could not resolve component: " +
-			def.bindEntity + "." + def.bindComponent);
+		Root::Current().Debugger().LogMessage("GameGUI binding ignored for unsupported widget: " + def.name);
 		return;
 	}
 
-	const std::vector<BindableEvent> bindableEvents = component->GetBindableEvents();
-	const bool exposesEvent = std::any_of(bindableEvents.begin(), bindableEvents.end(), [&def](const BindableEvent& event)
-	{
-		return event.name == def.bindEvent;
-	});
-	if (!exposesEvent)
-	{
-		Root::Current().Debugger().LogMessage(
-			"GameGUI binding event is not exposed by component: " +
-			def.bindEntity + "." + def.bindComponent + "." + def.bindEvent);
-		return;
-	}
-
-	textWidget->setCaption(component->GetBindableEventText(def.bindEvent));
-	const std::string channel = component->BindableEventChannel(def.bindEvent);
-	Root::Current().Events().GetEvent(channel).Subscribe(widget, [widget, binding = def]()
-	{
-		Component* currentComponent = ResolveBoundComponent(binding);
-		auto* currentTextWidget = dynamic_cast<MyGUI::TextBox*>(widget);
-		if (!currentComponent || !currentTextWidget)
-		{
-			return;
-		}
-		currentTextWidget->setCaption(currentComponent->GetBindableEventText(binding.bindEvent));
-	});
-	Root::Current().Debugger().LogMessage("GameGUI bound widget '" + def.name + "' to " + channel);
+	BindTextWidgetFromDef(def, textWidget);
 }
 
 void GameGUI::OnWidgetClicked(MyGUI::Widget* sender)

@@ -3,6 +3,7 @@
 #include "Engine/UI/GameGUIAsset.h"
 
 #include <string>
+#include <functional>
 #include <unordered_map>
 #include <vector>
 #include <MYGUI/MyGUI_OpenGLImageLoader.h>
@@ -23,47 +24,84 @@ class GameGUI {
 public:
 	using MenuNavigationMode = GameGUIMenuNavigationMode;
 	GameGUI() = default;
+
+	// Lifecycle
 	void startUp(Window& window);
 	void shutDown();
 	void BeginFrame();
 	void Draw();
 	void EndFrame();
+
+	// UI loading and reset
 	void LoadUIAsset(const GameGUIAsset& asset);
 	void ClearUI();
+
+	// Controller navigation
 	void FocusFirstControllerButton();
 	void ClearControllerFocus();
 	bool HasControllerFocus() const;
 	void NavigateControllerButtons(int direction);
 	void ActivateFocusedControllerButton();
+
+	// Visual configuration
 	void SetMenuNavigationMode(MenuNavigationMode mode);
 	void SetBoxStyle(int padding, int offsetX, int offsetY);
 	void SetBoxSkin(const std::string& skin);
 	void SetPointerStyle(int width, int height, int gap);
 	void SetHighlightColour(float r, float g, float b);
 	void SetPointerSkin(const std::string& skin);
+
+	// Lookup
 	MyGUI::Widget* RuntimeWidget(const std::string& name) const;
 private:
+	// Widget creation
 	MyGUI::Widget* CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* parent);
+	MyGUI::Widget* CreatePanelWidget(const GameGUIWidgetDef& def, MyGUI::Widget* parent);
+	MyGUI::Button* CreateButtonWidget(const GameGUIWidgetDef& def, MyGUI::Widget* parent);
+	MyGUI::TextBox* CreateTextWidget(const GameGUIWidgetDef& def, MyGUI::Widget* parent);
+	MyGUI::ImageBox* CreateImageWidget(const GameGUIWidgetDef& def, MyGUI::Widget* parent);
+	MyGUI::ProgressBar* CreateProgressBarWidget(const GameGUIWidgetDef& def, MyGUI::Widget* parent);
+	std::string ResolveButtonSkin(const GameGUIWidgetDef& def) const;
+	void ConfigureProgressBar(MyGUI::ProgressBar* progress);
+	void SetButtonVisualState(MyGUI::Button* button, const GameGUIWidgetDef& def);
+	void SetButtonFocusState(MyGUI::Button* button, const GameGUIWidgetDef& def);
+	void SetButtonLabel(MyGUI::Button* button, const GameGUIWidgetDef& def, int buttonWidth, int buttonHeight);
+	void HookButtonClick(MyGUI::Button* button, const GameGUIWidgetDef& def);
+	void FinalizeAndLogWidget(MyGUI::Widget* widget, const GameGUIWidgetDef& def, bool promoteToTopLayer, bool allowMouseFocus, bool inheritPick);
+
+	// Runtime binding and input handling
 	void BindWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* widget);
+	void BindTextWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::TextBox* textWidget);
+	void BindTextWidgetValue(const GameGUIWidgetDef& def, MyGUI::TextBox* textWidget);
+	void BindTextWidgetEvent(const GameGUIWidgetDef& def, MyGUI::TextBox* textWidget);
+	void BindValueWidgetRefresh(const GameGUIWidgetDef& def, MyGUI::Widget* widget, const std::function<void(float)>& applyValue);
 	void OnWidgetClicked(MyGUI::Widget* sender);
 	void OnButtonMouseFocus(MyGUI::Widget* sender, MyGUI::Widget* oldFocus);
 	void OnButtonMouseLostFocus(MyGUI::Widget* sender, MyGUI::Widget* newFocus);
 	void PositionMenuPointer(MyGUI::Widget* button);
 	void ApplyTextHighlight(MyGUI::Button* button, bool highlighted);
+	void BindProgressBarFromDef(const GameGUIWidgetDef& def, MyGUI::ProgressBar* progress);
+
+	// Core runtime
 	Window* m_window = nullptr;
 	MyGUI::OpenGLPlatform* m_platform = nullptr;
 	MyGUI::Gui* m_gui = nullptr;
 	GameGUIImageLoader m_imageLoader;
+
+	// Runtime widget registry
+	std::vector<MyGUI::Widget*> m_runtimeWidgets;
+	std::unordered_map<std::string, MyGUI::Widget*> m_runtimeWidgetLookup;
+
+	// Controller navigation state
 	MyGUI::Button* m_testButton = nullptr;
 	MyGUI::Widget* m_menuPointer = nullptr;
 	MyGUI::Widget* m_menuBox = nullptr;
-	std::vector<MyGUI::Widget*> m_runtimeWidgets;
 	std::vector<MyGUI::Button*> m_controllerButtons;
-	std::unordered_map<std::string, MyGUI::Widget*> m_runtimeWidgetLookup;
+	int m_focusedControllerButton = -1;
+
+	// Widget styling and selection state
 	std::unordered_map<MyGUI::Button*, MyGUI::Colour> m_buttonDefaultTextColours;
 	std::unordered_map<MyGUI::Button*, MyGUI::TextBox*> m_buttonLabels;
-	GameGUIAsset m_loadedAsset;
-	int m_focusedControllerButton = -1;
 	MenuNavigationMode m_menuNavigationMode = MenuNavigationMode::Pointer;
 	int m_boxPadding = 8;
 	int m_boxOffsetX = 0;
@@ -73,6 +111,9 @@ private:
 	int m_pointerWidth = 40, m_pointerHeight = 40, m_pointerGap = 24;
 	MyGUI::Colour m_highlightColour = MyGUI::Colour(1.0f, 1.0f, 0.0f);
 	MyGUI::Colour m_selectedColour = MyGUI::Colour(1.0f, 1.0f, 1.0f);
+
+	// Loaded asset and initialization flag
+	GameGUIAsset m_loadedAsset;
 	bool m_initialized = false;
 };
 

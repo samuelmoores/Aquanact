@@ -18,7 +18,18 @@ std::string Component::BindableEventChannel(const std::string& eventName) const
 	return entityName + "." + Name() + "." + eventName;
 }
 
+std::string Component::BindableValueChannel(const std::string& memberName) const
+{
+	const std::string entityName = m_owner ? m_owner->Name() : "<unowned>";
+	return entityName + "." + Name() + ".value." + memberName;
+}
+
 void Component::DispatchBindableEvent(const std::string& eventName) const
 {
 	Root::Current().Events().Dispatch(BindableEventChannel(eventName));
+}
+
+void Component::DispatchBindableValueChanged(const std::string& memberName) const
+{
+	Root::Current().Events().Dispatch(BindableValueChannel(memberName));
 }
