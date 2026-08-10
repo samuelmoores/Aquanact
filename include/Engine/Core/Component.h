@@ -1,7 +1,41 @@
 #pragma once
 
 #include <string>
+#include <type_traits>
 #include <vector>
+
+// Convert a bindable's C++ type into the small set of value types understood by
+// editor binding controls. This keeps UI metadata consistent with the member or
+// getter instead of requiring each component to repeat its type as a string.
+template <typename T>
+constexpr const char* AquaBindableTypeName()
+{
+	// A getter may return a const reference, but the editor only needs its value type.
+	using ValueType = std::remove_cvref_t<T>;
+
+	// Check bool before other integral types because C++ treats bool as integral.
+	if constexpr (std::is_same_v<ValueType, bool>)
+	{
+		return "bool";
+	}
+	else if constexpr (std::is_integral_v<ValueType>)
+	{
+		return "int";
+	}
+	// Preserve double metadata before handling the remaining floating-point types.
+	else if constexpr (std::is_same_v<ValueType, double>)
+	{
+		return "double";
+	}
+	else if constexpr (std::is_floating_point_v<ValueType>)
+	{
+		return "float";
+	}
+	else
+	{
+		return "unsupported";
+	}
+}
 
 struct BindableMember
 {
@@ -33,10 +67,10 @@ struct BindableEvent
 // They keep the component header compact while still generating the runtime
 // metadata and lookup logic the editor needs.
 #define AQUA_BIND_VALUE(memberName) \
-	BindableMember{ #memberName, #memberName, "float", BindableMember::Kind::Variable },
+	BindableMember{ #memberName, #memberName, AquaBindableTypeName<decltype(this->memberName)>(), BindableMember::Kind::Variable },
 
 #define AQUA_BIND_FUNCTION(functionName) \
-	BindableMember{ #functionName, #functionName, "float", BindableMember::Kind::Function },
+	BindableMember{ #functionName, #functionName, AquaBindableTypeName<decltype(this->functionName())>(), BindableMember::Kind::Function },
 
 #define AQUA_BIND_ACCESSOR_VALUE(bindName) \
 	if (memberName == #bindName) \

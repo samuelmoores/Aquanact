@@ -20,11 +20,12 @@ public:
 	void SetMovementDeadzone(float deadzone) { m_movementDeadzone = deadzone; }
 	bool IsMoving() const { return m_isMoving; }
 
-	// Bindable values are sampled state, not events. The UI polls them whenever
-	// it needs the latest controller state.
+	// Publish stable public accessor names for controller state. Existing animator
+	// transitions store these names, and type inference marks both as booleans so
+	// condition editors can present true/false instead of their float-backed 0/1.
 	#define CONTROLLER_BINDABLES(VALUE, FUNCTION) \
-		VALUE(m_isMoving) \
-		VALUE(m_isGrounded) \
+		FUNCTION(IsMoving) \
+		FUNCTION(IsGrounded) \
 		VALUE(m_moveSpeed)
 	AQUA_DECLARE_BINDABLES(CONTROLLER_BINDABLES)
 	#undef CONTROLLER_BINDABLES

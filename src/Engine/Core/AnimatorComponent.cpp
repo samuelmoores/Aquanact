@@ -20,19 +20,25 @@ namespace {
 }
 }
 
+// Construction
 AnimatorComponent::AnimatorComponent(Mesh* mesh)
 {
+	//Check if the mesh is invalid
 	if (!mesh || !mesh->Skinned())
 	{
 		return;
 	}
 
+	// create the animator with anim root node and skeleton
 	m_animator = std::make_unique<Animator>(mesh->GetRootNode(), mesh->GetSkeletonPtr());
+
+	// get the animations from the Mesh into our new animator
 	for (int i = 0; i < mesh->NumAnimations(); ++i)
 	{
 		m_animator->AddClip(new Animation(mesh->GetAnimation(i)));
 	}
 
+	// make a new state for each animation, the first one defaults to initial state
 	if (mesh->NumAnimations() > 0)
 	{
 		for (int i = 0; i < mesh->NumAnimations(); ++i)
@@ -45,34 +51,7 @@ AnimatorComponent::AnimatorComponent(Mesh* mesh)
 	}
 }
 
-const char* AnimatorComponent::ComparatorToString(Comparator comparator)
-{
-	switch (comparator)
-	{
-	case Comparator::NotEqual: return "!=";
-	case Comparator::Greater: return ">";
-	case Comparator::Less: return "<";
-	case Comparator::GreaterEqual: return ">=";
-	case Comparator::LessEqual: return "<=";
-	case Comparator::Equal:
-	default:
-		return "==";
-	}
-}
-
-std::string AnimatorComponent::OperandToString(const Operand& operand)
-{
-	if (operand.type == OperandType::Constant)
-	{
-		std::ostringstream value;
-		value << operand.constantValue;
-		return value.str();
-	}
-
-	const std::string sourceName = operand.componentName.empty() ? "Entity" : operand.componentName;
-	return sourceName + "." + (operand.memberName.empty() ? "<unbound>" : operand.memberName);
-}
-
+// Component lifecycle
 const char* AnimatorComponent::Name() const
 {
 	return "Animator";
@@ -84,13 +63,19 @@ void AnimatorComponent::startUp(Entity&)
 
 void AnimatorComponent::FirstFrame(Entity&)
 {
+	// Runtime playback cannot start without an animator and at least one state.
 	if (!m_animator || m_states.empty())
 	{
 		return;
 	}
 
-	const std::string& stateName = !m_initialState.empty() ? m_initialState : m_states.front().name;
-	SetInitialState(stateName);
+	// Use the first available state when no initial state was configured.
+	if (m_initialState.empty())
+	{
+		SetInitialState(m_states.front().name);
+	}
+
+	StartInitialState();
 }
 
 void AnimatorComponent::Update(Entity& owner, float dt)
@@ -210,104 +195,19 @@ void AnimatorComponent::Update(Entity& owner, float dt)
 	}
 }
 
-Animator* AnimatorComponent::GetAnimator()
+// Runtime state control
+void AnimatorComponent::SetInitialState(const std::string& stateName)
 {
-	return m_animator.get();
-}
+	// SceneManager and EngineGUI call this while configuring the state machine.
+	// It deliberately does not change runtime playback; FirstFrame starts the
+	// configured state when the scene begins running.
+	const State* initialState = FindState(stateName);
+	if (!initialState)
+	{
+		return;
+	}
 
-const Animator* AnimatorComponent::GetAnimator() const
-{
-	return m_animator.get();
-}
-
-const std::vector<AnimatorComponent::State>& AnimatorComponent::States() const
-{
-	return m_states;
-}
-
-const std::vector<AnimatorComponent::Transition>& AnimatorComponent::Transitions() const
-{
-	return m_transitions;
-}
-
-const std::vector<AnimatorComponent::Condition>& AnimatorComponent::Conditions(const Transition& transition) const
-{
-	return transition.conditions;
-}
-
-const std::string& AnimatorComponent::InitialState() const
-{
-	return m_initialState;
-}
-
-const std::string& AnimatorComponent::CurrentState() const
-{
-	return m_currentState;
-}
-
-const std::string& AnimatorComponent::DesiredState() const
-{
-	return m_desiredState;
-}
-
-std::string AnimatorComponent::LastTransitionDebug() const
-{
-	return m_lastTransitionDebug;
-}
-
-const std::string& AnimatorComponent::LastTransitionFrom() const
-{
-	return m_lastTransitionFrom;
-}
-
-const std::string& AnimatorComponent::LastTransitionTo() const
-{
-	return m_lastTransitionTo;
-}
-
-const std::string& AnimatorComponent::LastTransitionLeftOperandText() const
-{
-	return m_lastTransitionLeftOperandText;
-}
-
-const std::string& AnimatorComponent::LastTransitionRightOperandText() const
-{
-	return m_lastTransitionRightOperandText;
-}
-
-std::string AnimatorComponent::LastTransitionComparatorText() const
-{
-	return ComparatorToString(m_lastTransitionComparator);
-}
-
-float AnimatorComponent::LastTransitionLeftValue() const
-{
-	return m_lastTransitionLeftValue;
-}
-
-float AnimatorComponent::LastTransitionRightValue() const
-{
-	return m_lastTransitionRightValue;
-}
-
-bool AnimatorComponent::LastTransitionPassed() const
-{
-	return m_lastTransitionPassed;
-}
-
-const std::string& AnimatorComponent::LastResolvedTargetState() const
-{
-	return m_lastResolvedTargetState;
-}
-
-int AnimatorComponent::LastResolvedTargetClipIndex() const
-{
-	return m_lastResolvedTargetClipIndex;
-}
-
-bool AnimatorComponent::LastResolvedTargetFound() const
-{
-	return m_lastResolvedTargetFound;
+	m_initialState = initialState->name;
 }
 
 void AnimatorComponent::SetDesiredState(const std::string& stateName)
@@ -318,21 +218,7 @@ void AnimatorComponent::SetDesiredState(const std::string& stateName)
 	}
 }
 
-void AnimatorComponent::SetInitialState(const std::string& stateName)
-{
-	const State* state = FindState(stateName);
-	if (!state || !m_animator)
-	{
-		return;
-	}
-
-	m_initialState = state->name;
-	m_currentState = state->name;
-	m_desiredState = state->name;
-	m_transitionCooldown = 0.0f;
-	m_animator->Play(state->clipIndex, 0.0f);
-}
-
+// State machine configuration
 bool AnimatorComponent::AddState(std::string name, int clipIndex)
 {
 	if (!m_animator || name.empty() || clipIndex < 0 || clipIndex >= m_animator->ClipCount())
@@ -405,6 +291,160 @@ bool AnimatorComponent::RemoveTransition(std::size_t index)
 	return true;
 }
 
+// Runtime and state machine inspection
+Animator* AnimatorComponent::GetAnimator()
+{
+	return m_animator.get();
+}
+
+const Animator* AnimatorComponent::GetAnimator() const
+{
+	return m_animator.get();
+}
+
+const std::vector<AnimatorComponent::State>& AnimatorComponent::States() const
+{
+	return m_states;
+}
+
+const std::vector<AnimatorComponent::Transition>& AnimatorComponent::Transitions() const
+{
+	return m_transitions;
+}
+
+const std::vector<AnimatorComponent::Condition>& AnimatorComponent::Conditions(const Transition& transition) const
+{
+	return transition.conditions;
+}
+
+const std::string& AnimatorComponent::InitialState() const
+{
+	return m_initialState;
+}
+
+const std::string& AnimatorComponent::CurrentState() const
+{
+	return m_currentState;
+}
+
+const std::string& AnimatorComponent::DesiredState() const
+{
+	return m_desiredState;
+}
+
+// Transition diagnostics
+std::string AnimatorComponent::LastTransitionDebug() const
+{
+	return m_lastTransitionDebug;
+}
+
+const std::string& AnimatorComponent::LastTransitionFrom() const
+{
+	return m_lastTransitionFrom;
+}
+
+const std::string& AnimatorComponent::LastTransitionTo() const
+{
+	return m_lastTransitionTo;
+}
+
+const std::string& AnimatorComponent::LastTransitionLeftOperandText() const
+{
+	return m_lastTransitionLeftOperandText;
+}
+
+const std::string& AnimatorComponent::LastTransitionRightOperandText() const
+{
+	return m_lastTransitionRightOperandText;
+}
+
+std::string AnimatorComponent::LastTransitionComparatorText() const
+{
+	return ComparatorToString(m_lastTransitionComparator);
+}
+
+float AnimatorComponent::LastTransitionLeftValue() const
+{
+	return m_lastTransitionLeftValue;
+}
+
+float AnimatorComponent::LastTransitionRightValue() const
+{
+	return m_lastTransitionRightValue;
+}
+
+bool AnimatorComponent::LastTransitionPassed() const
+{
+	return m_lastTransitionPassed;
+}
+
+const std::string& AnimatorComponent::LastResolvedTargetState() const
+{
+	return m_lastResolvedTargetState;
+}
+
+int AnimatorComponent::LastResolvedTargetClipIndex() const
+{
+	return m_lastResolvedTargetClipIndex;
+}
+
+bool AnimatorComponent::LastResolvedTargetFound() const
+{
+	return m_lastResolvedTargetFound;
+}
+
+// Display formatting
+const char* AnimatorComponent::ComparatorToString(Comparator comparator)
+{
+	switch (comparator)
+	{
+	case Comparator::NotEqual: return "!=";
+	case Comparator::Greater: return ">";
+	case Comparator::Less: return "<";
+	case Comparator::GreaterEqual: return ">=";
+	case Comparator::LessEqual: return "<=";
+	case Comparator::Equal:
+	default:
+		return "==";
+	}
+}
+
+std::string AnimatorComponent::OperandToString(const Operand& operand)
+{
+	if (operand.type == OperandType::Constant)
+	{
+		std::ostringstream value;
+		value << operand.constantValue;
+		return value.str();
+	}
+
+	const std::string sourceName = operand.componentName.empty() ? "Entity" : operand.componentName;
+	return sourceName + "." + (operand.memberName.empty() ? "<unbound>" : operand.memberName);
+}
+
+// State activation and transition evaluation
+void AnimatorComponent::StartInitialState()
+{
+	if (!m_animator)
+	{
+		return;
+	}
+
+	const State* initialState = FindState(m_initialState);
+	if (!initialState)
+	{
+		return;
+	}
+
+	// Beginning a scene synchronizes the state machine with its configured start.
+	m_currentState = initialState->name;
+	m_desiredState = initialState->name;
+	m_transitionCooldown = 0.0f;
+
+	// Initial playback starts directly instead of blending from a previous pose.
+	m_animator->Play(initialState->clipIndex, 0.0f);
+}
+
 void AnimatorComponent::ActivateState(const std::string& stateName)
 {
 	const State* state = FindState(stateName);
@@ -472,6 +512,7 @@ bool AnimatorComponent::Compare(float lhs, float rhs, Comparator comparator) con
 	}
 }
 
+// State machine lookup
 const AnimatorComponent::Transition* AnimatorComponent::FindTransition(const std::string& from, const std::string& to) const
 {
 	for (const auto& transition : m_transitions)

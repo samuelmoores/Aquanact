@@ -6,14 +6,15 @@
 
 #include <assimp/scene.h>
 
-#include "Engine/Core/Component.h"
 #include "Engine/Core/Animator.h"
+#include "Engine/Core/Component.h"
 #include "Engine/Core/Mesh.h"
 
 class Entity;
 
 class AnimatorComponent : public Component {
 public:
+	// State machine types
 	enum class Comparator {
 		Equal,
 		NotEqual,
@@ -54,13 +55,28 @@ public:
 		std::vector<Condition> conditions;
 	};
 
+	// Construction
 	AnimatorComponent(Mesh* mesh);
 
+	// Component lifecycle
 	const char* Name() const override;
 	void startUp(Entity& owner) override;
 	void FirstFrame(Entity& owner) override;
 	void Update(Entity& owner, float dt) override;
 
+	// Runtime state control
+	void SetInitialState(const std::string& stateName);
+	void SetDesiredState(const std::string& stateName);
+
+	// State machine configuration
+	bool AddState(std::string name, int clipIndex);
+	bool AddTransition(std::string from, std::string to, float blendSeconds, Condition condition = {});
+	bool AddTransition(std::string from, std::string to, float blendSeconds, std::vector<Condition> conditions);
+	bool UpdateTransition(std::size_t index, std::string from, std::string to, float blendSeconds, Condition condition = {});
+	bool UpdateTransition(std::size_t index, std::string from, std::string to, float blendSeconds, std::vector<Condition> conditions);
+	bool RemoveTransition(std::size_t index);
+
+	// Runtime and state machine inspection
 	Animator* GetAnimator();
 	const Animator* GetAnimator() const;
 	const std::vector<State>& States() const;
@@ -69,6 +85,8 @@ public:
 	const std::string& InitialState() const;
 	const std::string& CurrentState() const;
 	const std::string& DesiredState() const;
+
+	// Transition diagnostics
 	std::string LastTransitionDebug() const;
 	const std::string& LastTransitionFrom() const;
 	const std::string& LastTransitionTo() const;
@@ -81,31 +99,37 @@ public:
 	const std::string& LastResolvedTargetState() const;
 	int LastResolvedTargetClipIndex() const;
 	bool LastResolvedTargetFound() const;
-	void SetInitialState(const std::string& stateName);
-	void SetDesiredState(const std::string& stateName);
-	bool AddState(std::string name, int clipIndex);
-	bool AddTransition(std::string from, std::string to, float blendSeconds, Condition condition = {});
-	bool AddTransition(std::string from, std::string to, float blendSeconds, std::vector<Condition> conditions);
-	bool UpdateTransition(std::size_t index, std::string from, std::string to, float blendSeconds, Condition condition = {});
-	bool UpdateTransition(std::size_t index, std::string from, std::string to, float blendSeconds, std::vector<Condition> conditions);
-	bool RemoveTransition(std::size_t index);
+
+	// Display formatting
 	static const char* ComparatorToString(Comparator comparator);
 	static std::string OperandToString(const Operand& operand);
 
 private:
+	// State activation and transition evaluation
+	void StartInitialState();
 	void ActivateState(const std::string& stateName);
 	bool TransitionConditionPasses(const Transition& transition, const Entity& owner, float& leftValue, float& rightValue, bool& operandsResolved) const;
 	bool ResolveOperand(const Operand& operand, const Entity& owner, float& value) const;
 	bool Compare(float lhs, float rhs, Comparator comparator) const;
+
+	// State machine lookup
 	const Transition* FindTransition(const std::string& from, const std::string& to) const;
 	const State* FindState(const std::string& name) const;
 
+	// Animation runtime
 	std::unique_ptr<Animator> m_animator;
+
+	// State machine definition
 	std::vector<State> m_states;
 	std::vector<Transition> m_transitions;
+
+	// Active state
 	std::string m_initialState;
 	std::string m_currentState;
 	std::string m_desiredState;
+	float m_transitionCooldown = 0.0f;
+
+	// Transition diagnostics
 	std::string m_lastTransitionDebug;
 	std::string m_lastTransitionFrom;
 	std::string m_lastTransitionTo;
@@ -118,7 +142,6 @@ private:
 	std::string m_lastResolvedTargetState;
 	int m_lastResolvedTargetClipIndex = -1;
 	bool m_lastResolvedTargetFound = false;
-	float m_transitionCooldown = 0.0f;
 };
 
 

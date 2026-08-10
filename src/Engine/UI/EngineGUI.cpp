@@ -374,14 +374,75 @@ namespace {
 		std::vector<BindableMember> members;
 	};
 
-	bool IsAnimatorConditionMember(const BindableMember& member)
+	std::string NormalizedBindableTypeName(const BindableMember& member)
 	{
 		std::string typeName = member.typeName;
 		std::transform(typeName.begin(), typeName.end(), typeName.begin(), [](unsigned char ch)
 		{
 			return static_cast<char>(std::tolower(ch));
 		});
+		return typeName;
+	}
+
+	bool IsAnimatorConditionMember(const BindableMember& member)
+	{
+		const std::string typeName = NormalizedBindableTypeName(member);
 		return typeName == "bool" || typeName == "int" || typeName == "float" || typeName == "double";
+	}
+
+	const BindableMember* FindAnimatorOperandMember(
+		const AnimatorComponent::Operand& operand,
+		const std::vector<AnimatorBindingSource>& sources)
+	{
+		// Constants do not have metadata of their own. Their presentation is inferred
+		// from the binding on the other side of the comparison.
+		if (operand.type != AnimatorComponent::OperandType::Binding)
+		{
+			return nullptr;
+		}
+
+		// Binding identity consists of both the owning component and member name.
+		for (const AnimatorBindingSource& source : sources)
+		{
+			if (source.componentName != operand.componentName)
+			{
+				continue;
+			}
+
+			for (const BindableMember& member : source.members)
+			{
+				if (member.name == operand.memberName)
+				{
+					return &member;
+				}
+			}
+		}
+
+		return nullptr;
+	}
+
+	bool IsBooleanAnimatorOperand(
+		const AnimatorComponent::Operand& operand,
+		const std::vector<AnimatorBindingSource>& sources)
+	{
+		const BindableMember* member = FindAnimatorOperandMember(operand, sources);
+		if (!member)
+		{
+			return false;
+		}
+
+		const std::string typeName = NormalizedBindableTypeName(*member);
+		return typeName == "bool" || typeName == "boolean";
+	}
+
+	bool IsBooleanAnimatorCondition(
+		const AnimatorComponent::Condition& condition,
+		const std::vector<AnimatorBindingSource>& sources)
+	{
+		// A constant is boolean when it is compared with a boolean binding. Checking
+		// both sides also supports conditions authored in either operand order.
+		return IsBooleanAnimatorOperand(condition.left, sources) ||
+			IsBooleanAnimatorOperand(condition.right, sources);
 	}
 
 	std::vector<BindableMember> AnimatorConditionMembers(const std::vector<BindableMember>& members)
@@ -481,7 +542,9 @@ namespace {
 			ImGui::SetNextItemWidth(160.0f);
 			if (useBooleanConstant)
 			{
-				const char* booleanValues[] = { "False", "True" };
+				// Animator operands are stored as floats at runtime. Restrict boolean
+				// constants to the equivalent 0/1 values while displaying true/false.
+				const char* booleanValues[] = { "false", "true" };
 				int booleanValue = operand.constantValue != 0.0f ? 1 : 0;
 				operand.constantValue = booleanValue == 1 ? 1.0f : 0.0f;
 				if (ImGui::Combo("Value", &booleanValue, booleanValues, IM_ARRAYSIZE(booleanValues)))
@@ -1785,44 +1848,146 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 	// Keep UI state per animator so reopening the popup preserves edits.
 	AnimatorStateMachineUiState& ui = m_animatorUiState[&animator];
 	const std::vector<AnimatorBindingSource> bindingSources = AnimatorBindingSources(animator.Owner());
+	const std::vector<AnimatorComponent::State>& states = animator.States();
+	const std::vector<AnimatorComponent::Transition>& transitions = animator.Transitions();
+
+	// Copy a state name into one of the fixed-size UI buffers.
+	const auto copyStateName = [](char* destination, std::size_t destinationSize, const std::string& value)
+	{
+		std::strncpy(destination, value.c_str(), destinationSize - 1);
+		destination[destinationSize - 1] = '\0';
+	};
+
+	// Constants use the other operand's binding type as their display context.
+	// The runtime stores all resolved values as floats, including boolean 0/1.
+	const auto operandToConditionText =
+		[&](const AnimatorComponent::Operand& operand, bool booleanContext) -> std::string
+	{
+		if (!booleanContext || operand.type != AnimatorComponent::OperandType::Constant)
+		{
+			return AnimatorComponent::OperandToString(operand);
+		}
+
+		return operand.constantValue != 0.0f ? "true" : "false";
+	};
+
+	// Build the exact text shown below a transition when Condition is expanded.
+	const auto conditionToBrowserText =
+		[&](const AnimatorComponent::Condition& condition) -> std::string
+	{
+		const bool isBooleanCondition = IsBooleanAnimatorCondition(condition, bindingSources);
+		const char* comparatorText = AnimatorComponent::ComparatorToString(condition.comparator);
+
+		return operandToConditionText(condition.left, isBooleanCondition) + " " +
+			comparatorText + " " +
+			operandToConditionText(condition.right, isBooleanCondition);
+	};
+
+	// Render a single transition row with an optional condition summary.
+	const auto drawTransitionRow =
+		[&](const AnimatorComponent::Transition& transition, std::size_t transitionIndex)
+	{
+		const std::string transitionKey = transition.from + "->" + transition.to + "#" + std::to_string(transitionIndex);
+		bool& showConditions = ui.expandedTransitionConditions[transitionKey];
+		const auto drawConditionText = [&](const AnimatorComponent::Condition& condition)
+		{
+			const std::string conditionText = conditionToBrowserText(condition);
+			ImGui::TextUnformatted(conditionText.c_str());
+		};
+
+		// Transition identity and row actions.
+		ImGui::PushID(static_cast<int>(transitionIndex));
+		ImGui::Text("%s -> %s", transition.from.c_str(), transition.to.c_str());
+		ImGui::SameLine();
+		if (ImGui::SmallButton("Edit"))
+		{
+			// Copy the selected transition into the shared add/edit popup state.
+			copyStateName(ui.transitionFromState, sizeof(ui.transitionFromState), transition.from);
+			copyStateName(ui.transitionToState, sizeof(ui.transitionToState), transition.to);
+			ui.transitionBlendSeconds = transition.blendSeconds;
+			ui.conditions = transition.conditions;
+			if (ui.conditions.empty())
+			{
+				// Projects created before multi-condition transitions used this field.
+				ui.conditions.push_back(transition.condition);
+			}
+			ui.editingTransitionIndex = static_cast<int>(transitionIndex);
+			ui.addTransitionPopupInitialized = true;
+			ui.editTransitionPopupRequested = true;
+		}
+		ImGui::SameLine();
+		if (ImGui::SmallButton("Delete"))
+		{
+			ui.expandedTransitionConditions.erase(transitionKey);
+			animator.RemoveTransition(transitionIndex);
+			ImGui::PopID();
+			return;
+		}
+
+		ImGui::SameLine();
+		if (ImGui::SmallButton("Condition"))
+		{
+			// Expansion is stored per transition so rows can be inspected independently.
+			showConditions = !showConditions;
+		}
+
+		if (showConditions)
+		{
+			ImGui::Indent();
+			if (!transition.conditions.empty())
+			{
+				for (const AnimatorComponent::Condition& condition : transition.conditions)
+				{
+					drawConditionText(condition);
+				}
+			}
+			else
+			{
+				drawConditionText(transition.condition);
+			}
+			ImGui::Unindent();
+		}
+
+		ImGui::PopID();
+	};
 
 	// Seed the editor with sensible defaults when the animator changes or has no state yet.
-	if (!ui.initialized || animator.States().empty())
+	if (!ui.initialized || states.empty())
 	{
-		ui.initialStateName[0] = '\0';
+		ui.selectedAnimationName[0] = '\0';
 		ui.transitionFromState[0] = '\0';
 		ui.transitionToState[0] = '\0';
 		ui.transitionFilterFromState[0] = '\0';
 		ui.transitionFilterToState[0] = '\0';
-		if (!animator.States().empty())
+		ui.showIncomingTransitions = false;
+		ui.showOutgoingTransitions = false;
+		ui.expandedTransitionConditions.clear();
+		if (!states.empty())
 		{
-			std::strncpy(ui.initialStateName, animator.States().front().name.c_str(), sizeof(ui.initialStateName) - 1);
-			ui.initialStateName[sizeof(ui.initialStateName) - 1] = '\0';
-			std::strncpy(ui.transitionFromState, animator.States().front().name.c_str(), sizeof(ui.transitionFromState) - 1);
-			ui.transitionFromState[sizeof(ui.transitionFromState) - 1] = '\0';
-			if (animator.States().size() > 1)
+			copyStateName(ui.selectedAnimationName, sizeof(ui.selectedAnimationName), states.front().name);
+			copyStateName(ui.transitionFromState, sizeof(ui.transitionFromState), states.front().name);
+			if (states.size() > 1)
 			{
-				std::strncpy(ui.transitionToState, animator.States()[1].name.c_str(), sizeof(ui.transitionToState) - 1);
-				ui.transitionToState[sizeof(ui.transitionToState) - 1] = '\0';
+				copyStateName(ui.transitionToState, sizeof(ui.transitionToState), states[1].name);
 			}
 		}
 		ui.initialized = true;
 	}
 
-	if (ImGui::BeginPopupModal("State Machine##AquanactAnimatorStateMachine", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
-	{
-		// Initial animation selection.
-		ImGui::TextUnformatted("Initial animation");
-		if (ImGui::BeginCombo("##InitialAnimation", ui.initialStateName[0] != '\0' ? ui.initialStateName : "<select animation>"))
+		ImGui::SetNextWindowSize(ImVec2(900.0f, 0.0f), ImGuiCond_FirstUseEver);
+		if (ImGui::BeginPopupModal("State Machine##AquanactAnimatorStateMachine", nullptr))
 		{
-			for (const AnimatorComponent::State& state : animator.States())
+			// Animation selection drives the transition browser below.
+			ImGui::TextUnformatted("Animation");
+			ImGui::SetNextItemWidth(180.0f);
+			if (ImGui::BeginCombo("##SelectedAnimation", ui.selectedAnimationName[0] != '\0' ? ui.selectedAnimationName : "<select animation>"))
 			{
-				const bool selected = std::strcmp(ui.initialStateName, state.name.c_str()) == 0;
+			for (const AnimatorComponent::State& state : states)
+			{
+				const bool selected = std::strcmp(ui.selectedAnimationName, state.name.c_str()) == 0;
 				if (ImGui::Selectable(state.name.c_str(), selected))
 				{
-					std::strncpy(ui.initialStateName, state.name.c_str(), sizeof(ui.initialStateName) - 1);
-					ui.initialStateName[sizeof(ui.initialStateName) - 1] = '\0';
-					animator.SetInitialState(ui.initialStateName);
+					copyStateName(ui.selectedAnimationName, sizeof(ui.selectedAnimationName), state.name);
 				}
 				if (selected)
 				{
@@ -1833,95 +1998,67 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 		}
 
 		ImGui::Separator();
-		ImGui::TextUnformatted("Transitions");
-		// Two optional filters keep the transition list manageable in larger graphs.
-		const std::function<void(const char*, const char*, char*, const std::vector<AnimatorComponent::State>&)> drawTransitionFilter =
-			[](const char* id, const char* preview, char* selectedState, const std::vector<AnimatorComponent::State>& states)
-		{
-			if (!ImGui::BeginCombo(id, selectedState[0] != '\0' ? selectedState : preview))
-			{
-				return;
-			}
-
-			const bool anySelected = selectedState[0] == '\0';
-			if (ImGui::Selectable("<any>", anySelected))
-			{
-				selectedState[0] = '\0';
-			}
-			if (anySelected)
-			{
-				ImGui::SetItemDefaultFocus();
-			}
-			for (const AnimatorComponent::State& state : states)
-			{
-				const bool selected = std::strcmp(selectedState, state.name.c_str()) == 0;
-				if (ImGui::Selectable(state.name.c_str(), selected))
-				{
-					std::strncpy(selectedState, state.name.c_str(), 63);
-					selectedState[63] = '\0';
-				}
-				if (selected)
-				{
-					ImGui::SetItemDefaultFocus();
-				}
-			}
-			ImGui::EndCombo();
-		};
-
-		drawTransitionFilter("From##TransitionFilter", "<select from>", ui.transitionFilterFromState, animator.States());
+		ImGui::Checkbox("incoming", &ui.showIncomingTransitions);
 		ImGui::SameLine();
-		drawTransitionFilter("To##TransitionFilter", "<select to>", ui.transitionFilterToState, animator.States());
+		ImGui::Checkbox("outgoing", &ui.showOutgoingTransitions);
 
-		const bool hasTransitionFilter = ui.transitionFilterFromState[0] != '\0' || ui.transitionFilterToState[0] != '\0';
-		bool displayedTransition = false;
-		// Show the filtered transition list and let the user edit or delete entries in place.
-		for (std::size_t transitionIndex = 0; hasTransitionFilter && transitionIndex < animator.Transitions().size(); ++transitionIndex)
+		// If the selected animation is invalid, fall back to the first available state.
+		if (ui.selectedAnimationName[0] == '\0' && !states.empty())
 		{
-			const AnimatorComponent::Transition& transition = animator.Transitions()[transitionIndex];
-			if ((ui.transitionFilterFromState[0] != '\0' && transition.from != ui.transitionFilterFromState) ||
-				(ui.transitionFilterToState[0] != '\0' && transition.to != ui.transitionFilterToState))
+			copyStateName(ui.selectedAnimationName, sizeof(ui.selectedAnimationName), states.front().name);
+		}
+
+		const bool hasSelectedAnimation = ui.selectedAnimationName[0] != '\0';
+		const bool showIncomingTransitions = hasSelectedAnimation && ui.showIncomingTransitions;
+		const bool showOutgoingTransitions = hasSelectedAnimation && ui.showOutgoingTransitions;
+		ImGui::Separator();
+		const float transitionBoxWidth = ImGui::GetContentRegionAvail().x;
+		ImGui::BeginChild("AnimatorTransitionBox", ImVec2(transitionBoxWidth, 220.0f), true);
+		if (ImGui::BeginTable("AnimatorTransitionTable", 2, ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_Resizable))
+		{
+			ImGui::TableSetupColumn("incoming", ImGuiTableColumnFlags_WidthStretch, 0.5f);
+			ImGui::TableSetupColumn("outgoing", ImGuiTableColumnFlags_WidthStretch, 0.5f);
+			ImGui::TableNextRow();
+
+			ImGui::TableSetColumnIndex(0);
+			if (showIncomingTransitions)
 			{
-				continue;
-			}
-			displayedTransition = true;
-			bool editRequested = false;
-			ImGui::PushID(static_cast<int>(transitionIndex));
-			ImGui::Text("%s -> %s", transition.from.c_str(), transition.to.c_str());
-			ImGui::SameLine();
-			if (ImGui::SmallButton("Edit"))
-			{
-				std::strncpy(ui.transitionFromState, transition.from.c_str(), sizeof(ui.transitionFromState) - 1);
-				ui.transitionFromState[sizeof(ui.transitionFromState) - 1] = '\0';
-				std::strncpy(ui.transitionToState, transition.to.c_str(), sizeof(ui.transitionToState) - 1);
-				ui.transitionToState[sizeof(ui.transitionToState) - 1] = '\0';
-				ui.transitionBlendSeconds = transition.blendSeconds;
-				ui.conditions = transition.conditions;
-				if (ui.conditions.empty())
+				for (std::size_t transitionIndex = 0; transitionIndex < transitions.size(); ++transitionIndex)
 				{
-					ui.conditions.push_back(transition.condition);
+					const AnimatorComponent::Transition& transition = transitions[transitionIndex];
+					if (transition.to != ui.selectedAnimationName)
+					{
+						continue;
+					}
+					drawTransitionRow(transition, transitionIndex);
 				}
-				ui.editingTransitionIndex = static_cast<int>(transitionIndex);
-				ui.addTransitionPopupInitialized = true;
-				editRequested = true;
 			}
-			ImGui::SameLine();
-			if (ImGui::SmallButton("Delete"))
+
+			ImGui::TableSetColumnIndex(1);
+			if (showOutgoingTransitions)
 			{
-				animator.RemoveTransition(transitionIndex);
-				ImGui::PopID();
-				break;
+				for (std::size_t transitionIndex = 0; transitionIndex < transitions.size(); ++transitionIndex)
+				{
+					const AnimatorComponent::Transition& transition = transitions[transitionIndex];
+					if (transition.from != ui.selectedAnimationName)
+					{
+						continue;
+					}
+					drawTransitionRow(transition, transitionIndex);
+				}
 			}
-			ImGui::PopID();
-			if (editRequested)
-			{
-				ImGui::OpenPopup("Add Transition##AquanactAnimatorStateMachine");
-			}
+
+			ImGui::EndTable();
 		}
-		if (hasTransitionFilter && !displayedTransition)
+		ImGui::EndChild();
+
+		if (ui.editTransitionPopupRequested)
 		{
-			ImGui::TextUnformatted("<no matching transitions>");
+			ImGui::OpenPopup("Add Transition##AquanactAnimatorStateMachine");
+			ui.editTransitionPopupRequested = false;
 		}
 
+		// Add or edit a transition in a modal popup.
 		ImGui::Separator();
 		if (ImGui::Button("Create Transition"))
 		{
@@ -1931,19 +2068,18 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 			ImGui::OpenPopup("Add Transition##AquanactAnimatorStateMachine");
 		}
 
-		if (ImGui::BeginPopupModal("Add Transition##AquanactAnimatorStateMachine", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+		ImGui::SetNextWindowSize(ImVec2(720.0f, 0.0f), ImGuiCond_FirstUseEver);
+		if (ImGui::BeginPopupModal("Add Transition##AquanactAnimatorStateMachine", nullptr))
 		{
 			// Initialize the add/edit popup only once per open cycle.
 			if (!ui.addTransitionPopupInitialized)
 			{
-				if (!animator.States().empty())
+				if (!states.empty())
 				{
-					std::strncpy(ui.transitionFromState, animator.States().front().name.c_str(), sizeof(ui.transitionFromState) - 1);
-					ui.transitionFromState[sizeof(ui.transitionFromState) - 1] = '\0';
-					if (animator.States().size() > 1)
+					copyStateName(ui.transitionFromState, sizeof(ui.transitionFromState), states.front().name);
+					if (states.size() > 1)
 					{
-						std::strncpy(ui.transitionToState, animator.States()[1].name.c_str(), sizeof(ui.transitionToState) - 1);
-						ui.transitionToState[sizeof(ui.transitionToState) - 1] = '\0';
+						copyStateName(ui.transitionToState, sizeof(ui.transitionToState), states[1].name);
 					}
 				}
 				ui.conditions.clear();
@@ -1957,13 +2093,12 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 			ImGui::TextUnformatted("From");
 			if (ImGui::BeginCombo("##TransitionFrom", ui.transitionFromState[0] != '\0' ? ui.transitionFromState : "<from>"))
 			{
-				for (const AnimatorComponent::State& state : animator.States())
+				for (const AnimatorComponent::State& state : states)
 				{
 					const bool selected = std::strcmp(ui.transitionFromState, state.name.c_str()) == 0;
 					if (ImGui::Selectable(state.name.c_str(), selected))
 					{
-						std::strncpy(ui.transitionFromState, state.name.c_str(), sizeof(ui.transitionFromState) - 1);
-						ui.transitionFromState[sizeof(ui.transitionFromState) - 1] = '\0';
+						copyStateName(ui.transitionFromState, sizeof(ui.transitionFromState), state.name);
 					}
 					if (selected)
 					{
@@ -1976,13 +2111,12 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 			ImGui::TextUnformatted("To");
 			if (ImGui::BeginCombo("##TransitionTo", ui.transitionToState[0] != '\0' ? ui.transitionToState : "<to>"))
 			{
-				for (const AnimatorComponent::State& state : animator.States())
+				for (const AnimatorComponent::State& state : states)
 				{
 					const bool selected = std::strcmp(ui.transitionToState, state.name.c_str()) == 0;
 					if (ImGui::Selectable(state.name.c_str(), selected))
 					{
-						std::strncpy(ui.transitionToState, state.name.c_str(), sizeof(ui.transitionToState) - 1);
-						ui.transitionToState[sizeof(ui.transitionToState) - 1] = '\0';
+						copyStateName(ui.transitionToState, sizeof(ui.transitionToState), state.name);
 					}
 					if (selected)
 					{
@@ -1996,35 +2130,6 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 			ImGui::InputFloat("Blend Seconds", &ui.transitionBlendSeconds, 0.0f, 0.0f, "%.2f");
 			ImGui::Separator();
 
-			// Keep the predicate explicit so the popup logic reads as "is this binding boolean?"
-			const std::function<bool(const AnimatorComponent::Operand&)> isBooleanBinding =
-				[&bindingSources](const AnimatorComponent::Operand& operand) -> bool
-			{
-
-				if (operand.type != AnimatorComponent::OperandType::Binding)
-				{
-					return false;
-				}
-
-				for (const AnimatorBindingSource& source : bindingSources)
-				{
-					if (source.componentName != operand.componentName)
-					{
-						continue;
-					}
-
-					for (const BindableMember& member : source.members)
-					{
-						if (member.name == operand.memberName)
-						{
-							return member.typeName == "bool" || member.typeName == "boolean";
-						}
-					}
-				}
-
-				return false;
-			};
-
 			// Each condition is edited as a full left/op/right triplet.
 			for (std::size_t conditionIndex = 0; conditionIndex < ui.conditions.size(); ++conditionIndex)
 			{
@@ -2036,11 +2141,13 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 				ImGui::PushID(static_cast<int>(conditionIndex));
 				ImGui::TextUnformatted("Left Operand");
 				ImGui::PushID("Left");
-				DrawAnimatorOperandEditor("", condition.left, bindingSources);
+				const bool isBooleanCondition = IsBooleanAnimatorCondition(condition, bindingSources);
+				DrawAnimatorOperandEditor("", condition.left, bindingSources, isBooleanCondition);
 				ImGui::PopID();
 
-				const bool booleanCondition = isBooleanBinding(condition.left) || isBooleanBinding(condition.right);
-				if (booleanCondition && condition.comparator != AnimatorComponent::Comparator::Equal && condition.comparator != AnimatorComponent::Comparator::NotEqual)
+				// Ordering comparisons are not meaningful for booleans. Normalize old or
+				// externally-authored boolean conditions before drawing the dropdown.
+				if (isBooleanCondition && condition.comparator != AnimatorComponent::Comparator::Equal && condition.comparator != AnimatorComponent::Comparator::NotEqual)
 				{
 					condition.comparator = AnimatorComponent::Comparator::Equal;
 				}
@@ -2048,8 +2155,9 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 				ImGui::TextUnformatted("Comparator");
 				const char* comparatorOptions[] = { "Equal", "Not Equal", "Greater", "Less", "Greater Equal", "Less Equal" };
 				int comparatorIndex = static_cast<int>(condition.comparator);
-				if (booleanCondition)
+				if (isBooleanCondition)
 				{
+					// Boolean conditions intentionally expose only equality operators.
 					const char* booleanComparatorOptions[] = { "Equal", "Not Equal" };
 					comparatorIndex = condition.comparator == AnimatorComponent::Comparator::NotEqual ? 1 : 0;
 					if (ImGui::Combo("##Comparator", &comparatorIndex, booleanComparatorOptions, IM_ARRAYSIZE(booleanComparatorOptions)))
@@ -2065,18 +2173,12 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 
 				ImGui::TextUnformatted("Right Operand");
 				ImGui::PushID("Right");
-				DrawAnimatorOperandEditor("", condition.right, bindingSources, isBooleanBinding(condition.left));
+				DrawAnimatorOperandEditor("", condition.right, bindingSources, isBooleanCondition);
 				ImGui::PopID();
 				ImGui::Separator();
-				const bool booleanConstant = isBooleanBinding(condition.left)
-					&& condition.right.type == AnimatorComponent::OperandType::Constant;
-				const std::string rightOperandText = booleanConstant
-					? (condition.right.constantValue != 0.0f ? "true" : "false")
-					: AnimatorComponent::OperandToString(condition.right);
-				ImGui::Text("Condition %zu: %s %s %s", conditionIndex + 1,
-					AnimatorComponent::OperandToString(condition.left).c_str(),
-					AnimatorComponent::ComparatorToString(condition.comparator),
-					rightOperandText.c_str());
+				// Preview the condition with the same formatter used by transition rows.
+				const std::string conditionPreview = conditionToBrowserText(condition);
+				ImGui::TextUnformatted(conditionPreview.c_str());
 				ImGui::Separator();
 				if (ui.conditions.size() > 1 && ImGui::SmallButton("Remove Condition"))
 				{
@@ -2120,6 +2222,7 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 			ImGui::EndPopup();
 		}
 
+		// Close the state machine editor and clear cached UI state.
 		ImGui::Separator();
 		if (ImGui::Button("Close"))
 		{

@@ -81,14 +81,18 @@ private:
 	// Per-animator UI state
 	struct AnimatorStateMachineUiState {
 		bool initialized = false;
-		char initialStateName[64] = "";
+		char selectedAnimationName[64] = "";
 		char transitionFromState[64] = "";
 		char transitionToState[64] = "";
 		char transitionFilterFromState[64] = "";
 		char transitionFilterToState[64] = "";
+		bool showIncomingTransitions = false;
+		bool showOutgoingTransitions = false;
 		float transitionBlendSeconds = 0.25f;
 		bool addTransitionPopupInitialized = false;
+		bool editTransitionPopupRequested = false;
 		int editingTransitionIndex = -1;
+		std::map<std::string, bool> expandedTransitionConditions;
 		std::vector<AnimatorComponent::Condition> conditions;
 	};
 
