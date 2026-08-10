@@ -115,13 +115,18 @@ private:
 	bool m_addCodeFilePopupRequested = false;
 	bool m_newLevelPopupRequested = false;
 	bool m_animatorStateMachinePopupRequested = false;
+	bool m_componentDeletePopupRequested = false;
+	bool m_createAndBuildPopupRequested = false;
 	bool m_addCodeFileCreated = false;
 
 	// Cached input and status text
-	char m_newCodeFileName[128] = "PlayerHealth";
+	char m_newCodeFileName[128] = "";
 	char m_newLevelName[128] = "Level1";
 	std::string m_addCodeFileStatusMessage;
 	std::string m_newLevelStatusMessage;
+	std::string m_componentTypePendingDelete;
+	std::string m_createAndBuildClassName;
+	int m_createAndBuildEntityIndex = 0;
 
 	// Animator UI state cache
 	std::unordered_map<AnimatorComponent*, AnimatorStateMachineUiState> m_animatorUiState;

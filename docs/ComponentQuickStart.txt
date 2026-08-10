@@ -1,0 +1,59 @@
+Component Quick Start
+
+1. Create a new component
+
+Add two files:
+
+    include/Game/MyComponent.h
+    src/Game/MyComponent.cpp
+
+Your class should inherit from `Component` and implement `Name()`.
+
+2. Register it
+
+Register the type in the component registry so the editor can create it.
+
+That makes it appear in the Entity window under `Add Component`.
+
+3. Expose data to GameGUI
+
+Use the bindable macros for anything the UI should read.
+
+Use a value when the data is stored in a member:
+
+    #define MY_COMPONENT_BINDABLES(VALUE, FUNCTION) \
+        VALUE(m_health)
+    AQUA_DECLARE_BINDABLES(MY_COMPONENT_BINDABLES)
+    #undef MY_COMPONENT_BINDABLES
+
+Use a function when the value is computed:
+
+    #define MY_COMPONENT_BINDABLES(VALUE, FUNCTION) \
+        FUNCTION(Health)
+    AQUA_DECLARE_BINDABLES(MY_COMPONENT_BINDABLES)
+    #undef MY_COMPONENT_BINDABLES
+
+4. What you can do after it exists
+
+- attach it to entities from the Entity window
+- remove it from entities
+- edit it in custom inspector code
+- bind its values or functions into GameGUI widgets
+- use bindable events for one-shot signals
+
+5. Add or delete component classes from the editor
+
+The top `Code` menu can:
+
+- create a new component class
+- update the registry and build list
+- delete a component type from the project
+
+Deleting a type removes live instances from loaded scenes first, then removes
+the registry entry and source files.
+
+6. Rule of thumb
+
+- use `VALUE(...)` for stored state
+- use `FUNCTION(...)` for computed values
+- use events when something happened once, not when the UI needs current state

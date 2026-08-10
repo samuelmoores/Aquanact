@@ -1,0 +1,224 @@
+Adding a New Component
+
+This project treats a component as a normal C++ class that inherits from `Component`.
+Once it exists, the engine can create it, show it in the Entity window, serialize it,
+and use its bindable data in GameGUI.
+
+1. Create the component files
+
+Make a header and source file in `include/Game/` and `src/Game/`.
+
+Example:
+
+    include/Game/MyComponent.h
+    src/Game/MyComponent.cpp
+
+Your component should inherit from `Component` and implement at least:
+
+    const char* Name() const override
+
+If the component needs startup logic, update logic, or first-frame setup, override:
+
+    void startUp(Entity&) override
+    void Update(Entity&, float) override
+    void FirstFrame(Entity&) override
+
+2. Register the component type
+
+The engine uses `ComponentFactory` to create components by name.
+That means the type name must be registered once so the editor can create it.
+
+Component registration is normally kept in:
+
+    src/Engine/Core/ComponentRegistry.cpp
+
+Each registered type appears in the Entity window "Add Component" dropdown.
+
+3. Expose bindable values
+
+If you want GameGUI to read a member directly, mark it with the bindable macro
+pattern used by the project.
+
+The binding helpers in `Engine/Core/Component.h` do two jobs at once:
+
+- they declare the editor metadata for the component
+- they generate the lookup code used by the runtime and the UI
+
+That means the binding list in your component header is the single source of
+truth for the values the editor can discover.
+
+The idea is:
+
+- bindable values are sampled state
+- GameGUI polls them when it needs to display or drive a widget
+
+Typical use case:
+
+- a health number
+- a speed value
+- a boolean like "is moving"
+
+If the value changes over time, call the component's bindable value dispatch
+helper after you update it so the UI can refresh cleanly.
+
+The current binding path is intentionally simple:
+
+- the editor expects a value name
+- the component returns the current value for that name
+- the runtime dispatches a change notification on the matching channel
+
+Example:
+
+    #pragma once
+
+    #include "Engine/Core/Component.h"
+
+    class PlayerHealth final : public Component
+    {
+    public:
+        const char* Name() const override { return "PlayerHealth"; }
+
+        int Health() const { return m_health; }
+        void SetHealth(int health);
+
+        int MaxHealth() const { return m_maxHealth; }
+        void SetMaxHealth(int maxHealth);
+
+        #define PLAYER_HEALTH_BINDABLES(VALUE, FUNCTION) \
+            VALUE(m_health) \
+            VALUE(m_maxHealth) \
+            FUNCTION(Health)
+        AQUA_DECLARE_BINDABLES(PLAYER_HEALTH_BINDABLES)
+        #undef PLAYER_HEALTH_BINDABLES
+
+    private:
+        int m_health = 100;
+        int m_maxHealth = 100;
+    };
+
+This means:
+
+- `VALUE(m_health)` exposes the stored member
+- `FUNCTION(Health)` exposes the getter return value
+- the editor can read either one without custom UI code
+
+Use the list macro as the only place where you enumerate exposed values.
+That keeps the metadata and the lookup code in sync.
+
+4. Expose bindable functions
+
+If the value is computed rather than stored directly, expose a getter function
+instead of a member.
+
+Typical use case:
+
+- `Health()` returns the current health
+- `MaxHealth()` returns the maximum health
+- a computed progress ratio
+
+Use a function binding when the value should be derived from component state
+instead of stored separately.
+
+Function bindings are useful when the UI should read a computed result rather
+than a raw member field.
+
+Example:
+
+    int AmmoCount() const { return m_totalAmmo - m_spentAmmo; }
+
+    #define WEAPON_BINDABLES(VALUE, FUNCTION) \
+        FUNCTION(AmmoCount)
+    AQUA_DECLARE_BINDABLES(WEAPON_BINDABLES)
+    #undef WEAPON_BINDABLES
+
+5. Use bindable events only for one-shot notifications
+
+Events are different from values.
+
+Use a bindable event when the UI or gameplay logic needs to know that something
+happened once, not when it needs a continually sampled value.
+
+Typical use case:
+
+- damage taken
+- animation finished
+- door opened
+
+Use a bindable value when the UI needs the current state every frame.
+Use a bindable event when the UI or runtime only needs a trigger.
+
+The event helpers follow the same pattern as the value helpers:
+
+- the component declares the event names once
+- the editor uses that metadata to build pickers
+- the runtime dispatches the corresponding channel when the event fires
+
+6. What the editor can do with the component
+
+Once the component is registered:
+
+- it appears in the Entity window add-component dropdown
+- it can be attached to an entity
+- it can be removed from an entity
+- it can be edited in the Entity window if the inspector knows about it
+- its bindable values can be used by GameGUI
+- its bindable events can be used by GameGUI when you expose them
+
+7. What the game programmer should edit
+
+In practice, a new gameplay component usually needs these pieces:
+
+- the component class itself
+- a registration entry in the component registry
+- any editor code needed to show custom controls
+- bindable values or functions for GameGUI
+- optional bindable events for one-shot actions
+
+8. If you delete a component type later
+
+Deleting a component type removes it from the registry and project source.
+Before confirming deletion, the editor also removes any live instances from
+loaded scenes so the project does not keep stale references around.
+
+That means deleting a type is a project-level action, not just an entity-level action.
+
+9. How the Code top menu works
+
+The editor's `Code` top menu is the place where the game programmer creates and
+removes gameplay component classes.
+
+In the current editor:
+
+- `Add Code File` generates a new component header and source file
+- it also updates the generated game source list
+- it updates the component registry so the new type appears in the Entity window
+- `Delete Component Type` removes the selected component type from the registry
+  and deletes the matching source files
+
+When you create a component through the menu, the editor uses the current game
+source folder and writes the boilerplate for you. That boilerplate already shows
+where to put `AQUA_DECLARE_BINDABLES(...)` and how to add bindable values or
+functions.
+
+When you delete a component through the menu, the editor first removes any live
+instances from loaded scenes, then unregisters the type, then deletes the files,
+and finally updates the registry/build lists so the project stays consistent.
+
+The generator and the maintenance helpers are separate concerns now:
+
+- code generation creates the new component scaffold
+- maintenance helpers rebuild the registry and generated source list from the
+  current source tree
+- deletion uses the same maintenance path so stale types do not remain in the
+  build state
+
+Summary
+
+If you want a new gameplay component to show up in the editor, the minimum is:
+
+- create the class
+- register the type
+- expose any state you want the UI to read
+
+If you want the UI to react to it, add bindable values, bindable functions, or
+bindable events depending on whether the data is sampled state or a one-shot signal.

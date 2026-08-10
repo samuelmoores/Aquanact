@@ -1,103 +1,10 @@
 #include "Game/PlayerHealth.h"
 
-#include "Engine/Core/EventManager.h"
-#include "Engine/Core/ComponentFactory.h"
-#include "Engine/Core/Root.h"
-#include "Engine/Core/Entity.h"
-
-#include <iostream>
-
-namespace
-{
-	const bool registeredPlayerHealth = []()
-	{
-		ComponentFactory::Instance().Register("PlayerHealth", [](Entity&) -> std::unique_ptr<Component>
-		{
-			return std::unique_ptr<Component>(new PlayerHealth());
-		});
-		return true;
-	}();
-}
-
-std::string PlayerHealth::GetHealthText() const
-{
-	return std::to_string(m_health) + "/" + std::to_string(m_maxHealth);
-}
-
-std::vector<BindableMember> PlayerHealth::GetBindableMembers() const
-{
-	return {
-		{ "Health", "Health", "int", BindableMember::Kind::Function },
-		{ "MaxHealth", "Max Health", "int", BindableMember::Kind::Function },
-	};
-}
-
-bool PlayerHealth::TryGetBindableValue(const std::string& memberName, float& value) const
-{
-	if (memberName == "Health")
-	{
-		value = static_cast<float>(m_health);
-		return true;
-	}
-	if (memberName == "MaxHealth")
-	{
-		value = static_cast<float>(m_maxHealth);
-		return true;
-	}
-	return false;
-}
-
-std::vector<BindableEvent> PlayerHealth::GetBindableEvents() const
-{
-	return {
-		{ "HealthChanged", "Health Changed" }
-	};
-}
-
-std::string PlayerHealth::GetBindableEventText(const std::string& eventName) const
-{
-	if (eventName == "HealthChanged")
-	{
-		return GetHealthText();
-	}
-	return {};
-}
-
-void PlayerHealth::SetHealth(int health)
-{
-	m_health = health;
-	if (m_health < 0)
-	{
-		m_health = 0;
-	}
-	DispatchBindableValueChanged("Health");
-	DispatchBindableEvent("HealthChanged");
-}
-
-void PlayerHealth::SetMaxHealth(int maxHealth)
-{
-	m_maxHealth = maxHealth;
-	DispatchBindableValueChanged("MaxHealth");
-	DispatchBindableEvent("HealthChanged");
-}
-
-void PlayerHealth::SubscribeToDamage()
-{
-	Root::Current().Events().GetEvent("Damage").Subscribe(this, [this]()
-	{
-		SetHealth(m_health - 90);
-		std::cout << "PlayerHealth received Damage and now has " << m_health << " health\n";
-	});
-}
-
 void PlayerHealth::startUp(Entity&)
 {
-	SubscribeToDamage();
-	SetHealth(m_maxHealth);
-	std::cout << "PlayerHealth subbed to Damage\n";
+	m_health = 100.0f;
 }
 
-void PlayerHealth::FirstFrame(Entity&)
-{
-	
-}
+// Bindable metadata stays in the header through the PlayerHealth_BINDABLES
+// macro list and AQUA_DECLARE_BINDABLES(...). This source file stays empty
+// unless the component needs startup logic or custom runtime behavior.

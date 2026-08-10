@@ -23,6 +23,7 @@ enum class PhysicsColliderShape
 class Entity
 {
 public:
+	// Entities own their components and drive their lifecycle in a fixed order.
 	Entity(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces);
 	Entity(const char* modelFile, bool addDefaultComponents = true);
 	explicit Entity(std::string name = "Entity");
@@ -33,6 +34,8 @@ public:
 	unsigned int Id() const { return m_id; }
 	void SetId(unsigned int id);
 
+	// Entity-level bindables are separate from component bindables so the UI
+	// can query core transform or gameplay state directly from the entity.
 	virtual const char* TypeName() const { return "Entity"; }
 	virtual std::vector<BindableMember> GetBindableMembers() const { return {}; }
 	virtual bool TryGetBindableValue(const std::string&, float&) const { return false; }
@@ -45,6 +48,8 @@ public:
 	ShaderProgram* GetShader();
 	AnimatorComponent* GetAnimatorComponent();
 	Controller* GetController();
+	// These return snapshots so callers can iterate safely while other code may
+	// still be mutating the underlying owned component list.
 	std::vector<Component*> Components();
 	std::vector<const Component*> Components() const;
 	Component* GetComponentByName(const std::string& name);
@@ -56,6 +61,8 @@ public:
 	const T* GetComponent() const;
 	template<typename T, typename... Args>
 	T* AddComponent(Args&&... args);
+	// Ownership transfer is explicit: the entity takes responsibility for the
+	// component and sets the owner pointer before storing it.
 	Component* AddComponent(std::unique_ptr<Component> component);
 	bool RemoveComponent(Component* component);
 	template<typename T>

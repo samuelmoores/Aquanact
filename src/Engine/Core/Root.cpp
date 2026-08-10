@@ -15,6 +15,7 @@
 #include "Engine/Core/InputManager.h"
 #include "Engine/Core/FrameProfiler.h"
 #include "Engine/Core/GLHeaders.h"
+#include "Game/ComponentRegistry.h"
 
 #include <chrono>
 #include <filesystem>
@@ -125,6 +126,7 @@ void Root::startUp(int argc, char** argv)
 	m_inputManager->startUp(*m_input);
 	m_debug->startUp();
 	m_fileManager->startUp();
+	RegisterGameComponents();
 	m_projectManager->LoadProject(DefaultProjectPath(), *m_sceneManager);
 	m_sceneManager->startUp();
 

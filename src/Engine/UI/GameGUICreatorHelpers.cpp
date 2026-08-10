@@ -463,12 +463,14 @@ namespace GameGUICreatorHelpers {
 		const char* componentLabel = widget.bindComponent.empty() ? "<Select Component>" : widget.bindComponent.c_str();
 
 		// ******** Entity's component select combo box *********
-		// set widgets bound component
+		// Show every component here so the user can see what is attached to the
+		// entity. The value dropdown below will explain whether that component
+		// actually exposes any numeric bindable data.
 		if (ImGui::BeginCombo("Component", componentLabel))
 		{
 			for (Component* component : boundEntity ? boundEntity->Components() : std::vector<Component*>{})
 			{
-				if (!component || component->GetBindableMembers().empty())
+				if (!component)
 				{
 					continue;
 				}
@@ -497,32 +499,51 @@ namespace GameGUICreatorHelpers {
 		ImGui::BeginDisabled(!boundComponent);
 		const char* memberLabel = widget.bindMember.empty() ? "<Select Value>" : widget.bindMember.c_str();
 		std::vector<BindableMember> bindableMembers = boundComponent ? boundComponent->GetBindableMembers() : std::vector<BindableMember>{};
+		bool hasNumericBindableValue = false;
+		for (const BindableMember& member : bindableMembers)
+		{
+			if (member.typeName == "int" || member.typeName == "float")
+			{
+				hasNumericBindableValue = true;
+				break;
+			}
+		}
 
 		// ******** Components's value select combo box *********
-		// set widgets value component
+		// If the component has no numeric bindable values, show a disabled
+		// placeholder instead of leaving the user wondering why the list is empty.
 		if (ImGui::BeginCombo("Value", memberLabel))
 		{
-			for (const BindableMember& member : bindableMembers)
+			if (!hasNumericBindableValue)
 			{
-				// Progress bars only bind to numeric members.
-				if (member.typeName != "int" && member.typeName != "float")
+				ImGui::BeginDisabled(true);
+				ImGui::Selectable("No numeric bindable values available", false);
+				ImGui::EndDisabled();
+			}
+			else
+			{
+				for (const BindableMember& member : bindableMembers)
 				{
-					continue;
-				}
+					// Progress bars only bind to numeric members.
+					if (member.typeName != "int" && member.typeName != "float")
+					{
+						continue;
+					}
 
-				const bool selected = widget.bindMember == member.name;
-				const char* label = member.displayName.empty() ? member.name.c_str() : member.displayName.c_str();
-				if (ImGui::Selectable(label, selected))
-				{
-					// Selecting the member completes the binding chain.
-					widget.bindMember = member.name;
-					changed = true;
-				}
+					const bool selected = widget.bindMember == member.name;
+					const char* label = member.displayName.empty() ? member.name.c_str() : member.displayName.c_str();
+					if (ImGui::Selectable(label, selected))
+					{
+						// Selecting the member completes the binding chain.
+						widget.bindMember = member.name;
+						changed = true;
+					}
 
-				// Keep the active member visible when the list opens.
-				if (selected)
-				{
-					ImGui::SetItemDefaultFocus();
+					// Keep the active member visible when the list opens.
+					if (selected)
+					{
+						ImGui::SetItemDefaultFocus();
+					}
 				}
 			}
 			ImGui::EndCombo();

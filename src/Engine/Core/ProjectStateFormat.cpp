@@ -9,7 +9,6 @@
 #include "Engine/Core/Controller.h"
 #include "Engine/Core/PlayerController.h"
 #include "Game/Enemy.h"
-#include "Game/PlayerHealth.h"
 
 #include <glm/glm.hpp>
 

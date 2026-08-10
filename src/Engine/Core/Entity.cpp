@@ -17,6 +17,8 @@ namespace
 
 	std::vector<Component*> OrderedComponents(Entity& entity)
 	{
+		// Take a snapshot before sorting so update order is deterministic even if
+		// components are added or removed elsewhere during the frame.
 		std::vector<Component*> components = entity.Components();
 		std::stable_sort(components.begin(), components.end(), [](const Component* left, const Component* right)
 		{
@@ -29,6 +31,8 @@ namespace
 Entity::Entity(std::string name)
 	: m_name(std::move(name))
 {
+	// Each entity gets a monotonically increasing id so runtime systems can
+	// distinguish instances even when the display name changes.
 	m_id = g_nextEntityId++;
 }
 
@@ -51,6 +55,8 @@ Entity::Entity(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 
 Entity::Entity(const char* modelFile, bool addDefaultComponents)
 {
+	// Imported models are converted into entities with a mesh, shader, and any
+	// default components required by the asset type.
 	m_id = g_nextEntityId++;
 	Root::Current().Debugger().LogTagged("MeshLoad", std::string("Importing model: ") + modelFile);
 	auto model = ModelImporter().Import(modelFile, true);
@@ -126,6 +132,8 @@ Component* Entity::AddComponent(std::unique_ptr<Component> component)
 		return nullptr;
 	}
 
+	// Store the owner before the component enters the entity so any lifecycle
+	// code sees the correct entity pointer immediately.
 	component->SetOwner(this);
 	Component* raw = component.get();
 	m_components.push_back(std::move(component));
@@ -162,6 +170,8 @@ bool Entity::RemoveComponent(Component* component)
 		return false;
 	}
 
+	// Removal is by pointer identity because the same component type may appear
+	// multiple times in the future.
 	const auto it = std::find_if(m_components.begin(), m_components.end(), [component](const auto& ownedComponent)
 	{
 		return ownedComponent.get() == component;
@@ -177,6 +187,8 @@ bool Entity::RemoveComponent(Component* component)
 
 void Entity::UpdateComponents(float dt)
 {
+	// Update all components in execution order so components with dependencies
+	// can opt into predictable ordering.
 	for (Component* component : OrderedComponents(*this))
 	{
 		component->Update(*this, dt);
@@ -185,6 +197,8 @@ void Entity::UpdateComponents(float dt)
 
 void Entity::UpdateControllers(float dt)
 {
+	// Controllers are updated separately because the gameplay loop treats them
+	// as an input/decision phase before the rest of the entity logic.
 	for (Component* component : OrderedComponents(*this))
 	{
 		if (dynamic_cast<Controller*>(component))
@@ -196,6 +210,8 @@ void Entity::UpdateControllers(float dt)
 
 void Entity::UpdateNonControllerComponents(float dt)
 {
+	// Non-controller components get the same ordered update pass, but after the
+	// controller-specific phase has already run.
 	for (Component* component : OrderedComponents(*this))
 	{
 		if (!dynamic_cast<Controller*>(component))
@@ -207,6 +223,8 @@ void Entity::UpdateNonControllerComponents(float dt)
 
 void Entity::FirstFrameComponents()
 {
+	// First-frame hooks are dispatched after startup so components can do any
+	// initialization that depends on the rest of the entity being present.
 	for (Component* component : OrderedComponents(*this))
 	{
 		component->FirstFrame(*this);
@@ -214,6 +232,8 @@ void Entity::FirstFrameComponents()
 }
 void Entity::startUp()
 {
+	// Startup is also ordered, so dependent components can rely on a stable
+	// execution sequence during initialization.
 	for (Component* component : OrderedComponents(*this))
 	{
 		component->startUp(*this);

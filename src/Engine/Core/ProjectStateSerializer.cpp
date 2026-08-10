@@ -13,7 +13,6 @@
 #include "Engine/Core/PlayerController.h"
 #include "Engine/Core/RenderManager.h"
 #include "Game/Enemy.h"
-#include "Game/PlayerHealth.h"
 
 #include <glm/glm.hpp>
 #include <istream>
@@ -38,7 +37,7 @@ namespace ProjectStateSerializer {
 
 		bool IsComponentType(const std::string& type)
 		{
-			return type == "controller" || type == "playercontroller" || type == "playerhealth" || type == "enemy" || type == "animator";
+			return type == "controller" || type == "playercontroller" || type == "enemy" || type == "animator";
 		}
 
 		struct ComponentRecordLayout
@@ -99,12 +98,6 @@ namespace ProjectStateSerializer {
 					AppendComponentLine(contents, projectPath, object, "controller");
 					contents += ";" + std::to_string(controller->MoveSpeed());
 					contents += ";" + std::to_string(controller->MovementDeadzone()) + "\n";
-				}
-				else if (const PlayerHealth* playerHealth = dynamic_cast<const PlayerHealth*>(component))
-				{
-					AppendComponentLine(contents, projectPath, object, "playerhealth");
-					contents += ";" + std::to_string(playerHealth->Health());
-					contents += ";" + std::to_string(playerHealth->MaxHealth()) + "\n";
 				}
 				else if (dynamic_cast<const Enemy*>(component))
 				{
@@ -207,377 +200,365 @@ namespace ProjectStateSerializer {
 				continue;
 			}
 
-			const std::vector<std::string> fields = ProjectStateFormat::SplitFields(line);
-			if ((fields.size() >= 7 && fields[0] == "gamecamera") || (fields.size() == 3 && fields[0] == "editorview") || (fields.size() >= 3 && fields[0] == "debugwindows") || ((fields.size() >= 8 && fields.size() <= 11) && fields[0] == "sunlight") || ((fields.size() >= 12 && fields.size() <= 15) && fields[0] == "pointlight") || (fields.size() == 2 && fields[0] == "imguilayout"))
+			try
 			{
-				if (fields.size() >= 7 && fields[0] == "gamecamera")
+				const std::vector<std::string> fields = ProjectStateFormat::SplitFields(line);
+				if ((fields.size() >= 7 && fields[0] == "gamecamera") || (fields.size() == 3 && fields[0] == "editorview") || (fields.size() >= 3 && fields[0] == "debugwindows") || ((fields.size() >= 8 && fields.size() <= 11) && fields[0] == "sunlight") || ((fields.size() >= 12 && fields.size() <= 15) && fields[0] == "pointlight") || (fields.size() == 2 && fields[0] == "imguilayout"))
 				{
-					if (fields.size() >= 7)
+					if (fields.size() >= 7 && fields[0] == "gamecamera")
 					{
 						renderState.gameCameraPosition = glm::vec3(std::stof(fields[1]), std::stof(fields[2]), std::stof(fields[3]));
 						renderState.gameCameraFacing = glm::vec3(std::stof(fields[4]), std::stof(fields[5]), std::stof(fields[6]));
-					}
-					if (fields.size() >= 8)
-					{
-						renderState.gameCameraRadius = std::stof(fields[7]);
-					}
-					if (fields.size() >= 9)
-					{
-						renderState.gameCameraYaw = std::stof(fields[8]);
-					}
-					if (fields.size() >= 10)
-					{
-						renderState.gameCameraPitch = std::stof(fields[9]);
-					}
-					if (fields.size() >= 11)
-					{
-						try
+						if (fields.size() >= 8)
 						{
-							renderState.gameCameraTargetId = static_cast<unsigned int>(std::stoul(fields[10]));
-							renderState.gameCameraHasTarget = renderState.gameCameraTargetId != 0;
+							renderState.gameCameraRadius = std::stof(fields[7]);
 						}
-						catch (...)
+						if (fields.size() >= 9)
 						{
-							renderState.gameCameraTargetId = 0;
-							renderState.gameCameraHasTarget = false;
-							Root::Current().Debugger().LogTagged(Debug::Severity::Warning, "ProjectLoad", "Failed to parse camera target id from gamecamera line");
+							renderState.gameCameraYaw = std::stof(fields[8]);
+						}
+						if (fields.size() >= 10)
+						{
+							renderState.gameCameraPitch = std::stof(fields[9]);
+						}
+						if (fields.size() >= 11)
+						{
+							try
+							{
+								renderState.gameCameraTargetId = static_cast<unsigned int>(std::stoul(fields[10]));
+								renderState.gameCameraHasTarget = renderState.gameCameraTargetId != 0;
+							}
+							catch (...)
+							{
+								renderState.gameCameraTargetId = 0;
+								renderState.gameCameraHasTarget = false;
+							}
+						}
+						if (fields.size() >= 12)
+						{
+							renderState.gameCameraColliderRadius = std::stof(fields[11]);
 						}
 					}
-					if (fields.size() >= 12)
+					else if (fields.size() == 3 && fields[0] == "editorview")
 					{
-						renderState.gameCameraColliderRadius = std::stof(fields[11]);
+						renderState.editorShowAxis = fields[1] == "1" || fields[1] == "true" || fields[1] == "True";
+						renderState.editorShowGrid = fields[2] == "1" || fields[2] == "true" || fields[2] == "True";
 					}
-				}
-				else if (fields.size() == 3 && fields[0] == "editorview")
-				{
-					renderState.editorShowAxis = fields[1] == "1" || fields[1] == "true" || fields[1] == "True";
-					renderState.editorShowGrid = fields[2] == "1" || fields[2] == "true" || fields[2] == "True";
-				}
-				else if (fields.size() >= 3 && fields[0] == "debugwindows")
-				{
-					renderState.debugShowLogWindow = fields[1] == "1" || fields[1] == "true" || fields[1] == "True";
-					renderState.debugShowStatsWindow = fields[2] == "1" || fields[2] == "true" || fields[2] == "True";
-					const auto readBool = [&fields](std::size_t index, bool fallback)
+					else if (fields.size() >= 3 && fields[0] == "debugwindows")
 					{
-						if (index >= fields.size()) return fallback;
-						return fields[index] == "1" || fields[index] == "true" || fields[index] == "True";
-					};
-					renderState.showFileExplorer = readBool(3, renderState.showFileExplorer);
-					renderState.showLevelWindow = readBool(4, renderState.showLevelWindow);
-					renderState.showEntityWindow = readBool(5, renderState.showEntityWindow);
-					renderState.showLightingWindow = readBool(6, renderState.showLightingWindow);
-					renderState.showInputMapWindow = readBool(7, renderState.showInputMapWindow);
-					renderState.showCameraWindow = readBool(8, renderState.showCameraWindow);
-					renderState.showGameInputWindow = readBool(9, renderState.showGameInputWindow);
-					renderState.showGameplayDiagnosticsWindow = readBool(10, renderState.showGameplayDiagnosticsWindow);
-					renderState.showAnimationDiagnosticsWindow = readBool(11, renderState.showAnimationDiagnosticsWindow);
-						 renderState.showGameGUIDiagnosticsWindow = readBool(12, renderState.showGameGUIDiagnosticsWindow);
+						renderState.debugShowLogWindow = fields[1] == "1" || fields[1] == "true" || fields[1] == "True";
+						renderState.debugShowStatsWindow = fields[2] == "1" || fields[2] == "true" || fields[2] == "True";
+						const auto readBool = [&fields](std::size_t index, bool fallback)
+						{
+							if (index >= fields.size()) return fallback;
+							return fields[index] == "1" || fields[index] == "true" || fields[index] == "True";
+						};
+						renderState.showFileExplorer = readBool(3, renderState.showFileExplorer);
+						renderState.showLevelWindow = readBool(4, renderState.showLevelWindow);
+						renderState.showEntityWindow = readBool(5, renderState.showEntityWindow);
+						renderState.showLightingWindow = readBool(6, renderState.showLightingWindow);
+						renderState.showInputMapWindow = readBool(7, renderState.showInputMapWindow);
+						renderState.showCameraWindow = readBool(8, renderState.showCameraWindow);
+						renderState.showGameInputWindow = readBool(9, renderState.showGameInputWindow);
+						renderState.showGameplayDiagnosticsWindow = readBool(10, renderState.showGameplayDiagnosticsWindow);
+						renderState.showAnimationDiagnosticsWindow = readBool(11, renderState.showAnimationDiagnosticsWindow);
+						renderState.showGameGUIDiagnosticsWindow = readBool(12, renderState.showGameGUIDiagnosticsWindow);
 						renderState.profilerEnabled = readBool(13, renderState.profilerEnabled);
 						renderState.showCameraCollisionDebug = readBool(14, renderState.showCameraCollisionDebug);
 						renderState.showPhysicsDiagnosticsWindow = readBool(15, renderState.showPhysicsDiagnosticsWindow);
-				}
-				else if (fields.size() >= 8 && fields.size() <= 11 && fields[0] == "sunlight")
-				{
-					renderState.sunLight.direction = glm::vec3(std::stof(fields[1]), std::stof(fields[2]), std::stof(fields[3]));
-					renderState.sunLight.color = glm::vec3(std::stof(fields[4]), std::stof(fields[5]), std::stof(fields[6]));
-					renderState.sunLight.intensity = std::stof(fields[7]);
-					if (fields.size() >= 9)
-					{
-						renderState.sunLight.ambient = std::stof(fields[8]);
 					}
-					if (fields.size() >= 10)
+					else if (fields.size() >= 8 && fields.size() <= 11 && fields[0] == "sunlight")
 					{
-						renderState.sunLight.shadowsEnabled = fields[9] == "1" || fields[9] == "true" || fields[9] == "True";
-					}
-					if (fields.size() >= 11)
-					{
-						renderState.sunLight.castsShadows = fields[10] == "1" || fields[10] == "true" || fields[10] == "True";
-					}
-				}
-				else if (fields.size() >= 12 && fields.size() <= 15 && fields[0] == "pointlight")
-				{
-					RenderStateData::PointLightData pointLight;
-					pointLight.position = glm::vec3(std::stof(fields[1]), std::stof(fields[2]), std::stof(fields[3]));
-					pointLight.color = glm::vec3(std::stof(fields[4]), std::stof(fields[5]), std::stof(fields[6]));
-					pointLight.intensity = std::stof(fields[7]);
-					if (fields.size() >= 14)
-					{
-						pointLight.ambient = std::stof(fields[8]);
-						pointLight.radius = std::stof(fields[9]);
-						pointLight.radiusFade = std::stof(fields[10]);
-						pointLight.constant = std::stof(fields[11]);
-						pointLight.linear = std::stof(fields[12]);
-						pointLight.quadratic = std::stof(fields[13]);
-						if (fields.size() >= 15)
+						renderState.sunLight.direction = glm::vec3(std::stof(fields[1]), std::stof(fields[2]), std::stof(fields[3]));
+						renderState.sunLight.color = glm::vec3(std::stof(fields[4]), std::stof(fields[5]), std::stof(fields[6]));
+						renderState.sunLight.intensity = std::stof(fields[7]);
+						if (fields.size() >= 9)
 						{
-							pointLight.castsShadows = fields[14] == "1" || fields[14] == "true" || fields[14] == "True";
+							renderState.sunLight.ambient = std::stof(fields[8]);
+						}
+						if (fields.size() >= 10)
+						{
+							renderState.sunLight.shadowsEnabled = fields[9] == "1" || fields[9] == "true" || fields[9] == "True";
+						}
+						if (fields.size() >= 11)
+						{
+							renderState.sunLight.castsShadows = fields[10] == "1" || fields[10] == "true" || fields[10] == "True";
 						}
 					}
-					else
+					else if (fields.size() >= 12 && fields.size() <= 15 && fields[0] == "pointlight")
 					{
-						pointLight.radius = std::stof(fields[8]);
-						if (fields.size() == 13)
+						RenderStateData::PointLightData pointLight;
+						pointLight.position = glm::vec3(std::stof(fields[1]), std::stof(fields[2]), std::stof(fields[3]));
+						pointLight.color = glm::vec3(std::stof(fields[4]), std::stof(fields[5]), std::stof(fields[6]));
+						pointLight.intensity = std::stof(fields[7]);
+						if (fields.size() >= 14)
 						{
-							pointLight.radiusFade = std::stof(fields[9]);
-							pointLight.constant = std::stof(fields[10]);
-							pointLight.linear = std::stof(fields[11]);
-							pointLight.quadratic = std::stof(fields[12]);
+							pointLight.ambient = std::stof(fields[8]);
+							pointLight.radius = std::stof(fields[9]);
+							pointLight.radiusFade = std::stof(fields[10]);
+							pointLight.constant = std::stof(fields[11]);
+							pointLight.linear = std::stof(fields[12]);
+							pointLight.quadratic = std::stof(fields[13]);
+							if (fields.size() >= 15)
+							{
+								pointLight.castsShadows = fields[14] == "1" || fields[14] == "true" || fields[14] == "True";
+							}
 						}
 						else
 						{
-							pointLight.constant = std::stof(fields[9]);
-							pointLight.linear = std::stof(fields[10]);
-							pointLight.quadratic = std::stof(fields[11]);
+							pointLight.radius = std::stof(fields[8]);
+							if (fields.size() == 13)
+							{
+								pointLight.radiusFade = std::stof(fields[9]);
+								pointLight.constant = std::stof(fields[10]);
+								pointLight.linear = std::stof(fields[11]);
+								pointLight.quadratic = std::stof(fields[12]);
+							}
+							else
+							{
+								pointLight.constant = std::stof(fields[9]);
+								pointLight.linear = std::stof(fields[10]);
+								pointLight.quadratic = std::stof(fields[11]);
+							}
+						}
+						renderState.pointLights.push_back(std::move(pointLight));
+					}
+					else if (fields.size() == 2 && fields[0] == "imguilayout")
+					{
+						renderState.imguiLayout = ProjectStateFormat::HexDecode(fields[1]);
+					}
+					continue;
+				}
+
+				if (fields.size() == 2 && fields[0] == "startuplevel")
+				{
+					startupLevelName = ProjectStateFormat::UnescapeField(fields[1]);
+					continue;
+				}
+
+				if (fields.size() == 2 && fields[0] == "scenecontext")
+				{
+					const std::string sceneName = ProjectStateFormat::UnescapeField(fields[1]);
+					currentLevel = nullptr;
+					for (auto& pendingLevel : pendingLevels)
+					{
+						if (pendingLevel.name == sceneName)
+						{
+							currentLevel = &pendingLevel;
+							break;
 						}
 					}
-					renderState.pointLights.push_back(std::move(pointLight));
+					continue;
 				}
-				else if (fields.size() == 2 && fields[0] == "imguilayout")
+
+				if (fields.size() == 2 && fields[0] == "gameguiasset")
 				{
-					renderState.imguiLayout = ProjectStateFormat::HexDecode(fields[1]);
+					pendingGameGUIAssets.push_back(ProjectStateFormat::UnescapeField(fields[1]));
+					continue;
 				}
-				continue;
-			}
 
-			if (fields.size() == 2 && fields[0] == "startuplevel")
-			{
-				startupLevelName = ProjectStateFormat::UnescapeField(fields[1]);
-				continue;
-			}
-
-			if (fields.size() == 2 && fields[0] == "scenecontext")
-			{
-				const std::string sceneName = ProjectStateFormat::UnescapeField(fields[1]);
-				currentLevel = nullptr;
-				for (auto& pendingLevel : pendingLevels)
+				if (fields.size() == 2 && fields[0] == "gameguiactive")
 				{
-					if (pendingLevel.name == sceneName)
+					pendingActiveGameGUIAsset = ProjectStateFormat::UnescapeField(fields[1]);
+					continue;
+				}
+
+				if (fields.size() == 2 && fields[0] == "gameguinavigationmode")
+				{
+					pendingGameGUINavigationMode = ProjectStateFormat::UnescapeField(fields[1]);
+					continue;
+				}
+
+				ComponentRecordLayout componentLayout;
+				if (ReadComponentRecordLayout(fields, componentLayout))
+				{
+					if (!currentLevel)
 					{
-						currentLevel = &pendingLevel;
-						break;
+						return false;
+					}
+
+					const std::string& componentType = fields[componentLayout.typeIndex];
+					const std::filesystem::path sourcePath = ProjectStateFormat::ResolveSourcePath(projectPath, fields[1]);
+					if (componentType == "controller" || componentType == "playercontroller")
+					{
+						if (fields.size() <= componentLayout.dataIndex)
+						{
+							return false;
+						}
+
+						PendingController controller;
+						controller.sourcePath = sourcePath;
+						controller.entityId = componentLayout.entityId;
+						controller.moveSpeed = std::stof(fields[componentLayout.dataIndex]);
+						controller.levelName = currentLevel->name;
+						controller.playerControlled = componentType == "playercontroller" || projectVersion <= 11;
+						if (componentLayout.entityId != 0)
+						{
+							if (controller.playerControlled && fields.size() > componentLayout.dataIndex + 1)
+							{
+								controller.turnSpeed = std::stof(fields[componentLayout.dataIndex + 1]);
+							}
+							const std::size_t deadzoneIndex = componentLayout.dataIndex + (controller.playerControlled ? 2 : 1);
+							if (fields.size() > deadzoneIndex)
+							{
+								controller.movementDeadzone = std::stof(fields[deadzoneIndex]);
+							}
+						}
+						pendingControllers.push_back(std::move(controller));
+						continue;
+					}
+
+					PendingComponent component;
+					component.sourcePath = sourcePath;
+					component.entityId = componentLayout.entityId;
+					component.levelName = currentLevel->name;
+					component.type = componentType;
+
+					if (componentType == "enemy")
+					{
+						pendingComponents.push_back(std::move(component));
+						continue;
+					}
+
+					if (componentType == "animator")
+					{
+						if (fields.size() < componentLayout.dataIndex + 3)
+						{
+							return false;
+						}
+
+						std::size_t index = componentLayout.dataIndex;
+						component.initialState = ProjectStateFormat::UnescapeField(fields[index++]);
+						const int stateCount = std::stoi(fields[index++]);
+						for (int i = 0; i < stateCount; ++i)
+						{
+							PendingComponent::AnimatorStateData state;
+							state.name = ProjectStateFormat::UnescapeField(fields[index++]);
+							state.clipIndex = std::stoi(fields[index++]);
+							component.animatorStates.push_back(std::move(state));
+						}
+						const int transitionCount = std::stoi(fields[index++]);
+						for (int i = 0; i < transitionCount; ++i)
+						{
+							PendingComponent::AnimatorTransitionData transition;
+							transition.from = ProjectStateFormat::UnescapeField(fields[index++]);
+							transition.to = ProjectStateFormat::UnescapeField(fields[index++]);
+							transition.blendSeconds = std::stof(fields[index++]);
+							if (projectVersion >= 17)
+							{
+								const int conditionCount = std::stoi(fields[index++]);
+								for (int conditionIndex = 0; conditionIndex < conditionCount; ++conditionIndex)
+								{
+									ProjectStateData::PendingComponent::AnimatorConditionData condition;
+									condition.left.type = std::stoi(fields[index++]);
+									condition.left.constantValue = std::stof(fields[index++]);
+									condition.left.componentName = ProjectStateFormat::UnescapeField(fields[index++]);
+									condition.left.memberName = ProjectStateFormat::UnescapeField(fields[index++]);
+									condition.comparator = std::stoi(fields[index++]);
+									condition.right.type = std::stoi(fields[index++]);
+									condition.right.constantValue = std::stof(fields[index++]);
+									condition.right.componentName = ProjectStateFormat::UnescapeField(fields[index++]);
+									condition.right.memberName = ProjectStateFormat::UnescapeField(fields[index++]);
+									transition.conditions.push_back(std::move(condition));
+								}
+							}
+							else if (projectVersion >= 11)
+							{
+								transition.left.type = std::stoi(fields[index++]);
+								transition.left.constantValue = std::stof(fields[index++]);
+								transition.left.componentName = ProjectStateFormat::UnescapeField(fields[index++]);
+								transition.left.memberName = ProjectStateFormat::UnescapeField(fields[index++]);
+								transition.comparator = std::stoi(fields[index++]);
+								transition.right.type = std::stoi(fields[index++]);
+								transition.right.constantValue = std::stof(fields[index++]);
+								transition.right.componentName = ProjectStateFormat::UnescapeField(fields[index++]);
+								transition.right.memberName = ProjectStateFormat::UnescapeField(fields[index++]);
+							}
+							component.animatorTransitions.push_back(std::move(transition));
+						}
+						pendingComponents.push_back(std::move(component));
+						continue;
 					}
 				}
-				continue;
-			}
 
-			if (fields.size() == 2 && fields[0] == "gameguiasset")
-			{
-				pendingGameGUIAssets.push_back(ProjectStateFormat::UnescapeField(fields[1]));
-				continue;
-			}
+				if (fields.size() >= 2 && fields[0] == "Scene")
+				{
+					PendingLevel Scene;
+					Scene.name = ProjectStateFormat::UnescapeField(fields[1]);
+					if (Scene.name.empty())
+					{
+						Scene.name = "Scene";
+					}
+					if (fields.size() >= 3)
+					{
+						Scene.active = fields[2] == "1" || fields[2] == "true" || fields[2] == "True";
+					}
+					if (fields.size() >= 4)
+					{
+						Scene.isCutscene = fields[3] == "cutscene";
+					}
+					if (fields.size() >= 5)
+					{
+						Scene.isMainMenu = fields[4] == "1" || fields[4] == "true" || fields[4] == "True";
+					}
+					pendingLevels.push_back(std::move(Scene));
+					currentLevel = &pendingLevels.back();
+					continue;
+				}
 
-			if (fields.size() == 2 && fields[0] == "gameguiactive")
-			{
-				pendingActiveGameGUIAsset = ProjectStateFormat::UnescapeField(fields[1]);
-				continue;
-			}
+				if (((fields.size() < 11 || fields.size() > 15) || fields[0] != "object"))
+				{
+					continue;
+				}
 
-			if (fields.size() == 2 && fields[0] == "gameguinavigationmode")
-			{
-				pendingGameGUINavigationMode = ProjectStateFormat::UnescapeField(fields[1]);
-				continue;
-			}
-
-			ComponentRecordLayout componentLayout;
-			if (ReadComponentRecordLayout(fields, componentLayout))
-			{
 				if (!currentLevel)
 				{
 					return false;
 				}
 
-				const std::string& componentType = fields[componentLayout.typeIndex];
-				const std::filesystem::path sourcePath = ProjectStateFormat::ResolveSourcePath(projectPath, fields[1]);
-				if (componentType == "controller" || componentType == "playercontroller")
+				PendingLevel::PendingObject object;
+				object.sourcePath = ProjectStateFormat::ResolveSourcePath(projectPath, fields[1]);
+				object.position = glm::vec3(std::stof(fields[2]), std::stof(fields[3]), std::stof(fields[4]));
+				object.rotation = glm::vec3(std::stof(fields[5]), std::stof(fields[6]), std::stof(fields[7]));
+				object.scale = glm::vec3(std::stof(fields[8]), std::stof(fields[9]), std::stof(fields[10]));
+				if (fields.size() >= 12)
 				{
-					if (fields.size() <= componentLayout.dataIndex)
+					try
 					{
-						return false;
+						object.id = static_cast<unsigned int>(std::stoul(fields[11]));
 					}
-
-					PendingController controller;
-					controller.sourcePath = sourcePath;
-					controller.entityId = componentLayout.entityId;
-					controller.moveSpeed = std::stof(fields[componentLayout.dataIndex]);
-					controller.levelName = currentLevel->name;
-					controller.playerControlled = componentType == "playercontroller" || projectVersion <= 11;
-					if (componentLayout.entityId != 0)
+					catch (...)
 					{
-						if (controller.playerControlled && fields.size() > componentLayout.dataIndex + 1)
-						{
-							controller.turnSpeed = std::stof(fields[componentLayout.dataIndex + 1]);
-						}
-						const std::size_t deadzoneIndex = componentLayout.dataIndex + (controller.playerControlled ? 2 : 1);
-						if (fields.size() > deadzoneIndex)
-						{
-							controller.movementDeadzone = std::stof(fields[deadzoneIndex]);
-						}
+						object.id = 0;
 					}
-					pendingControllers.push_back(std::move(controller));
-					continue;
 				}
-
-				PendingComponent component;
-				component.sourcePath = sourcePath;
-				component.entityId = componentLayout.entityId;
-				component.levelName = currentLevel->name;
-				component.type = componentType;
-
-				if (componentType == "playerhealth")
+				if (fields.size() >= 13)
 				{
-					if (fields.size() > componentLayout.dataIndex)
-					{
-						component.value1 = std::stoi(fields[componentLayout.dataIndex]);
-						component.hasValue1 = true;
-					}
-					if (fields.size() > componentLayout.dataIndex + 1)
-					{
-						component.value2 = std::stoi(fields[componentLayout.dataIndex + 1]);
-						component.hasValue2 = true;
-					}
-					pendingComponents.push_back(std::move(component));
-					continue;
+					object.ignoreCameraCollision = fields[12] == "1" || fields[12] == "true" || fields[12] == "True";
 				}
-
-				if (componentType == "enemy")
+				if (fields.size() >= 14)
 				{
-					pendingComponents.push_back(std::move(component));
-					continue;
+					object.showPhysicsBoundingBox = fields[13] == "1" || fields[13] == "true" || fields[13] == "True";
 				}
-
-				if (componentType == "animator")
+				if (fields.size() >= 15)
 				{
-					if (fields.size() < componentLayout.dataIndex + 3)
+					try
 					{
-						return false;
+						const int colliderShape = std::stoi(fields[14]);
+						object.physicsColliderShape = colliderShape == 1 ? 1 : colliderShape == 2 ? 2 : 0;
 					}
-
-					std::size_t index = componentLayout.dataIndex;
-					component.initialState = ProjectStateFormat::UnescapeField(fields[index++]);
-					const int stateCount = std::stoi(fields[index++]);
-					for (int i = 0; i < stateCount; ++i)
+					catch (...)
 					{
-						PendingComponent::AnimatorStateData state;
-						state.name = ProjectStateFormat::UnescapeField(fields[index++]);
-						state.clipIndex = std::stoi(fields[index++]);
-						component.animatorStates.push_back(std::move(state));
+						object.physicsColliderShape = 0;
 					}
-					const int transitionCount = std::stoi(fields[index++]);
-					for (int i = 0; i < transitionCount; ++i)
-					{
-						PendingComponent::AnimatorTransitionData transition;
-						transition.from = ProjectStateFormat::UnescapeField(fields[index++]);
-						transition.to = ProjectStateFormat::UnescapeField(fields[index++]);
-						transition.blendSeconds = std::stof(fields[index++]);
-						if (projectVersion >= 17)
-						{
-							const int conditionCount = std::stoi(fields[index++]);
-							for (int conditionIndex = 0; conditionIndex < conditionCount; ++conditionIndex)
-							{
-								ProjectStateData::PendingComponent::AnimatorConditionData condition;
-								condition.left.type = std::stoi(fields[index++]);
-								condition.left.constantValue = std::stof(fields[index++]);
-								condition.left.componentName = ProjectStateFormat::UnescapeField(fields[index++]);
-								condition.left.memberName = ProjectStateFormat::UnescapeField(fields[index++]);
-								condition.comparator = std::stoi(fields[index++]);
-								condition.right.type = std::stoi(fields[index++]);
-								condition.right.constantValue = std::stof(fields[index++]);
-								condition.right.componentName = ProjectStateFormat::UnescapeField(fields[index++]);
-								condition.right.memberName = ProjectStateFormat::UnescapeField(fields[index++]);
-								transition.conditions.push_back(std::move(condition));
-							}
-						}
-						else if (projectVersion >= 11)
-						{
-							transition.left.type = std::stoi(fields[index++]);
-							transition.left.constantValue = std::stof(fields[index++]);
-							transition.left.componentName = ProjectStateFormat::UnescapeField(fields[index++]);
-							transition.left.memberName = ProjectStateFormat::UnescapeField(fields[index++]);
-							transition.comparator = std::stoi(fields[index++]);
-							transition.right.type = std::stoi(fields[index++]);
-							transition.right.constantValue = std::stof(fields[index++]);
-							transition.right.componentName = ProjectStateFormat::UnescapeField(fields[index++]);
-							transition.right.memberName = ProjectStateFormat::UnescapeField(fields[index++]);
-						}
-						component.animatorTransitions.push_back(std::move(transition));
-					}
-					pendingComponents.push_back(std::move(component));
-					continue;
 				}
+				currentLevel->objects.push_back(std::move(object));
 			}
-
-			if (fields.size() >= 2 && fields[0] == "Scene")
+			catch (const std::exception& ex)
 			{
-				PendingLevel Scene;
-				Scene.name = ProjectStateFormat::UnescapeField(fields[1]);
-				if (Scene.name.empty())
-				{
-					Scene.name = "Scene";
-				}
-				if (fields.size() >= 3)
-				{
-					Scene.active = fields[2] == "1" || fields[2] == "true" || fields[2] == "True";
-				}
-				if (fields.size() >= 4)
-				{
-					Scene.isCutscene = fields[3] == "cutscene";
-				}
-				if (fields.size() >= 5)
-				{
-					Scene.isMainMenu = fields[4] == "1" || fields[4] == "true" || fields[4] == "True";
-				}
-				pendingLevels.push_back(std::move(Scene));
-				currentLevel = &pendingLevels.back();
+				Root::Current().Debugger().LogTagged(Debug::Severity::Warning, "ProjectLoad", std::string("Skipping malformed project line: ") + ex.what());
 				continue;
 			}
-
-			if (((fields.size() < 11 || fields.size() > 15) || fields[0] != "object"))
-			{
-				continue;
-			}
-
-			if (!currentLevel)
-			{
-				return false;
-			}
-
-			PendingLevel::PendingObject object;
-			object.sourcePath = ProjectStateFormat::ResolveSourcePath(projectPath, fields[1]);
-			object.position = glm::vec3(std::stof(fields[2]), std::stof(fields[3]), std::stof(fields[4]));
-			object.rotation = glm::vec3(std::stof(fields[5]), std::stof(fields[6]), std::stof(fields[7]));
-			object.scale = glm::vec3(std::stof(fields[8]), std::stof(fields[9]), std::stof(fields[10]));
-			if (fields.size() >= 12)
-			{
-				try
-				{
-					object.id = static_cast<unsigned int>(std::stoul(fields[11]));
-				}
-				catch (...)
-				{
-					object.id = 0;
-				}
-			}
-			if (fields.size() >= 13)
-			{
-				object.ignoreCameraCollision = fields[12] == "1" || fields[12] == "true" || fields[12] == "True";
-			}
-			if (fields.size() >= 14)
-			{
-				object.showPhysicsBoundingBox = fields[13] == "1" || fields[13] == "true" || fields[13] == "True";
-			}
-			if (fields.size() >= 15)
-			{
-				try
-				{
-					const int colliderShape = std::stoi(fields[14]);
-					object.physicsColliderShape = colliderShape == 1 ? 1 : colliderShape == 2 ? 2 : 0;
-				}
-				catch (...)
-				{
-					object.physicsColliderShape = 0;
-				}
-			}
-			currentLevel->objects.push_back(std::move(object));
 		}
 
 		return true;

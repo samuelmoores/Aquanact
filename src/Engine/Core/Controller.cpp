@@ -1,5 +1,4 @@
 #include "Engine/Core/Controller.h"
-#include "Engine/Core/ComponentFactory.h"
 
 #include "Engine/Core/Debug.h"
 #include "Engine/Core/Entity.h"
@@ -12,15 +11,6 @@
 
 namespace
 {
-	const bool registeredController = []()
-	{
-		ComponentFactory::Instance().Register("Controller", [](Entity&) -> std::unique_ptr<Component>
-		{
-			return std::unique_ptr<Component>(new Controller());
-		});
-		return true;
-	}();
-
 	// Imported assets and movement settings use centimeters as world units.
 	constexpr float worldUnitsPerMeter = 100.0f;
 	constexpr float gravity = -9.81f * worldUnitsPerMeter;
@@ -131,35 +121,6 @@ void Controller::startUp(Entity&)
 	m_grounded = false;
 	m_isGrounded = false;
 	m_groundedLossTimer = 0.0f;
-}
-
-std::vector<BindableMember> Controller::GetBindableMembers() const
-{
-	return {
-		{ "IsMoving", "Is Moving", "bool", BindableMember::Kind::Function },
-		{ "IsGrounded", "Is Grounded", "bool", BindableMember::Kind::Function },
-		{ "MoveSpeed", "Move Speed", "float", BindableMember::Kind::Function },
-	};
-}
-
-bool Controller::TryGetBindableValue(const std::string& memberName, float& value) const
-{
-	if (memberName == "IsMoving")
-	{
-		value = m_isMoving ? 1.0f : 0.0f;
-		return true;
-	}
-	if (memberName == "IsGrounded")
-	{
-		value = m_isGrounded ? 1.0f : 0.0f;
-		return true;
-	}
-	if (memberName == "MoveSpeed")
-	{
-		value = m_moveSpeed;
-		return true;
-	}
-	return false;
 }
 
 void Controller::SetMovementDirection(const glm::vec3& direction)

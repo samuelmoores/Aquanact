@@ -7,11 +7,11 @@
 #include "Engine/Core/PlayerController.h"
 #include "Engine/Core/ProjectStateData.h"
 #include "Game/Enemy.h"
-#include "Game/PlayerHealth.h"
 
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <filesystem>
 
 struct NewClassConfiguration
 {
@@ -101,6 +101,10 @@ Scene* SceneManager::startUp()
 	// check for new game code
 	// load congiguration
 	NewClassConfiguration configuration = loadConfiguration("NewClassConfiguration");
+	// The configuration is a one-time startup handoff, so delete it after we
+	// read it to avoid replaying the same action on the next launch.
+	std::error_code configDeleteEc;
+	std::filesystem::remove("NewClassConfiguration", configDeleteEc);
 
 	Scene* activeLevel = m_activeLevel;
 	if (!activeLevel)
@@ -377,25 +381,7 @@ void SceneManager::ApplyProjectState(
 				continue;
 			}
 
-			if (pendingComponent.type == "playerhealth")
-			{
-				if (!object->GetComponent<PlayerHealth>())
-				{
-					object->AddComponent<PlayerHealth>();
-				}
-				if (PlayerHealth* playerHealth = object->GetComponent<PlayerHealth>())
-				{
-					if (pendingComponent.hasValue1)
-					{
-						playerHealth->SetHealth(pendingComponent.value1);
-					}
-					if (pendingComponent.hasValue2)
-					{
-						playerHealth->SetMaxHealth(pendingComponent.value2);
-					}
-				}
-			}
-			else if (pendingComponent.type == "enemy")
+			if (pendingComponent.type == "enemy")
 			{
 				if (!object->GetComponent<Enemy>())
 				{

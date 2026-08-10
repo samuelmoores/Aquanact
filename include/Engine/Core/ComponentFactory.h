@@ -17,6 +17,7 @@ public:
 	static ComponentFactory& Instance();
 
 	void Register(std::string typeName, Creator creator);
+	bool Unregister(const std::string& typeName);
 
 	std::unique_ptr<Component> Create(const std::string& typeName, Entity& owner) const;
 	std::vector<std::string> Names() const;

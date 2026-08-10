@@ -19,8 +19,15 @@ public:
 	float MovementDeadzone() const { return m_movementDeadzone; }
 	void SetMovementDeadzone(float deadzone) { m_movementDeadzone = deadzone; }
 	bool IsMoving() const { return m_isMoving; }
-	std::vector<BindableMember> GetBindableMembers() const override;
-	bool TryGetBindableValue(const std::string& memberName, float& value) const override;
+
+	// Bindable values are sampled state, not events. The UI polls them whenever
+	// it needs the latest controller state.
+	#define CONTROLLER_BINDABLES(VALUE, FUNCTION) \
+		VALUE(m_isMoving) \
+		VALUE(m_isGrounded) \
+		VALUE(m_moveSpeed)
+	AQUA_DECLARE_BINDABLES(CONTROLLER_BINDABLES)
+	#undef CONTROLLER_BINDABLES
 	void SetMovementDirection(const glm::vec3& direction);
 	void StopMoving();
 	const glm::vec3& MovementDirection() const { return m_movementDirection; }

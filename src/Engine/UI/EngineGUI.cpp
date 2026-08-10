@@ -22,7 +22,6 @@
 #include "Engine/Core/PlayerController.h"
 #include "Engine/Core/AnimatorComponent.h"
 #include "Game/Enemy.h"
-#include "Game/PlayerHealth.h"
 #include "Engine/Core/GLHeaders.h"
 #include "Engine/Core/StbImage.h"
 #include "Engine/Core/FileSystem.h"
@@ -41,6 +40,142 @@
 
 namespace {
 	constexpr float worldUnitsPerMeter = 100.0f;
+
+	std::filesystem::path SourceRoot()
+	{
+#ifdef AQUANACT_SOURCE_ROOT
+		return std::filesystem::path(AQUANACT_SOURCE_ROOT);
+#else
+		return std::filesystem::current_path();
+#endif
+	}
+
+	std::filesystem::path GameIncludeRoot()
+	{
+		return SourceRoot() / "include" / "Game";
+	}
+
+	std::filesystem::path GameSourceRoot()
+	{
+		return SourceRoot() / "src" / "Game";
+	}
+
+	std::filesystem::path GeneratedRoot()
+	{
+		return SourceRoot() / "generated";
+	}
+
+	std::string MakeComponentRegistryTemplate(const std::vector<std::string>& componentNames)
+	{
+		// Keep the registry source in sync with the current game component set.
+		// When the editor deletes a component type, it must also stop generating
+		// registration code for that type or the next rebuild will fail.
+		std::string contents =
+			"#include \"Game/ComponentRegistry.h\"\n\n"
+			"#include \"Engine/Core/ComponentFactory.h\"\n"
+			"#include \"Engine/Core/Controller.h\"\n"
+			"#include \"Engine/Core/Entity.h\"\n";
+
+		for (const std::string& componentName : componentNames)
+		{
+			contents += "#include \"Game/" + componentName + ".h\"\n";
+		}
+
+		contents += "\n#include <memory>\n\n";
+		contents += "void RegisterGameComponents()\n{\n";
+		contents += "\tComponentFactory::Instance().Register(\"Controller\", [](Entity&) -> std::unique_ptr<Component>\n";
+		contents += "\t{\n";
+		contents += "\t\treturn std::make_unique<Controller>();\n";
+		contents += "\t});\n";
+		for (const std::string& componentName : componentNames)
+		{
+			// Each remaining component gets a direct registration entry so the
+			// factory can create it by the class name saved in project data.
+			contents +=
+				"\tComponentFactory::Instance().Register(\"" + componentName + "\", [](Entity&) -> std::unique_ptr<Component>\n"
+				"\t{\n"
+				"\t\treturn std::make_unique<" + componentName + ">();\n"
+				"\t});\n";
+		}
+		contents += "}\n";
+		return contents;
+	}
+
+	std::filesystem::path GameRegistryPath()
+	{
+		return std::filesystem::path(AQUANACT_SOURCE_ROOT) / "src" / "Engine" / "Core" / "ComponentRegistry.cpp";
+	}
+
+	std::vector<std::filesystem::path> CollectGameSourceFiles()
+	{
+		// Treat the game folder as the source of truth for generated maintenance
+		// files. If a file disappears from disk, the regenerated lists should stop
+		// referencing it automatically.
+		std::vector<std::filesystem::path> gameSources;
+		const std::filesystem::path gameSourceDir = GameSourceRoot();
+		for (const auto& entry : Root::Current().FileSystemRef().ReadDirectory(gameSourceDir))
+		{
+			if (!entry.is_regular_file())
+			{
+				continue;
+			}
+
+			const std::filesystem::path filePath = entry.path();
+			if (filePath.extension() != ".cpp")
+			{
+				continue;
+			}
+
+			gameSources.push_back(filePath);
+		}
+		std::sort(gameSources.begin(), gameSources.end());
+		gameSources.erase(std::unique(gameSources.begin(), gameSources.end()), gameSources.end());
+		return gameSources;
+	}
+
+	std::vector<std::string> CollectGameComponentNames()
+	{
+		// Build the registry from the on-disk source files, not from a hand-edited
+		// list. That keeps deleted component types out of the registry even if the
+		// project files were rearranged.
+		std::vector<std::string> componentNames;
+		for (const std::filesystem::path& filePath : CollectGameSourceFiles())
+		{
+			if (filePath.stem() == "ComponentRegistry")
+			{
+				continue;
+			}
+
+			componentNames.push_back(filePath.stem().string());
+		}
+		return componentNames;
+	}
+
+	std::string MakeGameSourcesList()
+	{
+		// The generated source list mirrors every game .cpp file so the build
+		// system stays in sync with the physical source tree.
+		std::string gameSources = "set(GAME_SOURCES\n";
+		for (const std::filesystem::path& filePath : CollectGameSourceFiles())
+		{
+			gameSources += "    \"${CMAKE_SOURCE_DIR}/src/Game/" + filePath.filename().string() + "\"\n";
+		}
+		gameSources += "    \"${CMAKE_SOURCE_DIR}/src/Engine/Core/ComponentRegistry.cpp\"\n";
+		gameSources += ")\n";
+		return gameSources;
+	}
+
+	bool WriteGameSourcesList()
+	{
+		return Root::Current().FileSystemRef().WriteTextFile(GeneratedRoot() / "GameSources.cmake", MakeGameSourcesList());
+	}
+
+	bool WriteComponentRegistryFile()
+	{
+		// The registry file is regenerated from the same source list, so the
+		// component factory always matches the actual game code that is present.
+		return Root::Current().FileSystemRef().WriteTextFile(GameRegistryPath(), MakeComponentRegistryTemplate(CollectGameComponentNames()));
+	}
 
 	std::string InputBindingLabel(const InputBinding& binding)
 	{
@@ -95,23 +230,141 @@ namespace {
 		return "Unknown binding";
 	}
 
-	std::filesystem::path SourceRoot()
+	bool DeleteComponentSourceFiles(const std::string& componentName)
 	{
-#ifdef AQUANACT_SOURCE_ROOT
-		return std::filesystem::path(AQUANACT_SOURCE_ROOT);
-#else
-		return std::filesystem::current_path();
-#endif
+		const std::filesystem::path headerPath = GameIncludeRoot() / (componentName + ".h");
+		const std::filesystem::path sourcePath = GameSourceRoot() / (componentName + ".cpp");
+		bool deletedAny = false;
+		if (std::filesystem::exists(headerPath))
+		{
+			deletedAny |= std::filesystem::remove(headerPath);
+		}
+		if (std::filesystem::exists(sourcePath))
+		{
+			deletedAny |= std::filesystem::remove(sourcePath);
+		}
+		return deletedAny;
 	}
 
-	std::filesystem::path GameIncludeRoot()
+	void RemoveComponentFromBuildLists(const std::string&)
 	{
-		return SourceRoot() / "include" / "Game";
+		// Rebuild both generated files from the current source tree instead of
+		// editing a stale line in place. That guarantees a deleted component type
+		// disappears from the registry and from the generated source list.
+		WriteGameSourcesList();
+		WriteComponentRegistryFile();
 	}
 
-	std::filesystem::path GameSourceRoot()
+	std::size_t RemoveLiveComponentsFromScene(Scene* scene, const std::string& componentName)
 	{
-		return SourceRoot() / "src" / "Game";
+		if (!scene)
+		{
+			return 0;
+		}
+
+		std::size_t removedCount = 0;
+		for (const std::unique_ptr<Entity>& entity : scene->Objects())
+		{
+			if (!entity)
+			{
+				continue;
+			}
+
+			std::vector<Component*> components = entity->Components();
+			for (Component* component : components)
+			{
+				if (component && component->Name() == componentName)
+				{
+					if (entity->RemoveComponent(component))
+					{
+						++removedCount;
+					}
+				}
+			}
+		}
+
+		return removedCount;
+	}
+
+	std::size_t CountLiveComponentsInScene(const Scene* scene, const std::string& componentName)
+	{
+		if (!scene)
+		{
+			return 0;
+		}
+
+		std::size_t count = 0;
+		for (const std::unique_ptr<Entity>& entity : scene->Objects())
+		{
+			if (!entity)
+			{
+				continue;
+			}
+
+			for (const Component* component : entity->Components())
+			{
+				if (component && component->Name() == componentName)
+				{
+					++count;
+				}
+			}
+		}
+
+		return count;
+	}
+
+	std::size_t RemoveLiveComponentsFromAllScenes(const SceneManager& sceneManager, const std::string& componentName)
+	{
+		// The delete button must scrub every loaded scene, not just the active one,
+		// so hidden scenes do not keep stale instances alive in memory.
+		std::size_t removedCount = 0;
+		for (const std::unique_ptr<Scene>& scene : sceneManager.Levels())
+		{
+			if (!scene)
+			{
+				continue;
+			}
+
+			// Reuse the per-scene cleanup so the deletion flow stays easy to follow.
+			removedCount += RemoveLiveComponentsFromScene(scene.get(), componentName);
+		}
+		return removedCount;
+	}
+
+	std::size_t CountLiveComponentsInAllScenes(const SceneManager& sceneManager, const std::string& componentName)
+	{
+		// This is the preview path used by the confirmation popup. It reports the
+		// blast radius without mutating any scene state yet.
+		std::size_t count = 0;
+		for (const std::unique_ptr<Scene>& scene : sceneManager.Levels())
+		{
+			if (!scene)
+			{
+				continue;
+			}
+
+			count += CountLiveComponentsInScene(scene.get(), componentName);
+		}
+		return count;
+	}
+
+	void DeleteComponentType(SceneManager& sceneManager, const std::string& componentName)
+	{
+		// Deletion is a multi-step maintenance action:
+		// 1. remove live instances from scenes,
+		// 2. unregister the type from the factory,
+		// 3. remove the source files,
+		// 4. regenerate the build-time lists.
+		const std::size_t removedInstances = RemoveLiveComponentsFromAllScenes(sceneManager, componentName);
+		const bool removedFromRegistry = ComponentFactory::Instance().Unregister(componentName);
+		const bool removedFiles = DeleteComponentSourceFiles(componentName);
+		RemoveComponentFromBuildLists(componentName);
+
+		if (removedInstances > 0 || removedFromRegistry || removedFiles)
+		{
+			Root::Current().Debugger().LogMessage(
+				"Component type deleted: " + componentName + " (removed " + std::to_string(removedInstances) + " live instances)");
+		}
 	}
 
 	struct AnimatorBindingSource
@@ -750,6 +1003,11 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 			{
 				m_addCodeFilePopupRequested = true;
 			}
+			ImGui::Separator();
+			if (ImGui::MenuItem("Delete Component Type"))
+			{
+				m_componentDeletePopupRequested = true;
+			}
 			ImGui::EndMenu();
 		}
 
@@ -774,6 +1032,76 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 	DrawNewLevelPopup();
 	DrawInputMapWindow();
 	DrawCameraWindow();
+	if (m_componentDeletePopupRequested)
+	{
+		ImGui::OpenPopup("Delete Component Type##AquanactDeleteComponentType");
+	}
+	if (ImGui::BeginPopupModal("Delete Component Type##AquanactDeleteComponentType", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		// The popup is a destructive confirmation, so name the selected type and
+		// show the current live-instance count before the user commits.
+		const std::vector<std::string> componentNames = ComponentFactory::Instance().Names();
+		// The combo is stateful across frames so the user can open the popup,
+		// select a type, and confirm without the selection disappearing.
+		if (ImGui::BeginCombo("Component Type", m_componentTypePendingDelete.empty() ? "<select component>" : m_componentTypePendingDelete.c_str()))
+		{
+			for (const std::string& componentName : componentNames)
+			{
+				const bool selected = m_componentTypePendingDelete == componentName;
+				if (ImGui::Selectable(componentName.c_str(), selected))
+				{
+					m_componentTypePendingDelete = componentName;
+				}
+				if (selected)
+				{
+					ImGui::SetItemDefaultFocus();
+				}
+			}
+			ImGui::EndCombo();
+		}
+
+		const bool canDelete = !m_componentTypePendingDelete.empty();
+		const std::size_t liveInstanceCount = canDelete
+			? CountLiveComponentsInAllScenes(SceneManager, m_componentTypePendingDelete)
+			: 0;
+
+		// Show the deletion impact before the user confirms. This reflects every
+		// loaded scene, not just the active one.
+		if (canDelete)
+		{
+			ImGui::Text("Delete %s?", m_componentTypePendingDelete.c_str());
+			if (liveInstanceCount == 1)
+			{
+				ImGui::Text("1 live instance will be removed from loaded scenes.");
+			}
+			else
+			{
+				ImGui::Text("%zu live instances will be removed from loaded scenes.", liveInstanceCount);
+			}
+		}
+		else
+		{
+			ImGui::TextDisabled("Select a component type to see how many live instances will be removed.");
+		}
+
+		ImGui::BeginDisabled(!canDelete);
+		if (ImGui::Button("Delete"))
+		{
+			DeleteComponentType(SceneManager, m_componentTypePendingDelete);
+			m_componentTypePendingDelete.clear();
+			m_componentDeletePopupRequested = false;
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndDisabled();
+		ImGui::SameLine();
+		if (ImGui::Button("Cancel"))
+		{
+			m_componentTypePendingDelete.clear();
+			m_componentDeletePopupRequested = false;
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
 
 	// Keep the file explorer responsive to the selected directory and import actions.
 	if (m_showFileExplorer)
@@ -861,6 +1189,11 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 	{
 		// The entity inspector is intentionally large because it exposes many
 		// nested controls for transform, physics, and component editing.
+		// The structure below is:
+		// 1. Validate selection.
+		// 2. Handle entity-level actions like delete and add component.
+		// 3. Edit core transform/physics properties.
+		// 4. Render each attached component and its per-component controls.
 		bool open = m_showEntityWindow;
 		if (ImGui::Begin("Entity", &open, ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_AlwaysAutoResize))
 		{
@@ -879,6 +1212,8 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 				{
 					const bool activeSceneIsCutscene = SceneManager.SceneKindFor(activeLevel->Name()) == SceneManager::SceneKind::Cutscene;
 
+					// Entity-level actions live at the top of the inspector so they are
+					// easy to find before the user starts editing individual components.
 					bool deleteEntity = false;
 					if (ImGui::Button("Delete"))
 					{
@@ -886,6 +1221,8 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 					}
 					ImGui::SameLine();
 					ImGui::SetNextItemWidth(120.0f);
+					// The add-component combo only lists registered component types.
+					// Runtime checks prevent duplicates and enforce scene-specific rules.
 					if (ImGui::BeginCombo("##AddComponent", "Add Component"))
 					{
 						const std::vector<std::string> componentNames = ComponentFactory::Instance().Names();
@@ -937,7 +1274,8 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 						ImGui::EndCombo();
 					}
 
-					// Confirm destructive actions inside a modal popup.
+					// Confirm destructive actions inside a modal popup so the entity
+					// cannot be removed by a stray click.
 					if (ImGui::BeginPopupModal("Delete Entity##Confirm", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 					{
 						ImGui::Text("Delete %s from the scene?", object->Name().empty() ? "<unnamed>" : object->Name().c_str());
@@ -955,11 +1293,14 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 						ImGui::EndPopup();
 					}
 
+					// Apply the entity delete only after the confirmation popup closes.
 					if (deleteEntity && activeLevel && activeLevel->RemoveObject(object.get()))
 					{
 						m_selectedLevelObjectIndex = -1;
 					}
 
+					// Transform editing is kept separate from components because it
+					// applies to every entity regardless of attached gameplay scripts.
 					ImGui::Separator();
 					ImGui::TextUnformatted("Position");
 					const glm::vec3 position = object->Position();
@@ -1020,6 +1361,8 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 						object->SetRotation(glm::vec3(rotation.x, rotation.y, editedRotZ));
 					}
 
+					// Physics belongs here because it is another entity-level concern,
+					// separate from the component-specific editor controls below.
 					if (ImGui::CollapsingHeader("Physics", ImGuiTreeNodeFlags_DefaultOpen))
 					{
 						// Physics controls are grouped because they are only relevant when
@@ -1041,6 +1384,8 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 
 					}
 
+					// Components are rendered last so entity-level settings stay at the
+					// top and each attached component can manage its own UI independently.
 					ImGui::Separator();
 					ImGui::TextUnformatted("Components");
 					ImGui::Separator();
@@ -1059,11 +1404,20 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 							ImGui::Separator();
 						}
 
+						// Keep each component's widgets isolated so popups and headers do
+						// not collide when multiple components share the same label.
 						ImGui::PushID(component);
 						const std::string componentLabel = component->Name();
+						const std::string removePopupId = std::string("Remove Component##Confirm_") + std::to_string(reinterpret_cast<std::uintptr_t>(component));
 						const float removeButtonWidth = ImGui::CalcTextSize("Remove").x + ImGui::GetStyle().FramePadding.x * 2.0f;
 						bool open = false;
-						if (ImGui::BeginTable("ComponentHeader", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoSavedSettings))
+						bool openRemovePopup = false;
+						
+						const std::string componentHeaderId = std::string("ComponentHeader##") + std::to_string(reinterpret_cast<std::uintptr_t>(component));
+						
+						// The header row gives the user a stable place to collapse the
+						// component while keeping the remove button aligned to the right.
+						if (ImGui::BeginTable(componentHeaderId.c_str(), 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoSavedSettings))
 						{
 							ImGui::TableSetupColumn("Component", ImGuiTableColumnFlags_WidthStretch);
 							ImGui::TableSetupColumn("Remove", ImGuiTableColumnFlags_WidthFixed, removeButtonWidth);
@@ -1073,79 +1427,75 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 							ImGui::TableSetColumnIndex(1);
 							if (ImGui::SmallButton("Remove"))
 							{
-								ImGui::OpenPopup("Remove Component##Confirm");
+								openRemovePopup = true;
 							}
 							ImGui::EndTable();
 						}
-						if (!open)
+						if (openRemovePopup)
 						{
-							ImGui::PopID();
-							if (componentIndex + 1 < components.size())
+							ImGui::OpenPopup(removePopupId.c_str());
+						}
+						// Only draw the component's editor when the header is expanded.
+						// The header row still stays visible so the user can reopen it or
+						// remove the component even while the details are collapsed.
+						if (open)
+						{
+							// Component-specific controls are selected by type so each component
+							// can expose its own editor without the entity window knowing details.
+							if (AnimatorComponent* animator = dynamic_cast<AnimatorComponent*>(component))
 							{
-								ImGui::Separator();
+								// Animator gets a dedicated popup because its state machine editing
+								// needs more context than a simple inline control.
+								if (ImGui::Button("Open State Machine"))
+								{
+									m_animatorStateMachinePopupRequested = true;
+									ImGui::OpenPopup("State Machine##AquanactAnimatorStateMachine");
+								}
+								if (m_animatorStateMachinePopupRequested)
+								{
+									DrawAnimatorStateMachinePopup(*animator);
+								}
 							}
-							continue;
+							else if (PlayerController* playerController = dynamic_cast<PlayerController*>(component))
+							{
+								float moveSpeed = playerController->MoveSpeed();
+								ImGui::SetNextItemWidth(140.0f);
+								if (ImGui::InputFloat("Move Speed", &moveSpeed, 0.0f, 0.0f, "%.1f"))
+								{
+									playerController->SetMoveSpeed(moveSpeed);
+								}
+
+								float turnSpeed = playerController->TurnSpeed();
+								ImGui::SetNextItemWidth(140.0f);
+								if (ImGui::InputFloat("Turn Speed", &turnSpeed, 0.0f, 0.0f, "%.2f"))
+								{
+									playerController->SetTurnSpeed(turnSpeed);
+								}
+							}
+							else if (Controller* controller = dynamic_cast<Controller*>(component))
+							{
+								float moveSpeed = controller->MoveSpeed();
+								ImGui::SetNextItemWidth(140.0f);
+								if (ImGui::InputFloat("Move Speed", &moveSpeed, 0.0f, 0.0f, "%.1f"))
+								{
+									controller->SetMoveSpeed(moveSpeed);
+								}
+							}
+		else if (Enemy* enemy = dynamic_cast<Enemy*>(component))
+							{
+								ImGui::TextUnformatted("Enemy behavior component");
+								(void)enemy;
+							}
+							else
+							{
+								ImGui::TextUnformatted("No editor controls for this component.");
+							}
 						}
 
-						if (AnimatorComponent* animator = dynamic_cast<AnimatorComponent*>(component))
-						{
-							// Animator gets a dedicated popup because its state machine editing
-							// needs more context than a simple inline control.
-							if (ImGui::Button("Open State Machine"))
-							{
-								m_animatorStateMachinePopupRequested = true;
-								ImGui::OpenPopup("State Machine##AquanactAnimatorStateMachine");
-							}
-							if (m_animatorStateMachinePopupRequested)
-							{
-								DrawAnimatorStateMachinePopup(*animator);
-							}
-						}
-						else if (PlayerController* playerController = dynamic_cast<PlayerController*>(component))
-						{
-							float moveSpeed = playerController->MoveSpeed();
-							ImGui::SetNextItemWidth(140.0f);
-							if (ImGui::InputFloat("Move Speed", &moveSpeed, 0.0f, 0.0f, "%.1f"))
-							{
-								playerController->SetMoveSpeed(moveSpeed);
-							}
-
-							float turnSpeed = playerController->TurnSpeed();
-							ImGui::SetNextItemWidth(140.0f);
-							if (ImGui::InputFloat("Turn Speed", &turnSpeed, 0.0f, 0.0f, "%.2f"))
-							{
-								playerController->SetTurnSpeed(turnSpeed);
-							}
-						}
-						else if (Controller* controller = dynamic_cast<Controller*>(component))
-						{
-							float moveSpeed = controller->MoveSpeed();
-							ImGui::SetNextItemWidth(140.0f);
-							if (ImGui::InputFloat("Move Speed", &moveSpeed, 0.0f, 0.0f, "%.1f"))
-							{
-								controller->SetMoveSpeed(moveSpeed);
-							}
-						}
-						else if (PlayerHealth* playerHealth = dynamic_cast<PlayerHealth*>(component))
-						{
-							ImGui::Text("Health: %s", playerHealth->GetHealthText().c_str());
-							if (ImGui::Button("Heal to Max"))
-							{
-								playerHealth->SetHealth(playerHealth->MaxHealth());
-							}
-						}
-						else if (Enemy* enemy = dynamic_cast<Enemy*>(component))
-						{
-							ImGui::TextUnformatted("Enemy behavior component");
-							(void)enemy;
-						}
-						else
-						{
-							ImGui::TextUnformatted("No editor controls for this component.");
-						}
-
+						// Component removal is confirmed separately so the header button is
+						// never an immediate destructive action.
 						bool removeComponent = false;
-						if (ImGui::BeginPopupModal("Remove Component##Confirm", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+						if (ImGui::BeginPopupModal(removePopupId.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 						{
 							ImGui::Text("Remove %s from %s?", componentLabel.c_str(), object->Name().c_str());
 							ImGui::TextDisabled("This change is permanent after the project is saved.");
@@ -1169,10 +1519,24 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 								m_animatorUiState.erase(animator);
 								m_animatorStateMachinePopupRequested = false;
 							}
+							// Remove the component only after any component-specific cleanup.
 							object->RemoveComponent(component);
 							ImGui::PopID();
 							continue;
 						}
+
+						// A closed collapsing header still needs its popup and ID cleanup, but
+						// it should skip the trailing separator so the next component stays tidy.
+						if (!open)
+						{
+							ImGui::PopID();
+							if (componentIndex + 1 < components.size())
+							{
+								ImGui::Separator();
+							}
+							continue;
+						}
+
 						ImGui::PopID();
 						if (componentIndex + 1 < components.size())
 						{
@@ -1849,11 +2213,32 @@ std::string EngineGUI::MakeHeaderTemplate(const std::string& className)
 	return
 		"#pragma once\n\n"
 		"#include \"Engine/Core/Component.h\"\n\n"
-		"// Generated gameplay component. Start here if you want to add game behavior.\n"
+		"// Generated gameplay component scaffold.\n"
 		"//\n"
-		"// This class inherits from Component, so it must implement:\n"
-		"// - Name()\n"
-		"// - any lifecycle or binding hooks you need\n"
+		"// Contract:\n"
+		"// - Name() identifies the component type for the factory and editor\n"
+		"// - startUp/Update/FirstFrame provide the runtime lifecycle hooks\n"
+		"// - the bindable macros expose values and one-shot events to the UI\n"
+		"//\n"
+		"// Keep the binding lists as the single source of truth for exposed data.\n"
+		"// The macros generate both editor metadata and lookup code.\n"
+		"//\n"
+		"// Example values:\n"
+		"//   #define " + className + "_BINDABLES(BIND_VALUE, BIND_FUNCTION) \\\n"
+		"//   \tBIND_VALUE(m_health) \\\n"
+		"//   \tBIND_FUNCTION(Health)\n"
+		"//   AQUA_DECLARE_BINDABLES(" + className + "_BINDABLES)\n"
+		"//   #undef " + className + "_BINDABLES\n"
+		"//\n"
+		"// Example events:\n"
+		"//   #define " + className + "_EVENTS(EVENT) \\\n"
+		"//   \tEVENT(HealthChanged, \"Health changed\") \\\n"
+		"//   \tEVENT(Died, \"Died\")\n"
+		"//   AQUA_EVENTS_BEGIN\n"
+		"//   \t" + className + "_EVENTS(AQUA_EVENT)\n"
+		"//   AQUA_EVENTS_TEXT_END\n"
+		"//   \t" + className + "_EVENTS(AQUA_EVENT_TEXT)\n"
+		"//   AQUA_EVENTS_END\n"
 		"class " + className + " final : public Component\n"
 		"{\n"
 		"public:\n"
@@ -1862,7 +2247,9 @@ std::string EngineGUI::MakeHeaderTemplate(const std::string& className)
 		"\tvoid startUp(Entity&) override;\n"
 		"\tvoid Update(Entity&, float) override {}\n"
 		"\tvoid FirstFrame(Entity&) override {}\n"
-		"\tstd::vector<BindableMember> GetBindableMembers() const override;\n"
+		"\n"
+		"\t// Put the component's exposed value list here. This is the only place\n"
+		"\t// that should enumerate values the editor needs to see.\n"
 		"};\n";
 }
 
@@ -1870,27 +2257,11 @@ std::string EngineGUI::MakeSourceTemplate(const std::string& className)
 {
 	return
 		"#include \"Game/" + className + ".h\"\n\n"
-		"#include \"Engine/Core/ComponentFactory.h\"\n"
-		"#include \"Engine/Core/Entity.h\"\n\n"
-		"#include <memory>\n\n"
-		"namespace\n"
-		"{\n"
-		"\tconst bool registered" + className + " = []()\n"
-		"\t{\n"
-		"\t\tComponentFactory::Instance().Register(\"" + className + "\", [](Entity&) -> std::unique_ptr<Component>\n"
-		"\t\t{\n"
-		"\t\t\treturn std::unique_ptr<Component>(new " + className + "());\n"
-		"\t\t});\n"
-		"\t\treturn true;\n"
-		"\t}();\n"
-		"}\n\n"
 		"void " + className + "::startUp(Entity&)\n"
 		"{\n"
 		"}\n\n"
-		"std::vector<BindableMember> " + className + "::GetBindableMembers() const\n"
-		"{\n"
-		"\treturn {};\n"
-		"}\n";
+		"// Keep component metadata in the header with the binding/event list macros.\n"
+		"// Add runtime logic here only if the component needs it.\n";
 }
 
 void EngineGUI::CreateGameCodeFile(const std::string& className)
@@ -1898,8 +2269,9 @@ void EngineGUI::CreateGameCodeFile(const std::string& className)
 	// Generated code belongs in the game include/source folders.
 	const std::filesystem::path headerPath = GameIncludeRoot() / (className + ".h");
 	const std::filesystem::path sourcePath = GameSourceRoot() / (className + ".cpp");
-	const std::filesystem::path generatedDir = SourceRoot() / "generated";
+	const std::filesystem::path generatedDir = GeneratedRoot();
 	const std::filesystem::path generatedSourcesPath = generatedDir / "GameSources.cmake";
+	const std::filesystem::path registryPath = GameRegistryPath();
 
 	// Create parent directories if they do not already exist.
 	const std::filesystem::path headerDir = headerPath.parent_path();
@@ -1908,36 +2280,26 @@ void EngineGUI::CreateGameCodeFile(const std::string& className)
 	std::filesystem::create_directories(headerDir, ec);
 	std::filesystem::create_directories(sourceDir, ec);
 
+	// Write the new gameplay class first so the source tree contains the new
+	// component before we regenerate any build-time lists from disk.
 	const bool headerWritten = Root::Current().FileSystemRef().WriteTextFile(headerPath, MakeHeaderTemplate(className));
 	const bool sourceWritten = Root::Current().FileSystemRef().WriteTextFile(sourcePath, MakeSourceTemplate(className));
 	bool sourcesListWritten = false;
+	bool registryWritten = false;
 	if (headerWritten && sourceWritten)
 	{
-		std::vector<std::string> gameSourceFiles = {
-			"Enemy.cpp",
-			"GameManager.cpp",
-			"PlayerHealth.cpp",
-			className + ".cpp"
-		};
-		std::sort(gameSourceFiles.begin(), gameSourceFiles.end());
-		gameSourceFiles.erase(std::unique(gameSourceFiles.begin(), gameSourceFiles.end()), gameSourceFiles.end());
-
-		std::string sourcesListContents = "set(GAME_SOURCES\n";
-		for (const std::string& fileName : gameSourceFiles)
-		{
-			sourcesListContents += "    \"${CMAKE_SOURCE_DIR}/src/Game/" + fileName + "\"\n";
-		}
-		sourcesListContents += ")\n";
-
 		std::error_code generatedEc;
 		std::filesystem::create_directories(generatedDir, generatedEc);
-		sourcesListWritten = Root::Current().FileSystemRef().WriteTextFile(generatedSourcesPath, sourcesListContents);
+		// Regenerate the maintenance files from the actual source tree so the
+		// build list and the factory registry stay aligned with what exists.
+		sourcesListWritten = Root::Current().FileSystemRef().WriteTextFile(generatedSourcesPath, MakeGameSourcesList());
+		registryWritten = Root::Current().FileSystemRef().WriteTextFile(registryPath, MakeComponentRegistryTemplate(CollectGameComponentNames()));
 	}
 
 	// Report one success/failure message back to the popup.
-	if (headerWritten && sourceWritten && sourcesListWritten)
+	if (headerWritten && sourceWritten && sourcesListWritten && registryWritten)
 	{
-		m_addCodeFileStatusMessage = "Created " + headerPath.string() + ", " + sourcePath.string() + " and updated " + generatedSourcesPath.string();
+		m_addCodeFileStatusMessage = "Created " + headerPath.string() + ", " + sourcePath.string() + ", " + registryPath.string() + " and updated " + generatedSourcesPath.string();
 	}
 	else
 	{
@@ -1994,6 +2356,7 @@ void EngineGUI::DrawAddCodeFilePopup()
 	if (m_addCodeFilePopupRequested)
 	{
 		// Clear stale text so each open starts fresh.
+		m_newCodeFileName[0] = '\0';
 		ImGui::OpenPopup("Add Code File##AquanactAddCodeFile");
 		m_addCodeFilePopupRequested = false;
 		m_addCodeFileCreated = false;
@@ -2003,48 +2366,49 @@ void EngineGUI::DrawAddCodeFilePopup()
 	Entity* newEntity    = nullptr;
 	Entity* updateEntity = nullptr;
 
-	if (ImGui::BeginPopupModal("Add Code File##AquanactAddCodeFile", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
-	{
-		// Normalize the class name before generating files so the output is valid C++.
-		ImGui::TextUnformatted("Create a new gameplay class:");
-		ImGui::InputText("Class Name", m_newCodeFileName, sizeof(m_newCodeFileName));
+		if (ImGui::BeginPopupModal("Add Code File##AquanactAddCodeFile", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+		{
+			// Normalize the class name before generating files so the output is valid C++.
+			ImGui::TextUnformatted("Create a new gameplay class:");
+			ImGui::InputText("Class Name", m_newCodeFileName, sizeof(m_newCodeFileName));
 
-		//actually get the names of the entitys
-		//get the scene manager
+		// Build the entity list for the attachment dropdown.
 		Scene* activeScene = Root::Current().Scenes().ActiveLevel();
-		const std::vector<std::unique_ptr<Entity>>& entities = activeScene->Objects();
+		static const std::vector<std::unique_ptr<Entity>> emptyEntities;
+		const std::vector<std::unique_ptr<Entity>>& entities = activeScene ? activeScene->Objects() : emptyEntities;
 		std::vector<std::string> entityNames;
+		entityNames.reserve(entities.size() + 1);
 		entityNames.push_back("none");
 
-		for (int i = 0; i < entities.size(); i++)
+		for (std::size_t i = 0; i < entities.size(); ++i)
 		{
 			const std::unique_ptr<Entity>& entity = entities[i];
-			// how can I add the entity name to the items array?
-			entityNames.push_back(entity->Name());
+			entityNames.push_back(entity ? entity->Name() : "<unnamed>");
 		}
 		
-		static int select_index = 0;
-		const char* default_item = entityNames[select_index].c_str();
+		if (m_createAndBuildEntityIndex < 0 || m_createAndBuildEntityIndex >= static_cast<int>(entityNames.size()))
+		{
+			m_createAndBuildEntityIndex = 0;
+		}
+		const char* default_item = entityNames[static_cast<std::size_t>(m_createAndBuildEntityIndex)].c_str();
 		
-		// Combo box
+		// Selection index 0 means "none", which creates a brand new entity on startup.
 		if (ImGui::BeginCombo("Entity", default_item))
 		{
-			// loop through each item in dropdown
-			for (int i = 0; i < entityNames.size(); i++)
+			// The combo includes a synthetic "none" entry at index 0, so real
+			// entities are shifted by one slot.
+			for (int i = 0; i < static_cast<int>(entityNames.size()); ++i)
 			{
-				//check which is selected
-				const bool is_selected = (select_index == i);
-
-				//if the current one is selected
+				const bool is_selected = (m_createAndBuildEntityIndex == i);
 				if (ImGui::Selectable(entityNames[i].c_str(), is_selected))
 				{
-					select_index = i;
+					// Store the choice immediately so the next button press reads the
+					// same target the user just selected.
+					m_createAndBuildEntityIndex = i;
 				}
 
-				// select it
 				if (is_selected)
 				{
-					updateEntity = entities[i].get();
 					ImGui::SetItemDefaultFocus();
 				}
 			}
@@ -2052,41 +2416,90 @@ void EngineGUI::DrawAddCodeFilePopup()
 			ImGui::EndCombo();
 		}
 
+		// Resolve the selected target after the combo so the button logic always
+		// sees the same entity the popup is displaying.
+		updateEntity = (m_createAndBuildEntityIndex > 0
+			&& static_cast<std::size_t>(m_createAndBuildEntityIndex - 1) < entities.size())
+			? entities[static_cast<std::size_t>(m_createAndBuildEntityIndex - 1)].get()
+			: nullptr;
+
 		if (ImGui::Button("Create and Build"))
 		{
 			const std::string className = NormalizeGameClassName(m_newCodeFileName);
-
 			if (className.empty())
 			{
 				m_addCodeFileStatusMessage = "Enter a valid class name.";
 			}
 			else
 			{
-				std::strncpy(m_newCodeFileName, className.c_str(), sizeof(m_newCodeFileName) - 1);
-				m_newCodeFileName[sizeof(m_newCodeFileName) - 1] = '\0';
+				// Stage the normalized name and open a confirmation popup so the
+				// user sees the shutdown/rebuild behavior before it happens.
+				m_createAndBuildClassName = className;
+				m_createAndBuildPopupRequested = true;
+			}
+		}
 
-				// start create and build sequence
+		if (m_createAndBuildPopupRequested)
+		{
+			// Open the modal once per request; the persistent state keeps the
+			// selection alive until the user confirms or cancels.
+			ImGui::OpenPopup("Create and Build##AquanactCreateAndBuild");
+			m_createAndBuildPopupRequested = false;
+		}
 
-				//step one
-				//TODO: check if class already exists
-				CreateGameCodeFile(className);
+		if (ImGui::BeginPopupModal("Create and Build##AquanactCreateAndBuild", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+		{
+			// The popup explains the workflow before any files are generated so the
+			// user knows the editor will save, exit, and expect a rebuild.
+			const bool attachToExistingEntity = (updateEntity != nullptr);
+			const std::string selectedEntityLabel = updateEntity ? updateEntity->Name() : "none";
+			ImGui::Text("Create a new component type: %s", m_createAndBuildClassName.c_str());
+			ImGui::Text("Selected entity: %s", selectedEntityLabel.c_str());
+			// This branch mirrors the dropdown selection above: if an entity was
+			// selected, the new class will be attached to it; otherwise startup will
+			// create a brand new entity for the component.
+			if (attachToExistingEntity)
+			{
+				ImGui::Text("It will be attached to entity: %s", updateEntity->Name().c_str());
+			}
+			else
+			{
+				ImGui::TextUnformatted("It will be created as a new entity component.");
+			}
+			ImGui::TextWrapped("The editor will generate the new class, save the project, and then shut down so you can rebuild the game.");
+			ImGui::TextWrapped("Please rebuild after the editor closes to compile the new type into the project.");
 
-				//step 2: save bools to disk, new component -> new entity or existing entity
+			if (ImGui::Button("Create and Exit"))
+			{
+				// Build the class files and record the startup handoff before closing
+				// the editor. The generated files are written first so the rebuild has
+				// the new source available immediately.
+				CreateGameCodeFile(m_createAndBuildClassName);
+
+				// Save the exact startup choice the popup described above so the next
+				// launch can attach to the same entity or create a new one.
 				NewClassConfiguration configuration;
-				configuration.className = className;
-				configuration.attachToExistingEntity = (updateEntity != nullptr);
+				configuration.className = m_createAndBuildClassName;
+				// Match the confirmation text exactly: attach to the selected entity
+				// when one is chosen, otherwise create a brand new entity on startup.
+				configuration.attachToExistingEntity = attachToExistingEntity;
 				configuration.targetEntityName = updateEntity ? updateEntity->Name() : "";
-				configuration.createNewEntity = (updateEntity == nullptr);
-
+				configuration.createNewEntity = !attachToExistingEntity;
 				SaveNewClassConfiguration(configuration);
 
-				//step 3: stop program
+				// The project needs to restart/build outside the editor after the new
+				// type is generated, so request window close now.
 				glfwSetWindowShouldClose(m_window->GLFW(), GLFW_TRUE);
-
-				//step 4: make sure SceneManager checks the bools on startup
+				m_createAndBuildClassName.clear();
+				ImGui::CloseCurrentPopup();
 			}
-
-			ImGui::CloseCurrentPopup();
+			ImGui::SameLine();
+			if (ImGui::Button("Cancel"))
+			{
+				m_createAndBuildClassName.clear();
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::EndPopup();
 		}
 
 		ImGui::SameLine();

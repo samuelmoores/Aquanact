@@ -1,0 +1,79 @@
+Game Programming Layer Refactor Report
+
+Date: 2026-08-09
+
+Scope
+- Refactor the gameplay programming layer for readability and maintainability.
+- Focus on the editor-generated component workflow, the `Component` interface, the `Entity` lifecycle paths, and the bindable macro layer.
+- Keep runtime behavior intact while making the intent of the code and docs clearer.
+
+What changed
+
+1. Editor code generation and maintenance
+- Refactored the component-generation path in `src/Engine/UI/EngineGUI.cpp`.
+- Split the maintenance logic into smaller helpers:
+  - source root discovery
+  - game include/source root discovery
+  - generated output root discovery
+  - game source file collection
+  - component name collection
+  - registry template generation
+  - game source list generation
+  - registry/build-list write helpers
+- Kept the behavior the same:
+  - `Add Code File` still generates the header and source scaffold
+  - the generated source list and component registry are still rebuilt from disk state
+  - component deletion still removes live instances, unregisters the type, deletes files, and refreshes generated maintenance files
+- Added comments that explain why each step exists instead of only what the code does.
+
+2. Component interface cleanup
+- Clarified the `Component` contract in `include/Engine/Core/Component.h`.
+- Added comments to the bindable macros so the header explains how the list macros generate both metadata and lookup behavior.
+- Extracted channel construction into a single helper in `src/Engine/Core/Component.cpp`.
+- Added comments to the destructor and dispatch helpers so lifecycle and notification behavior are easier to follow.
+- Left the public API shape unchanged.
+
+3. Entity lifecycle cleanup
+- Added comments in `include/Engine/Core/Entity.h` explaining ownership, component snapshots, and lifecycle sequencing.
+- Clarified the ordered update model in `src/Engine/Core/Entity.cpp`.
+- Added comments for:
+  - ordered update snapshots
+  - ownership transfer in `AddComponent`
+  - pointer-identity removal in `RemoveComponent`
+  - controller-only update phase
+  - non-controller update phase
+  - startup and first-frame dispatch
+- Kept the update and ownership behavior unchanged.
+
+4. Bindable macro layer cleanup
+- Added clarifying comments in `include/Engine/Core/Component.h` around:
+  - bindable value metadata
+  - bindable event metadata
+  - macro-generated lookup code
+  - the single-source-of-truth binding list pattern
+- Updated `docs/AddingComponents.txt` to describe the binding/event macros more directly and to explain the split between code generation and project maintenance.
+
+5. Generated scaffold and example components
+- Simplified the generated component template in `src/Engine/UI/EngineGUI.cpp`.
+- Kept the scaffold focused on the real contract:
+  - `Name()`
+  - lifecycle hooks
+  - binding/event list macros
+- Updated the example headers in:
+  - `include/Game/PlayerHealth.h`
+  - `include/Game/Enemy.h`
+- Aligned those samples with the new scaffold style so they read as concrete examples instead of verbose duplicated docs.
+
+Validation
+- Rebuilt the project after the refactor.
+- Result: successful build of both `AquanactEngine.exe` and `AquanactGame.exe`.
+
+Notes
+- Runtime behavior was intentionally preserved.
+- The refactor was primarily structural and explanatory.
+- The current component binding model remains float-oriented and string-derived; that larger API change was not attempted in this pass.
+
+Follow-up ideas
+- Broaden typed bindables beyond float.
+- Replace string-derived binding channels with stable identifiers.
+- Separate generation/scaffolding from project-maintenance behavior more fully.

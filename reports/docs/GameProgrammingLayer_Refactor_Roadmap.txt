@@ -1,0 +1,127 @@
+Game Programming Layer Refactor Roadmap
+
+Scope
+- Refactor the gameplay component layer so code generation, registration, binding metadata, and runtime behavior are less coupled.
+- Keep the current editor workflow working during migration.
+
+Current shape
+- `Component` owns lifecycle, ownership, bindable metadata, and event dispatch.
+- The editor generates new gameplay classes in `include/Game/` and `src/Game/`.
+- The editor also rewrites `generated/GameSources.cmake` and `src/Engine/Core/ComponentRegistry.cpp` from the source tree.
+- Bindable values and events are string-based and are mostly driven through macros.
+
+Target shape
+- `Component` is primarily runtime behavior and lifecycle.
+- Binding metadata is typed and easier to extend.
+- Runtime identity is stable and not derived from display names.
+- Code generation scaffolds new classes only, while project-maintenance logic is isolated.
+
+Phase 1: Stabilize the current workflow
+
+1. `include/Engine/Core/Component.h`
+- Keep the existing API intact.
+- Add a narrow extension point for bindable metadata so future typed bindings can be introduced without breaking current components.
+- Keep existing macro helpers working during the transition.
+
+2. `src/Engine/Core/Component.cpp`
+- Leave current channel construction in place for now.
+- Add a migration-friendly abstraction around channel creation so later work can switch away from name-derived channels without touching every callsite at once.
+
+3. `src/Engine/UI/EngineGUI.cpp`
+- Split the code-generation logic into smaller helpers if it stays in this file.
+- Separate these responsibilities conceptually:
+  - template generation
+  - file creation
+  - registry regeneration
+  - build-list regeneration
+  - deletion cleanup
+- Do not change behavior yet; reduce complexity first.
+
+4. `docs/AddingComponents.txt` and `docs/ComponentQuickStart.txt`
+- Update the docs to describe the current workflow more precisely:
+  - what the generator writes
+  - what gets registered automatically
+  - what remains manual
+- Add a short migration note for upcoming binding changes.
+
+Phase 2: Introduce typed bindables
+
+5. `include/Engine/Core/Component.h`
+- Replace the float-only bindable model with a typed value representation.
+- Keep the old float-based macros as compatibility shims.
+- Prefer a value object or tagged variant over expanding the float-only interface.
+
+6. `src/Engine/UI/EngineGUI.cpp`
+- Update the GameGUI binding picker to read typed metadata.
+- Keep the UI behavior the same for existing float bindings.
+- Add support for any new bindable types only after the runtime side can serve them.
+
+7. Gameplay component headers in `include/Game/`
+- Gradually migrate existing components to the new typed macros or helper methods.
+- Migrate one component at a time so breakage is obvious and localized.
+
+Phase 3: Decouple identity from display names
+
+8. `include/Engine/Core/Component.h`
+- Add a stable identifier for bindable members and events.
+- Keep human-readable names as labels only.
+
+9. `src/Engine/Core/Component.cpp`
+- Stop using `Entity::Name()` and `Component::Name()` as the only identity source for event channels.
+- Introduce an internal ID-backed channel path with compatibility mapping if needed.
+
+10. `src/Engine/Core/Entity.cpp`
+- If entity identity is used in bindable channels or serialization, ensure it is stable across renames.
+- Keep display name changes from breaking subscriptions.
+
+Phase 4: Simplify generation and project maintenance
+
+11. `src/Engine/UI/EngineGUI.cpp`
+- Make `Add Code File` only generate source scaffolding.
+- Move registry and build-list regeneration into explicit helper functions or a dedicated maintenance step.
+- Keep deletion behavior, but make the mutation order explicit and testable.
+
+12. `generated/GameSources.cmake`
+- Treat this as generated project state, not as the primary source of truth.
+- Regenerate it from a structured manifest or explicit project index if one is introduced later.
+
+13. `src/Engine/Core/ComponentRegistry.cpp`
+- Keep the handwritten registry, but make its generation path less dependent on file scanning.
+- Add validation so duplicate component names or stale entries are detected early.
+
+Phase 5: Add safety checks and tests
+
+14. Add tests around generation
+- New component files are created in the correct folders.
+- Registry entries are produced for new components.
+- Generated source lists include the expected files.
+
+15. Add tests around deletion
+- Live instances are removed from scenes.
+- The factory unregisters the deleted type.
+- Generated registry/build files no longer reference deleted components.
+
+16. Add tests around binding
+- Bindable metadata is exposed correctly.
+- GameGUI can read values without custom per-component code.
+- Event dispatch still reaches subscribers after the refactor.
+
+Suggested implementation order
+1. Add the migration-friendly abstraction in `Component`.
+2. Split the editor generation helpers in `EngineGUI`.
+3. Introduce typed bindables with compatibility shims.
+4. Add stable IDs for channels.
+5. Reduce filesystem-scanning responsibility.
+6. Add tests and migrate existing components.
+
+Risks
+- Binding and event code are currently embedded in several systems, so identity changes need a compatibility layer.
+- The generator currently touches build-state files directly, so moving it too aggressively could break the create/delete workflow.
+- The current float-only assumption is likely baked into some UI paths, so typed bindables should be introduced gradually.
+
+Definition of done
+- New gameplay components can still be created from the editor.
+- Existing gameplay components still load and bind correctly.
+- The binding system supports more than one value shape.
+- Component/event identity survives rename operations.
+- Code generation no longer owns unrelated project-maintenance behavior.

@@ -13,6 +13,11 @@ void ComponentFactory::Register(std::string typeName, Creator creator)
 	m_creators[std::move(typeName)] = std::move(creator);
 }
 
+bool ComponentFactory::Unregister(const std::string& typeName)
+{
+	return m_creators.erase(typeName) > 0;
+}
+
 std::unique_ptr<Component> ComponentFactory::Create(const std::string& typeName, Entity& owner) const
 {
 	const auto it = m_creators.find(typeName);
