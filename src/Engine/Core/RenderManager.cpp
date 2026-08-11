@@ -308,6 +308,7 @@ void RenderManager::DrawRuntimeFrame(FrontEndManager& frontEndManager, Debug& de
 	{
 		debug.drawGameModeInput(input);
 	}
+	debug.DrawPhysicsBoundingVolumes(*m_gameCamera);
 	frontEndManager.DrawRuntimeGUI();
 	const auto debugEnd = std::chrono::high_resolution_clock::now();
 	m_lastFrameDebugOverlayTime = debugEnd - debugStart;

@@ -89,10 +89,38 @@ float PlayerController::ShortestAngleDelta(float from, float to)
 	return WrapAngle(to - from);
 }
 
+void PlayerController::TryJump(const InputManager& input, const glm::vec2& move2D)
+{
+	// Step 1: accept only a new Jump press while grounded. This prevents held
+	// input from creating repeated jumps and leaves landing to the physics code.
+	if (!input.WasPressed("Jump") || !m_isGrounded)
+	{
+		return;
+	}
+
+	// Step 2: leave the grounded state before applying vertical launch velocity.
+	// MoveWithPhysics() clears vertical velocity while grounded, so this order is
+	// required for the jump impulse to survive the movement step.
+	m_grounded = false;
+	m_isGrounded = false;
+	m_groundedLossTimer = 0.0f;
+	m_velocity.y = m_jumpSpeed;
+
+	// Step 3: capture horizontal launch velocity in world space. The cached value
+	// is not rebuilt from input while airborne, which makes the jump projectile-like.
+	const glm::vec3 launchMovement = BuildWorldMovement(move2D);
+	m_jumpHorizontalVelocity = glm::length(launchMovement) > 0.0001f
+		? glm::normalize(launchMovement) * m_moveSpeed
+		: glm::vec3(0.0f);
+	m_jumpTrajectoryLocked = true;
+}
+
 void PlayerController::startUp(Entity& owner)
 {
 	Controller::startUp(owner);
 	m_wantsToMove = false;
+	m_jumpHorizontalVelocity = glm::vec3(0.0f);
+	m_jumpTrajectoryLocked = false;
 	m_inputActions = &Root::Current().InputActions();
 }
 
@@ -105,10 +133,16 @@ void PlayerController::Move(Entity& owner, const glm::vec2& move2D, float dt)
 {
 	// Keep a 3D version of the input around for diagnostics and animation.
 	const glm::vec3 moveInput(move2D.x, 0.0f, move2D.y);
-	SetDiagnosticInput(moveInput);
+	MoveWithWorldDirection(owner, BuildWorldMovement(move2D), moveInput, dt);
+}
 
-	// Convert input into world-space movement relative to the camera.
-	const glm::vec3 movement = BuildWorldMovement(move2D);
+void PlayerController::MoveWithWorldDirection(
+	Entity& owner,
+	const glm::vec3& movement,
+	const glm::vec3& diagnosticInput,
+	float dt)
+{
+	SetDiagnosticInput(diagnosticInput);
 	SetMovementDirection(movement);
 
 	// Exact zero input means no movement this frame, but we still skip the
@@ -117,7 +151,7 @@ void PlayerController::Move(Entity& owner, const glm::vec2& move2D, float dt)
 	{
 		m_isMoving = false;
 		const glm::vec3 appliedDelta = MoveWithPhysics(owner, glm::vec3(0.0f), dt);
-		Root::Current().Debugger().SetGameplayDiagnostics(owner.Name(), moveInput, m_moveSpeed, dt, appliedDelta, owner.Position());
+		Root::Current().Debugger().SetGameplayDiagnostics(owner.Name(), diagnosticInput, m_moveSpeed, dt, appliedDelta, owner.Position());
 		return;
 	}
 
@@ -135,7 +169,7 @@ void PlayerController::Move(Entity& owner, const glm::vec2& move2D, float dt)
 	// and diagnostics stay consistent with the rest of the controller.
 	const glm::vec3 desiredHorizontalVelocity = normalizedMovement * m_moveSpeed;
 	const glm::vec3 appliedDelta = MoveWithPhysics(owner, desiredHorizontalVelocity, dt);
-	Root::Current().Debugger().SetGameplayDiagnostics(owner.Name(), moveInput, m_moveSpeed, dt, appliedDelta, owner.Position());
+	Root::Current().Debugger().SetGameplayDiagnostics(owner.Name(), diagnosticInput, m_moveSpeed, dt, appliedDelta, owner.Position());
 }
 
 void PlayerController::Update(Entity& owner, float dt)
@@ -143,6 +177,13 @@ void PlayerController::Update(Entity& owner, float dt)
 	const InputManager& input = m_inputActions ? *m_inputActions : Root::Current().InputActions();
 	const glm::vec2 move2D = input.VectorValue("Move");
 	m_wantsToMove = glm::length(move2D) > 0.0001f;
+
+	// Landing ends the projectile phase. The next grounded frame can once again
+	// use the player's live movement input.
+	if (m_isGrounded)
+	{
+		m_jumpTrajectoryLocked = false;
+	}
 
 	if (m_entityState->CurrentStateBlocksMovement())
 	{
@@ -153,5 +194,21 @@ void PlayerController::Update(Entity& owner, float dt)
 		return;
 	}
 
-	Move(owner, move2D, dt);
+	// A jump can only be requested after state-based movement blocking has been
+	// handled. This prevents attacks or other blocking states from launching.
+	TryJump(input, move2D);
+	if (m_jumpTrajectoryLocked && !m_isGrounded)
+	{
+		// Step 4: use the cached world-space launch velocity while airborne. The
+		// movement helper still applies gravity and collision resolution normally.
+		const glm::vec3 diagnosticInput(
+			m_jumpHorizontalVelocity.x,
+			0.0f,
+			m_jumpHorizontalVelocity.z);
+		MoveWithWorldDirection(owner, m_jumpHorizontalVelocity, diagnosticInput, dt);
+	}
+	else
+	{
+		Move(owner, move2D, dt);
+	}
 }

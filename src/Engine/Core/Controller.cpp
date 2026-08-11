@@ -171,7 +171,9 @@ glm::vec3 Controller::MoveWithCollision(Entity& owner, const glm::vec3& delta,
 		BuildVerticalCapsule(startMin, startMax, capsuleBase, capsuleTip, capsuleRadius);
 	}
 	constexpr int maxSlideIterations = 4;
-	constexpr float collisionSkin = 0.001f;
+	// Controller contacts are resolved directly to the surface. Keeping a
+	// deliberate gap here causes the capsule to visibly float after landing.
+	constexpr float collisionSkin = 0.0f;
 	for (int iteration = 0; iteration < maxSlideIterations && glm::length(remainingMovement) > 0.0001f; ++iteration)
 	{
 		const glm::vec3 currentMin = startMin + resolvedDelta;
@@ -255,7 +257,8 @@ glm::vec3 Controller::MoveWithCollision(Entity& owner, const glm::vec3& delta,
 		}
 
 		const float movementLength = glm::length(remainingMovement);
-		const float safeTime = glm::max(0.0f, earliestHit.time - collisionSkin / movementLength);
+		const float skinOffset = movementLength > 0.0f ? collisionSkin / movementLength : 0.0f;
+		const float safeTime = glm::max(0.0f, earliestHit.time - skinOffset);
 		resolvedDelta += remainingMovement * safeTime;
 
 		glm::vec3 slideMovement = remainingMovement * (1.0f - earliestHit.time);
@@ -292,15 +295,20 @@ glm::vec3 Controller::MoveWithPhysics(Entity& owner, const glm::vec3& desiredHor
 	const glm::vec3 appliedDelta = MoveWithCollision(owner, m_velocity * dt, &lastCollisionNormal, &collidedWithGround);
 	mainGroundContact = collidedWithGround;
 	bool probeGroundContact = false;
-	if (!collidedWithGround)
+	// Do not run the downward ground probe while moving upward. During a jump,
+	// probing from the newly raised position can find the floor and snap the
+	// capsule back down in the same frame that the jump was applied.
+	if (!collidedWithGround && m_velocity.y <= 0.0f)
 	{
 		// Ramp contact can briefly miss the main sweep while descending. Probe
 		// directly below the controller, then restore the probed position.
 		glm::vec3 probeNormal(0.0f);
 		const glm::vec3 probeDelta = MoveWithCollision(
 			owner, glm::vec3(0.0f, -groundProbeDistance, 0.0f), &probeNormal, &probeGroundContact);
-		if (glm::dot(probeDelta, probeDelta) > 0.0f)
+		if (!probeGroundContact && glm::dot(probeDelta, probeDelta) > 0.0f)
 		{
+			// Restore probes that hit a wall or another non-ground surface. A
+			// walkable ground hit is intentionally retained to snap onto the floor.
 			owner.Move(-probeDelta);
 		}
 		if (probeGroundContact)

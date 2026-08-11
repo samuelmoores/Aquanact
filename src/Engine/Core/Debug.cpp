@@ -435,6 +435,8 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 	for (std::size_t i = 0; i < m_entityBoundingBoxObjects.size(); ++i)
 	{
 		Entity* object = m_entityBoundingBoxObjects[i];
+		// Editor volumes are controlled only by the selected entity's toggle. The
+		// global diagnostics toggle is applied separately by the game-view path.
 		if (!object || !object->ShowPhysicsBoundingBox() || !object->GetMesh())
 		{
 			continue;
@@ -837,6 +839,78 @@ void Debug::drawGameModeInput(const Input& input)
 	ImGui::EndChild();
 		ImGui::End();
 		m_showAnimationDiagnosticsWindow = open;
+	}
+}
+
+void Debug::DrawPhysicsBoundingVolumes(const Camera& camera)
+{
+	if (!m_showPhysicsDiagnosticsWindow)
+	{
+		return;
+	}
+
+	const Scene* activeLevel = Root::Current().Scenes().ActiveLevel();
+	std::vector<Entity*> currentBoundingBoxObjects;
+	if (activeLevel)
+	{
+		currentBoundingBoxObjects.reserve(activeLevel->Objects().size());
+		for (const auto& object : activeLevel->Objects())
+		{
+			if (object)
+			{
+				currentBoundingBoxObjects.push_back(object.get());
+			}
+		}
+	}
+
+	if (currentBoundingBoxObjects != m_entityBoundingBoxObjects)
+	{
+		ClearEntityBoundingBoxes();
+		m_entityBoundingBoxObjects = currentBoundingBoxObjects;
+		for (Entity* object : m_entityBoundingBoxObjects)
+		{
+			m_entityBoundingBoxes.push_back(new Line(glm::vec3(0.0f), glm::vec3(0.0f)));
+		}
+	}
+
+	const glm::mat4 projection = camera.GetProjectionMatrix();
+	const glm::mat4 view = camera.GetViewMatrix();
+	for (std::size_t i = 0; i < m_entityBoundingBoxObjects.size(); ++i)
+	{
+		Entity* object = m_entityBoundingBoxObjects[i];
+		if (!object || !object->GetMesh())
+		{
+			continue;
+		}
+
+		glm::vec3 boxMin;
+		glm::vec3 boxMax;
+		if (!object->WorldAABB(boxMin, boxMax))
+		{
+			continue;
+		}
+
+		Line* volume = m_entityBoundingBoxes[i];
+		const glm::vec3 debugColor(1.0f, 0.7f, 0.1f);
+		if (object->GetPhysicsColliderShape() == PhysicsColliderShape::Capsule)
+		{
+			glm::vec3 base;
+			glm::vec3 tip;
+			float radius = 0.0f;
+			BuildVerticalCapsule(boxMin, boxMax, base, tip, radius);
+			volume->SetVertices(MakeWireCapsuleVertices(base, tip, radius, debugColor));
+		}
+		else if (object->GetPhysicsColliderShape() == PhysicsColliderShape::Convex)
+		{
+			volume->SetVertices(MakeWireConvexVertices(*object, debugColor));
+		}
+		else
+		{
+			volume->SetBounds(boxMin, boxMax, debugColor);
+		}
+
+		volume->UpdateProjection(projection);
+		volume->draw(view);
 	}
 }
 
