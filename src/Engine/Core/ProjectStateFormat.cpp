@@ -7,7 +7,7 @@
 #include "Engine/Core/ProjectStateData.h"
 #include "Engine/Core/EntityStateMachine.h"
 #include "Engine/Core/Controller.h"
-#include "Engine/Core/PlayerController.h"
+#include "Game/PlayerController.h"
 #include "Game/Enemy.h"
 
 #include <glm/glm.hpp>

@@ -251,30 +251,6 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 		}
 	}
 
-	std::string entityStateListText;
-	for (const auto& object : activeLevel->Objects())
-	{
-		if (!object)
-		{
-			continue;
-		}
-
-		if (EntityStateMachine* entityState = object->GetEntityState())
-		{
-			entityStateListText += object->Name();
-			entityStateListText += " -> ";
-			entityStateListText += entityState->CurrentState().empty() ? "<none>" : entityState->CurrentState();
-			if (!entityState->DesiredState().empty() && entityState->DesiredState() != entityState->CurrentState())
-			{
-				entityStateListText += " (desired: ";
-				entityStateListText += entityState->DesiredState();
-				entityStateListText += ")";
-			}
-			entityStateListText += "\n";
-		}
-	}
-	debug.SetEntityStateDiagnostics(entityStateListText);
-
 }
 
 void GameplayManager::SetPaused(bool paused, FrontEndManager& frontEndManager, Debug& debug)

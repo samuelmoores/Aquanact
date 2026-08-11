@@ -61,7 +61,7 @@ public:
 		std::string from;
 		std::string to;
 		float blendSeconds = 0.33f;
-		bool interrupt = true;
+		bool waitForCurrentStateComplete = false;
 		Condition condition;
 		std::vector<Condition> conditions;
 	};
@@ -82,10 +82,10 @@ public:
 	bool RemoveState(std::size_t index);
 
 	// Transition editing.
-	bool AddTransition(std::string from, std::string to, float blendSeconds, bool interrupt, Condition condition = {});
-	bool AddTransition(std::string from, std::string to, float blendSeconds, bool interrupt, std::vector<Condition> conditions);
-	bool UpdateTransition(std::size_t index, std::string from, std::string to, float blendSeconds, bool interrupt, Condition condition = {});
-	bool UpdateTransition(std::size_t index, std::string from, std::string to, float blendSeconds, bool interrupt, std::vector<Condition> conditions);
+	bool AddTransition(std::string from, std::string to, float blendSeconds, bool waitForCurrentStateComplete, Condition condition = {});
+	bool AddTransition(std::string from, std::string to, float blendSeconds, bool waitForCurrentStateComplete, std::vector<Condition> conditions);
+	bool UpdateTransition(std::size_t index, std::string from, std::string to, float blendSeconds, bool waitForCurrentStateComplete, Condition condition = {});
+	bool UpdateTransition(std::size_t index, std::string from, std::string to, float blendSeconds, bool waitForCurrentStateComplete, std::vector<Condition> conditions);
 	bool RemoveTransition(std::size_t index);
 
 	// Runtime accessors.
@@ -99,6 +99,10 @@ public:
 	const std::string& CurrentState() const;
 	const std::string& DesiredState() const;
 	bool CurrentStateLockedUntilComplete() const;
+	bool CurrentStateWaitsForCompletion() const;
+	float CurrentStateElapsedSeconds() const;
+	float CurrentStateClipDurationSeconds() const;
+	float CurrentStateSecondsUntilUnlock() const;
 	bool CurrentStateBlocksMovement() const;
 	bool CurrentStateBlocksInput() const;
 
@@ -112,6 +116,8 @@ public:
 	float LastTransitionLeftValue() const;
 	float LastTransitionRightValue() const;
 	bool LastTransitionPassed() const;
+	bool LastTransitionWaitBlocked() const;
+	const std::string& LastTransitionBlockedReason() const;
 	const std::string& LastResolvedTargetState() const;
 	int LastResolvedTargetClipIndex() const;
 	bool LastResolvedTargetFound() const;
@@ -122,6 +128,12 @@ public:
 
 private:
 	// Internal state management.
+	void ResetTransitionDiagnostics();
+	void UpdateTimers(float dt);
+	bool ProcessDesiredStateChange();
+	void EvaluateTransitions(Entity& owner);
+	bool EvaluateTransitionConditions(const Transition& transition, const Entity& owner, float& leftValue, float& rightValue, bool& operandsResolved);
+	bool FireTransition(const Transition& transition);
 	void StartInitialState();
 	void ActivateState(const std::string& stateName);
 	int ResolveAnimationClipIndex(const State& state) const;
@@ -171,6 +183,8 @@ private:
 	float m_lastTransitionLeftValue = 0.0f;
 	float m_lastTransitionRightValue = 0.0f;
 	bool m_lastTransitionPassed = false;
+	bool m_lastTransitionWaitBlocked = false;
+	std::string m_lastTransitionBlockedReason;
 
 	// Last resolved target state/clip. Useful when a transition or forced state
 	// change succeeds or fails.

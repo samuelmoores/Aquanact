@@ -15,7 +15,7 @@
 #include "Engine/Core/InputManager.h"
 #include "Engine/Core/FrameProfiler.h"
 #include "Engine/Core/GLHeaders.h"
-#include "Game/ComponentRegistry.h"
+#include "Engine/Core/ComponentRegistry.h"
 
 #include <chrono>
 #include <filesystem>
@@ -127,8 +127,13 @@ void Root::startUp(int argc, char** argv)
 	m_debug->startUp();
 	m_fileManager->startUp();
 	RegisterGameComponents();
-	m_projectManager->LoadProject(DefaultProjectPath(), *m_sceneManager);
+	const std::filesystem::path projectPath = DefaultProjectPath();
+	m_projectManager->LoadProject(projectPath, *m_sceneManager);
 	m_sceneManager->startUp();
+	if (m_sceneManager->AppliedNewClassConfigurationOnStartup())
+	{
+		m_projectManager->SaveProject(projectPath, *m_sceneManager);
+	}
 
 	StartInitialSession();
 	m_started = true;

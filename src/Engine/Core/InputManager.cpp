@@ -4,6 +4,7 @@
 
 #include "GLFW/glfw3.h"
 
+#include <imgui.h>
 #include <algorithm>
 #include <cmath>
 #include <utility>
@@ -153,6 +154,9 @@ bool InputManager::IsBindingDown(const InputBinding& binding) const
 void InputManager::EvaluateActions()
 {
 	m_vectorStates.clear();
+	const ImGuiIO& io = ImGui::GetIO();
+	const bool uiCapturesKeyboard = io.WantCaptureKeyboard || io.WantTextInput;
+	const bool uiCapturesMouse = io.WantCaptureMouse || ImGui::IsAnyItemActive();
 	for (auto& [action, state] : m_states)
 	{
 		state.previousValue = state.value;
@@ -169,6 +173,10 @@ void InputManager::EvaluateActions()
 		{
 			if (binding.type == InputBindingType::Key)
 			{
+				if (uiCapturesKeyboard)
+				{
+					continue;
+				}
 				if (m_input->KeyDown(binding.code))
 				{
 					vectorValue += binding.vector * binding.scale;
@@ -176,6 +184,10 @@ void InputManager::EvaluateActions()
 			}
 			else if (binding.type == InputBindingType::MouseButton)
 			{
+				if (uiCapturesMouse)
+				{
+					continue;
+				}
 				if (m_input->MouseButtonDown(binding.code))
 				{
 					vectorValue += binding.vector * binding.scale;
@@ -183,6 +195,10 @@ void InputManager::EvaluateActions()
 			}
 			else if (binding.type == InputBindingType::MouseDelta)
 			{
+				if (uiCapturesMouse)
+				{
+					continue;
+				}
 				vectorValue += m_input->MouseDelta() * binding.vector;
 			}
 			else if (binding.type == InputBindingType::ControllerDigital)

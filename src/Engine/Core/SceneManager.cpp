@@ -4,7 +4,7 @@
 #include "Engine/Core/ComponentFactory.h"
 #include "Engine/Core/Controller.h"
 #include "Engine/Core/Entity.h"
-#include "Engine/Core/PlayerController.h"
+#include "Game/PlayerController.h"
 #include "Engine/Core/ProjectStateData.h"
 #include "Game/Enemy.h"
 
@@ -90,6 +90,40 @@ namespace
 			? object.Id() == entityId
 			: object.SourcePath() == sourcePath.string();
 	}
+
+	std::string WithoutPathSeparators(const std::string& value)
+	{
+		std::string compact;
+		compact.reserve(value.size());
+		for (const char character : value)
+		{
+			if (character != '/' && character != '\\')
+			{
+				compact.push_back(character);
+			}
+		}
+		return compact;
+	}
+
+	std::string ResolveSavedAnimationSource(Entity& entity, const std::string& savedAnimationSource)
+	{
+		const Mesh* mesh = entity.GetMesh();
+		if (!mesh || savedAnimationSource.empty())
+		{
+			return savedAnimationSource;
+		}
+
+		const std::string compactSavedSource = WithoutPathSeparators(savedAnimationSource);
+		for (int animationIndex = 0; animationIndex < mesh->NumAnimations(); ++animationIndex)
+		{
+			const std::string& animationSource = mesh->GetAnimationSource(animationIndex);
+			if (animationSource == savedAnimationSource || WithoutPathSeparators(animationSource) == compactSavedSource)
+			{
+				return animationSource;
+			}
+		}
+		return savedAnimationSource;
+	}
 }
 
 SceneManager::~SceneManager() = default;
@@ -97,6 +131,7 @@ SceneManager::~SceneManager() = default;
 // Lifecycle and state reset
 Scene* SceneManager::startUp()
 {
+	m_appliedNewClassConfigurationOnStartup = false;
 
 	// check for new game code
 	// load congiguration
@@ -141,7 +176,7 @@ Scene* SceneManager::startUp()
 
 		if (entity)
 		{
-			attachComponent(*entity);
+			m_appliedNewClassConfigurationOnStartup = attachComponent(*entity);
 		}
 	}
 	else if (configuration.attachToExistingEntity && !configuration.targetEntityName.empty())
@@ -153,7 +188,7 @@ Scene* SceneManager::startUp()
 				continue;
 			}
 
-			attachComponent(*entity);
+			m_appliedNewClassConfigurationOnStartup = attachComponent(*entity);
 			break;
 		}
 	}
@@ -386,6 +421,17 @@ void SceneManager::ApplyProjectState(
 					object->AddComponent<Enemy>();
 				}
 			}
+			else if (pendingComponent.type == "gamecomponent")
+			{
+				if (!object->GetComponentByName(pendingComponent.componentClassName))
+				{
+					std::unique_ptr<Component> component = ComponentFactory::Instance().Create(pendingComponent.componentClassName, *object);
+					if (component)
+					{
+						object->AddComponent(std::move(component));
+					}
+				}
+			}
 			else if (pendingComponent.type == "entitystate")
 			{
 				if (!object->GetComponent<EntityStateMachine>())
@@ -397,7 +443,11 @@ void SceneManager::ApplyProjectState(
 				{
 					for (const ProjectStateData::PendingComponent::EntityStateData& state : pendingComponent.entityStateStates)
 					{
-						entityStateMachine->AddState(state.name, state.animationName, state.blocksMovement, state.blocksInput);
+						entityStateMachine->AddState(
+							state.name,
+							ResolveSavedAnimationSource(*object, state.animationName),
+							state.blocksMovement,
+							state.blocksInput);
 					}
 					entityStateMachine->SetInitialState(pendingComponent.initialState);
 
@@ -437,7 +487,7 @@ void SceneManager::ApplyProjectState(
 							conditions.push_back(std::move(condition));
 						}
 
-						entityStateMachine->AddTransition(transition.from, transition.to, transition.blendSeconds, transition.interrupt, std::move(conditions));
+						entityStateMachine->AddTransition(transition.from, transition.to, transition.blendSeconds, transition.waitForCurrentStateComplete, std::move(conditions));
 					}
 				}
 			}
@@ -570,6 +620,11 @@ void SceneManager::SetStartupLevelName(std::string name)
 const std::string& SceneManager::StartupLevelName() const
 {
 	return m_startupLevelName;
+}
+
+bool SceneManager::AppliedNewClassConfigurationOnStartup() const
+{
+	return m_appliedNewClassConfigurationOnStartup;
 }
 
 

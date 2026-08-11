@@ -89,7 +89,7 @@ private:
 		bool showIncomingTransitions = true;
 		bool showOutgoingTransitions = true;
 		float transitionBlendSeconds = 0.25f;
-		bool transitionInterrupt = true;
+		bool transitionWaitForCurrentStateComplete = false;
 		bool addStatePopupInitialized = false;
 		bool editStatePopupRequested = false;
 		int editingStateIndex = -1;

@@ -119,7 +119,10 @@ float Animator::ClipDuration(int clipIndex) const
 	{
 		return 0.0f;
 	}
-	return m_clips[clipIndex]->Duration();
+
+	const Animation& clip = *m_clips[clipIndex];
+	const float ticksPerSecond = clip.TicksPerSecond();
+	return ticksPerSecond > 0.0f ? clip.Duration() / ticksPerSecond : 0.0f;
 }
 
 void Animator::Traverse(float timeTicks, const aiNode* node, const aiMatrix4x4& parent, Animation* anim)

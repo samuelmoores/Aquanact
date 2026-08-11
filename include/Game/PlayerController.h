@@ -6,6 +6,7 @@ class Input;
 class InputManager;
 class EntityStateMachine;
 
+// Game-specific input controller for the player-controlled entity.
 class PlayerController final : public Controller
 {
 public:
@@ -20,11 +21,13 @@ public:
 	// Editor-facing tuning values.
 	float TurnSpeed() const { return m_turnSpeed; }
 	void SetTurnSpeed(float turnSpeed) { m_turnSpeed = turnSpeed; }
+	bool WantsToMove() const { return m_wantsToMove; }
 
 	// Bindable player-controller settings shown in the editor.
 	// Keep this list limited to stable gameplay tuning values that are useful to inspect or edit.
 	#define PLAYER_CONTROLLER_BINDABLES(VALUE, FUNCTION) \
 		FUNCTION(IsMoving) \
+		FUNCTION(WantsToMove) \
 		FUNCTION(IsGrounded) \
 		VALUE(m_moveSpeed) \
 		VALUE(m_turnSpeed) 
@@ -47,6 +50,7 @@ private:
 	const Input* m_inputDevice = nullptr;
 	const InputManager* m_inputActions = nullptr;
 	EntityStateMachine* m_entityState = nullptr;
+	bool m_wantsToMove = false;
 
 	// Player-specific tuning.
 	float m_turnSpeed = 8.0f;

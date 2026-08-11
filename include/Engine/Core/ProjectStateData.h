@@ -20,6 +20,7 @@ namespace ProjectStateData {
 		unsigned int entityId = 0;
 		std::string levelName;
 		std::string type;
+		std::string componentClassName;
 		std::string initialState;
 		struct EntityStateData {
 			std::string name;
@@ -48,7 +49,7 @@ namespace ProjectStateData {
 				std::string from;
 				std::string to;
 				float blendSeconds = 0.33f;
-				bool interrupt = true;
+				bool waitForCurrentStateComplete = false;
 				OperandData left;
 				int comparator = 0;
 				OperandData right;

@@ -25,7 +25,6 @@ namespace ProjectStateSerializer {
 	bool LoadLevelState(
 		const std::filesystem::path& projectPath,
 		std::istream& file,
-		int projectVersion,
 		std::vector<ProjectStateData::PendingLevel>& pendingLevels,
 		std::vector<ProjectStateData::PendingController>& pendingControllers,
 		std::vector<ProjectStateData::PendingComponent>& pendingComponents,

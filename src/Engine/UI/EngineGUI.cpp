@@ -19,7 +19,7 @@
 #include "Engine/Core/Entity.h"
 #include "Engine/Core/ComponentFactory.h"
 #include "Engine/Core/Controller.h"
-#include "Engine/Core/PlayerController.h"
+#include "Game/PlayerController.h"
 #include "Engine/Core/EntityStateMachine.h"
 #include "Game/Enemy.h"
 #include "Engine/Core/GLHeaders.h"
@@ -40,6 +40,12 @@
 
 namespace {
 	constexpr float worldUnitsPerMeter = 100.0f;
+
+	std::string AnimationFileName(const std::string& animationPath)
+	{
+		const std::size_t separator = animationPath.find_last_of("/\\");
+		return separator == std::string::npos ? animationPath : animationPath.substr(separator + 1);
+	}
 
 	std::filesystem::path SourceRoot()
 	{
@@ -71,7 +77,7 @@ namespace {
 		// When the editor deletes a component type, it must also stop generating
 		// registration code for that type or the next rebuild will fail.
 		std::string contents =
-			"#include \"Game/ComponentRegistry.h\"\n\n"
+			"#include \"Engine/Core/ComponentRegistry.h\"\n\n"
 			"#include \"Engine/Core/ComponentFactory.h\"\n"
 			"#include \"Engine/Core/Controller.h\"\n"
 			"#include \"Engine/Core/Entity.h\"\n";
@@ -1490,6 +1496,11 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 						{
 							continue;
 						}
+						// EntityStateMachine has a dedicated editor directly below Rotation.
+						if (dynamic_cast<EntityStateMachine*>(component))
+						{
+							continue;
+						}
 
 						if (componentIndex > 0)
 						{
@@ -1917,7 +1928,7 @@ void EngineGUI::DrawEntityStateMachinePopup(EntityStateMachine& entityStateMachi
 			copyStateName(ui.transitionFromState, sizeof(ui.transitionFromState), transition.from);
 			copyStateName(ui.transitionToState, sizeof(ui.transitionToState), transition.to);
 			ui.transitionBlendSeconds = transition.blendSeconds;
-			ui.transitionInterrupt = transition.interrupt;
+			ui.transitionWaitForCurrentStateComplete = transition.waitForCurrentStateComplete;
 			ui.conditions = transition.conditions.empty() ? std::vector<EntityStateMachine::Condition>{ transition.condition } : transition.conditions;
 			ui.editingTransitionIndex = static_cast<int>(transitionIndex);
 			ui.addTransitionPopupInitialized = true;
@@ -2002,10 +2013,6 @@ void EngineGUI::DrawEntityStateMachinePopup(EntityStateMachine& entityStateMachi
 		{
 			if (!ui.addStatePopupInitialized)
 			{
-				if (ui.stateEditName[0] == '\0' && !states.empty())
-				{
-					copyStateName(ui.stateEditName, sizeof(ui.stateEditName), states.front().name);
-				}
 				if (ui.editingStateIndex >= 0 && static_cast<std::size_t>(ui.editingStateIndex) < states.size())
 				{
 					const EntityStateMachine::State& editedState = states[static_cast<std::size_t>(ui.editingStateIndex)];
@@ -2013,18 +2020,25 @@ void EngineGUI::DrawEntityStateMachinePopup(EntityStateMachine& entityStateMachi
 					ui.stateEditBlocksMovement = editedState.blocksMovement;
 					ui.stateEditBlocksInput = editedState.blocksInput;
 				}
+				else
+				{
+					ui.stateEditName[0] = '\0';
+					ui.stateEditAnimationName[0] = '\0';
+					ui.stateEditBlocksMovement = false;
+					ui.stateEditBlocksInput = false;
+				}
 				ui.addStatePopupInitialized = true;
 			}
 
 			ImGui::InputText("State Name", ui.stateEditName, sizeof(ui.stateEditName));
 			const std::string currentAnimation = ui.stateEditAnimationName[0] != '\0'
-				? std::filesystem::path(ui.stateEditAnimationName).filename().string()
+				? AnimationFileName(ui.stateEditAnimationName)
 				: "<select animation>";
 			if (ImGui::BeginCombo("Animation", currentAnimation.c_str()))
 			{
 				for (int i = 0; i < static_cast<int>(animationNames.size()); ++i)
 				{
-					const std::string animationLabel = std::filesystem::path(animationNames[static_cast<std::size_t>(i)]).filename().string();
+					const std::string animationLabel = AnimationFileName(animationNames[static_cast<std::size_t>(i)]);
 					const bool selected = animationNames[static_cast<std::size_t>(i)] == ui.stateEditAnimationName;
 					if (ImGui::Selectable(animationLabel.c_str(), selected))
 					{
@@ -2037,7 +2051,7 @@ void EngineGUI::DrawEntityStateMachinePopup(EntityStateMachine& entityStateMachi
 				}
 				ImGui::EndCombo();
 			}
-			ImGui::Checkbox("Blocks Movement", &ui.stateEditBlocksMovement);
+			ImGui::Checkbox("Block Movement", &ui.stateEditBlocksMovement);
 			ImGui::Checkbox("Blocks Input", &ui.stateEditBlocksInput);
 
 			if (ImGui::Button("Create"))
@@ -2210,7 +2224,7 @@ void EngineGUI::DrawEntityStateMachinePopup(EntityStateMachine& entityStateMachi
 				defaultCondition.right.constantValue = 1.0f;
 				ui.conditions.push_back(std::move(defaultCondition));
 				ui.transitionBlendSeconds = 0.25f;
-				ui.transitionInterrupt = true;
+				ui.transitionWaitForCurrentStateComplete = false;
 				ui.addTransitionPopupInitialized = true;
 			}
 
@@ -2248,7 +2262,7 @@ void EngineGUI::DrawEntityStateMachinePopup(EntityStateMachine& entityStateMachi
 
 			ImGui::SetNextItemWidth(120.0f);
 			ImGui::InputFloat("Blend Seconds", &ui.transitionBlendSeconds, 0.0f, 0.0f, "%.2f");
-			ImGui::Checkbox("Interrupt", &ui.transitionInterrupt);
+			ImGui::Checkbox("Wait for source state to finish before transitioning", &ui.transitionWaitForCurrentStateComplete);
 			ImGui::Separator();
 
 			for (std::size_t conditionIndex = 0; conditionIndex < ui.conditions.size(); ++conditionIndex)
@@ -2314,13 +2328,13 @@ void EngineGUI::DrawEntityStateMachinePopup(EntityStateMachine& entityStateMachi
 			{
 				if (ui.editingTransitionIndex >= 0)
 				{
-					entityStateMachine.UpdateTransition(static_cast<std::size_t>(ui.editingTransitionIndex), ui.transitionFromState, ui.transitionToState, ui.transitionBlendSeconds, ui.transitionInterrupt, ui.conditions);
+					entityStateMachine.UpdateTransition(static_cast<std::size_t>(ui.editingTransitionIndex), ui.transitionFromState, ui.transitionToState, ui.transitionBlendSeconds, ui.transitionWaitForCurrentStateComplete, ui.conditions);
 				}
 				else
 				{
-					entityStateMachine.AddTransition(ui.transitionFromState, ui.transitionToState, ui.transitionBlendSeconds, ui.transitionInterrupt, ui.conditions);
+					entityStateMachine.AddTransition(ui.transitionFromState, ui.transitionToState, ui.transitionBlendSeconds, ui.transitionWaitForCurrentStateComplete, ui.conditions);
+					ui.visibleStateTransitions[ui.transitionFromState] = true;
 				}
-				ui.visibleStateTransitions[ui.transitionFromState] = true;
 				ui.editingTransitionIndex = -1;
 				ui.addTransitionPopupInitialized = false;
 				ui.transitionListNeedsRefresh = true;
@@ -2428,6 +2442,11 @@ std::string EngineGUI::MakeHeaderTemplate(const std::string& className)
 	return
 		"#pragma once\n\n"
 		"#include \"Engine/Core/Component.h\"\n\n"
+		"class Entity;\n"
+		"class EntityStateMachine;\n"
+		"class Input;\n"
+		"class InputManager;\n"
+		"class Root;\n\n"
 		"// Generated gameplay component scaffold.\n"
 		"//\n"
 		"// Contract:\n"
@@ -2472,6 +2491,11 @@ std::string EngineGUI::MakeSourceTemplate(const std::string& className)
 {
 	return
 		"#include \"Game/" + className + ".h\"\n\n"
+		"#include \"Engine/Core/Entity.h\"\n"
+		"#include \"Engine/Core/EntityStateMachine.h\"\n"
+		"#include \"Engine/Core/Input.h\"\n"
+		"#include \"Engine/Core/InputManager.h\"\n"
+		"#include \"Engine/Core/Root.h\"\n\n"
 		"void " + className + "::startUp(Entity&)\n"
 		"{\n"
 		"}\n\n"
@@ -2701,6 +2725,13 @@ void EngineGUI::DrawAddCodeFilePopup()
 				configuration.targetEntityName = updateEntity ? updateEntity->Name() : "";
 				configuration.createNewEntity = !attachToExistingEntity;
 				SaveNewClassConfiguration(configuration);
+
+				// Preserve all existing editor changes before leaving for the rebuild.
+				ProjectManager& projectManager = Root::Current().Projects();
+				if (!projectManager.CurrentProjectPath().empty())
+				{
+					projectManager.SaveProject(projectManager.CurrentProjectPath(), Root::Current().Scenes());
+				}
 
 				// The project needs to restart/build outside the editor after the new
 				// type is generated, so request window close now.

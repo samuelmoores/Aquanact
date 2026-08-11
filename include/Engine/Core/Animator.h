@@ -27,6 +27,7 @@ public:
 	// Playback
 	void Play(int clipIndex, float blendSeconds = 0.33f);
 	void Update(float dt);
+	// Returns the full clip length in seconds.
 	float ClipDuration(int clipIndex) const;
 
 	// Clip management

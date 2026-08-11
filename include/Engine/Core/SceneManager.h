@@ -55,6 +55,7 @@ public:
 	// Startup configuration
 	void SetStartupLevelName(std::string name);
 	const std::string& StartupLevelName() const;
+	bool AppliedNewClassConfigurationOnStartup() const;
 
 	const std::vector<std::unique_ptr<Scene>>& Levels() const { return m_levels; }
 
@@ -71,4 +72,5 @@ private:
 	Scene* m_activeLevel = nullptr;
 	std::unordered_map<Entity*, EditorTransformSnapshot> m_editorTransformSnapshots;
 	std::string m_startupLevelName;
+	bool m_appliedNewClassConfigurationOnStartup = false;
 };

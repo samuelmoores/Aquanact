@@ -241,8 +241,7 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 	std::istringstream file(fileContents);
 	std::string header;
 	std::getline(file, header);
-	const int projectVersion = 21;
-	if (header != "AquanactProject" && header != "AquanactProject 19")
+	if (header != "AquanactProject")
 	{
 		return false;
 	}
@@ -255,7 +254,7 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 	std::string pendingGameGUINavigationMode;
 	ProjectStateData::RenderStateData renderState;
 	std::string startupLevelName;
-	const bool loaded = ProjectStateSerializer::LoadLevelState(path, file, projectVersion, pendingLevels, pendingControllers, pendingComponents, pendingInputActions, pendingGameGUIAssets, pendingActiveGameGUIAsset, pendingGameGUINavigationMode, renderState, startupLevelName);
+	const bool loaded = ProjectStateSerializer::LoadLevelState(path, file, pendingLevels, pendingControllers, pendingComponents, pendingInputActions, pendingGameGUIAssets, pendingActiveGameGUIAsset, pendingGameGUINavigationMode, renderState, startupLevelName);
 	if (loaded) // broken boundary, no longer just I/O
 	{
 		MaterializePendingLevels(SceneManager, pendingLevels);

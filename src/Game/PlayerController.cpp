@@ -1,4 +1,4 @@
-#include "Engine/Core/PlayerController.h"
+#include "Game/PlayerController.h"
 
 #include "Engine/Core/EntityStateMachine.h"
 #include "Engine/Core/Entity.h"
@@ -92,6 +92,7 @@ float PlayerController::ShortestAngleDelta(float from, float to)
 void PlayerController::startUp(Entity& owner)
 {
 	Controller::startUp(owner);
+	m_wantsToMove = false;
 	m_inputActions = &Root::Current().InputActions();
 }
 
@@ -141,9 +142,14 @@ void PlayerController::Update(Entity& owner, float dt)
 {
 	const InputManager& input = m_inputActions ? *m_inputActions : Root::Current().InputActions();
 	const glm::vec2 move2D = input.VectorValue("Move");
+	m_wantsToMove = glm::length(move2D) > 0.0001f;
 
 	if (m_entityState->CurrentStateBlocksMovement())
 	{
+		// Keep the movement bindable synchronized while movement is blocked. If
+		// this is skipped, IsMoving can remain true from the previous Run frame and
+		// incorrectly select Punch -> Run when the attack animation completes.
+		Move(owner, glm::vec2(0.0f), dt);
 		return;
 	}
 

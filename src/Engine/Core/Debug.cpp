@@ -19,11 +19,17 @@
 #include "Engine/Core/GameCamera.h"
 #include "Engine/Core/CameraCollider.h"
 #include "Engine/Core/Mesh.h"
+#include "Engine/Core/Scene.h"
+#include "Engine/Core/Entity.h"
+#include "Engine/Core/EntityStateMachine.h"
 
 #include <imgui.h>
 #include <chrono>
 #include <algorithm>
 #include <cmath>
+#include <iomanip>
+#include <limits>
+#include <sstream>
 #include <glm/gtc/matrix_transform.hpp>
 
 #ifdef _WIN32
@@ -38,6 +44,63 @@
 
 namespace {
 	const auto g_programStartTime = std::chrono::high_resolution_clock::now();
+
+	std::string FormatBindableValueForDebug(float value)
+	{
+		std::ostringstream stream;
+		stream << std::fixed << std::setprecision(3) << value;
+		return stream.str();
+	}
+
+	struct DebugBindableGroup
+	{
+		std::string label;
+		const Component* component = nullptr;
+		std::vector<BindableMember> members;
+	};
+
+	std::vector<DebugBindableGroup> CollectBindableGroups(const Entity& entity)
+	{
+		std::vector<DebugBindableGroup> groups;
+		auto addGroup = [&groups](std::string label, const Component* component, std::vector<BindableMember> members)
+		{
+			if (!members.empty())
+			{
+				groups.push_back({ std::move(label), component, std::move(members) });
+			}
+		};
+
+		addGroup("Entity", nullptr, entity.GetBindableMembers());
+		for (const Component* component : entity.Components())
+		{
+			if (!component)
+			{
+				continue;
+			}
+			addGroup(component->Name(), component, component->GetBindableMembers());
+		}
+		return groups;
+	}
+
+	void DrawBindableGroup(const DebugBindableGroup& group, const Entity& entity)
+	{
+		if (!ImGui::TreeNode(group.label.c_str()))
+		{
+			return;
+		}
+
+		for (const BindableMember& member : group.members)
+		{
+			float value = 0.0f;
+			const bool hasValue = group.component
+				? group.component->TryGetBindableValue(member.name, value)
+				: entity.TryGetBindableValue(member.name, value);
+			ImGui::Text("%s: %s", member.displayName.empty() ? member.name.c_str() : member.displayName.c_str(),
+				hasValue ? FormatBindableValueForDebug(value).c_str() : "<unavailable>");
+		}
+
+		ImGui::TreePop();
+	}
 
 	std::vector<LineVertex3D> MakeWireSphereVertices(const glm::vec3& color)
 	{
@@ -575,11 +638,173 @@ void Debug::drawGameModeInput(const Input& input)
 	{
 		bool open = m_showEntityStateDiagnosticsWindow;
 		ImGui::Begin("Entity State Diagnostics", &open);
-		ImGui::TextUnformatted("Entity states in active scene:");
-		ImGui::Separator();
-		ImGui::BeginChild("EntityStateDiagnosticsList", ImVec2(0.0f, 0.0f), true);
-		ImGui::TextUnformatted(m_entityStateStateListText.empty() ? "<none>" : m_entityStateStateListText.c_str());
-		ImGui::EndChild();
+		Scene* activeScene = Root::Current().Scenes().ActiveLevel();
+		const std::vector<std::unique_ptr<Entity>>* objects = activeScene ? &activeScene->Objects() : nullptr;
+		if (!objects || objects->empty())
+		{
+			ImGui::TextDisabled("No active scene entities.");
+		}
+		else
+		{
+			std::vector<Entity*> selectableEntities;
+			selectableEntities.reserve(objects->size());
+			for (const std::unique_ptr<Entity>& object : *objects)
+			{
+				if (object)
+				{
+					selectableEntities.push_back(object.get());
+				}
+			}
+
+			if (m_entityStateDiagnosticsSelectedEntityId == 0 ||
+				std::none_of(selectableEntities.begin(), selectableEntities.end(), [this](Entity* entity)
+				{
+					return entity->Id() == m_entityStateDiagnosticsSelectedEntityId;
+				}))
+			{
+				m_entityStateDiagnosticsSelectedEntityId = selectableEntities.front()->Id();
+			}
+
+			Entity* selectedEntity = nullptr;
+			for (Entity* entity : selectableEntities)
+			{
+				if (entity->Id() == m_entityStateDiagnosticsSelectedEntityId)
+				{
+					selectedEntity = entity;
+					break;
+				}
+			}
+
+			if (ImGui::BeginCombo("Entity", selectedEntity ? selectedEntity->Name().c_str() : "<select entity>"))
+			{
+				for (Entity* entity : selectableEntities)
+				{
+					const bool selected = entity->Id() == m_entityStateDiagnosticsSelectedEntityId;
+					if (ImGui::Selectable(entity->Name().c_str(), selected))
+					{
+						m_entityStateDiagnosticsSelectedEntityId = entity->Id();
+						selectedEntity = entity;
+					}
+					if (selected)
+					{
+						ImGui::SetItemDefaultFocus();
+					}
+				}
+				ImGui::EndCombo();
+			}
+
+			if (selectedEntity)
+			{
+				ImGui::Separator();
+				ImGui::Text("Entity: %s", selectedEntity->Name().c_str());
+				ImGui::Text("Id: %u", selectedEntity->Id());
+				if (EntityStateMachine* stateMachine = selectedEntity->GetEntityState())
+				{
+					ImGui::Separator();
+					ImGui::TextUnformatted("State Machine");
+					ImGui::Text("Current state: %s", stateMachine->CurrentState().empty() ? "<none>" : stateMachine->CurrentState().c_str());
+					ImGui::Text("Desired state: %s", stateMachine->DesiredState().empty() ? "<none>" : stateMachine->DesiredState().c_str());
+					ImGui::Text("Initial state: %s", stateMachine->InitialState().empty() ? "<none>" : stateMachine->InitialState().c_str());
+					ImGui::Text("Locked until complete: %s", stateMachine->CurrentStateLockedUntilComplete() ? "yes" : "no");
+					ImGui::Text("Wait for current state to finish: %s", stateMachine->CurrentStateWaitsForCompletion() ? "yes" : "no");
+					ImGui::Text("Blocks movement: %s", stateMachine->CurrentStateBlocksMovement() ? "yes" : "no");
+					ImGui::Text("Blocks input: %s", stateMachine->CurrentStateBlocksInput() ? "yes" : "no");
+					const float clipDuration = stateMachine->CurrentStateClipDurationSeconds();
+					const float elapsed = stateMachine->CurrentStateElapsedSeconds();
+					const float remaining = stateMachine->CurrentStateSecondsUntilUnlock();
+					const std::string remainingText = stateMachine->CurrentStateLockedUntilComplete()
+						? (remaining > 0.0f ? FormatBindableValueForDebug(remaining) + " s" : "0.000 s")
+						: "not locked";
+					ImGui::Text("Animation time: %.3f / %.3f s", elapsed, clipDuration);
+					ImGui::Text("Time until unlock: %s", remainingText.c_str());
+					ImGui::Separator();
+					ImGui::TextUnformatted("Transition Gating");
+					ImGui::Text("Last transition evaluated: %s -> %s",
+						stateMachine->LastTransitionFrom().empty() ? "<not evaluated yet>" : stateMachine->LastTransitionFrom().c_str(),
+						stateMachine->LastTransitionTo().empty() ? "<not evaluated yet>" : stateMachine->LastTransitionTo().c_str());
+					ImGui::Text("Condition passed: %s", stateMachine->LastTransitionPassed() ? "yes" : "no");
+					ImGui::Text("Wait gate blocked: %s", stateMachine->LastTransitionWaitBlocked() ? "yes" : "no");
+					ImGui::Text("Block reason: %s",
+						stateMachine->LastTransitionBlockedReason().empty() ? "<none>" : stateMachine->LastTransitionBlockedReason().c_str());
+					ImGui::Separator();
+					ImGui::TextUnformatted("Outgoing Transitions");
+					const std::vector<EntityStateMachine::Transition>& transitions = stateMachine->Transitions();
+					const std::string currentState = stateMachine->CurrentState();
+					const auto conditionToText = [](const EntityStateMachine::Condition& condition)
+					{
+						std::string text = EntityStateMachine::OperandToString(condition.left);
+						text += " ";
+						text += EntityStateMachine::ComparatorToString(condition.comparator);
+						text += " ";
+						text += EntityStateMachine::OperandToString(condition.right);
+						return text;
+					};
+					bool anyOutgoing = false;
+					for (const EntityStateMachine::Transition& transition : transitions)
+					{
+						if (!currentState.empty() && transition.from != currentState && transition.from != "*")
+						{
+							continue;
+						}
+						anyOutgoing = true;
+						const std::vector<EntityStateMachine::Condition>& conditions = transition.conditions.empty()
+							? std::vector<EntityStateMachine::Condition>{ transition.condition }
+							: transition.conditions;
+						std::string conditionText;
+						for (std::size_t i = 0; i < conditions.size(); ++i)
+						{
+							if (i > 0)
+							{
+								conditionText += " AND ";
+							}
+							conditionText += conditionToText(conditions[i]);
+						}
+						const bool isLastTransition =
+							stateMachine->LastTransitionFrom() == transition.from &&
+							stateMachine->LastTransitionTo() == transition.to;
+						if (isLastTransition)
+						{
+							ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.82f, 0.20f, 1.0f));
+						}
+						ImGui::BulletText(
+							"%s -> %s | wait: %s | blend: %.2f s | when: %s",
+							transition.from.c_str(),
+							transition.to.c_str(),
+							transition.waitForCurrentStateComplete ? "yes" : "no",
+							transition.blendSeconds,
+							conditionText.empty() ? "<none>" : conditionText.c_str());
+						if (isLastTransition)
+						{
+							ImGui::PopStyleColor();
+						}
+					}
+					if (!anyOutgoing)
+					{
+						ImGui::TextDisabled("No outgoing transitions from the current state.");
+					}
+				}
+				else
+				{
+					ImGui::Separator();
+					ImGui::TextDisabled("No EntityStateMachine on this entity.");
+				}
+
+				ImGui::Separator();
+				ImGui::TextUnformatted("Bindable Values");
+				const std::vector<DebugBindableGroup> groups = CollectBindableGroups(*selectedEntity);
+				if (groups.empty())
+				{
+					ImGui::TextDisabled("No bindable values.");
+				}
+				else
+				{
+					for (const DebugBindableGroup& group : groups)
+					{
+						DrawBindableGroup(group, *selectedEntity);
+					}
+				}
+			}
+		}
 		ImGui::End();
 		m_showEntityStateDiagnosticsWindow = open;
 	}
@@ -700,11 +925,6 @@ void Debug::SetAnimationDiagnostics(const std::string& currentState, const std::
 	m_animationLastResolvedTargetClipIndex = lastResolvedTargetClipIndex;
 	m_animationLastResolvedTargetFound = lastResolvedTargetFound;
 	m_animationStateListText = stateListText;
-}
-
-void Debug::SetEntityStateDiagnostics(const std::string& stateListText)
-{
-	m_entityStateStateListText = stateListText;
 }
 
 void Debug::SetGameplayContext(const std::string& activeLevelName, std::size_t activeLevelObjects, std::size_t controllerCount, const std::string& engineMode)

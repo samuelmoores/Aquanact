@@ -75,7 +75,6 @@ set(SOURCES
     "include/Engine/Core/Animator.h" "src/Engine/Core/Animator.cpp"
     "include/Engine/Core/EntityStateMachine.h" "src/Engine/Core/EntityStateMachine.cpp"
     "include/Engine/Core/Controller.h" "src/Engine/Core/Controller.cpp"
-    "include/Engine/Core/PlayerController.h" "src/Engine/Core/PlayerController.cpp"
     "include/Engine/Core/Component.h" "src/Engine/Core/Component.cpp"
     "include/Engine/Core/ComponentFactory.h" "src/Engine/Core/ComponentFactory.cpp"
     "include/Engine/Core/Entity.h" "src/Engine/Core/Entity.cpp"
