@@ -44,6 +44,19 @@ void Animator::Play(int clipIndex, float blendSeconds)
 {
 	if (clipIndex < 0 || clipIndex >= static_cast<int>(m_clips.size())) return;
 	if (clipIndex == m_currentClip && m_blendFactor >= 1.0f) return;
+
+	// If a transition is interrupted by returning to the clip that was being
+	// blended away from, reverse the existing blend. This preserves the pose
+	// currently visible on screen instead of restarting from a hard snap.
+	if (m_blendFactor < 1.0f && clipIndex == m_currentClip)
+	{
+		std::swap(m_currentClip, m_nextClip);
+		std::swap(m_currentTime, m_nextTime);
+		m_blendFactor = 1.0f - m_blendFactor;
+		m_blendSpeed = blendSeconds > 0.0f ? (1.0f / blendSeconds) : 9999.0f;
+		return;
+	}
+
 	m_nextClip    = clipIndex;
 	m_blendFactor = 0.0f;
 	m_blendSpeed = blendSeconds > 0.0f ? (1.0f / blendSeconds) : 9999.0f;

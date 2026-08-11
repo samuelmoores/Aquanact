@@ -45,10 +45,10 @@ namespace
 		return movement;
 	}
 
-	void FaceMovementDirection(Entity& owner, const glm::vec3& direction, float turnSpeed, float dt, bool grounded)
+	void FaceMovementDirection(Entity& owner, const glm::vec3& direction, float turnSpeed, float dt)
 	{
-		// Only rotate when grounded so airborne movement does not fight physics.
-		if (!grounded || turnSpeed <= 0.0f)
+		// Rotation follows live input both on the ground and in the air.
+		if (turnSpeed <= 0.0f)
 		{
 			return;
 		}
@@ -89,7 +89,14 @@ float PlayerController::ShortestAngleDelta(float from, float to)
 	return WrapAngle(to - from);
 }
 
-void PlayerController::TryJump(const InputManager& input, const glm::vec2& move2D)
+float PlayerController::GravityScale() const
+{
+	// Increase gravity during both halves of the jump so the full arc completes
+	// faster. The stronger downward scale still makes the descent decisive.
+	return m_velocity.y > 0.0f ? 1.875f : 5.0f;
+}
+
+void PlayerController::TryJump(const InputManager& input)
 {
 	// Step 1: accept only a new Jump press while grounded. This prevents held
 	// input from creating repeated jumps and leaves landing to the physics code.
@@ -98,7 +105,17 @@ void PlayerController::TryJump(const InputManager& input, const glm::vec2& move2
 		return;
 	}
 
-	// Step 2: leave the grounded state before applying vertical launch velocity.
+	// Step 2: wait until the state machine has left Falling. Physics can report
+	// ground contact one frame before Falling -> Idle/Run is evaluated. Launching
+	// during that gap immediately re-enters the falling animation and interrupts
+	// the landing transition.
+	if (m_entityState && (m_entityState->CurrentState() == "Falling"
+		|| m_entityState->CurrentState() == "Landing"))
+	{
+		return;
+	}
+
+	// Step 3: leave the grounded state before applying vertical launch velocity.
 	// MoveWithPhysics() clears vertical velocity while grounded, so this order is
 	// required for the jump impulse to survive the movement step.
 	m_grounded = false;
@@ -106,21 +123,12 @@ void PlayerController::TryJump(const InputManager& input, const glm::vec2& move2
 	m_groundedLossTimer = 0.0f;
 	m_velocity.y = m_jumpSpeed;
 
-	// Step 3: capture horizontal launch velocity in world space. The cached value
-	// is not rebuilt from input while airborne, which makes the jump projectile-like.
-	const glm::vec3 launchMovement = BuildWorldMovement(move2D);
-	m_jumpHorizontalVelocity = glm::length(launchMovement) > 0.0001f
-		? glm::normalize(launchMovement) * m_moveSpeed
-		: glm::vec3(0.0f);
-	m_jumpTrajectoryLocked = true;
 }
 
 void PlayerController::startUp(Entity& owner)
 {
 	Controller::startUp(owner);
 	m_wantsToMove = false;
-	m_jumpHorizontalVelocity = glm::vec3(0.0f);
-	m_jumpTrajectoryLocked = false;
 	m_inputActions = &Root::Current().InputActions();
 }
 
@@ -158,12 +166,9 @@ void PlayerController::MoveWithWorldDirection(
 	const glm::vec3 normalizedMovement = glm::normalize(movement);
 	m_isMoving = true;
 
-	// When grounded, turn toward the travel direction so the character faces the
-	// way it is moving instead of sliding sideways.
-	if (m_grounded)
-	{
-		FaceMovementDirection(owner, normalizedMovement, m_turnSpeed, dt, m_grounded);
-	}
+	// Turn toward the travel direction so the character faces the way it is
+	// moving, including while airborne.
+	FaceMovementDirection(owner, normalizedMovement, m_turnSpeed, dt);
 
 	// Apply the final horizontal velocity through the physics path so collision
 	// and diagnostics stay consistent with the rest of the controller.
@@ -178,13 +183,6 @@ void PlayerController::Update(Entity& owner, float dt)
 	const glm::vec2 move2D = input.VectorValue("Move");
 	m_wantsToMove = glm::length(move2D) > 0.0001f;
 
-	// Landing ends the projectile phase. The next grounded frame can once again
-	// use the player's live movement input.
-	if (m_isGrounded)
-	{
-		m_jumpTrajectoryLocked = false;
-	}
-
 	if (m_entityState->CurrentStateBlocksMovement())
 	{
 		// Keep the movement bindable synchronized while movement is blocked. If
@@ -196,19 +194,7 @@ void PlayerController::Update(Entity& owner, float dt)
 
 	// A jump can only be requested after state-based movement blocking has been
 	// handled. This prevents attacks or other blocking states from launching.
-	TryJump(input, move2D);
-	if (m_jumpTrajectoryLocked && !m_isGrounded)
-	{
-		// Step 4: use the cached world-space launch velocity while airborne. The
-		// movement helper still applies gravity and collision resolution normally.
-		const glm::vec3 diagnosticInput(
-			m_jumpHorizontalVelocity.x,
-			0.0f,
-			m_jumpHorizontalVelocity.z);
-		MoveWithWorldDirection(owner, m_jumpHorizontalVelocity, diagnosticInput, dt);
-	}
-	else
-	{
-		Move(owner, move2D, dt);
-	}
+	TryJump(input);
+	// Use live input for horizontal movement and facing throughout the jump.
+	Move(owner, move2D, dt);
 }

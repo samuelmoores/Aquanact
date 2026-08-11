@@ -41,10 +41,12 @@ public:
 	const InputManager* InputActions() const { return m_inputActions; }
 
 private:
+	float GravityScale() const override;
+
 	// Shared helpers for movement and facing math.
 	static float WrapAngle(float angle);
 	static float ShortestAngleDelta(float from, float to);
-	void TryJump(const InputManager& input, const glm::vec2& move2D);
+	void TryJump(const InputManager& input);
 	void Move(Entity& owner, const glm::vec2& move2D, float dt);
 	void MoveWithWorldDirection(Entity& owner, const glm::vec3& movement, const glm::vec3& diagnosticInput, float dt);
 
@@ -53,12 +55,9 @@ private:
 	const InputManager* m_inputActions = nullptr;
 	EntityStateMachine* m_entityState = nullptr;
 	bool m_wantsToMove = false;
-	// Horizontal velocity captured at jump launch and reused until landing.
-	glm::vec3 m_jumpHorizontalVelocity{ 0.0f };
-	bool m_jumpTrajectoryLocked = false;
 
 	// Player-specific tuning.
 	float m_turnSpeed = 8.0f;
-	float m_jumpSpeed = 550.0f;
+	float m_jumpSpeed = 840.0f;
 };
 

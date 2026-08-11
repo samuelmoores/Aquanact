@@ -37,6 +37,10 @@ public:
 	void Update(Entity&, float) override;
 
 protected:
+	// Allows game-specific controllers to customize vertical acceleration while
+	// retaining the shared collision and grounding implementation.
+	virtual float GravityScale() const { return 1.0f; }
+
 	// Internal helpers used by the controller update pipeline.
 	void SetDiagnosticInput(const glm::vec3& input) { m_diagnosticInput = input; }
 	void ApplyMovement(Entity& owner, float dt);

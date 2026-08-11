@@ -15,9 +15,11 @@ namespace
 	constexpr float worldUnitsPerMeter = 100.0f;
 	constexpr float gravity = -9.81f * worldUnitsPerMeter;
 	constexpr float terminalFallSpeed = -55.0f * worldUnitsPerMeter;
-	constexpr float groundedLossThreshold = 3.0f / 120.0f;
+	// Keep grounded state through brief contact misses caused by collider seams
+	// or uneven ground while the controller is still moving across the surface.
+	constexpr float groundedLossThreshold = 0.1f;
 	constexpr float walkableGroundNormalY = 0.25f;
-	constexpr float groundProbeDistance = 10.0f;
+	constexpr float groundProbeDistance = 20.0f;
 
 	void BuildVerticalCapsule(const glm::vec3& boxMin, const glm::vec3& boxMax,
 		glm::vec3& base, glm::vec3& tip, float& radius)
@@ -286,7 +288,9 @@ glm::vec3 Controller::MoveWithPhysics(Entity& owner, const glm::vec3& desiredHor
 	}
 	else
 	{
-		m_velocity.y = std::max(terminalFallSpeed, m_velocity.y + gravity * dt);
+		m_velocity.y = std::max(
+			terminalFallSpeed,
+			m_velocity.y + gravity * GravityScale() * dt);
 	}
 
 	glm::vec3 lastCollisionNormal(0.0f);
