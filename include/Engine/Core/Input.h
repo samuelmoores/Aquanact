@@ -25,6 +25,7 @@ public:
 	std::uint64_t MouseActivitySerial() const;
 	float DeltaTime() const;
 	bool KeyDown(int key) const;
+	bool MouseButtonDown(int button) const;
 	bool ControllerButtonDown(int button, int joystick = GLFW_JOYSTICK_1) const;
 	float ControllerAxisValue(int axis, int joystick = GLFW_JOYSTICK_1) const;
 

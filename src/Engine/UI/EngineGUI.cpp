@@ -20,7 +20,7 @@
 #include "Engine/Core/ComponentFactory.h"
 #include "Engine/Core/Controller.h"
 #include "Engine/Core/PlayerController.h"
-#include "Engine/Core/AnimatorComponent.h"
+#include "Engine/Core/EntityStateMachine.h"
 #include "Game/Enemy.h"
 #include "Engine/Core/GLHeaders.h"
 #include "Engine/Core/StbImage.h"
@@ -199,6 +199,17 @@ namespace {
 			}
 		}
 
+		if (binding.type == InputBindingType::MouseButton)
+		{
+			switch (binding.code)
+			{
+			case GLFW_MOUSE_BUTTON_LEFT: return "Mouse: Left";
+			case GLFW_MOUSE_BUTTON_RIGHT: return "Mouse: Right";
+			case GLFW_MOUSE_BUTTON_MIDDLE: return "Mouse: Middle";
+			default: return "Mouse: Button " + std::to_string(binding.code + 1);
+			}
+		}
+
 		if (binding.type == InputBindingType::MouseDelta)
 		{
 			return "Mouse";
@@ -367,7 +378,7 @@ namespace {
 		}
 	}
 
-	struct AnimatorBindingSource
+	struct EntityStateBindingSource
 	{
 		std::string componentName;
 		std::string label;
@@ -384,25 +395,25 @@ namespace {
 		return typeName;
 	}
 
-	bool IsAnimatorConditionMember(const BindableMember& member)
+	bool IsEntityStateConditionMember(const BindableMember& member)
 	{
 		const std::string typeName = NormalizedBindableTypeName(member);
 		return typeName == "bool" || typeName == "int" || typeName == "float" || typeName == "double";
 	}
 
-	const BindableMember* FindAnimatorOperandMember(
-		const AnimatorComponent::Operand& operand,
-		const std::vector<AnimatorBindingSource>& sources)
+	const BindableMember* FindEntityStateOperandMember(
+		const EntityStateMachine::Operand& operand,
+		const std::vector<EntityStateBindingSource>& sources)
 	{
 		// Constants do not have metadata of their own. Their presentation is inferred
 		// from the binding on the other side of the comparison.
-		if (operand.type != AnimatorComponent::OperandType::Binding)
+		if (operand.type != EntityStateMachine::OperandType::Binding)
 		{
 			return nullptr;
 		}
 
 		// Binding identity consists of both the owning component and member name.
-		for (const AnimatorBindingSource& source : sources)
+		for (const EntityStateBindingSource& source : sources)
 		{
 			if (source.componentName != operand.componentName)
 			{
@@ -421,11 +432,11 @@ namespace {
 		return nullptr;
 	}
 
-	bool IsBooleanAnimatorOperand(
-		const AnimatorComponent::Operand& operand,
-		const std::vector<AnimatorBindingSource>& sources)
+	bool IsBooleanEntityStateOperand(
+		const EntityStateMachine::Operand& operand,
+		const std::vector<EntityStateBindingSource>& sources)
 	{
-		const BindableMember* member = FindAnimatorOperandMember(operand, sources);
+		const BindableMember* member = FindEntityStateOperandMember(operand, sources);
 		if (!member)
 		{
 			return false;
@@ -435,22 +446,22 @@ namespace {
 		return typeName == "bool" || typeName == "boolean";
 	}
 
-	bool IsBooleanAnimatorCondition(
-		const AnimatorComponent::Condition& condition,
-		const std::vector<AnimatorBindingSource>& sources)
+	bool IsBooleanEntityStateCondition(
+		const EntityStateMachine::Condition& condition,
+		const std::vector<EntityStateBindingSource>& sources)
 	{
 		// A constant is boolean when it is compared with a boolean binding. Checking
 		// both sides also supports conditions authored in either operand order.
-		return IsBooleanAnimatorOperand(condition.left, sources) ||
-			IsBooleanAnimatorOperand(condition.right, sources);
+		return IsBooleanEntityStateOperand(condition.left, sources) ||
+			IsBooleanEntityStateOperand(condition.right, sources);
 	}
 
-	std::vector<BindableMember> AnimatorConditionMembers(const std::vector<BindableMember>& members)
+	std::vector<BindableMember> EntityStateConditionMembers(const std::vector<BindableMember>& members)
 	{
 		std::vector<BindableMember> result;
 		for (const BindableMember& member : members)
 		{
-			if (IsAnimatorConditionMember(member))
+			if (IsEntityStateConditionMember(member))
 			{
 				result.push_back(member);
 			}
@@ -458,15 +469,15 @@ namespace {
 		return result;
 	}
 
-	std::vector<AnimatorBindingSource> AnimatorBindingSources(Entity* owner)
+	std::vector<EntityStateBindingSource> EntityStateBindingSources(Entity* owner)
 	{
-		std::vector<AnimatorBindingSource> sources;
+		std::vector<EntityStateBindingSource> sources;
 		if (!owner)
 		{
 			return sources;
 		}
 
-		std::vector<BindableMember> entityMembers = AnimatorConditionMembers(owner->GetBindableMembers());
+		std::vector<BindableMember> entityMembers = EntityStateConditionMembers(owner->GetBindableMembers());
 		if (!entityMembers.empty())
 		{
 			sources.push_back({ {}, "Entity", std::move(entityMembers) });
@@ -479,7 +490,7 @@ namespace {
 				continue;
 			}
 
-			std::vector<BindableMember> members = AnimatorConditionMembers(component->GetBindableMembers());
+			std::vector<BindableMember> members = EntityStateConditionMembers(component->GetBindableMembers());
 			if (!members.empty())
 			{
 				sources.push_back({ component->Name(), component->Name(), std::move(members) });
@@ -488,16 +499,16 @@ namespace {
 		return sources;
 	}
 
-	void SetDefaultAnimatorOperand(AnimatorComponent::Operand& operand, const std::vector<AnimatorBindingSource>& sources)
+	void SetDefaultEntityStateOperand(EntityStateMachine::Operand& operand, const std::vector<EntityStateBindingSource>& sources)
 	{
 		operand = {};
-		for (const AnimatorBindingSource& source : sources)
+		for (const EntityStateBindingSource& source : sources)
 		{
 			for (const BindableMember& member : source.members)
 			{
 				if ((source.componentName == "PlayerController" || source.componentName == "Controller") && member.name == "IsMoving")
 				{
-					operand.type = AnimatorComponent::OperandType::Binding;
+					operand.type = EntityStateMachine::OperandType::Binding;
 					operand.componentName = source.componentName;
 					operand.memberName = member.name;
 					return;
@@ -507,16 +518,16 @@ namespace {
 
 		if (!sources.empty() && !sources.front().members.empty())
 		{
-			operand.type = AnimatorComponent::OperandType::Binding;
+			operand.type = EntityStateMachine::OperandType::Binding;
 			operand.componentName = sources.front().componentName;
 			operand.memberName = sources.front().members.front().name;
 		}
 	}
 
-	void DrawAnimatorOperandEditor(
+	void DrawEntityStateOperandEditor(
 		const char* label,
-		AnimatorComponent::Operand& operand,
-		const std::vector<AnimatorBindingSource>& sources,
+		EntityStateMachine::Operand& operand,
+		const std::vector<EntityStateBindingSource>& sources,
 		bool useBooleanConstant = false)
 	{
 		ImGui::PushID(label);
@@ -529,15 +540,15 @@ namespace {
 		int operandType = static_cast<int>(operand.type);
 		if (ImGui::Combo("Type", &operandType, operandTypes, IM_ARRAYSIZE(operandTypes)))
 		{
-			operand.type = static_cast<AnimatorComponent::OperandType>(operandType);
-			if (operand.type == AnimatorComponent::OperandType::Binding && operand.memberName.empty())
+			operand.type = static_cast<EntityStateMachine::OperandType>(operandType);
+			if (operand.type == EntityStateMachine::OperandType::Binding && operand.memberName.empty())
 			{
-				SetDefaultAnimatorOperand(operand, sources);
-				operand.type = AnimatorComponent::OperandType::Binding;
+				SetDefaultEntityStateOperand(operand, sources);
+				operand.type = EntityStateMachine::OperandType::Binding;
 			}
 		}
 
-		if (operand.type == AnimatorComponent::OperandType::Constant)
+		if (operand.type == EntityStateMachine::OperandType::Constant)
 		{
 			ImGui::SetNextItemWidth(160.0f);
 			if (useBooleanConstant)
@@ -560,8 +571,8 @@ namespace {
 			return;
 		}
 
-		const AnimatorBindingSource* selectedSource = nullptr;
-		for (const AnimatorBindingSource& source : sources)
+		const EntityStateBindingSource* selectedSource = nullptr;
+		for (const EntityStateBindingSource& source : sources)
 		{
 			if (source.componentName == operand.componentName)
 			{
@@ -570,10 +581,10 @@ namespace {
 			}
 		}
 
-		const char* sourceLabel = selectedSource ? selectedSource->label.c_str() : "<select source>";
-		if (ImGui::BeginCombo("Component", sourceLabel))
+		const char* sourceLabel = selectedSource ? selectedSource->label.c_str() : "<select variable>";
+		if (ImGui::BeginCombo("Variable", sourceLabel))
 		{
-			for (const AnimatorBindingSource& source : sources)
+			for (const EntityStateBindingSource& source : sources)
 			{
 				const bool selected = source.componentName == operand.componentName;
 				if (ImGui::Selectable(source.label.c_str(), selected))
@@ -607,8 +618,8 @@ namespace {
 		}
 		const char* memberLabel = selectedMember
 			? (selectedMember->displayName.empty() ? selectedMember->name.c_str() : selectedMember->displayName.c_str())
-			: "<select member>";
-		if (ImGui::BeginCombo("Value", memberLabel))
+			: "<select variable>";
+		if (ImGui::BeginCombo("Variable Value", memberLabel))
 		{
 			for (const BindableMember& member : selectedSource->members)
 			{
@@ -1302,7 +1313,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 						for (const std::string& componentName : componentNames)
 						{
 							const bool alreadyAttached = std::find(attachedNames.begin(), attachedNames.end(), componentName) != attachedNames.end();
-							const bool canAttachAnimator = componentName == "AnimatorComponent"
+							const bool canAttachAnimator = componentName == "EntityStateMachine"
 								? object->GetMesh() != nullptr && object->GetMesh()->Skinned()
 								: true;
 							const bool disabled = activeSceneIsCutscene || alreadyAttached || !canAttachAnimator;
@@ -1424,6 +1435,24 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 						object->SetRotation(glm::vec3(rotation.x, rotation.y, editedRotZ));
 					}
 
+					ImGui::Separator();
+					// The state machine is an entity-level gameplay controller, so it is
+					// shown here with transform settings instead of buried in components.
+					if (EntityStateMachine* entityStateMachine = object->GetEntityState())
+					{
+						ImGui::Separator();
+						if (ImGui::Button("Entity State Machine"))
+						{
+							m_entityStateMachinePopupRequested = true;
+							ImGui::OpenPopup("State Machine##AquanactEntityStateMachine");
+						}
+						if (m_entityStateMachinePopupRequested)
+						{
+							DrawEntityStateMachinePopup(*entityStateMachine);
+						}
+						ImGui::Separator();
+					}
+
 					// Physics belongs here because it is another entity-level concern,
 					// separate from the component-specific editor controls below.
 					if (ImGui::CollapsingHeader("Physics", ImGuiTreeNodeFlags_DefaultOpen))
@@ -1505,21 +1534,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 						{
 							// Component-specific controls are selected by type so each component
 							// can expose its own editor without the entity window knowing details.
-							if (AnimatorComponent* animator = dynamic_cast<AnimatorComponent*>(component))
-							{
-								// Animator gets a dedicated popup because its state machine editing
-								// needs more context than a simple inline control.
-								if (ImGui::Button("Open State Machine"))
-								{
-									m_animatorStateMachinePopupRequested = true;
-									ImGui::OpenPopup("State Machine##AquanactAnimatorStateMachine");
-								}
-								if (m_animatorStateMachinePopupRequested)
-								{
-									DrawAnimatorStateMachinePopup(*animator);
-								}
-							}
-							else if (PlayerController* playerController = dynamic_cast<PlayerController*>(component))
+							if (PlayerController* playerController = dynamic_cast<PlayerController*>(component))
 							{
 								float moveSpeed = playerController->MoveSpeed();
 								ImGui::SetNextItemWidth(140.0f);
@@ -1544,7 +1559,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 									controller->SetMoveSpeed(moveSpeed);
 								}
 							}
-		else if (Enemy* enemy = dynamic_cast<Enemy*>(component))
+							else if (Enemy* enemy = dynamic_cast<Enemy*>(component))
 							{
 								ImGui::TextUnformatted("Enemy behavior component");
 								(void)enemy;
@@ -1577,10 +1592,10 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 
 						if (removeComponent)
 						{
-							if (AnimatorComponent* animator = dynamic_cast<AnimatorComponent*>(component))
+							if (EntityStateMachine* entityStateMachine = dynamic_cast<EntityStateMachine*>(component))
 							{
-								m_animatorUiState.erase(animator);
-								m_animatorStateMachinePopupRequested = false;
+								m_entityStateUiState.erase(entityStateMachine);
+								m_entityStateMachinePopupRequested = false;
 							}
 							// Remove the component only after any component-specific cleanup.
 							object->RemoveComponent(component);
@@ -1843,74 +1858,67 @@ void EngineGUI::DrawCameraWindow()
 	m_showCameraWindow = open;
 }
 
-void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
+void EngineGUI::DrawEntityStateMachinePopup(EntityStateMachine& entityStateMachine)
 {
-	// Keep UI state per animator so reopening the popup preserves edits.
-	AnimatorStateMachineUiState& ui = m_animatorUiState[&animator];
-	const std::vector<AnimatorBindingSource> bindingSources = AnimatorBindingSources(animator.Owner());
-	const std::vector<AnimatorComponent::State>& states = animator.States();
-	const std::vector<AnimatorComponent::Transition>& transitions = animator.Transitions();
+	EntityStateMachineUiState& ui = m_entityStateUiState[&entityStateMachine];
+	const std::vector<EntityStateBindingSource> bindingSources = EntityStateBindingSources(entityStateMachine.Owner());
+	const std::vector<EntityStateMachine::State> states = entityStateMachine.States();
+	const std::vector<EntityStateMachine::Transition> transitions = entityStateMachine.Transitions();
+	const std::vector<std::string> animationNames = [&]()
+	{
+		std::vector<std::string> names;
+		if (Entity* owner = entityStateMachine.Owner())
+		{
+			if (const Mesh* mesh = owner->GetMesh())
+			{
+				names.reserve(static_cast<std::size_t>(mesh->NumAnimations()));
+				for (int i = 0; i < mesh->NumAnimations(); ++i)
+				{
+					names.push_back(mesh->GetAnimationSource(i));
+				}
+			}
+		}
+		return names;
+	}();
 
-	// Copy a state name into one of the fixed-size UI buffers.
 	const auto copyStateName = [](char* destination, std::size_t destinationSize, const std::string& value)
 	{
 		std::strncpy(destination, value.c_str(), destinationSize - 1);
 		destination[destinationSize - 1] = '\0';
 	};
 
-	// Constants use the other operand's binding type as their display context.
-	// The runtime stores all resolved values as floats, including boolean 0/1.
-	const auto operandToConditionText =
-		[&](const AnimatorComponent::Operand& operand, bool booleanContext) -> std::string
+	const auto operandToConditionText = [&](const EntityStateMachine::Operand& operand, bool booleanContext) -> std::string
 	{
-		if (!booleanContext || operand.type != AnimatorComponent::OperandType::Constant)
+		if (!booleanContext || operand.type != EntityStateMachine::OperandType::Constant)
 		{
-			return AnimatorComponent::OperandToString(operand);
+			return EntityStateMachine::OperandToString(operand);
 		}
-
 		return operand.constantValue != 0.0f ? "true" : "false";
 	};
 
-	// Build the exact text shown below a transition when Condition is expanded.
-	const auto conditionToBrowserText =
-		[&](const AnimatorComponent::Condition& condition) -> std::string
+	const auto conditionToBrowserText = [&](const EntityStateMachine::Condition& condition) -> std::string
 	{
-		const bool isBooleanCondition = IsBooleanAnimatorCondition(condition, bindingSources);
-		const char* comparatorText = AnimatorComponent::ComparatorToString(condition.comparator);
-
+		const bool isBooleanCondition = IsBooleanEntityStateCondition(condition, bindingSources);
 		return operandToConditionText(condition.left, isBooleanCondition) + " " +
-			comparatorText + " " +
+			EntityStateMachine::ComparatorToString(condition.comparator) + " " +
 			operandToConditionText(condition.right, isBooleanCondition);
 	};
 
-	// Render a single transition row with an optional condition summary.
-	const auto drawTransitionRow =
-		[&](const AnimatorComponent::Transition& transition, std::size_t transitionIndex)
+	const auto drawTransitionRow = [&](const EntityStateMachine::Transition& transition, std::size_t transitionIndex)
 	{
 		const std::string transitionKey = transition.from + "->" + transition.to + "#" + std::to_string(transitionIndex);
 		bool& showConditions = ui.expandedTransitionConditions[transitionKey];
-		const auto drawConditionText = [&](const AnimatorComponent::Condition& condition)
-		{
-			const std::string conditionText = conditionToBrowserText(condition);
-			ImGui::TextUnformatted(conditionText.c_str());
-		};
 
-		// Transition identity and row actions.
 		ImGui::PushID(static_cast<int>(transitionIndex));
 		ImGui::Text("%s -> %s", transition.from.c_str(), transition.to.c_str());
 		ImGui::SameLine();
 		if (ImGui::SmallButton("Edit"))
 		{
-			// Copy the selected transition into the shared add/edit popup state.
 			copyStateName(ui.transitionFromState, sizeof(ui.transitionFromState), transition.from);
 			copyStateName(ui.transitionToState, sizeof(ui.transitionToState), transition.to);
 			ui.transitionBlendSeconds = transition.blendSeconds;
-			ui.conditions = transition.conditions;
-			if (ui.conditions.empty())
-			{
-				// Projects created before multi-condition transitions used this field.
-				ui.conditions.push_back(transition.condition);
-			}
+			ui.transitionInterrupt = transition.interrupt;
+			ui.conditions = transition.conditions.empty() ? std::vector<EntityStateMachine::Condition>{ transition.condition } : transition.conditions;
 			ui.editingTransitionIndex = static_cast<int>(transitionIndex);
 			ui.addTransitionPopupInitialized = true;
 			ui.editTransitionPopupRequested = true;
@@ -1919,131 +1927,249 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 		if (ImGui::SmallButton("Delete"))
 		{
 			ui.expandedTransitionConditions.erase(transitionKey);
-			animator.RemoveTransition(transitionIndex);
+			entityStateMachine.RemoveTransition(transitionIndex);
 			ImGui::PopID();
 			return;
 		}
-
 		ImGui::SameLine();
 		if (ImGui::SmallButton("Condition"))
 		{
-			// Expansion is stored per transition so rows can be inspected independently.
 			showConditions = !showConditions;
 		}
-
 		if (showConditions)
 		{
 			ImGui::Indent();
-			if (!transition.conditions.empty())
+			for (const EntityStateMachine::Condition& condition : transition.conditions.empty() ? std::vector<EntityStateMachine::Condition>{ transition.condition } : transition.conditions)
 			{
-				for (const AnimatorComponent::Condition& condition : transition.conditions)
-				{
-					drawConditionText(condition);
-				}
-			}
-			else
-			{
-				drawConditionText(transition.condition);
+				ImGui::TextUnformatted(conditionToBrowserText(condition).c_str());
 			}
 			ImGui::Unindent();
 		}
-
 		ImGui::PopID();
 	};
 
-	// Seed the editor with sensible defaults when the animator changes or has no state yet.
-	if (!ui.initialized || states.empty())
+	if (!ui.initialized)
 	{
-		ui.selectedAnimationName[0] = '\0';
+		ui.stateEditName[0] = '\0';
 		ui.transitionFromState[0] = '\0';
 		ui.transitionToState[0] = '\0';
 		ui.transitionFilterFromState[0] = '\0';
 		ui.transitionFilterToState[0] = '\0';
-		ui.showIncomingTransitions = false;
-		ui.showOutgoingTransitions = false;
+		ui.visibleStateTransitions.clear();
+		ui.showIncomingTransitions = true;
+		ui.showOutgoingTransitions = true;
 		ui.expandedTransitionConditions.clear();
-		if (!states.empty())
-		{
-			copyStateName(ui.selectedAnimationName, sizeof(ui.selectedAnimationName), states.front().name);
-			copyStateName(ui.transitionFromState, sizeof(ui.transitionFromState), states.front().name);
-			if (states.size() > 1)
-			{
-				copyStateName(ui.transitionToState, sizeof(ui.transitionToState), states[1].name);
-			}
-		}
 		ui.initialized = true;
 	}
 
-		ImGui::SetNextWindowSize(ImVec2(900.0f, 0.0f), ImGuiCond_FirstUseEver);
-		if (ImGui::BeginPopupModal("State Machine##AquanactAnimatorStateMachine", nullptr))
+	if (ui.stateEditName[0] == '\0' && !states.empty())
+	{
+		copyStateName(ui.stateEditName, sizeof(ui.stateEditName), states.front().name);
+	}
+	if (ui.transitionFromState[0] == '\0' && !states.empty())
+	{
+		copyStateName(ui.transitionFromState, sizeof(ui.transitionFromState), states.front().name);
+	}
+	if (ui.transitionToState[0] == '\0' && states.size() > 1)
+	{
+		copyStateName(ui.transitionToState, sizeof(ui.transitionToState), states[1].name);
+	}
+
+	ImGui::SetNextWindowSize(ImVec2(900.0f, 0.0f), ImGuiCond_FirstUseEver);
+	if (ImGui::BeginPopupModal("State Machine##AquanactEntityStateMachine", nullptr))
+	{
+		auto setComboWidthToText = [](const char* text)
 		{
-			// Animation selection drives the transition browser below.
-			ImGui::TextUnformatted("Animation");
-			ImGui::SetNextItemWidth(180.0f);
-			if (ImGui::BeginCombo("##SelectedAnimation", ui.selectedAnimationName[0] != '\0' ? ui.selectedAnimationName : "<select animation>"))
+			const ImGuiStyle& style = ImGui::GetStyle();
+			const float width = ImGui::CalcTextSize(text).x + style.FramePadding.x * 2.0f + ImGui::GetFrameHeight();
+			ImGui::SetNextItemWidth(width);
+		};
+
+		if (ImGui::Button("Add State"))
+		{
+			ui.editingStateIndex = -1;
+			ui.addStatePopupInitialized = false;
+			ui.editStatePopupRequested = true;
+		}
+
+		if (ui.editStatePopupRequested)
+		{
+			ImGui::OpenPopup("Add State##AquanactEntityStateMachine");
+			ui.editStatePopupRequested = false;
+		}
+
+		if (ImGui::BeginPopupModal("Add State##AquanactEntityStateMachine", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+		{
+			if (!ui.addStatePopupInitialized)
 			{
-			for (const AnimatorComponent::State& state : states)
+				if (ui.stateEditName[0] == '\0' && !states.empty())
+				{
+					copyStateName(ui.stateEditName, sizeof(ui.stateEditName), states.front().name);
+				}
+				if (ui.editingStateIndex >= 0 && static_cast<std::size_t>(ui.editingStateIndex) < states.size())
+				{
+					const EntityStateMachine::State& editedState = states[static_cast<std::size_t>(ui.editingStateIndex)];
+					copyStateName(ui.stateEditName, sizeof(ui.stateEditName), editedState.name);
+					ui.stateEditBlocksMovement = editedState.blocksMovement;
+					ui.stateEditBlocksInput = editedState.blocksInput;
+				}
+				ui.addStatePopupInitialized = true;
+			}
+
+			ImGui::InputText("State Name", ui.stateEditName, sizeof(ui.stateEditName));
+			const std::string currentAnimation = ui.stateEditAnimationName[0] != '\0'
+				? std::filesystem::path(ui.stateEditAnimationName).filename().string()
+				: "<select animation>";
+			if (ImGui::BeginCombo("Animation", currentAnimation.c_str()))
 			{
-				const bool selected = std::strcmp(ui.selectedAnimationName, state.name.c_str()) == 0;
+				for (int i = 0; i < static_cast<int>(animationNames.size()); ++i)
+				{
+					const std::string animationLabel = std::filesystem::path(animationNames[static_cast<std::size_t>(i)]).filename().string();
+					const bool selected = animationNames[static_cast<std::size_t>(i)] == ui.stateEditAnimationName;
+					if (ImGui::Selectable(animationLabel.c_str(), selected))
+					{
+						copyStateName(ui.stateEditAnimationName, sizeof(ui.stateEditAnimationName), animationNames[static_cast<std::size_t>(i)]);
+					}
+					if (selected)
+					{
+						ImGui::SetItemDefaultFocus();
+					}
+				}
+				ImGui::EndCombo();
+			}
+			ImGui::Checkbox("Blocks Movement", &ui.stateEditBlocksMovement);
+			ImGui::Checkbox("Blocks Input", &ui.stateEditBlocksInput);
+
+			if (ImGui::Button("Create"))
+			{
+				if (ui.editingStateIndex >= 0)
+				{
+					const std::size_t editedStateIndex = static_cast<std::size_t>(ui.editingStateIndex);
+					const std::string previousStateName = states[editedStateIndex].name;
+					const bool transitionsWereVisible = ui.visibleStateTransitions[previousStateName];
+					if (entityStateMachine.UpdateState(
+						editedStateIndex,
+						ui.stateEditName,
+						ui.stateEditAnimationName,
+						ui.stateEditBlocksMovement,
+						ui.stateEditBlocksInput))
+					{
+						ui.visibleStateTransitions.erase(previousStateName);
+						ui.visibleStateTransitions[ui.stateEditName] = transitionsWereVisible;
+					}
+				}
+				else
+				{
+					entityStateMachine.AddState(
+						ui.stateEditName,
+						ui.stateEditAnimationName,
+						ui.stateEditBlocksMovement,
+						ui.stateEditBlocksInput);
+				}
+				copyStateName(ui.transitionFromState, sizeof(ui.transitionFromState), ui.stateEditName);
+				ui.editingStateIndex = -1;
+				ui.addStatePopupInitialized = false;
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Cancel"))
+			{
+				ui.editingStateIndex = -1;
+				ui.addStatePopupInitialized = false;
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::EndPopup();
+		}
+
+		ImGui::Separator();
+		ImGui::TextUnformatted("Initial State");
+		const char* currentInitialState = entityStateMachine.InitialState().empty() ? "<none>" : entityStateMachine.InitialState().c_str();
+		setComboWidthToText(currentInitialState);
+		if (ImGui::BeginCombo("##EntityStateInitialState", currentInitialState))
+		{
+			for (const EntityStateMachine::State& state : states)
+			{
+				const bool selected = entityStateMachine.InitialState() == state.name;
 				if (ImGui::Selectable(state.name.c_str(), selected))
 				{
-					copyStateName(ui.selectedAnimationName, sizeof(ui.selectedAnimationName), state.name);
+					entityStateMachine.SetInitialState(state.name);
 				}
-				if (selected)
-				{
-					ImGui::SetItemDefaultFocus();
-				}
+				if (selected) ImGui::SetItemDefaultFocus();
 			}
 			ImGui::EndCombo();
 		}
 
-		ImGui::Separator();
-		ImGui::Checkbox("incoming", &ui.showIncomingTransitions);
-		ImGui::SameLine();
-		ImGui::Checkbox("outgoing", &ui.showOutgoingTransitions);
-
-		// If the selected animation is invalid, fall back to the first available state.
-		if (ui.selectedAnimationName[0] == '\0' && !states.empty())
+		ImGui::TextUnformatted("States");
+		for (std::size_t stateIndex = 0; stateIndex < states.size(); ++stateIndex)
 		{
-			copyStateName(ui.selectedAnimationName, sizeof(ui.selectedAnimationName), states.front().name);
+			const EntityStateMachine::State& state = states[stateIndex];
+			ImGui::PushID(static_cast<int>(stateIndex));
+			bool& showTransitions = ui.visibleStateTransitions[state.name];
+			ImGui::Checkbox("##ShowTransitions", &showTransitions);
+			ImGui::SameLine();
+			ImGui::TextUnformatted(state.name.c_str());
+			ImGui::SameLine();
+			if (ImGui::SmallButton("Edit"))
+			{
+				copyStateName(ui.stateEditName, sizeof(ui.stateEditName), state.name);
+				copyStateName(ui.stateEditAnimationName, sizeof(ui.stateEditAnimationName), state.animationName);
+				ui.stateEditBlocksMovement = state.blocksMovement;
+				ui.stateEditBlocksInput = state.blocksInput;
+				ui.editingStateIndex = static_cast<int>(stateIndex);
+				ui.addStatePopupInitialized = false;
+				ui.editStatePopupRequested = true;
+			}
+			ImGui::SameLine();
+			if (ImGui::SmallButton("Delete"))
+			{
+				ui.visibleStateTransitions.erase(state.name);
+				entityStateMachine.RemoveState(stateIndex);
+				ImGui::PopID();
+				break;
+			}
+			ImGui::PopID();
 		}
 
-		const bool hasSelectedAnimation = ui.selectedAnimationName[0] != '\0';
-		const bool showIncomingTransitions = hasSelectedAnimation && ui.showIncomingTransitions;
-		const bool showOutgoingTransitions = hasSelectedAnimation && ui.showOutgoingTransitions;
-		ImGui::Separator();
+		auto stateTransitionsAreVisible = [](const std::map<std::string, bool>& visibility, const std::string& stateName)
+		{
+			const auto visibleState = visibility.find(stateName);
+			return visibleState != visibility.end() && visibleState->second;
+		};
+
+		ImGui::SeparatorText("Transitions");
+		if (ImGui::BeginTable("EntityStateTransitionDirectionTable", 2, ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingStretchProp))
+		{
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			ImGui::Checkbox("incoming", &ui.showIncomingTransitions);
+			ImGui::TableSetColumnIndex(1);
+			ImGui::Checkbox("outgoing", &ui.showOutgoingTransitions);
+			ImGui::EndTable();
+		}
 		const float transitionBoxWidth = ImGui::GetContentRegionAvail().x;
-		ImGui::BeginChild("AnimatorTransitionBox", ImVec2(transitionBoxWidth, 220.0f), true);
-		if (ImGui::BeginTable("AnimatorTransitionTable", 2, ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_Resizable))
+		ImGui::BeginChild("EntityStateTransitionBox", ImVec2(transitionBoxWidth, 220.0f), true);
+		if (ImGui::BeginTable("EntityStateTransitionTable", 2, ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_Resizable))
 		{
 			ImGui::TableSetupColumn("incoming", ImGuiTableColumnFlags_WidthStretch, 0.5f);
 			ImGui::TableSetupColumn("outgoing", ImGuiTableColumnFlags_WidthStretch, 0.5f);
 			ImGui::TableNextRow();
 
 			ImGui::TableSetColumnIndex(0);
-			if (showIncomingTransitions)
+			for (std::size_t transitionIndex = 0; transitionIndex < transitions.size(); ++transitionIndex)
 			{
-				for (std::size_t transitionIndex = 0; transitionIndex < transitions.size(); ++transitionIndex)
+				const EntityStateMachine::Transition& transition = transitions[transitionIndex];
+				if (ui.showIncomingTransitions && stateTransitionsAreVisible(ui.visibleStateTransitions, transition.to))
 				{
-					const AnimatorComponent::Transition& transition = transitions[transitionIndex];
-					if (transition.to != ui.selectedAnimationName)
-					{
-						continue;
-					}
 					drawTransitionRow(transition, transitionIndex);
 				}
 			}
 
 			ImGui::TableSetColumnIndex(1);
-			if (showOutgoingTransitions)
+			for (std::size_t transitionIndex = 0; transitionIndex < transitions.size(); ++transitionIndex)
 			{
-				for (std::size_t transitionIndex = 0; transitionIndex < transitions.size(); ++transitionIndex)
+				const EntityStateMachine::Transition& transition = transitions[transitionIndex];
+				if (ui.showOutgoingTransitions && stateTransitionsAreVisible(ui.visibleStateTransitions, transition.from))
 				{
-					const AnimatorComponent::Transition& transition = transitions[transitionIndex];
-					if (transition.from != ui.selectedAnimationName)
-					{
-						continue;
-					}
 					drawTransitionRow(transition, transitionIndex);
 				}
 			}
@@ -2054,24 +2180,21 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 
 		if (ui.editTransitionPopupRequested)
 		{
-			ImGui::OpenPopup("Add Transition##AquanactAnimatorStateMachine");
+			ImGui::OpenPopup("Add Transition##AquanactEntityStateMachine");
 			ui.editTransitionPopupRequested = false;
 		}
 
-		// Add or edit a transition in a modal popup.
 		ImGui::Separator();
 		if (ImGui::Button("Create Transition"))
 		{
-			// Reset the inline editor so a fresh transition starts from clean defaults.
 			ui.editingTransitionIndex = -1;
 			ui.addTransitionPopupInitialized = false;
-			ImGui::OpenPopup("Add Transition##AquanactAnimatorStateMachine");
+			ImGui::OpenPopup("Add Transition##AquanactEntityStateMachine");
 		}
 
 		ImGui::SetNextWindowSize(ImVec2(720.0f, 0.0f), ImGuiCond_FirstUseEver);
-		if (ImGui::BeginPopupModal("Add Transition##AquanactAnimatorStateMachine", nullptr))
+		if (ImGui::BeginPopupModal("Add Transition##AquanactEntityStateMachine", nullptr))
 		{
-			// Initialize the add/edit popup only once per open cycle.
 			if (!ui.addTransitionPopupInitialized)
 			{
 				if (!states.empty())
@@ -2083,57 +2206,54 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 					}
 				}
 				ui.conditions.clear();
-				AnimatorComponent::Condition defaultCondition;
+				EntityStateMachine::Condition defaultCondition;
 				defaultCondition.right.constantValue = 1.0f;
 				ui.conditions.push_back(std::move(defaultCondition));
 				ui.transitionBlendSeconds = 0.25f;
+				ui.transitionInterrupt = true;
 				ui.addTransitionPopupInitialized = true;
 			}
 
 			ImGui::TextUnformatted("From");
+			setComboWidthToText(ui.transitionFromState[0] != '\0' ? ui.transitionFromState : "<from>");
 			if (ImGui::BeginCombo("##TransitionFrom", ui.transitionFromState[0] != '\0' ? ui.transitionFromState : "<from>"))
 			{
-				for (const AnimatorComponent::State& state : states)
+				for (const EntityStateMachine::State& state : states)
 				{
 					const bool selected = std::strcmp(ui.transitionFromState, state.name.c_str()) == 0;
 					if (ImGui::Selectable(state.name.c_str(), selected))
 					{
 						copyStateName(ui.transitionFromState, sizeof(ui.transitionFromState), state.name);
 					}
-					if (selected)
-					{
-						ImGui::SetItemDefaultFocus();
-					}
+					if (selected) ImGui::SetItemDefaultFocus();
 				}
 				ImGui::EndCombo();
 			}
 
 			ImGui::TextUnformatted("To");
+			setComboWidthToText(ui.transitionToState[0] != '\0' ? ui.transitionToState : "<to>");
 			if (ImGui::BeginCombo("##TransitionTo", ui.transitionToState[0] != '\0' ? ui.transitionToState : "<to>"))
 			{
-				for (const AnimatorComponent::State& state : states)
+				for (const EntityStateMachine::State& state : states)
 				{
 					const bool selected = std::strcmp(ui.transitionToState, state.name.c_str()) == 0;
 					if (ImGui::Selectable(state.name.c_str(), selected))
 					{
 						copyStateName(ui.transitionToState, sizeof(ui.transitionToState), state.name);
 					}
-					if (selected)
-					{
-						ImGui::SetItemDefaultFocus();
-					}
+					if (selected) ImGui::SetItemDefaultFocus();
 				}
 				ImGui::EndCombo();
 			}
 
 			ImGui::SetNextItemWidth(120.0f);
 			ImGui::InputFloat("Blend Seconds", &ui.transitionBlendSeconds, 0.0f, 0.0f, "%.2f");
+			ImGui::Checkbox("Interrupt", &ui.transitionInterrupt);
 			ImGui::Separator();
 
-			// Each condition is edited as a full left/op/right triplet.
 			for (std::size_t conditionIndex = 0; conditionIndex < ui.conditions.size(); ++conditionIndex)
 			{
-				AnimatorComponent::Condition& condition = ui.conditions[conditionIndex];
+				EntityStateMachine::Condition& condition = ui.conditions[conditionIndex];
 				if (conditionIndex > 0)
 				{
 					ImGui::Separator();
@@ -2141,15 +2261,12 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 				ImGui::PushID(static_cast<int>(conditionIndex));
 				ImGui::TextUnformatted("Left Operand");
 				ImGui::PushID("Left");
-				const bool isBooleanCondition = IsBooleanAnimatorCondition(condition, bindingSources);
-				DrawAnimatorOperandEditor("", condition.left, bindingSources, isBooleanCondition);
+				const bool isBooleanCondition = IsBooleanEntityStateCondition(condition, bindingSources);
+				DrawEntityStateOperandEditor("", condition.left, bindingSources, isBooleanCondition);
 				ImGui::PopID();
-
-				// Ordering comparisons are not meaningful for booleans. Normalize old or
-				// externally-authored boolean conditions before drawing the dropdown.
-				if (isBooleanCondition && condition.comparator != AnimatorComponent::Comparator::Equal && condition.comparator != AnimatorComponent::Comparator::NotEqual)
+				if (isBooleanCondition && condition.comparator != EntityStateMachine::Comparator::Equal && condition.comparator != EntityStateMachine::Comparator::NotEqual)
 				{
-					condition.comparator = AnimatorComponent::Comparator::Equal;
+					condition.comparator = EntityStateMachine::Comparator::Equal;
 				}
 				ImGui::Separator();
 				ImGui::TextUnformatted("Comparator");
@@ -2157,28 +2274,24 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 				int comparatorIndex = static_cast<int>(condition.comparator);
 				if (isBooleanCondition)
 				{
-					// Boolean conditions intentionally expose only equality operators.
 					const char* booleanComparatorOptions[] = { "Equal", "Not Equal" };
-					comparatorIndex = condition.comparator == AnimatorComponent::Comparator::NotEqual ? 1 : 0;
+					comparatorIndex = condition.comparator == EntityStateMachine::Comparator::NotEqual ? 1 : 0;
 					if (ImGui::Combo("##Comparator", &comparatorIndex, booleanComparatorOptions, IM_ARRAYSIZE(booleanComparatorOptions)))
 					{
-						condition.comparator = comparatorIndex == 1 ? AnimatorComponent::Comparator::NotEqual : AnimatorComponent::Comparator::Equal;
+						condition.comparator = comparatorIndex == 1 ? EntityStateMachine::Comparator::NotEqual : EntityStateMachine::Comparator::Equal;
 					}
 				}
 				else if (ImGui::Combo("##Comparator", &comparatorIndex, comparatorOptions, IM_ARRAYSIZE(comparatorOptions)))
 				{
-					condition.comparator = static_cast<AnimatorComponent::Comparator>(comparatorIndex);
+					condition.comparator = static_cast<EntityStateMachine::Comparator>(comparatorIndex);
 				}
 				ImGui::Separator();
-
 				ImGui::TextUnformatted("Right Operand");
 				ImGui::PushID("Right");
-				DrawAnimatorOperandEditor("", condition.right, bindingSources, isBooleanCondition);
+				DrawEntityStateOperandEditor("", condition.right, bindingSources, isBooleanCondition);
 				ImGui::PopID();
 				ImGui::Separator();
-				// Preview the condition with the same formatter used by transition rows.
-				const std::string conditionPreview = conditionToBrowserText(condition);
-				ImGui::TextUnformatted(conditionPreview.c_str());
+				ImGui::TextUnformatted(conditionToBrowserText(condition).c_str());
 				ImGui::Separator();
 				if (ui.conditions.size() > 1 && ImGui::SmallButton("Remove Condition"))
 				{
@@ -2192,24 +2305,25 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 			ImGui::Separator();
 			if (ImGui::Button("Add Condition"))
 			{
-				AnimatorComponent::Condition condition;
+				EntityStateMachine::Condition condition;
 				condition.right.constantValue = 1.0f;
 				ui.conditions.push_back(std::move(condition));
 			}
 
 			if (ImGui::Button("Create"))
 			{
-				// Reuse the same popup for both insertion and update.
 				if (ui.editingTransitionIndex >= 0)
 				{
-					animator.UpdateTransition(static_cast<std::size_t>(ui.editingTransitionIndex), ui.transitionFromState, ui.transitionToState, ui.transitionBlendSeconds, ui.conditions);
+					entityStateMachine.UpdateTransition(static_cast<std::size_t>(ui.editingTransitionIndex), ui.transitionFromState, ui.transitionToState, ui.transitionBlendSeconds, ui.transitionInterrupt, ui.conditions);
 				}
 				else
 				{
-					animator.AddTransition(ui.transitionFromState, ui.transitionToState, ui.transitionBlendSeconds, ui.conditions);
+					entityStateMachine.AddTransition(ui.transitionFromState, ui.transitionToState, ui.transitionBlendSeconds, ui.transitionInterrupt, ui.conditions);
 				}
+				ui.visibleStateTransitions[ui.transitionFromState] = true;
 				ui.editingTransitionIndex = -1;
 				ui.addTransitionPopupInitialized = false;
+				ui.transitionListNeedsRefresh = true;
 				ImGui::CloseCurrentPopup();
 			}
 			ImGui::SameLine();
@@ -2222,21 +2336,19 @@ void EngineGUI::DrawAnimatorStateMachinePopup(AnimatorComponent& animator)
 			ImGui::EndPopup();
 		}
 
-		// Close the state machine editor and clear cached UI state.
 		ImGui::Separator();
 		if (ImGui::Button("Close"))
 		{
-			m_animatorStateMachinePopupRequested = false;
-			m_animatorUiState.erase(&animator);
+			m_entityStateMachinePopupRequested = false;
+			m_entityStateUiState.erase(&entityStateMachine);
 			ImGui::CloseCurrentPopup();
 		}
 		ImGui::EndPopup();
 	}
-	else if (m_animatorStateMachinePopupRequested && !ImGui::IsPopupOpen("State Machine##AquanactAnimatorStateMachine"))
+	else if (m_entityStateMachinePopupRequested && !ImGui::IsPopupOpen("State Machine##AquanactEntityStateMachine"))
 	{
-		// If the popup was requested but closed externally, clear the cached state.
-		m_animatorStateMachinePopupRequested = false;
-		m_animatorUiState.erase(&animator);
+		m_entityStateMachinePopupRequested = false;
+		m_entityStateUiState.erase(&entityStateMachine);
 	}
 }
 
@@ -2628,15 +2740,17 @@ void EngineGUI::DrawInputMapWindow()
 		return;
 	}
 
-	// The input map editor currently focuses on the "Move" action and rewrites
-	// the binding set in place when the user changes a control.
 	InputManager& inputManager = Root::Current().InputActions();
-	const std::function<InputBinding*(std::vector<InputBinding>&, InputBindingType, int, InputStick)> findBinding =
-		[](std::vector<InputBinding>& bindings, InputBindingType type, int code, InputStick stick) -> InputBinding*
+	InputMapUiState& ui = m_inputMapUi;
+
+	// Find bindings by their purpose rather than their current button. This keeps
+	// an edited direction associated with its row after its key changes.
+	const auto findDirectionalBinding =
+		[](std::vector<InputBinding>& bindings, InputBindingType type, const glm::vec2& direction) -> InputBinding*
 	{
 		for (InputBinding& binding : bindings)
 		{
-			if (binding.type == type && binding.code == code && binding.stick == stick)
+			if (binding.type == type && binding.vector == direction)
 			{
 				return &binding;
 			}
@@ -2644,58 +2758,154 @@ void EngineGUI::DrawInputMapWindow()
 		return nullptr;
 	};
 
-	const std::function<void(std::vector<InputBinding>&, InputBinding)> ensureBinding =
-		[](std::vector<InputBinding>& bindings, InputBinding binding)
+	const auto findFirstBindingOfType =
+		[](std::vector<InputBinding>& bindings, InputBindingType type) -> InputBinding*
 	{
-		for (InputBinding& existing : bindings)
+		for (InputBinding& binding : bindings)
 		{
-			if (existing.type == binding.type && existing.code == binding.code && existing.stick == binding.stick)
+			if (binding.type == type)
 			{
-				existing = binding;
-				return;
+				return &binding;
 			}
 		}
-		bindings.push_back(binding);
+		return nullptr;
 	};
 
-	bool open = m_showInputMapWindow;
-	if (ImGui::Begin("Input Map", &open, ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize))
+	// Keep Move first, then present every other runtime action alphabetically.
+	std::vector<std::string> actionNames;
+	actionNames.reserve(inputManager.Bindings().size());
+	for (const auto& [actionName, bindings] : inputManager.Bindings())
 	{
-		// Use the concrete iterator type returned by the binding map instead of guessing one.
-		const decltype(inputManager.Bindings().find("Move")) bindingIt = inputManager.Bindings().find("Move");
+		(void)bindings;
+		actionNames.push_back(actionName);
+	}
+	std::sort(actionNames.begin(), actionNames.end(), [](const std::string& left, const std::string& right)
+	{
+		if (left == right) return false;
+		if (left == "Move") return true;
+		if (right == "Move") return false;
+		return left < right;
+	});
+
+	if (inputManager.Bindings().find(ui.selectedAction) == inputManager.Bindings().end())
+	{
+		ui.selectedAction = inputManager.Bindings().contains("Move")
+			? "Move"
+			: (actionNames.empty() ? std::string{} : actionNames.front());
+	}
+
+	bool open = m_showInputMapWindow;
+	ImGui::SetNextWindowSize(ImVec2(540.0f, 0.0f), ImGuiCond_FirstUseEver);
+	if (ImGui::Begin("Input Map", &open, ImGuiWindowFlags_NoFocusOnAppearing))
+	{
+		// Action selection and creation
+		ImGui::TextUnformatted("Mapping Action");
+		ImGui::SameLine();
+			// Keep the action selector compact so the creation button stays visible.
+			ImGui::SetNextItemWidth(180.0f);
+		if (ImGui::BeginCombo("##InputAction", ui.selectedAction.empty() ? "<select action>" : ui.selectedAction.c_str()))
+		{
+			for (const std::string& actionName : actionNames)
+			{
+				const bool selected = actionName == ui.selectedAction;
+				if (ImGui::Selectable(actionName.c_str(), selected))
+				{
+					ui.selectedAction = actionName;
+				}
+				if (selected)
+				{
+					ImGui::SetItemDefaultFocus();
+				}
+			}
+			ImGui::EndCombo();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Add New Action"))
+		{
+			ui.newActionName[0] = '\0';
+			ui.statusMessage.clear();
+			ui.addActionPopupRequested = true;
+		}
+
+		if (ui.addActionPopupRequested)
+		{
+			ImGui::OpenPopup("Add Input Action##AquanactInputMap");
+			ui.addActionPopupRequested = false;
+		}
+
+		if (ImGui::BeginPopupModal("Add Input Action##AquanactInputMap", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+		{
+			ImGui::TextUnformatted("Action Name");
+			ImGui::SetNextItemWidth(280.0f);
+			ImGui::InputText("##NewInputActionName", ui.newActionName, sizeof(ui.newActionName));
+
+			if (ImGui::Button("Create"))
+			{
+				std::string actionName = ui.newActionName;
+				const auto firstCharacter = std::find_if_not(actionName.begin(), actionName.end(), [](unsigned char ch) { return std::isspace(ch); });
+				const auto lastCharacter = std::find_if_not(actionName.rbegin(), actionName.rend(), [](unsigned char ch) { return std::isspace(ch); }).base();
+				actionName = firstCharacter < lastCharacter ? std::string(firstCharacter, lastCharacter) : std::string{};
+
+				if (actionName.empty())
+				{
+					ui.statusMessage = "Enter an action name.";
+				}
+				else if (inputManager.Bindings().contains(actionName))
+				{
+					ui.statusMessage = "That action already exists.";
+				}
+				else
+				{
+					inputManager.SetBindings(actionName, {});
+					ui.selectedAction = actionName;
+					ui.statusMessage.clear();
+					ImGui::CloseCurrentPopup();
+				}
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Cancel"))
+			{
+				ui.statusMessage.clear();
+				ImGui::CloseCurrentPopup();
+			}
+			if (!ui.statusMessage.empty())
+			{
+				ImGui::TextUnformatted(ui.statusMessage.c_str());
+			}
+			ImGui::EndPopup();
+		}
+
+		ImGui::Separator();
+
+		const auto bindingIt = inputManager.Bindings().find(ui.selectedAction);
 		if (bindingIt != inputManager.Bindings().end())
 		{
 			std::vector<InputBinding> editedBindings = bindingIt->second;
 			bool bindingsChanged = false;
 
-			// Keyboard bindings are edited through a shared helper to keep the four directions consistent.
-			const std::function<void(const char*, int, const glm::vec2&)> drawKeyboardBinding =
-				[&](const char* label, int keyCode, const glm::vec2& vector)
+			// Shared keyboard selector for Move's four vector directions.
+			const auto drawKeyboardDirection = [&](const char* label, int defaultKey, const glm::vec2& direction)
 			{
-				InputBinding* binding = findBinding(editedBindings, InputBindingType::Key, keyCode, InputStick::Left);
+				InputBinding* binding = findDirectionalBinding(editedBindings, InputBindingType::Key, direction);
 				if (!binding)
 				{
-					ensureBinding(editedBindings, { InputBindingType::Key, keyCode, GLFW_JOYSTICK_1, 1.0f, vector });
-					binding = findBinding(editedBindings, InputBindingType::Key, keyCode, InputStick::Left);
-				}
-
-				if (!binding)
-				{
-					return;
+					editedBindings.push_back({ InputBindingType::Key, defaultKey, GLFW_JOYSTICK_1, 1.0f, direction });
+					binding = &editedBindings.back();
+					bindingsChanged = true;
 				}
 
 				if (ImGui::BeginCombo(label, InputBindingLabel(*binding).c_str()))
 				{
-					const InputBinding options[] = {
-						{ InputBindingType::Key, GLFW_KEY_W, GLFW_JOYSTICK_1, 1.0f, glm::vec2(0.0f, 1.0f) },
-						{ InputBindingType::Key, GLFW_KEY_A, GLFW_JOYSTICK_1, 1.0f, glm::vec2(-1.0f, 0.0f) },
-						{ InputBindingType::Key, GLFW_KEY_S, GLFW_JOYSTICK_1, 1.0f, glm::vec2(0.0f, -1.0f) },
-						{ InputBindingType::Key, GLFW_KEY_D, GLFW_JOYSTICK_1, 1.0f, glm::vec2(1.0f, 0.0f) },
+					const int keyOptions[] = {
+						GLFW_KEY_W, GLFW_KEY_A, GLFW_KEY_S, GLFW_KEY_D,
+						GLFW_KEY_UP, GLFW_KEY_LEFT, GLFW_KEY_DOWN, GLFW_KEY_RIGHT
 					};
-					for (const InputBinding& option : options)
+					for (const int keyCode : keyOptions)
 					{
-						const bool selected = option.code == binding->code;
-						if (ImGui::Selectable(InputBindingLabel(option).c_str(), selected))
+						const InputBinding option{ InputBindingType::Key, keyCode, GLFW_JOYSTICK_1, 1.0f, direction };
+						const bool selected = keyCode == binding->code;
+						const std::string optionLabel = InputBindingLabel(option);
+						if (ImGui::Selectable(optionLabel.c_str(), selected))
 						{
 							*binding = option;
 							bindingsChanged = true;
@@ -2709,112 +2919,221 @@ void EngineGUI::DrawInputMapWindow()
 				}
 			};
 
-			ImGui::PushID("Move");
-			ImGui::TextUnformatted("Move");
-			ImGui::TextDisabled("Keyboard");
-			ImGui::Separator();
-			drawKeyboardBinding("Up##KeyboardUp", GLFW_KEY_W, glm::vec2(0.0f, 1.0f));
-			drawKeyboardBinding("Down##KeyboardDown", GLFW_KEY_S, glm::vec2(0.0f, -1.0f));
-			drawKeyboardBinding("Left##KeyboardLeft", GLFW_KEY_A, glm::vec2(-1.0f, 0.0f));
-			drawKeyboardBinding("Right##KeyboardRight", GLFW_KEY_D, glm::vec2(1.0f, 0.0f));
+			ImGui::PushID(ui.selectedAction.c_str());
 
-			ImGui::Spacing();
-			ImGui::TextDisabled("Controller");
-			ImGui::Separator();
-			static const char* controllerModes[] = { "Digital", "Analog" };
-			int controllerMode = findBinding(editedBindings, InputBindingType::ControllerStick, 0, InputStick::Left) ? 1 : 0;
-			// Switching between digital D-pad and analog stick rewrites the controller entries.
-			if (ImGui::Combo("##MoveControllerMode", &controllerMode, controllerModes, IM_ARRAYSIZE(controllerModes)))
+			if (ui.selectedAction == "Move")
 			{
-				editedBindings.erase(std::remove_if(editedBindings.begin(), editedBindings.end(), [](const InputBinding& binding)
+				ImGui::TextDisabled("Keyboard / Mouse");
+				ImGui::Separator();
+				drawKeyboardDirection("Up##KeyboardUp", GLFW_KEY_W, glm::vec2(0.0f, 1.0f));
+				drawKeyboardDirection("Down##KeyboardDown", GLFW_KEY_S, glm::vec2(0.0f, -1.0f));
+				drawKeyboardDirection("Left##KeyboardLeft", GLFW_KEY_A, glm::vec2(-1.0f, 0.0f));
+				drawKeyboardDirection("Right##KeyboardRight", GLFW_KEY_D, glm::vec2(1.0f, 0.0f));
+
+				ImGui::Spacing();
+				ImGui::TextDisabled("Controller");
+				ImGui::Separator();
+				const char* controllerModes[] = { "Digital", "Analog" };
+				int controllerMode = findFirstBindingOfType(editedBindings, InputBindingType::ControllerStick) ? 1 : 0;
+				if (ImGui::Combo("##MoveControllerMode", &controllerMode, controllerModes, IM_ARRAYSIZE(controllerModes)))
 				{
-					return binding.type == InputBindingType::ControllerDigital || binding.type == InputBindingType::ControllerStick;
-				}), editedBindings.end());
+					editedBindings.erase(std::remove_if(editedBindings.begin(), editedBindings.end(), [](const InputBinding& binding)
+					{
+						return binding.type == InputBindingType::ControllerDigital || binding.type == InputBindingType::ControllerStick;
+					}), editedBindings.end());
+
+					if (controllerMode == 0)
+					{
+						editedBindings.push_back({ InputBindingType::ControllerDigital, GLFW_GAMEPAD_BUTTON_DPAD_UP, GLFW_JOYSTICK_1, 1.0f, glm::vec2(0.0f, 1.0f) });
+						editedBindings.push_back({ InputBindingType::ControllerDigital, GLFW_GAMEPAD_BUTTON_DPAD_DOWN, GLFW_JOYSTICK_1, 1.0f, glm::vec2(0.0f, -1.0f) });
+						editedBindings.push_back({ InputBindingType::ControllerDigital, GLFW_GAMEPAD_BUTTON_DPAD_LEFT, GLFW_JOYSTICK_1, 1.0f, glm::vec2(-1.0f, 0.0f) });
+						editedBindings.push_back({ InputBindingType::ControllerDigital, GLFW_GAMEPAD_BUTTON_DPAD_RIGHT, GLFW_JOYSTICK_1, 1.0f, glm::vec2(1.0f, 0.0f) });
+					}
+					else
+					{
+						editedBindings.push_back({ InputBindingType::ControllerStick, 0, GLFW_JOYSTICK_1, 1.0f, glm::vec2(0.0f), InputStick::Left });
+					}
+					bindingsChanged = true;
+				}
 
 				if (controllerMode == 0)
 				{
-					editedBindings.push_back({ InputBindingType::ControllerDigital, GLFW_GAMEPAD_BUTTON_DPAD_UP, GLFW_JOYSTICK_1, 1.0f, glm::vec2(0.0f, 1.0f) });
-					editedBindings.push_back({ InputBindingType::ControllerDigital, GLFW_GAMEPAD_BUTTON_DPAD_DOWN, GLFW_JOYSTICK_1, 1.0f, glm::vec2(0.0f, -1.0f) });
-					editedBindings.push_back({ InputBindingType::ControllerDigital, GLFW_GAMEPAD_BUTTON_DPAD_LEFT, GLFW_JOYSTICK_1, 1.0f, glm::vec2(-1.0f, 0.0f) });
-					editedBindings.push_back({ InputBindingType::ControllerDigital, GLFW_GAMEPAD_BUTTON_DPAD_RIGHT, GLFW_JOYSTICK_1, 1.0f, glm::vec2(1.0f, 0.0f) });
+					const char* labels[] = { "Up", "Down", "Left", "Right" };
+					const InputBinding defaults[] = {
+						{ InputBindingType::ControllerDigital, GLFW_GAMEPAD_BUTTON_DPAD_UP, GLFW_JOYSTICK_1, 1.0f, glm::vec2(0.0f, 1.0f) },
+						{ InputBindingType::ControllerDigital, GLFW_GAMEPAD_BUTTON_DPAD_DOWN, GLFW_JOYSTICK_1, 1.0f, glm::vec2(0.0f, -1.0f) },
+						{ InputBindingType::ControllerDigital, GLFW_GAMEPAD_BUTTON_DPAD_LEFT, GLFW_JOYSTICK_1, 1.0f, glm::vec2(-1.0f, 0.0f) },
+						{ InputBindingType::ControllerDigital, GLFW_GAMEPAD_BUTTON_DPAD_RIGHT, GLFW_JOYSTICK_1, 1.0f, glm::vec2(1.0f, 0.0f) },
+					};
+
+					for (int directionIndex = 0; directionIndex < IM_ARRAYSIZE(defaults); ++directionIndex)
+					{
+						InputBinding* binding = findDirectionalBinding(editedBindings, InputBindingType::ControllerDigital, defaults[directionIndex].vector);
+						if (!binding)
+						{
+							editedBindings.push_back(defaults[directionIndex]);
+							binding = &editedBindings.back();
+							bindingsChanged = true;
+						}
+
+						if (ImGui::BeginCombo(labels[directionIndex], InputBindingLabel(*binding).c_str()))
+						{
+							for (const InputBinding& optionTemplate : defaults)
+							{
+								InputBinding option = optionTemplate;
+								option.vector = defaults[directionIndex].vector;
+								const bool selected = option.code == binding->code;
+								const std::string optionLabel = InputBindingLabel(option);
+								if (ImGui::Selectable(optionLabel.c_str(), selected))
+								{
+									*binding = option;
+									bindingsChanged = true;
+								}
+								if (selected) ImGui::SetItemDefaultFocus();
+							}
+							ImGui::EndCombo();
+						}
+					}
 				}
 				else
 				{
-					editedBindings.push_back({ InputBindingType::ControllerStick, 0, GLFW_JOYSTICK_1, 1.0f, glm::vec2(0.0f), InputStick::Left });
-				}
-				bindingsChanged = true;
-			}
-
-			if (controllerMode == 0)
-			{
-				const char* labels[] = { "Up", "Down", "Left", "Right" };
-				const InputBinding options[] = {
-					{ InputBindingType::ControllerDigital, GLFW_GAMEPAD_BUTTON_DPAD_UP, GLFW_JOYSTICK_1, 1.0f, glm::vec2(0.0f, 1.0f) },
-					{ InputBindingType::ControllerDigital, GLFW_GAMEPAD_BUTTON_DPAD_DOWN, GLFW_JOYSTICK_1, 1.0f, glm::vec2(0.0f, -1.0f) },
-					{ InputBindingType::ControllerDigital, GLFW_GAMEPAD_BUTTON_DPAD_LEFT, GLFW_JOYSTICK_1, 1.0f, glm::vec2(-1.0f, 0.0f) },
-					{ InputBindingType::ControllerDigital, GLFW_GAMEPAD_BUTTON_DPAD_RIGHT, GLFW_JOYSTICK_1, 1.0f, glm::vec2(1.0f, 0.0f) },
-				};
-
-				for (int i = 0; i < 4; ++i)
-				{
-					InputBinding* binding = findBinding(editedBindings, InputBindingType::ControllerDigital, options[i].code, InputStick::Left);
-					if (!binding)
+					InputBinding* stickBinding = findFirstBindingOfType(editedBindings, InputBindingType::ControllerStick);
+					if (!stickBinding)
 					{
-						ensureBinding(editedBindings, options[i]);
-						binding = findBinding(editedBindings, InputBindingType::ControllerDigital, options[i].code, InputStick::Left);
+						editedBindings.push_back({ InputBindingType::ControllerStick, 0, GLFW_JOYSTICK_1, 1.0f, glm::vec2(0.0f), InputStick::Left });
+						stickBinding = &editedBindings.back();
+						bindingsChanged = true;
 					}
 
-					if (!binding)
+					if (ImGui::BeginCombo("Stick##MoveControllerStick", InputBindingLabel(*stickBinding).c_str()))
 					{
-						continue;
-					}
-
-					if (ImGui::BeginCombo(labels[i], InputBindingLabel(*binding).c_str()))
-					{
-						for (const InputBinding& option : options)
+						const InputStick stickOptions[] = { InputStick::Left, InputStick::Right };
+						for (const InputStick stick : stickOptions)
 						{
-							const bool selected = option.code == binding->code;
-							if (ImGui::Selectable(InputBindingLabel(option).c_str(), selected))
+							const bool selected = stick == stickBinding->stick;
+							const char* label = stick == InputStick::Left ? "Left Stick" : "Right Stick";
+							if (ImGui::Selectable(label, selected))
 							{
-								*binding = option;
+								stickBinding->stick = stick;
 								bindingsChanged = true;
 							}
-							if (selected)
-							{
-								ImGui::SetItemDefaultFocus();
-							}
+							if (selected) ImGui::SetItemDefaultFocus();
 						}
 						ImGui::EndCombo();
 					}
 				}
 			}
-			else
+			else if (ui.selectedAction == "Look")
 			{
-				InputBinding* stickBinding = findBinding(editedBindings, InputBindingType::ControllerStick, 0, InputStick::Left);
+				ImGui::TextDisabled("Keyboard / Mouse");
+				ImGui::Separator();
+				ImGui::TextUnformatted("Mouse Movement");
+
+				ImGui::Spacing();
+				ImGui::TextDisabled("Controller");
+				ImGui::Separator();
+				InputBinding* stickBinding = findFirstBindingOfType(editedBindings, InputBindingType::ControllerStick);
 				if (!stickBinding)
 				{
-					ensureBinding(editedBindings, { InputBindingType::ControllerStick, 0, GLFW_JOYSTICK_1, 1.0f, glm::vec2(0.0f), InputStick::Left });
-					stickBinding = findBinding(editedBindings, InputBindingType::ControllerStick, 0, InputStick::Left);
+					editedBindings.push_back({ InputBindingType::ControllerStick, 0, GLFW_JOYSTICK_1, 1.0f, glm::vec2(0.0f), InputStick::Right });
+					stickBinding = &editedBindings.back();
+					bindingsChanged = true;
 				}
 
-				if (stickBinding && ImGui::BeginCombo("##ControllerAnalog", InputBindingLabel(*stickBinding).c_str()))
+				if (ImGui::BeginCombo("Stick##LookControllerStick", InputBindingLabel(*stickBinding).c_str()))
 				{
-					const InputBinding options[] = {
-						{ InputBindingType::ControllerStick, 0, GLFW_JOYSTICK_1, 1.0f, glm::vec2(0.0f), InputStick::Left },
-						{ InputBindingType::ControllerStick, 0, GLFW_JOYSTICK_1, 1.0f, glm::vec2(0.0f), InputStick::Right },
-					};
-					for (const InputBinding& option : options)
+					const InputStick stickOptions[] = { InputStick::Left, InputStick::Right };
+					for (const InputStick stick : stickOptions)
 					{
-						const bool selected = option.stick == stickBinding->stick;
-						if (ImGui::Selectable(InputBindingLabel(option).c_str(), selected))
+						const bool selected = stick == stickBinding->stick;
+						const char* label = stick == InputStick::Left ? "Left Stick" : "Right Stick";
+						if (ImGui::Selectable(label, selected))
 						{
-							*stickBinding = option;
+							stickBinding->stick = stick;
 							bindingsChanged = true;
 						}
-						if (selected)
+						if (selected) ImGui::SetItemDefaultFocus();
+					}
+					ImGui::EndCombo();
+				}
+			}
+			else
+			{
+				// New actions are digital and receive one desktop and one controller binding.
+				ImGui::TextDisabled("Keyboard / Mouse");
+				ImGui::Separator();
+				InputBinding* desktopBinding = nullptr;
+				for (InputBinding& binding : editedBindings)
+				{
+					if (binding.type == InputBindingType::Key || binding.type == InputBindingType::MouseButton)
+					{
+						desktopBinding = &binding;
+						break;
+					}
+				}
+				if (!desktopBinding)
+				{
+					editedBindings.push_back({ InputBindingType::Key, GLFW_KEY_SPACE, GLFW_JOYSTICK_1, 1.0f, glm::vec2(1.0f, 0.0f) });
+					desktopBinding = &editedBindings.back();
+					bindingsChanged = true;
+				}
+
+				if (ImGui::BeginCombo("Button##DesktopActionButton", InputBindingLabel(*desktopBinding).c_str()))
+				{
+					const InputBinding desktopOptions[] = {
+						{ InputBindingType::Key, GLFW_KEY_SPACE, GLFW_JOYSTICK_1, 1.0f, glm::vec2(1.0f, 0.0f) },
+						{ InputBindingType::Key, GLFW_KEY_ENTER, GLFW_JOYSTICK_1, 1.0f, glm::vec2(1.0f, 0.0f) },
+						{ InputBindingType::Key, GLFW_KEY_E, GLFW_JOYSTICK_1, 1.0f, glm::vec2(1.0f, 0.0f) },
+						{ InputBindingType::Key, GLFW_KEY_F, GLFW_JOYSTICK_1, 1.0f, glm::vec2(1.0f, 0.0f) },
+						{ InputBindingType::Key, GLFW_KEY_Q, GLFW_JOYSTICK_1, 1.0f, glm::vec2(1.0f, 0.0f) },
+						{ InputBindingType::MouseButton, GLFW_MOUSE_BUTTON_LEFT, GLFW_JOYSTICK_1, 1.0f, glm::vec2(1.0f, 0.0f) },
+						{ InputBindingType::MouseButton, GLFW_MOUSE_BUTTON_RIGHT, GLFW_JOYSTICK_1, 1.0f, glm::vec2(1.0f, 0.0f) },
+						{ InputBindingType::MouseButton, GLFW_MOUSE_BUTTON_MIDDLE, GLFW_JOYSTICK_1, 1.0f, glm::vec2(1.0f, 0.0f) },
+					};
+					for (const InputBinding& option : desktopOptions)
+					{
+						const bool selected = option.type == desktopBinding->type && option.code == desktopBinding->code;
+						const std::string optionLabel = InputBindingLabel(option);
+						if (ImGui::Selectable(optionLabel.c_str(), selected))
 						{
-							ImGui::SetItemDefaultFocus();
+							*desktopBinding = option;
+							bindingsChanged = true;
 						}
+						if (selected) ImGui::SetItemDefaultFocus();
+					}
+					ImGui::EndCombo();
+				}
+
+				ImGui::Spacing();
+				ImGui::TextDisabled("Controller");
+				ImGui::Separator();
+				InputBinding* controllerBinding = findFirstBindingOfType(editedBindings, InputBindingType::ControllerDigital);
+				if (!controllerBinding)
+				{
+					editedBindings.push_back({ InputBindingType::ControllerDigital, GLFW_GAMEPAD_BUTTON_A, GLFW_JOYSTICK_1, 1.0f, glm::vec2(1.0f, 0.0f) });
+					controllerBinding = &editedBindings.back();
+					bindingsChanged = true;
+				}
+
+				if (ImGui::BeginCombo("Button##ControllerActionButton", InputBindingLabel(*controllerBinding).c_str()))
+				{
+					const int buttonOptions[] = {
+						GLFW_GAMEPAD_BUTTON_A, GLFW_GAMEPAD_BUTTON_B, GLFW_GAMEPAD_BUTTON_X, GLFW_GAMEPAD_BUTTON_Y,
+						GLFW_GAMEPAD_BUTTON_LEFT_BUMPER, GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER,
+						GLFW_GAMEPAD_BUTTON_DPAD_UP, GLFW_GAMEPAD_BUTTON_DPAD_DOWN,
+						GLFW_GAMEPAD_BUTTON_DPAD_LEFT, GLFW_GAMEPAD_BUTTON_DPAD_RIGHT
+					};
+					for (const int buttonCode : buttonOptions)
+					{
+						const InputBinding option{ InputBindingType::ControllerDigital, buttonCode, GLFW_JOYSTICK_1, 1.0f, glm::vec2(1.0f, 0.0f) };
+						const bool selected = buttonCode == controllerBinding->code;
+						const std::string optionLabel = InputBindingLabel(option);
+						if (ImGui::Selectable(optionLabel.c_str(), selected))
+						{
+							*controllerBinding = option;
+							bindingsChanged = true;
+						}
+						if (selected) ImGui::SetItemDefaultFocus();
 					}
 					ImGui::EndCombo();
 				}
@@ -2824,7 +3143,7 @@ void EngineGUI::DrawInputMapWindow()
 
 			if (bindingsChanged)
 			{
-				inputManager.SetBindings("Move", std::move(editedBindings));
+				inputManager.SetBindings(ui.selectedAction, std::move(editedBindings));
 			}
 		}
 	}
@@ -2909,3 +3228,7 @@ std::string EngineGUI::NormalizeLevelName(const std::string& input)
 	}
 	return output;
 }
+
+
+
+

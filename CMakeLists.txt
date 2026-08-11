@@ -73,7 +73,7 @@ set(SOURCES
     "include/Engine/Core/ProjectStateSerializer.h" "src/Engine/Core/ProjectStateSerializer.cpp"
     "include/Engine/Core/Animation.h" "src/Engine/Core/Animation.cpp"
     "include/Engine/Core/Animator.h" "src/Engine/Core/Animator.cpp"
-    "include/Engine/Core/AnimatorComponent.h" "src/Engine/Core/AnimatorComponent.cpp"
+    "include/Engine/Core/EntityStateMachine.h" "src/Engine/Core/EntityStateMachine.cpp"
     "include/Engine/Core/Controller.h" "src/Engine/Core/Controller.cpp"
     "include/Engine/Core/PlayerController.h" "src/Engine/Core/PlayerController.cpp"
     "include/Engine/Core/Component.h" "src/Engine/Core/Component.cpp"

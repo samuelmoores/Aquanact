@@ -100,6 +100,10 @@ bool InputManager::IsBindingConnected(const InputBinding& binding) const
 	{
 		return binding.code >= 0 && binding.code <= GLFW_KEY_LAST;
 	}
+	if (binding.type == InputBindingType::MouseButton)
+	{
+		return binding.code >= GLFW_MOUSE_BUTTON_1 && binding.code <= GLFW_MOUSE_BUTTON_LAST;
+	}
 	if (binding.type == InputBindingType::MouseDelta)
 	{
 		return true;
@@ -121,6 +125,10 @@ bool InputManager::IsBindingDown(const InputBinding& binding) const
 	if (binding.type == InputBindingType::Key)
 	{
 		return m_input->KeyDown(binding.code);
+	}
+	if (binding.type == InputBindingType::MouseButton)
+	{
+		return m_input->MouseButtonDown(binding.code);
 	}
 	if (binding.type == InputBindingType::MouseDelta)
 	{
@@ -162,6 +170,13 @@ void InputManager::EvaluateActions()
 			if (binding.type == InputBindingType::Key)
 			{
 				if (m_input->KeyDown(binding.code))
+				{
+					vectorValue += binding.vector * binding.scale;
+				}
+			}
+			else if (binding.type == InputBindingType::MouseButton)
+			{
+				if (m_input->MouseButtonDown(binding.code))
 				{
 					vectorValue += binding.vector * binding.scale;
 				}

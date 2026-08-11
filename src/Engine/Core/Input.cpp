@@ -379,6 +379,11 @@ bool Input::KeyDown(int key) const
 	return m_window && m_windowFocused && glfwGetKey(m_window->GLFW(), key) == GLFW_PRESS;
 }
 
+bool Input::MouseButtonDown(int button) const
+{
+	return m_window && m_windowFocused && glfwGetMouseButton(m_window->GLFW(), button) == GLFW_PRESS;
+}
+
 bool Input::ControllerButtonDown(int button, int joystick) const
 {
 	if (!m_windowFocused || !glfwJoystickIsGamepad(joystick))

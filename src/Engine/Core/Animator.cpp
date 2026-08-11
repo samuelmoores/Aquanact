@@ -113,6 +113,15 @@ int Animator::ClipCount() const
 	return static_cast<int>(m_clips.size());
 }
 
+float Animator::ClipDuration(int clipIndex) const
+{
+	if (clipIndex < 0 || clipIndex >= static_cast<int>(m_clips.size()) || !m_clips[clipIndex])
+	{
+		return 0.0f;
+	}
+	return m_clips[clipIndex]->Duration();
+}
+
 void Animator::Traverse(float timeTicks, const aiNode* node, const aiMatrix4x4& parent, Animation* anim)
 {
 	const std::string name = node->mName.C_Str();

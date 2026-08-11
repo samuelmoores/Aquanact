@@ -571,6 +571,19 @@ void Debug::drawGameModeInput(const Input& input)
 		m_showGameplayDiagnosticsWindow = open;
 	}
 
+	if (m_showEntityStateDiagnosticsWindow)
+	{
+		bool open = m_showEntityStateDiagnosticsWindow;
+		ImGui::Begin("Entity State Diagnostics", &open);
+		ImGui::TextUnformatted("Entity states in active scene:");
+		ImGui::Separator();
+		ImGui::BeginChild("EntityStateDiagnosticsList", ImVec2(0.0f, 0.0f), true);
+		ImGui::TextUnformatted(m_entityStateStateListText.empty() ? "<none>" : m_entityStateStateListText.c_str());
+		ImGui::EndChild();
+		ImGui::End();
+		m_showEntityStateDiagnosticsWindow = open;
+	}
+
 	if (m_showAnimationDiagnosticsWindow)
 	{
 		bool open = m_showAnimationDiagnosticsWindow;
@@ -689,6 +702,11 @@ void Debug::SetAnimationDiagnostics(const std::string& currentState, const std::
 	m_animationStateListText = stateListText;
 }
 
+void Debug::SetEntityStateDiagnostics(const std::string& stateListText)
+{
+	m_entityStateStateListText = stateListText;
+}
+
 void Debug::SetGameplayContext(const std::string& activeLevelName, std::size_t activeLevelObjects, std::size_t controllerCount, const std::string& engineMode)
 {
 	m_activeLevelName = activeLevelName;
@@ -705,6 +723,8 @@ bool Debug::ShowGameInputWindow() const { return m_showGameInputWindow; }
 void Debug::SetShowGameInputWindow(bool show) { m_showGameInputWindow = show; }
 bool Debug::ShowGameplayDiagnosticsWindow() const { return m_showGameplayDiagnosticsWindow; }
 void Debug::SetShowGameplayDiagnosticsWindow(bool show) { m_showGameplayDiagnosticsWindow = show; }
+bool Debug::ShowEntityStateDiagnosticsWindow() const { return m_showEntityStateDiagnosticsWindow; }
+void Debug::SetShowEntityStateDiagnosticsWindow(bool show) { m_showEntityStateDiagnosticsWindow = show; }
 bool Debug::ShowAnimationDiagnosticsWindow() const { return m_showAnimationDiagnosticsWindow; }
 void Debug::SetShowAnimationDiagnosticsWindow(bool show) { m_showAnimationDiagnosticsWindow = show; }
 

@@ -1,7 +1,7 @@
 #include "Engine/Core/GameplayManager.h"
 
 #include "Engine/Core/Controller.h"
-#include "Engine/Core/AnimatorComponent.h"
+#include "Engine/Core/EntityStateMachine.h"
 #include "Engine/Core/Debug.h"
 #include "Engine/Core/FrontEndManager.h"
 #include "Engine/Core/Scene.h"
@@ -10,6 +10,8 @@
 #include "Engine/Core/Input.h"
 
 #include <algorithm>
+#include <filesystem>
+#include <sstream>
 
 GameplayManager::~GameplayManager() = default;
 
@@ -217,12 +219,15 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 		{
 			FrameProfiler::Scope controllerScope(Root::Current().Profiler(), "Controllers");
 			object->UpdateComponents(dt);
-			if (AnimatorComponent* animator = object->GetAnimatorComponent())
+			if (EntityStateMachine* animator = object->GetEntityState())
 			{
 				std::string stateListText;
 				for (const auto& state : animator->States())
 				{
-					stateListText += state.name + " -> clip " + std::to_string(state.clipIndex) + "\n";
+					const std::string animationLabel = state.animationName.empty()
+						? "<none>"
+						: std::filesystem::path(state.animationName).filename().string();
+					stateListText += state.name + " -> animation " + animationLabel + "\n";
 				}
 
 				// but all this debugging should be moved out of the game loop
@@ -245,6 +250,30 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 			}
 		}
 	}
+
+	std::string entityStateListText;
+	for (const auto& object : activeLevel->Objects())
+	{
+		if (!object)
+		{
+			continue;
+		}
+
+		if (EntityStateMachine* entityState = object->GetEntityState())
+		{
+			entityStateListText += object->Name();
+			entityStateListText += " -> ";
+			entityStateListText += entityState->CurrentState().empty() ? "<none>" : entityState->CurrentState();
+			if (!entityState->DesiredState().empty() && entityState->DesiredState() != entityState->CurrentState())
+			{
+				entityStateListText += " (desired: ";
+				entityStateListText += entityState->DesiredState();
+				entityStateListText += ")";
+			}
+			entityStateListText += "\n";
+		}
+	}
+	debug.SetEntityStateDiagnostics(entityStateListText);
 
 }
 

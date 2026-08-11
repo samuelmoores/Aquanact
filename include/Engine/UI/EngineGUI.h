@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Engine/Core/AnimatorComponent.h"
+#include "Engine/Core/EntityStateMachine.h"
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -48,7 +48,7 @@ private:
 	void DrawNewLevelPopup();
 	void DrawInputMapWindow();
 	void DrawCameraWindow();
-	void DrawAnimatorStateMachinePopup(AnimatorComponent& animator);
+	void DrawEntityStateMachinePopup(EntityStateMachine& entityState);
 
 	// File and name helpers
 	static std::string NormalizeGameClassName(const std::string& input);
@@ -78,22 +78,39 @@ private:
 	// *** Members ***
 	// ***************
 
-	// Per-animator UI state
-	struct AnimatorStateMachineUiState {
+	// Per-entity-state UI state
+	struct EntityStateMachineUiState {
 		bool initialized = false;
-		char selectedAnimationName[64] = "";
 		char transitionFromState[64] = "";
 		char transitionToState[64] = "";
 		char transitionFilterFromState[64] = "";
 		char transitionFilterToState[64] = "";
-		bool showIncomingTransitions = false;
-		bool showOutgoingTransitions = false;
+		std::map<std::string, bool> visibleStateTransitions;
+		bool showIncomingTransitions = true;
+		bool showOutgoingTransitions = true;
 		float transitionBlendSeconds = 0.25f;
+		bool transitionInterrupt = true;
+		bool addStatePopupInitialized = false;
+		bool editStatePopupRequested = false;
+		int editingStateIndex = -1;
+		char stateEditName[64] = "";
+		char stateEditAnimationName[64] = "";
+		bool stateEditBlocksMovement = false;
+		bool stateEditBlocksInput = false;
 		bool addTransitionPopupInitialized = false;
 		bool editTransitionPopupRequested = false;
+		bool transitionListNeedsRefresh = false;
 		int editingTransitionIndex = -1;
 		std::map<std::string, bool> expandedTransitionConditions;
-		std::vector<AnimatorComponent::Condition> conditions;
+		std::vector<EntityStateMachine::Condition> conditions;
+	};
+
+	// Input-map selection and add-action workflow
+	struct InputMapUiState {
+		std::string selectedAction = "Move";
+		char newActionName[64] = "";
+		bool addActionPopupRequested = false;
+		std::string statusMessage;
 	};
 
 	// EngineGUI runtime state
@@ -118,7 +135,7 @@ private:
 	bool m_buildGamePopupRequested = false;
 	bool m_addCodeFilePopupRequested = false;
 	bool m_newLevelPopupRequested = false;
-	bool m_animatorStateMachinePopupRequested = false;
+	bool m_entityStateMachinePopupRequested = false;
 	bool m_componentDeletePopupRequested = false;
 	bool m_createAndBuildPopupRequested = false;
 	bool m_addCodeFileCreated = false;
@@ -133,7 +150,8 @@ private:
 	int m_createAndBuildEntityIndex = 0;
 
 	// Animator UI state cache
-	std::unordered_map<AnimatorComponent*, AnimatorStateMachineUiState> m_animatorUiState;
+	std::unordered_map<EntityStateMachine*, EntityStateMachineUiState> m_entityStateUiState;
+	InputMapUiState m_inputMapUi;
 
 	// New code state
 	Entity* m_pendingEntity;
@@ -145,5 +163,6 @@ private:
 	bool m_buildInProgress;
 
 };
+
 
 

@@ -1,7 +1,7 @@
 #include "Engine/Core/ProjectStateSerializer.h"
 #include "Engine/Core/ProjectStateFormat.h"
 
-#include "Engine/Core/AnimatorComponent.h"
+#include "Engine/Core/EntityStateMachine.h"
 #include "Engine/Core/Controller.h"
 #include "Engine/Core/Entity.h"
 #include "Engine/Core/FrontEndManager.h"
@@ -25,6 +25,141 @@ namespace ProjectStateSerializer {
 	using ProjectStateData::RenderStateData;
 
 	namespace {
+		bool DeserializeInputBinding(const std::vector<std::string>& fields, std::size_t& index, ProjectStateData::PendingInputAction::InputBindingData& binding)
+		{
+			if (index + 6 >= fields.size())
+			{
+				return false;
+			}
+			binding.type = std::stoi(fields[index++]);
+			binding.code = std::stoi(fields[index++]);
+			binding.joystick = std::stoi(fields[index++]);
+			binding.scale = std::stof(fields[index++]);
+			binding.vector.x = std::stof(fields[index++]);
+			binding.vector.y = std::stof(fields[index++]);
+			binding.stick = std::stoi(fields[index++]);
+			return true;
+		}
+
+		bool IsIntegerField(const std::vector<std::string>& fields, std::size_t index)
+		{
+			if (index >= fields.size())
+			{
+				return false;
+			}
+			const std::string& value = fields[index];
+			if (value.empty())
+			{
+				return false;
+			}
+			std::size_t start = (value[0] == '-' || value[0] == '+') ? 1 : 0;
+			if (start >= value.size())
+			{
+				return false;
+			}
+			for (std::size_t i = start; i < value.size(); ++i)
+			{
+				if (!std::isdigit(static_cast<unsigned char>(value[i])))
+				{
+					return false;
+				}
+			}
+			return true;
+		}
+
+		struct EntityStateParseResult
+		{
+			std::vector<PendingComponent::EntityStateData> states;
+			std::vector<PendingComponent::EntityStateTransitionData> transitions;
+			std::size_t nextIndex = 0;
+			bool valid = false;
+		};
+
+		EntityStateParseResult ParseEntityStateComponent(const std::vector<std::string>& fields, std::size_t startIndex, int projectVersion, bool legacyStateInterruptField)
+		{
+			EntityStateParseResult result;
+			std::size_t index = startIndex;
+			try
+			{
+				int stateCount = std::stoi(fields.at(index++));
+				if (stateCount < 0)
+				{
+					return result;
+				}
+				for (int i = 0; i < stateCount; ++i)
+				{
+					PendingComponent::EntityStateData state;
+					state.name = ProjectStateFormat::UnescapeField(fields.at(index++));
+					state.animationName = ProjectStateFormat::UnescapeField(fields.at(index++));
+					if (legacyStateInterruptField)
+					{
+						(void)fields.at(index++);
+					}
+					if (projectVersion >= 20)
+					{
+						state.blocksMovement = fields.at(index++) == "1" || fields.at(index - 1) == "true" || fields.at(index - 1) == "True";
+						state.blocksInput = fields.at(index++) == "1" || fields.at(index - 1) == "true" || fields.at(index - 1) == "True";
+					}
+					result.states.push_back(std::move(state));
+				}
+
+				int transitionCount = std::stoi(fields.at(index++));
+				if (transitionCount < 0)
+				{
+					return result;
+				}
+				for (int i = 0; i < transitionCount; ++i)
+				{
+					PendingComponent::EntityStateTransitionData transition;
+					transition.from = ProjectStateFormat::UnescapeField(fields.at(index++));
+					transition.to = ProjectStateFormat::UnescapeField(fields.at(index++));
+					transition.blendSeconds = std::stof(fields.at(index++));
+					if (projectVersion >= 19)
+					{
+						const std::string interruptField = fields.at(index++);
+						transition.interrupt = interruptField == "1" || interruptField == "true" || interruptField == "True";
+					}
+					if (projectVersion >= 17)
+					{
+						int conditionCount = std::stoi(fields.at(index++));
+						for (int conditionIndex = 0; conditionIndex < conditionCount; ++conditionIndex)
+						{
+							PendingComponent::EntityStateConditionData condition;
+							condition.left.type = std::stoi(fields.at(index++));
+							condition.left.constantValue = std::stof(fields.at(index++));
+							condition.left.componentName = ProjectStateFormat::UnescapeField(fields.at(index++));
+							condition.left.memberName = ProjectStateFormat::UnescapeField(fields.at(index++));
+							condition.comparator = std::stoi(fields.at(index++));
+							condition.right.type = std::stoi(fields.at(index++));
+							condition.right.constantValue = std::stof(fields.at(index++));
+							condition.right.componentName = ProjectStateFormat::UnescapeField(fields.at(index++));
+							condition.right.memberName = ProjectStateFormat::UnescapeField(fields.at(index++));
+							transition.conditions.push_back(std::move(condition));
+						}
+					}
+					else if (projectVersion >= 11)
+					{
+						transition.left.type = std::stoi(fields.at(index++));
+						transition.left.constantValue = std::stof(fields.at(index++));
+						transition.left.componentName = ProjectStateFormat::UnescapeField(fields.at(index++));
+						transition.left.memberName = ProjectStateFormat::UnescapeField(fields.at(index++));
+						transition.comparator = std::stoi(fields.at(index++));
+						transition.right.type = std::stoi(fields.at(index++));
+						transition.right.constantValue = std::stof(fields.at(index++));
+						transition.right.componentName = ProjectStateFormat::UnescapeField(fields.at(index++));
+						transition.right.memberName = ProjectStateFormat::UnescapeField(fields.at(index++));
+					}
+					result.transitions.push_back(std::move(transition));
+				}
+				result.nextIndex = index;
+				result.valid = true;
+			}
+			catch (...)
+			{
+			}
+			return result;
+		}
+
 		void AppendComponentLine(std::string& contents, const std::filesystem::path& projectPath, const Entity* object, const char* componentType)
 		{
 			contents += "component;";
@@ -37,7 +172,7 @@ namespace ProjectStateSerializer {
 
 		bool IsComponentType(const std::string& type)
 		{
-			return type == "controller" || type == "playercontroller" || type == "enemy" || type == "animator";
+			return type == "controller" || type == "playercontroller" || type == "enemy" || type == "entitystate";
 		}
 
 		struct ComponentRecordLayout
@@ -86,39 +221,39 @@ namespace ProjectStateSerializer {
 					continue;
 				}
 
-				if (const PlayerController* playerController = dynamic_cast<const PlayerController*>(component))
-				{
-					AppendComponentLine(contents, projectPath, object, "playercontroller");
-					contents += ";" + std::to_string(playerController->MoveSpeed());
-					contents += ";" + std::to_string(playerController->TurnSpeed());
-					contents += ";" + std::to_string(playerController->MovementDeadzone()) + "\n";
-				}
-				else if (const Controller* controller = dynamic_cast<const Controller*>(component))
-				{
-					AppendComponentLine(contents, projectPath, object, "controller");
-					contents += ";" + std::to_string(controller->MoveSpeed());
-					contents += ";" + std::to_string(controller->MovementDeadzone()) + "\n";
-				}
+					if (const PlayerController* playerController = dynamic_cast<const PlayerController*>(component))
+					{
+						AppendComponentLine(contents, projectPath, object, "playercontroller");
+						contents += ";" + std::to_string(playerController->MoveSpeed());
+						contents += ";" + std::to_string(playerController->TurnSpeed()) + "\n";
+					}
+					else if (const Controller* controller = dynamic_cast<const Controller*>(component))
+					{
+						AppendComponentLine(contents, projectPath, object, "controller");
+						contents += ";" + std::to_string(controller->MoveSpeed()) + "\n";
+					}
 				else if (dynamic_cast<const Enemy*>(component))
 				{
 					AppendComponentLine(contents, projectPath, object, "enemy");
 					contents += "\n";
 				}
-				else if (const AnimatorComponent* animator = dynamic_cast<const AnimatorComponent*>(component))
+				else if (const EntityStateMachine* animator = dynamic_cast<const EntityStateMachine*>(component))
 				{
-					AppendComponentLine(contents, projectPath, object, "animator");
+					AppendComponentLine(contents, projectPath, object, "entitystate");
 					contents += ";" + ProjectStateFormat::EscapeField(animator->InitialState());
 					contents += ";" + std::to_string(animator->States().size());
 					for (const auto& state : animator->States())
 					{
 						contents += ";" + ProjectStateFormat::EscapeField(state.name);
-						contents += ";" + std::to_string(state.clipIndex);
+						contents += ";" + ProjectStateFormat::EscapeField(state.animationName);
+						contents += ";" + std::to_string(state.blocksMovement ? 1 : 0);
+						contents += ";" + std::to_string(state.blocksInput ? 1 : 0);
 					}
 
 					contents += ";" + std::to_string(animator->Transitions().size());
 					for (const auto& transition : animator->Transitions())
 					{
-						const auto appendOperand = [&contents](const AnimatorComponent::Operand& operand)
+						const auto appendOperand = [&contents](const EntityStateMachine::Operand& operand)
 						{
 							contents += ";" + std::to_string(static_cast<int>(operand.type));
 							contents += ";" + std::to_string(operand.constantValue);
@@ -128,10 +263,11 @@ namespace ProjectStateSerializer {
 
 						contents += ";" + ProjectStateFormat::EscapeField(transition.from);
 						contents += ";" + ProjectStateFormat::EscapeField(transition.to);
-					contents += ";" + std::to_string(transition.blendSeconds);
-					const auto& conditions = transition.conditions.empty()
-						? std::vector<AnimatorComponent::Condition>{ transition.condition }
-						: transition.conditions;
+						contents += ";" + std::to_string(transition.blendSeconds);
+						contents += ";" + std::to_string(transition.interrupt ? 1 : 0);
+						const auto& conditions = transition.conditions.empty()
+							? std::vector<EntityStateMachine::Condition>{ transition.condition }
+							: transition.conditions;
 					contents += ";" + std::to_string(conditions.size());
 					for (const auto& condition : conditions)
 					{
@@ -184,6 +320,7 @@ namespace ProjectStateSerializer {
 		std::vector<PendingLevel>& pendingLevels,
 		std::vector<PendingController>& pendingControllers,
 		std::vector<PendingComponent>& pendingComponents,
+		std::vector<ProjectStateData::PendingInputAction>& pendingInputActions,
 	std::vector<std::string>& pendingGameGUIAssets,
 	std::string& pendingActiveGameGUIAsset,
 	std::string& pendingGameGUINavigationMode,
@@ -330,52 +467,77 @@ namespace ProjectStateSerializer {
 					continue;
 				}
 
-				if (fields.size() == 2 && fields[0] == "startuplevel")
-				{
-					startupLevelName = ProjectStateFormat::UnescapeField(fields[1]);
-					continue;
-				}
+		if (fields.size() == 2 && fields[0] == "startuplevel")
+		{
+			startupLevelName = ProjectStateFormat::UnescapeField(fields[1]);
+			continue;
+		}
 
-				if (fields.size() == 2 && fields[0] == "scenecontext")
+		if (fields.size() >= 3 && fields[0] == "inputaction")
+		{
+			try
+			{
+				ProjectStateData::PendingInputAction action;
+				action.name = ProjectStateFormat::UnescapeField(fields[1]);
+				const std::size_t bindingCount = static_cast<std::size_t>(std::stoul(fields[2]));
+				std::size_t index = 3;
+				for (std::size_t i = 0; i < bindingCount; ++i)
 				{
-					const std::string sceneName = ProjectStateFormat::UnescapeField(fields[1]);
-					currentLevel = nullptr;
-					for (auto& pendingLevel : pendingLevels)
+					ProjectStateData::PendingInputAction::InputBindingData binding;
+					if (!DeserializeInputBinding(fields, index, binding))
 					{
-						if (pendingLevel.name == sceneName)
-						{
-							currentLevel = &pendingLevel;
-							break;
-						}
+						break;
 					}
-					continue;
+					action.bindings.push_back(binding);
 				}
+				pendingInputActions.push_back(std::move(action));
+			}
+			catch (...)
+			{
+			}
+			continue;
+		}
 
-				if (fields.size() == 2 && fields[0] == "gameguiasset")
+		if (fields.size() == 2 && fields[0] == "scenecontext")
+		{
+			const std::string sceneName = ProjectStateFormat::UnescapeField(fields[1]);
+			currentLevel = nullptr;
+			for (auto& pendingLevel : pendingLevels)
+			{
+				if (pendingLevel.name == sceneName)
 				{
-					pendingGameGUIAssets.push_back(ProjectStateFormat::UnescapeField(fields[1]));
-					continue;
+					currentLevel = &pendingLevel;
+					break;
 				}
+			}
+			continue;
+		}
 
-				if (fields.size() == 2 && fields[0] == "gameguiactive")
-				{
-					pendingActiveGameGUIAsset = ProjectStateFormat::UnescapeField(fields[1]);
-					continue;
-				}
+		if (fields.size() == 2 && fields[0] == "gameguiasset")
+		{
+			pendingGameGUIAssets.push_back(ProjectStateFormat::UnescapeField(fields[1]));
+			continue;
+		}
 
-				if (fields.size() == 2 && fields[0] == "gameguinavigationmode")
-				{
-					pendingGameGUINavigationMode = ProjectStateFormat::UnescapeField(fields[1]);
-					continue;
-				}
+		if (fields.size() == 2 && fields[0] == "gameguiactive")
+		{
+			pendingActiveGameGUIAsset = ProjectStateFormat::UnescapeField(fields[1]);
+			continue;
+		}
 
-				ComponentRecordLayout componentLayout;
-				if (ReadComponentRecordLayout(fields, componentLayout))
-				{
-					if (!currentLevel)
-					{
-						return false;
-					}
+		if (fields.size() == 2 && fields[0] == "gameguinavigationmode")
+		{
+			pendingGameGUINavigationMode = ProjectStateFormat::UnescapeField(fields[1]);
+			continue;
+		}
+
+		ComponentRecordLayout componentLayout;
+		if (ReadComponentRecordLayout(fields, componentLayout))
+		{
+			if (!currentLevel)
+			{
+				return false;
+			}
 
 					const std::string& componentType = fields[componentLayout.typeIndex];
 					const std::filesystem::path sourcePath = ProjectStateFormat::ResolveSourcePath(projectPath, fields[1]);
@@ -398,11 +560,6 @@ namespace ProjectStateSerializer {
 							{
 								controller.turnSpeed = std::stof(fields[componentLayout.dataIndex + 1]);
 							}
-							const std::size_t deadzoneIndex = componentLayout.dataIndex + (controller.playerControlled ? 2 : 1);
-							if (fields.size() > deadzoneIndex)
-							{
-								controller.movementDeadzone = std::stof(fields[deadzoneIndex]);
-							}
 						}
 						pendingControllers.push_back(std::move(controller));
 						continue;
@@ -420,62 +577,34 @@ namespace ProjectStateSerializer {
 						continue;
 					}
 
-					if (componentType == "animator")
+					if (componentType == "entitystate")
 					{
-						if (fields.size() < componentLayout.dataIndex + 3)
+						if (fields.size() < componentLayout.dataIndex + 2)
 						{
 							return false;
 						}
 
-						std::size_t index = componentLayout.dataIndex;
-						component.initialState = ProjectStateFormat::UnescapeField(fields[index++]);
-						const int stateCount = std::stoi(fields[index++]);
-						for (int i = 0; i < stateCount; ++i)
+						component.initialState = ProjectStateFormat::UnescapeField(fields[componentLayout.dataIndex]);
+						const std::size_t dataStart = componentLayout.dataIndex + 1;
+						const bool oldLayoutCandidate = fields.size() > dataStart + 1 && IsIntegerField(fields, dataStart + 1 + static_cast<std::size_t>(std::stoi(fields[dataStart])) * 5);
+						const bool newLayoutCandidate = fields.size() > dataStart + 1 && IsIntegerField(fields, dataStart + 1 + static_cast<std::size_t>(std::stoi(fields[dataStart])) * 4);
+
+						EntityStateParseResult parsed;
+						if (oldLayoutCandidate)
 						{
-							PendingComponent::AnimatorStateData state;
-							state.name = ProjectStateFormat::UnescapeField(fields[index++]);
-							state.clipIndex = std::stoi(fields[index++]);
-							component.animatorStates.push_back(std::move(state));
+							parsed = ParseEntityStateComponent(fields, dataStart, projectVersion, true);
 						}
-						const int transitionCount = std::stoi(fields[index++]);
-						for (int i = 0; i < transitionCount; ++i)
+						if (!parsed.valid && newLayoutCandidate)
 						{
-							PendingComponent::AnimatorTransitionData transition;
-							transition.from = ProjectStateFormat::UnescapeField(fields[index++]);
-							transition.to = ProjectStateFormat::UnescapeField(fields[index++]);
-							transition.blendSeconds = std::stof(fields[index++]);
-							if (projectVersion >= 17)
-							{
-								const int conditionCount = std::stoi(fields[index++]);
-								for (int conditionIndex = 0; conditionIndex < conditionCount; ++conditionIndex)
-								{
-									ProjectStateData::PendingComponent::AnimatorConditionData condition;
-									condition.left.type = std::stoi(fields[index++]);
-									condition.left.constantValue = std::stof(fields[index++]);
-									condition.left.componentName = ProjectStateFormat::UnescapeField(fields[index++]);
-									condition.left.memberName = ProjectStateFormat::UnescapeField(fields[index++]);
-									condition.comparator = std::stoi(fields[index++]);
-									condition.right.type = std::stoi(fields[index++]);
-									condition.right.constantValue = std::stof(fields[index++]);
-									condition.right.componentName = ProjectStateFormat::UnescapeField(fields[index++]);
-									condition.right.memberName = ProjectStateFormat::UnescapeField(fields[index++]);
-									transition.conditions.push_back(std::move(condition));
-								}
-							}
-							else if (projectVersion >= 11)
-							{
-								transition.left.type = std::stoi(fields[index++]);
-								transition.left.constantValue = std::stof(fields[index++]);
-								transition.left.componentName = ProjectStateFormat::UnescapeField(fields[index++]);
-								transition.left.memberName = ProjectStateFormat::UnescapeField(fields[index++]);
-								transition.comparator = std::stoi(fields[index++]);
-								transition.right.type = std::stoi(fields[index++]);
-								transition.right.constantValue = std::stof(fields[index++]);
-								transition.right.componentName = ProjectStateFormat::UnescapeField(fields[index++]);
-								transition.right.memberName = ProjectStateFormat::UnescapeField(fields[index++]);
-							}
-							component.animatorTransitions.push_back(std::move(transition));
+							parsed = ParseEntityStateComponent(fields, dataStart, projectVersion, false);
 						}
+						if (!parsed.valid)
+						{
+							return false;
+						}
+
+						component.entityStateStates = std::move(parsed.states);
+						component.entityStateTransitions = std::move(parsed.transitions);
 						pendingComponents.push_back(std::move(component));
 						continue;
 					}
@@ -655,6 +784,8 @@ namespace ProjectStateSerializer {
 		}
 	}
 }
+
+
 
 
 

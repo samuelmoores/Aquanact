@@ -13,43 +13,49 @@ public:
 	int ExecutionOrder() const override { return -100; }
 	void startUp(Entity&) override;
 
+	// Movement tuning. These values control how the controller behaves.
 	float MoveSpeed() const { return m_moveSpeed; }
 	void SetMoveSpeed(float moveSpeed) { m_moveSpeed = moveSpeed; }
-	bool IsGrounded() const { return m_isGrounded; }
-	float MovementDeadzone() const { return m_movementDeadzone; }
-	void SetMovementDeadzone(float deadzone) { m_movementDeadzone = deadzone; }
-	bool IsMoving() const { return m_isMoving; }
 
-	// Publish stable public accessor names for controller state. Existing animator
-	// transitions store these names, and type inference marks both as booleans so
-	// condition editors can present true/false instead of their float-backed 0/1.
+	// Movement intent. These expose what the controller is trying to do this frame.
+	const glm::vec3& MovementDirection() const { return m_movementDirection; }
+	void SetMovementDirection(const glm::vec3& direction);
+	bool IsMoving() const { return m_isMoving; }
+	bool IsGrounded() const { return m_isGrounded; }
+	void StopMoving();
+
+	// Bindable names used by entity state transitions and editor condition pickers.
+	// These stay stable so saved state machine graphs continue to resolve.
 	#define CONTROLLER_BINDABLES(VALUE, FUNCTION) \
 		FUNCTION(IsMoving) \
 		FUNCTION(IsGrounded) \
 		VALUE(m_moveSpeed)
 	AQUA_DECLARE_BINDABLES(CONTROLLER_BINDABLES)
 	#undef CONTROLLER_BINDABLES
-	void SetMovementDirection(const glm::vec3& direction);
-	void StopMoving();
-	const glm::vec3& MovementDirection() const { return m_movementDirection; }
 
+	// Per-frame controller update entry point.
 	void Update(Entity&, float) override;
 
-	protected:
+protected:
+	// Internal helpers used by the controller update pipeline.
 	void SetDiagnosticInput(const glm::vec3& input) { m_diagnosticInput = input; }
 	void ApplyMovement(Entity& owner, float dt);
 	glm::vec3 MoveWithPhysics(Entity& owner, const glm::vec3& desiredHorizontalVelocity, float dt);
 	glm::vec3 MoveWithCollision(Entity& owner, const glm::vec3& delta,
 		glm::vec3* lastCollisionNormal = nullptr, bool* collidedWithGround = nullptr);
 
+	// Tunable movement settings.
 	float m_moveSpeed = 50.0f;
+
+	// Runtime movement state.
 	glm::vec3 m_velocity{ 0.0f };
+	glm::vec3 m_movementDirection{ 0.0f };
 	bool m_grounded = false;
 	bool m_isGrounded = false;
-	float m_groundedLossTimer = 0.0f;
 	bool m_isMoving = false;
-	float m_movementDeadzone = 0.01f;
-	glm::vec3 m_movementDirection{ 0.0f };
+	float m_groundedLossTimer = 0.0f;
+
+	// Diagnostics and editor-facing helper data.
 	glm::vec3 m_diagnosticInput{ 0.0f };
 };
 

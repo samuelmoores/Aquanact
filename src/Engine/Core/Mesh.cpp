@@ -72,16 +72,16 @@ Mesh::Mesh(ImportedModel&& importedModel)
 
 void Mesh::AdoptImportedModel(ImportedModel&& importedModel)
 {
-	// Animation bridge state kept until the animator stops using Assimp node types.
+	// Animation bridge state kept until the engine fully owns imported animation data.
 	m_importer = std::move(importedModel.importer); // Owns the imported scene lifetime.
 	m_animImporters = std::move(importedModel.animImporters); // Keeps sibling animation scenes alive.
-	m_scene = importedModel.scene; // Temporary bridge for AnimatorComponent::GetRootNode().
+	m_scene = importedModel.scene; // Temporary bridge for EntityStateMachine::GetRootNode().
 	m_skeleton = std::move(importedModel.skeleton); // Bone mapping and final transforms used by Animator.
 	m_animations = std::move(importedModel.animations); // Temporary bridge until animation data is engine-owned.
-	m_animationSources = std::move(importedModel.animationSources); // Used to name animation states in AnimatorComponent.
+	m_animationSources = std::move(importedModel.animationSources); // Used to name animation states in EntityStateMachine.
 
 	// Mesh payload used directly by rendering and object setup.
-	m_skinned = importedModel.skinned; // Cached so Entity can decide whether to attach AnimatorComponent.
+	m_skinned = importedModel.skinned; // Cached so Entity can decide whether to attach EntityStateMachine.
 	m_vertices = std::move(importedModel.vertices); // Final imported vertex buffer for GPU upload.
 	m_faces = std::move(importedModel.faces); // Final imported index buffer for GPU upload.
 	m_facesSize = std::move(importedModel.facesSize); // One index-count entry per imported submesh.
@@ -488,6 +488,7 @@ uint32_t Mesh::FacesSize(int index) const
 		return 0;
 	return static_cast<uint32_t>(m_facesSize[index]);
 }
+
 
 
 

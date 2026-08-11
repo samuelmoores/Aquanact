@@ -1,6 +1,6 @@
 #include "Engine/Core/Entity.h"
 
-#include "Engine/Core/AnimatorComponent.h"
+#include "Engine/Core/EntityStateMachine.h"
 #include "Engine/Core/Controller.h"
 #include "Engine/Core/Debug.h"
 #include "Engine/Core/Root.h"
@@ -34,6 +34,7 @@ Entity::Entity(std::string name)
 	// Each entity gets a monotonically increasing id so runtime systems can
 	// distinguish instances even when the display name changes.
 	m_id = g_nextEntityId++;
+	AddComponent<EntityStateMachine>(m_mesh);
 }
 
 Entity::Entity(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
@@ -41,6 +42,7 @@ Entity::Entity(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 	m_id = g_nextEntityId++;
 	m_skinned = false;
 	m_mesh = new Mesh(vertices, faces);
+	AddComponent<EntityStateMachine>(m_mesh);
 	m_shader.load("shaders/texture_perspective.vert", "shaders/texturing.frag");
 	m_shader.activate();
 	m_position = glm::vec3(0);
@@ -62,9 +64,9 @@ Entity::Entity(const char* modelFile, bool addDefaultComponents)
 	auto model = ModelImporter().Import(modelFile, true);
 	m_mesh = new Mesh(std::move(model));
 	m_skinned = m_mesh->Skinned();
-	if (m_skinned && addDefaultComponents)
+	if (addDefaultComponents)
 	{
-		AddComponent<AnimatorComponent>(m_mesh);
+		AddComponent<EntityStateMachine>(m_mesh);
 	}
 	m_shader.load("shaders/phong.vert", "shaders/phong.frag");
 	m_position = glm::vec3(0);
@@ -101,7 +103,7 @@ Entity::~Entity()
 
 Mesh* Entity::GetMesh() { return m_mesh; }
 ShaderProgram* Entity::GetShader() { return &m_shader; }
-AnimatorComponent* Entity::GetAnimatorComponent() { return GetComponent<AnimatorComponent>(); }
+EntityStateMachine* Entity::GetEntityState() { return GetComponent<EntityStateMachine>(); }
 Controller* Entity::GetController() { return GetComponent<Controller>(); }
 std::vector<Component*> Entity::Components()
 {
@@ -255,7 +257,7 @@ void Entity::Scale(glm::vec3 delta) { m_scale += delta; }
 void Entity::SetScale(glm::vec3 scale) { m_scale = scale; }
 void Entity::updateMeshAABB(glm::vec3 delta) { if (m_mesh) m_mesh->updateAABB(delta, m_scale); }
 bool Entity::intersectsRayMesh(glm::vec3 origin, glm::vec3& direction) { return m_mesh && m_mesh->intersectsRay(origin, direction); }
-bool Entity::skinned() { return m_skinned && GetComponent<AnimatorComponent>() != nullptr; }
+bool Entity::skinned() { return m_skinned && GetComponent<EntityStateMachine>() != nullptr; }
 std::string Entity::SourcePath() const { return m_sourcePath; }
 glm::vec3 Entity::Position() const { return m_position; }
 glm::vec3 Entity::WorldPosition() { return glm::vec3(BuildModelMatrix()[3]); }
@@ -307,4 +309,4 @@ void Entity::ResetToDefaultRotation()
 {
 	m_rotation = m_defaultRotation;
 }
-bool Entity::HasAnimatorComponent() const { return GetComponent<AnimatorComponent>() != nullptr; }
+bool Entity::HasEntityState() const { return GetComponent<EntityStateMachine>() != nullptr; }

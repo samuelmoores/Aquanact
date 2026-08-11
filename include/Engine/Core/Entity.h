@@ -10,7 +10,7 @@
 #include <utility>
 #include <vector>
 
-class AnimatorComponent;
+class EntityStateMachine;
 class Controller;
 
 enum class PhysicsColliderShape
@@ -46,7 +46,7 @@ public:
 
 	Mesh* GetMesh();
 	ShaderProgram* GetShader();
-	AnimatorComponent* GetAnimatorComponent();
+	EntityStateMachine* GetEntityState();
 	Controller* GetController();
 	// These return snapshots so callers can iterate safely while other code may
 	// still be mutating the underlying owned component list.
@@ -103,7 +103,7 @@ public:
 	bool ShowPhysicsBoundingBox() const { return m_showPhysicsBoundingBox; }
 	void SetPhysicsColliderShape(PhysicsColliderShape shape) { m_physicsColliderShape = shape; }
 	PhysicsColliderShape GetPhysicsColliderShape() const { return m_physicsColliderShape; }
-	bool HasAnimatorComponent() const;
+	bool HasEntityState() const;
 
 protected:
 	Mesh* m_mesh = nullptr;

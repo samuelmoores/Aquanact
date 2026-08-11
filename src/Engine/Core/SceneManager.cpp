@@ -1,6 +1,6 @@
 #include "Engine/Core/SceneManager.h"
 
-#include "Engine/Core/AnimatorComponent.h"
+#include "Engine/Core/EntityStateMachine.h"
 #include "Engine/Core/ComponentFactory.h"
 #include "Engine/Core/Controller.h"
 #include "Engine/Core/Entity.h"
@@ -340,25 +340,23 @@ void SceneManager::ApplyProjectState(
 				{
 					object->AddComponent<PlayerController>();
 				}
-				if (PlayerController* playerController = object->GetComponent<PlayerController>())
-				{
-					playerController->SetMoveSpeed(pendingController.moveSpeed);
-					playerController->SetMovementDeadzone(pendingController.movementDeadzone);
-					playerController->SetTurnSpeed(pendingController.turnSpeed);
+					if (PlayerController* playerController = object->GetComponent<PlayerController>())
+					{
+						playerController->SetMoveSpeed(pendingController.moveSpeed);
+						playerController->SetTurnSpeed(pendingController.turnSpeed);
+					}
 				}
-			}
 			else
 			{
 				if (!object->GetController())
 				{
 					object->AddComponent<Controller>();
 				}
-				if (Controller* controller = object->GetController())
-				{
-					controller->SetMoveSpeed(pendingController.moveSpeed);
-					controller->SetMovementDeadzone(pendingController.movementDeadzone);
+					if (Controller* controller = object->GetController())
+					{
+						controller->SetMoveSpeed(pendingController.moveSpeed);
+					}
 				}
-			}
 		}
 	}
 
@@ -388,34 +386,36 @@ void SceneManager::ApplyProjectState(
 					object->AddComponent<Enemy>();
 				}
 			}
-			else if (pendingComponent.type == "animator")
+			else if (pendingComponent.type == "entitystate")
 			{
-				if (!object->GetComponent<AnimatorComponent>())
+				if (!object->GetComponent<EntityStateMachine>())
 				{
-					object->AddComponent<AnimatorComponent>(object->GetMesh());
+					object->AddComponent<EntityStateMachine>(object->GetMesh());
 				}
-				if (AnimatorComponent* animator = object->GetComponent<AnimatorComponent>())
+
+				if (EntityStateMachine* entityStateMachine = object->GetComponent<EntityStateMachine>())
 				{
-					animator->SetInitialState(pendingComponent.initialState);
-					for (const ProjectStateData::PendingComponent::AnimatorStateData& state : pendingComponent.animatorStates)
+					for (const ProjectStateData::PendingComponent::EntityStateData& state : pendingComponent.entityStateStates)
 					{
-						animator->AddState(state.name, state.clipIndex);
+						entityStateMachine->AddState(state.name, state.animationName, state.blocksMovement, state.blocksInput);
 					}
-					for (const ProjectStateData::PendingComponent::AnimatorTransitionData& transition : pendingComponent.animatorTransitions)
+					entityStateMachine->SetInitialState(pendingComponent.initialState);
+
+					for (const ProjectStateData::PendingComponent::EntityStateTransitionData& transition : pendingComponent.entityStateTransitions)
 					{
-						std::vector<AnimatorComponent::Condition> conditions;
+						std::vector<EntityStateMachine::Condition> conditions;
 						if (!transition.conditions.empty())
 						{
-							// Convert serialized animator conditions back into live AnimatorComponent conditions.
-							for (const ProjectStateData::PendingComponent::AnimatorConditionData& conditionData : transition.conditions)
+							// Convert serialized state conditions back into live EntityStateMachine conditions.
+							for (const ProjectStateData::PendingComponent::EntityStateConditionData& conditionData : transition.conditions)
 							{
-								AnimatorComponent::Condition condition;
-								condition.left.type = static_cast<AnimatorComponent::OperandType>(conditionData.left.type);
+								EntityStateMachine::Condition condition;
+								condition.left.type = static_cast<EntityStateMachine::OperandType>(conditionData.left.type);
 								condition.left.constantValue = conditionData.left.constantValue;
 								condition.left.componentName = conditionData.left.componentName;
 								condition.left.memberName = conditionData.left.memberName;
-								condition.comparator = static_cast<AnimatorComponent::Comparator>(conditionData.comparator);
-								condition.right.type = static_cast<AnimatorComponent::OperandType>(conditionData.right.type);
+								condition.comparator = static_cast<EntityStateMachine::Comparator>(conditionData.comparator);
+								condition.right.type = static_cast<EntityStateMachine::OperandType>(conditionData.right.type);
 								condition.right.constantValue = conditionData.right.constantValue;
 								condition.right.componentName = conditionData.right.componentName;
 								condition.right.memberName = conditionData.right.memberName;
@@ -424,21 +424,37 @@ void SceneManager::ApplyProjectState(
 						}
 						else
 						{
-							AnimatorComponent::Condition condition;
-							condition.left.type = static_cast<AnimatorComponent::OperandType>(transition.left.type);
+							EntityStateMachine::Condition condition;
+							condition.left.type = static_cast<EntityStateMachine::OperandType>(transition.left.type);
 							condition.left.constantValue = transition.left.constantValue;
 							condition.left.componentName = transition.left.componentName;
 							condition.left.memberName = transition.left.memberName;
-							condition.comparator = static_cast<AnimatorComponent::Comparator>(transition.comparator);
-							condition.right.type = static_cast<AnimatorComponent::OperandType>(transition.right.type);
+							condition.comparator = static_cast<EntityStateMachine::Comparator>(transition.comparator);
+							condition.right.type = static_cast<EntityStateMachine::OperandType>(transition.right.type);
 							condition.right.constantValue = transition.right.constantValue;
 							condition.right.componentName = transition.right.componentName;
 							condition.right.memberName = transition.right.memberName;
 							conditions.push_back(std::move(condition));
 						}
-						animator->AddTransition(transition.from, transition.to, transition.blendSeconds, std::move(conditions));
+
+						entityStateMachine->AddTransition(transition.from, transition.to, transition.blendSeconds, transition.interrupt, std::move(conditions));
 					}
 				}
+			}
+		}
+	}
+
+	for (const std::unique_ptr<Scene>& scene : m_levels)
+	{
+		if (!scene)
+		{
+			continue;
+		}
+		for (const std::unique_ptr<Entity>& object : scene->Objects())
+		{
+			if (object && !object->GetComponent<EntityStateMachine>())
+			{
+				object->AddComponent<EntityStateMachine>(object->GetMesh());
 			}
 		}
 	}
@@ -555,3 +571,5 @@ const std::string& SceneManager::StartupLevelName() const
 {
 	return m_startupLevelName;
 }
+
+

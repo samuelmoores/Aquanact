@@ -10,6 +10,7 @@
 class SceneManager;
 class FrontEndManager;
 class RenderManager;
+class InputManager;
 class Entity;
 
 namespace ProjectStateSerializer {
@@ -28,6 +29,7 @@ namespace ProjectStateSerializer {
 		std::vector<ProjectStateData::PendingLevel>& pendingLevels,
 		std::vector<ProjectStateData::PendingController>& pendingControllers,
 		std::vector<ProjectStateData::PendingComponent>& pendingComponents,
+		std::vector<ProjectStateData::PendingInputAction>& pendingInputActions,
 		std::vector<std::string>& pendingGameGUIAssets,
 		std::string& pendingActiveGameGUIAsset,
 		std::string& pendingGameGUINavigationMode,

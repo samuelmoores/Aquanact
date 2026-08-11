@@ -9,6 +9,7 @@
 #include "Engine/Core/ProjectStateSerializer.h"
 #include "Engine/Core/FrameProfiler.h"
 #include "Engine/Core/RenderManager.h"
+#include "Engine/Core/InputManager.h"
 #include <fstream>
 #include <imgui.h>
 #include <cstring>
@@ -45,6 +46,25 @@ namespace {
 	void AppendProjectStateSnapshot(std::string& contents, const std::filesystem::path& path, const SceneManager& SceneManager)
 	{
 		ProjectStateSerializer::AppendLevelState(contents, path, SceneManager);
+		for (const auto& [actionName, bindings] : Root::Current().InputActions().Bindings())
+		{
+			contents += "inputaction;";
+			contents += ProjectStateSerializer::EscapeField(actionName);
+			contents += ";";
+			contents += std::to_string(bindings.size());
+			for (const InputBinding& binding : bindings)
+			{
+				contents += ";";
+				contents += std::to_string(static_cast<int>(binding.type)) + ";" +
+					std::to_string(binding.code) + ";" +
+					std::to_string(binding.joystick) + ";" +
+					std::to_string(binding.scale) + ";" +
+					std::to_string(binding.vector.x) + ";" +
+					std::to_string(binding.vector.y) + ";" +
+					std::to_string(static_cast<int>(binding.stick));
+			}
+			contents += "\n";
+		}
 		ProjectStateSerializer::AppendRenderState(contents, Root::Current().FrontEnd(), Root::Current().Render());
 		SceneManager.AppendProjectState(contents);
 		if (SceneManager.StartupLevelName().empty())
@@ -221,20 +241,21 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 	std::istringstream file(fileContents);
 	std::string header;
 	std::getline(file, header);
-	const int projectVersion = 18;
-	if (header != "AquanactProject" && header != "AquanactProject 18")
+	const int projectVersion = 21;
+	if (header != "AquanactProject" && header != "AquanactProject 19")
 	{
 		return false;
 	}
 	std::vector<ProjectStateData::PendingLevel> pendingLevels;
 	std::vector<ProjectStateData::PendingController> pendingControllers;
 	std::vector<ProjectStateData::PendingComponent> pendingComponents;
+	std::vector<ProjectStateData::PendingInputAction> pendingInputActions;
 	std::vector<std::string> pendingGameGUIAssets;
 	std::string pendingActiveGameGUIAsset;
 	std::string pendingGameGUINavigationMode;
 	ProjectStateData::RenderStateData renderState;
 	std::string startupLevelName;
-	const bool loaded = ProjectStateSerializer::LoadLevelState(path, file, projectVersion, pendingLevels, pendingControllers, pendingComponents, pendingGameGUIAssets, pendingActiveGameGUIAsset, pendingGameGUINavigationMode, renderState, startupLevelName);
+	const bool loaded = ProjectStateSerializer::LoadLevelState(path, file, projectVersion, pendingLevels, pendingControllers, pendingComponents, pendingInputActions, pendingGameGUIAssets, pendingActiveGameGUIAsset, pendingGameGUINavigationMode, renderState, startupLevelName);
 	if (loaded) // broken boundary, no longer just I/O
 	{
 		MaterializePendingLevels(SceneManager, pendingLevels);
@@ -275,6 +296,23 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 		Root::Current().Debugger().SetShowPhysicsDiagnosticsWindow(renderState.showPhysicsDiagnosticsWindow);
 		Root::Current().FrontEnd().RuntimeGUI().SetShowDiagnosticsWindow(renderState.showGameGUIDiagnosticsWindow);
 		Root::Current().Profiler().SetEnabled(renderState.profilerEnabled);
+		for (const auto& pendingAction : pendingInputActions)
+		{
+			std::vector<InputBinding> bindings;
+			bindings.reserve(pendingAction.bindings.size());
+			for (const auto& bindingData : pendingAction.bindings)
+			{
+				InputBinding binding;
+				binding.type = static_cast<InputBindingType>(bindingData.type);
+				binding.code = bindingData.code;
+				binding.joystick = bindingData.joystick;
+				binding.scale = bindingData.scale;
+				binding.vector = bindingData.vector;
+				binding.stick = static_cast<InputStick>(bindingData.stick);
+				bindings.push_back(binding);
+			}
+			Root::Current().InputActions().SetBindings(pendingAction.name, std::move(bindings));
+		}
 		m_currentProjectPath = path;
 	}
 	return loaded;

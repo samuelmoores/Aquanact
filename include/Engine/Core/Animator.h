@@ -27,6 +27,7 @@ public:
 	// Playback
 	void Play(int clipIndex, float blendSeconds = 0.33f);
 	void Update(float dt);
+	float ClipDuration(int clipIndex) const;
 
 	// Clip management
 	void AddClip(Animation* clip);

@@ -357,7 +357,7 @@ void Controller::Update(Entity& owner, float dt)
 void Controller::ApplyMovement(Entity& owner, float dt)
 {
 	glm::vec3 desiredHorizontalVelocity(0.0f);
-	if (glm::length(m_movementDirection) > m_movementDeadzone)
+	if (glm::length(m_movementDirection) > 0.0f)
 	{
 		const glm::vec3 movement = glm::normalize(m_movementDirection);
 		m_isMoving = true;

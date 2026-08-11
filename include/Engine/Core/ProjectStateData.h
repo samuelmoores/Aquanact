@@ -10,7 +10,6 @@ namespace ProjectStateData {
 		std::filesystem::path sourcePath;
 		unsigned int entityId = 0;
 		float moveSpeed = 50.0f;
-		float movementDeadzone = 0.01f;
 		float turnSpeed = 8.0f;
 		std::string levelName;
 		bool playerControlled = false;
@@ -22,11 +21,13 @@ namespace ProjectStateData {
 		std::string levelName;
 		std::string type;
 		std::string initialState;
-		struct AnimatorStateData {
+		struct EntityStateData {
 			std::string name;
-			int clipIndex = -1;
+			std::string animationName;
+			bool blocksMovement = false;
+			bool blocksInput = false;
 		};
-		struct AnimatorConditionData {
+		struct EntityStateConditionData {
 			struct OperandData {
 				int type = 0;
 				float constantValue = 0.0f;
@@ -37,23 +38,24 @@ namespace ProjectStateData {
 			int comparator = 0;
 			OperandData right;
 		};
-		struct AnimatorTransitionData {
-			struct OperandData {
-				int type = 0;
-				float constantValue = 0.0f;
-				std::string componentName;
-				std::string memberName;
+			struct EntityStateTransitionData {
+				struct OperandData {
+					int type = 0;
+					float constantValue = 0.0f;
+					std::string componentName;
+					std::string memberName;
+				};
+				std::string from;
+				std::string to;
+				float blendSeconds = 0.33f;
+				bool interrupt = true;
+				OperandData left;
+				int comparator = 0;
+				OperandData right;
+				std::vector<EntityStateConditionData> conditions;
 			};
-			std::string from;
-			std::string to;
-			float blendSeconds = 0.33f;
-			OperandData left;
-			int comparator = 0;
-			OperandData right;
-			std::vector<AnimatorConditionData> conditions;
-		};
-		std::vector<AnimatorStateData> animatorStates;
-		std::vector<AnimatorTransitionData> animatorTransitions;
+		std::vector<EntityStateData> entityStateStates;
+		std::vector<EntityStateTransitionData> entityStateTransitions;
 		int value1 = 0;
 		int value2 = 0;
 		bool hasValue1 = false;
@@ -129,5 +131,19 @@ namespace ProjectStateData {
 		std::vector<PointLightData> pointLights;
 		std::string imguiLayout;
 	};
+
+	struct PendingInputAction {
+		std::string name;
+		struct InputBindingData {
+			int type = 0;
+			int code = 0;
+			int joystick = 0;
+			float scale = 1.0f;
+			glm::vec2 vector{ 0.0f };
+			int stick = 0;
+		};
+		std::vector<InputBindingData> bindings;
+	};
 }
+
 

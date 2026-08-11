@@ -37,6 +37,8 @@ public:
 	void SetGameplayDiagnostics(const std::string& objectName, const glm::vec3& moveInput, float moveSpeed, float dt, const glm::vec3& delta, const glm::vec3& position);
 	// Cached animation state shown in the gameplay debugger.
 	void SetAnimationDiagnostics(const std::string& currentState, const std::string& desiredState, const std::string& lastTransitionDebug, const std::string& lastTransitionFrom, const std::string& lastTransitionTo, const std::string& lastTransitionLeftOperandText, const std::string& lastTransitionComparatorText, const std::string& lastTransitionRightOperandText, float lastTransitionLeftValue, float lastTransitionRightValue, bool lastTransitionPassed, const std::string& lastResolvedTargetState, int lastResolvedTargetClipIndex, bool lastResolvedTargetFound, const std::string& stateListText);
+	// Cached entity-state overview shown in the gameplay debugger.
+	void SetEntityStateDiagnostics(const std::string& stateListText);
 	// Basic logging writes to the in-memory debug log window.
 	void LogMessage(const std::string& message);
 	// Severity-aware logging prefixes messages so they can be visually filtered.
@@ -73,6 +75,8 @@ public:
 	void SetShowGameInputWindow(bool show);
 	bool ShowGameplayDiagnosticsWindow() const;
 	void SetShowGameplayDiagnosticsWindow(bool show);
+	bool ShowEntityStateDiagnosticsWindow() const;
+	void SetShowEntityStateDiagnosticsWindow(bool show);
 	bool ShowAnimationDiagnosticsWindow() const;
 	void SetShowAnimationDiagnosticsWindow(bool show);
 	bool ShowCameraCollisionDebug() const;
@@ -110,6 +114,7 @@ private:
 	bool m_showStatsWindow = false;
 	bool m_showGameInputWindow = true;
 	bool m_showGameplayDiagnosticsWindow = true;
+	bool m_showEntityStateDiagnosticsWindow = false;
 	bool m_showAnimationDiagnosticsWindow = true;
 	bool m_showCameraCollisionDebug = false;
 	bool m_showPhysicsDiagnosticsWindow = true;
@@ -152,6 +157,7 @@ private:
 	int m_animationLastResolvedTargetClipIndex = -1;
 	bool m_animationLastResolvedTargetFound = false;
 	std::string m_animationStateListText;
+	std::string m_entityStateStateListText;
 	std::vector<std::string> m_logMessages;
 	std::vector<std::string> m_logOnceKeys;
 };
