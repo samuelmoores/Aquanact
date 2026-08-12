@@ -33,6 +33,8 @@ public:
 		Entity** hitEntity = nullptr) const;
 
 	// Sweeps the camera's sphere through registered colliders without moving it.
+	// This is a continuous movement query: it finds whether the camera hits an
+	// obstacle while moving and returns the earliest contact details.
 	// The target and entities marked IgnoreCameraCollision() are excluded; an
 	// optional hitEntity receives the owner of the earliest blocking collider.
 	Physics::SweepCollision SweepCamera(
@@ -41,6 +43,15 @@ public:
 		const glm::vec3& movement,
 		const Entity* target,
 		Entity** hitEntity = nullptr) const;
+
+	// Tests whether the camera sphere overlaps any registered collider at one
+	// position, using the same target and camera-ignore filters as SweepCamera.
+	// Unlike SweepCamera, this is an instantaneous position query with no
+	// movement or collision time; it is used to validate safe camera positions.
+	bool OverlapsCamera(
+		const glm::vec3& position,
+		float radius,
+		const Entity* target) const;
 
 	// Add only accepts entities with a mesh and a valid world AABB.
 	// The returned handle is InvalidColliderHandle when registration fails.

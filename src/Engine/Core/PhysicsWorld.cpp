@@ -358,6 +358,34 @@ Physics::SweepCollision PhysicsWorld::SweepCamera(
 	return earliestHit;
 }
 
+bool PhysicsWorld::OverlapsCamera(
+	const glm::vec3& position,
+	float radius,
+	const Entity* target) const
+{
+	// Check only the collision records that are valid for camera queries. This
+	// keeps camera blocking behavior consistent with SweepCamera().
+	for (const PhysicsCollider& candidate : m_colliders)
+	{
+		if (!IsCameraCandidate(candidate, target))
+		{
+			continue;
+		}
+
+		// A position overlap is a simple sphere-vs-AABB test because this query
+		// answers whether the camera is already inside or touching an obstacle.
+		if (Physics::SphereAABBOverlap(
+			position, radius, candidate.minBounds, candidate.maxBounds))
+		{
+			// One blocking collider is enough to classify the position as blocked.
+			return true;
+		}
+	}
+
+	// No eligible collider overlaps the camera sphere at this position.
+	return false;
+}
+
 ColliderHandle PhysicsWorld::Add(Entity& entity)
 {
 	// Meshless entities have no geometry that can participate in collision.
