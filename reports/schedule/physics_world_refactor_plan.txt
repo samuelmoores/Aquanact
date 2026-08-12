@@ -1,0 +1,373 @@
+PhysicsWorld Collision Refactor
+===============================
+
+Purpose
+-------
+Refactor collision handling so PhysicsWorld owns a dedicated representation of
+the collidable part of the game world. Controllers and the camera should query
+PhysicsWorld instead of iterating over Scene::Objects(). The first pass must
+preserve current movement, sliding, and grounding behavior while keeping the
+amount of new code small and readable.
+
+This is a staged migration. Do not introduce a spatial grid, collision layers,
+triggers, or a full data-oriented storage system until the basic architecture
+works and existing behavior has been checked.
+
+Current responsibilities
+-------------------------
+Physics currently provides stateless geometry helpers in:
+
+  include/Engine/Core/Physics.h
+  src/Engine/Core/Physics.cpp
+
+Controller currently owns both movement behavior and scene collision queries:
+
+  include/Engine/Core/Controller.h
+  src/Engine/Core/Controller.cpp
+
+GameCamera currently performs a separate scene collision pass:
+
+  src/Engine/Core/GameCamera.cpp
+
+The first refactor should leave Physics unchanged. PhysicsWorld will use those
+existing algorithms rather than duplicating them.
+
+Target responsibilities
+-----------------------
+PhysicsWorld owns:
+
+  - Which entities are represented as colliders.
+  - Cached collision-relevant bounds and shape information.
+  - Registration, removal, and synchronization of colliders.
+  - Candidate filtering and earliest-hit queries.
+  - The collision-world representation used by controllers and the camera.
+
+Physics remains responsible for:
+
+  - AABB, sphere, capsule, and convex geometry calculations.
+  - Stateless overlap and sweep functions.
+
+Controller remains responsible for:
+
+  - Gravity and velocity.
+  - Movement input.
+  - Slide resolution after a hit.
+  - Grounding and jump behavior.
+
+GameCamera remains responsible for:
+
+  - Camera positioning and follow behavior.
+  - Camera-specific movement policy and safe-position handling.
+
+Step 1: Define the minimal collider record
+-------------------------------------------
+Create a small runtime record in PhysicsWorld.h. It should contain only data
+needed by collision queries and a reference used to report the hit object.
+
+Suggested initial structure:
+
+  struct PhysicsCollider
+  {
+      Entity* owner = nullptr;
+      PhysicsColliderShape shape = PhysicsColliderShape::Box;
+      glm::vec3 minBounds{ 0.0f };
+      glm::vec3 maxBounds{ 0.0f };
+      bool enabled = true;
+  };
+
+Use a simple index for the first implementation:
+
+  using ColliderHandle = std::size_t;
+
+Do not add generation counters, collision layers, masks, triggers, velocities,
+or polymorphic collider classes in this step. Those are useful later but would
+make the first migration harder to review.
+
+Files:
+
+  include/Engine/Core/PhysicsWorld.h
+
+Verification:
+
+  - The new header includes only the types it needs.
+  - PhysicsCollider does not own Entity objects.
+  - The project still compiles after the header is added.
+
+Step 2: Add the singleton world
+-------------------------------
+Create PhysicsWorld.cpp and implement a function-local singleton:
+
+  PhysicsWorld& PhysicsWorld::Instance()
+  {
+      static PhysicsWorld world;
+      return world;
+  }
+
+Initial public API:
+
+  class PhysicsWorld final
+  {
+  public:
+      static PhysicsWorld& Instance();
+
+      ColliderHandle Add(Entity& entity);
+      void Remove(ColliderHandle handle);
+      void Update(ColliderHandle handle);
+      void Clear();
+
+      const std::vector<PhysicsCollider>& Colliders() const;
+  };
+
+Keep the constructor private and delete copy construction and assignment. The
+singleton is an access point to the one active collision world, not a reason
+to make geometry functions global or static stateful operations.
+
+Add both new files to CMakeLists.txt. Do not change Controller or GameCamera
+until this world builds successfully on its own.
+
+Verification:
+
+  - The singleton can be accessed from two call sites and returns the same
+    instance.
+  - Clear removes all records.
+  - No entity is destroyed by PhysicsWorld.
+
+Step 3: Register collidable entities
+-------------------------------------
+Add registration at the active-level setup point, after entities have their
+meshes and transforms. Register only entities that can participate in world
+collision:
+
+  - The entity has a mesh.
+  - WorldAABB() succeeds.
+  - The entity is not explicitly excluded from the relevant collision query.
+
+For the first pass, use the existing entity collider shape and ignore-camera
+flag. The world should not infer gameplay behavior beyond these existing
+settings.
+
+Registration outline:
+
+  PhysicsWorld::Instance().Clear();
+  for (const auto& object : activeLevel->Objects())
+  {
+      if (object && object->GetMesh())
+          PhysicsWorld::Instance().Add(*object);
+  }
+
+Add registration and clearing where levels are loaded and unloaded. Do not
+register from every collision query. The point of this step is to establish a
+dedicated collision-world data set.
+
+Update policy for the first pass:
+
+  - Static level objects are updated once after registration.
+  - Dynamic objects are updated before their collision query or once per game
+    update, whichever fits the existing lifecycle with less code.
+
+The Add and Update methods should refresh the cached world AABB and shape.
+
+Verification:
+
+  - A level with meshes produces the expected collider count.
+  - UI-only or meshless entities are absent.
+  - Reloading a level does not leave stale colliders in the singleton.
+
+Step 4: Move scene iteration into PhysicsWorld
+-----------------------------------------------
+Add one query that returns the earliest narrow-phase hit:
+
+  Physics::SweepCollision Sweep(
+      ColliderHandle movingCollider,
+      const glm::vec3& minBounds,
+      const glm::vec3& maxBounds,
+      const glm::vec3& movement,
+      Entity** hitEntity = nullptr) const;
+
+Responsibilities of Sweep:
+
+  1. Reset hitEntity when supplied.
+  2. Compute the swept AABB for the moving shape.
+  3. Iterate only m_colliders, never Scene::Objects().
+  4. Skip the moving collider and disabled records.
+  5. Skip records whose bounds do not overlap the swept bounds.
+  6. Select the existing box, capsule, or convex Physics function.
+  7. Return the hit with the smallest valid time.
+  8. Return the owner only for the winning collider.
+
+The convex-plane helper currently local to Controller.cpp should move into a
+private PhysicsWorld helper because it depends on the collider record and is
+part of preparing world collision data. Keep its algorithm unchanged during
+this migration. If possible, cache the generated planes during Update rather
+than rebuilding them on every sweep, but defer that cache if it makes the step
+too large.
+
+Important behavior rules:
+
+  - Preserve the current broadphase rejection.
+  - Preserve the current shape selection.
+  - Preserve the current earliest-hit comparison.
+  - Preserve the current handling of invalid or missing AABBs.
+
+Verification:
+
+  - Sweep results match the old controller query for box movement.
+  - Capsule movement still lands on floors and slides along walls.
+  - Convex colliders still use their narrow-phase path.
+
+Step 5: Refactor Controller
+---------------------------
+Give the controller one stored ColliderHandle, or provide a reliable lookup
+from Entity to its registered handle. A stored handle is preferable because it
+avoids searching the world.
+
+Replace the object loop inside Controller::MoveWithCollision() with a call to:
+
+  PhysicsWorld::Instance().Sweep(
+      ownerCollider,
+      currentMin,
+      currentMax,
+      remainingMovement,
+      &hitObject);
+
+Keep the surrounding movement code in Controller unchanged:
+
+  - maxSlideIterations
+  - resolvedDelta
+  - safeTime
+  - slideMovement
+  - collision normal output
+  - grounded normal test
+
+This is the key boundary: PhysicsWorld finds a collision; Controller decides
+how the character responds to it.
+
+Verification checklist:
+
+  - Walking into a wall stops horizontal movement into the wall.
+  - Walking along a wall slides instead of stopping completely.
+  - Falling onto the floor sets grounded state.
+  - Jumping does not immediately snap back to the floor.
+  - Ground probes still work.
+  - Existing physics diagnostics still report useful values.
+
+Step 6: Refactor camera collision
+---------------------------------
+After player movement is stable, remove the camera's direct iteration over
+Scene::Objects(). Add a camera-specific query to PhysicsWorld, or reuse a
+generic sphere sweep if the current API supports it cleanly:
+
+  CameraMoveResult MoveCamera(
+      const glm::vec3& position,
+      const glm::vec3& desiredPosition,
+      float radius,
+      const Entity* target) const;
+
+The camera query should skip:
+
+  - The camera target.
+  - Objects marked IgnoreCameraCollision().
+  - Disabled colliders.
+
+Keep camera safe-position fallback, debug counters, and diagnostic reporting
+in GameCamera.cpp. Only move collision-world lookup into PhysicsWorld.
+
+Verification:
+
+  - The camera remains outside walls.
+  - The camera can follow the player without colliding with the player.
+  - Camera collision debug visualization still matches the camera position.
+
+Step 7: Cleanup and documentation
+----------------------------------
+Remove now-unused Physics and SceneManager includes from Controller.cpp and
+GameCamera.cpp. Remove duplicated local collision loops, but do not remove
+geometry helpers still used by CameraCollider or other callers.
+
+Add short comments only at the world/controller boundary. In particular,
+document that PhysicsWorld owns collision records while entities own gameplay
+and rendering state.
+
+Review that all handles are invalidated by Clear and that Remove does not leave
+an entry that can still be queried. A simple first implementation may leave a
+hole in the vector or use swap-and-pop; choose the option that keeps the code
+readable. Avoid optimizing handle stability before it is needed.
+
+Optional Step 8: Add a simple spatial grid
+-------------------------------------------
+Only begin this step after behavior is correct and time remains.
+
+Keep m_colliders as the authoritative storage and add a grid containing only
+candidate handles. The grid API can start as:
+
+  void Insert(ColliderHandle handle, const AABB& bounds);
+  void Update(ColliderHandle handle, const AABB& bounds);
+  void Remove(ColliderHandle handle);
+  void Query(const AABB& bounds, std::vector<ColliderHandle>& results) const;
+
+PhysicsWorld::Sweep then queries the grid and runs the existing narrow phase on
+the returned candidates. Do not replace the entire storage layout with a
+structure-of-arrays design today. That optimization should be measured after
+the query path is centralized.
+
+Suggested end-of-day schedule
+-----------------------------
+Hour 1:   Define PhysicsCollider, ColliderHandle, and PhysicsWorld API.
+Hour 2:   Implement singleton, CMake entries, Add, Remove, Update, and Clear.
+Hour 3:   Register active-level colliders and verify level lifecycle behavior.
+Hour 4:   Move sweep candidate iteration and shape dispatch into PhysicsWorld.
+Hour 5:   Refactor Controller and verify walking, sliding, grounding, and jump.
+Hour 6:   Refactor GameCamera and verify camera obstruction behavior.
+Final:    Cleanup includes, add focused comments, build, and run a smoke test.
+
+If time is lost, stop after Step 5. A PhysicsWorld-backed controller is the
+core architectural milestone. Camera unification and spatial indexing can be
+completed later without reverting that work.
+
+End-of-day definition of done
+-----------------------------
+
+Required:
+
+  - PhysicsWorld is a singleton with dedicated collider storage.
+  - Only collision-relevant entities are registered.
+  - Controller no longer iterates Scene::Objects() for collision.
+  - Existing Physics geometry helpers remain reusable and stateless.
+  - Level load and unload correctly populate and clear the world.
+  - Player movement, sliding, grounding, and jumping still work.
+
+Preferred:
+
+  - Camera collision uses PhysicsWorld as well.
+  - Collider records cache world bounds.
+  - Convex data is not rebuilt unnecessarily.
+
+Deferred:
+
+  - Spatial grid or BVH.
+  - Structure-of-arrays storage.
+  - Stable generation-safe handles.
+  - Collision layers and masks.
+  - Trigger events and rigid-body simulation.
+
+Testing notes
+-------------
+Use a small test scene containing:
+
+  - One floor box.
+  - One wall box.
+  - One capsule player.
+  - One convex or ramp object.
+  - One meshless entity.
+  - One object with IgnoreCameraCollision enabled.
+
+Record the following before and after the refactor:
+
+  - Player position after walking into the wall.
+  - Player position and grounded state after falling.
+  - Player behavior while walking across the ramp.
+  - Camera position when placed between the player and a wall.
+  - Registered collider count after loading and unloading the level.
+
+The first implementation is successful if the architecture changes while these
+observable behaviors remain unchanged.
