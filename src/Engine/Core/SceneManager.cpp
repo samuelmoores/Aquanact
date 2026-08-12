@@ -6,6 +6,7 @@
 #include "Engine/Core/Entity.h"
 #include "Game/PlayerController.h"
 #include "Engine/Core/ProjectStateData.h"
+#include "Engine/Core/PhysicsWorld.h"
 #include "Game/Enemy.h"
 
 #include <fstream>
@@ -216,6 +217,10 @@ Scene* SceneManager::startUp()
 	{
 		// Scene startup is delegated to the currently active scene.
 		m_activeLevel->startUp();
+
+		// Build the collision-world representation only after the active scene's
+		// entities have initialized their meshes and transforms.
+		PhysicsWorld::Instance().RegisterScene(*m_activeLevel);
 	}
 
 	return m_activeLevel;
@@ -223,6 +228,10 @@ Scene* SceneManager::startUp()
 
 void SceneManager::Clear()
 {
+	// PhysicsWorld stores non-owning entity pointers, so clear its scene-bound
+	// representation before destroying the scene entities below.
+	PhysicsWorld::Instance().Clear();
+
 	// Reset all scene-manager state to a fresh startup baseline.
 	m_levels.clear();
 	m_sceneKinds.clear();
@@ -277,6 +286,13 @@ bool SceneManager::SetActiveLevel(const std::string& name)
 	if (!level)
 	{
 		return false;
+	}
+
+	if (m_activeLevel != level)
+	{
+		// The current PhysicsWorld represents one active scene at a time. Its
+		// colliders will be repopulated when the new scene is registered.
+		PhysicsWorld::Instance().Clear();
 	}
 
 	m_activeLevel = level;

@@ -4,10 +4,17 @@
 
 #include <vector>
 
+class Scene;
+
 class PhysicsWorld final
 {
 public:
 	static PhysicsWorld& Instance();
+
+	// Rebuilds the collision representation for one active scene. Existing
+	// records are cleared first, then each scene entity is passed to Add(),
+	// which excludes meshless entities and entities without a valid world AABB.
+	void RegisterScene(const Scene& scene);
 
 	// Add only accepts entities with a mesh and a valid world AABB.
 	// The returned handle is InvalidColliderHandle when registration fails.

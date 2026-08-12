@@ -1,9 +1,26 @@
 #include "Engine/Core/PhysicsWorld.h"
 
+#include "Engine/Core/Scene.h"
+
 PhysicsWorld& PhysicsWorld::Instance()
 {
 	static PhysicsWorld world;
 	return world;
+}
+
+void PhysicsWorld::RegisterScene(const Scene& scene)
+{
+	// The world represents one active scene, so discard records belonging to
+	// the previous scene before registering the new scene's entities.
+	Clear();
+
+	for (const auto& object : scene.Objects())
+	{
+		if (object)
+		{
+			Add(*object);
+		}
+	}
 }
 
 ColliderHandle PhysicsWorld::Add(Entity& entity)
