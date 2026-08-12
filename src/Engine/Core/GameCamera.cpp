@@ -11,10 +11,131 @@
 #include "Engine/Core/Scene.h"
 #include "Engine/Core/SceneManager.h"
 #include "Engine/Core/Debug.h"
+#include "Engine/Core/PhysicsWorld.h"
 
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <cmath>
+
+namespace
+{
+	glm::vec3 BuildThirdPersonDesiredPosition(const glm::vec3& targetPosition,
+		float yaw, float pitch, float radius)
+	{
+		const float yawRad = glm::radians(yaw);
+		const float pitchRad = glm::radians(pitch);
+		glm::vec3 offset(
+			std::sin(yawRad) * std::cos(pitchRad),
+			std::sin(pitchRad),
+			std::cos(yawRad) * std::cos(pitchRad));
+
+		if (!std::isfinite(offset.x) || !std::isfinite(offset.y) ||
+			!std::isfinite(offset.z) || glm::length(offset) <= 0.0001f)
+		{
+			return targetPosition;
+		}
+
+		return targetPosition - glm::normalize(offset) * radius;
+	}
+
+	struct CameraCollisionResolution
+	{
+		glm::vec3 position{ 0.0f };
+		int collisionCount = 0;
+		glm::vec3 lastNormal{ 0.0f };
+		float lastPenetration = 0.0f;
+		std::string lastObject;
+	};
+
+	glm::vec3 RecoverCameraStartPosition(
+		const glm::vec3& startPosition,
+		const glm::vec3& lastSafePosition,
+		bool hasSafePosition,
+		float colliderRadius,
+		const Entity* target)
+	{
+		const bool startBlocked = PhysicsWorld::Instance().OverlapsCamera(
+			startPosition, colliderRadius, target);
+		const bool safePositionAvailable = hasSafePosition &&
+			!PhysicsWorld::Instance().OverlapsCamera(lastSafePosition, colliderRadius, target);
+
+		// If the current camera position is invalid, use the last known valid
+		// position before attempting to follow the target again.
+		return startBlocked && safePositionAvailable ? lastSafePosition : startPosition;
+	}
+
+	glm::vec3 ResolveCameraSlide(
+		const glm::vec3& position,
+		const glm::vec3& movement,
+		float colliderRadius,
+		const Entity* target,
+		CameraCollisionResolution& result)
+	{
+		Entity* hitObject = nullptr;
+		const Physics::SweepCollision hit = PhysicsWorld::Instance().SweepCamera(
+			position, colliderRadius, movement, target, &hitObject);
+		if (!hit.hit)
+		{
+			result.position = position + movement;
+			return glm::vec3(0.0f);
+		}
+
+		++result.collisionCount;
+		result.lastNormal = hit.normal;
+		result.lastObject = hitObject ? hitObject->Name() : std::string();
+
+		constexpr float collisionSkin = 0.05f;
+		const float movementLength = glm::length(movement);
+		const float safeTime = glm::max(0.0f,
+			hit.time - collisionSkin / movementLength);
+		result.position = position + movement * safeTime;
+
+		// Remove movement into the surface and return only the tangent movement
+		// for the next slide iteration.
+		glm::vec3 slideMovement = movement * (1.0f - hit.time);
+		const float intoSurface = glm::dot(slideMovement, hit.normal);
+		if (intoSurface < 0.0f)
+		{
+			slideMovement -= hit.normal * intoSurface;
+		}
+		return slideMovement;
+	}
+
+	CameraCollisionResolution ResolveThirdPersonPosition(
+		const glm::vec3& startPosition,
+		const glm::vec3& desiredPosition,
+		const glm::vec3& lastSafePosition,
+		bool hasSafePosition,
+		float colliderRadius,
+		const Entity* target)
+	{
+		CameraCollisionResolution result;
+		// First recover from an invalid starting position if a previous safe
+		// position is available.
+		result.position = RecoverCameraStartPosition(
+			startPosition, lastSafePosition, hasSafePosition, colliderRadius, target);
+
+		// Then follow the desired orbit position through at most a few slide
+		// iterations, stopping when no movement remains.
+		glm::vec3 remainingMovement = desiredPosition - result.position;
+		constexpr int maxSlideIterations = 3;
+		for (int iteration = 0;
+			iteration < maxSlideIterations && glm::length(remainingMovement) > 0.0001f;
+			++iteration)
+		{
+			remainingMovement = ResolveCameraSlide(
+				result.position, remainingMovement, colliderRadius, target, result);
+		}
+
+		// Reject a result that still leaves the camera inside geometry. The caller
+		// will retain the original position in this failure case.
+		if (PhysicsWorld::Instance().OverlapsCamera(result.position, colliderRadius, target))
+		{
+			result.position = startPosition;
+		}
+		return result;
+	}
+}
 
 GameCamera::GameCamera()
 	: m_collider(std::make_unique<CameraCollider>())
@@ -168,162 +289,70 @@ void GameCamera::RebuildView()
 
 void GameCamera::UpdateThirdPerson(const Input& input, float dt)
 {
+	// Read orbit input and update the camera's yaw and pitch.
 	(void)input;
 	const glm::vec2 look = Root::Current().InputActions().VectorValue("Look");
+
 	if (glm::length(look) > 0.0f)
 	{
 		const float stepScale = glm::max(dt, 0.0001f) * 120.0f;
+
 		m_yaw -= look.x * m_lookSensitivity * stepScale;
+
 		m_pitch = glm::clamp(m_pitch + look.y * m_lookSensitivity * stepScale, -75.0f, 75.0f);
 	}
 
+	// Validate the follow target before calculating an orbit position.
 	Entity* target = m_target;
 	if (!target)
 	{
 		return;
 	}
 
+	// Build the desired orbit position from the interpolated target pose.
 	// Follow the same interpolated target pose used by rendering. Following the
 	// raw physics pose here makes the camera jump whenever the fixed-step
 	// accumulator performs zero or multiple controller updates in a frame.
 	const glm::vec3 targetPos = target->WorldCenterPosition();
+
 	if (!std::isfinite(targetPos.x) || !std::isfinite(targetPos.y) || !std::isfinite(targetPos.z))
 	{
 		return;
 	}
-	const float yawRad = glm::radians(m_yaw);
-	const float pitchRad = glm::radians(m_pitch);
-	glm::vec3 offset;
-	offset.x = std::sin(yawRad) * std::cos(pitchRad);
-	offset.y = std::sin(pitchRad);
-	offset.z = std::cos(yawRad) * std::cos(pitchRad);
-	if (!std::isfinite(offset.x) || !std::isfinite(offset.y) || !std::isfinite(offset.z) || glm::length(offset) <= 0.0001f)
+
+	const glm::vec3 desiredPosition = BuildThirdPersonDesiredPosition(targetPos, m_yaw, m_pitch, m_radius);
+
+	if (desiredPosition == targetPos && m_radius > 0.0f)
 	{
 		return;
 	}
-	offset = glm::normalize(offset) * m_radius;
-	const glm::vec3 desiredPosition = targetPos - offset;
-	glm::vec3 resolvedPosition = m_position;
-	int collisionCount = 0;
-	glm::vec3 lastCollisionNormal(0.0f);
-	float lastPenetration = 0.0f;
-	std::string lastCollisionObject;
-	const Scene* activeLevel = Root::Current().Scenes().ActiveLevel();
-	if (activeLevel)
+
+	// 4. Resolve the desired orbit position against the physics world. This
+	// includes safe-position recovery and sliding around obstructions.
+	const CameraCollisionResolution resolution = ResolveThirdPersonPosition(
+		m_position, desiredPosition, m_lastSafePosition, m_hasSafePosition,
+		m_collider->Radius(), target);
+
+	const glm::vec3 resolvedPosition = resolution.position;
+
+	if (resolvedPosition != m_position)
 	{
-		const auto positionBlocked = [&](const glm::vec3& position)
-		{
-			m_collider->SetPosition(position);
-			for (const auto& object : activeLevel->Objects())
-			{
-				if (!object || object.get() == target || object->IgnoreCameraCollision() || !object->GetMesh())
-				{
-					continue;
-				}
-
-				glm::vec3 boxMin;
-				glm::vec3 boxMax;
-				if (object->WorldAABB(boxMin, boxMax) && m_collider->OverlapsAABB(boxMin, boxMax))
-				{
-					return true;
-				}
-			}
-			return false;
-		};
-
-		const glm::vec3 frameStartPosition = m_position;
-		if (positionBlocked(m_position) && m_hasSafePosition && !positionBlocked(m_lastSafePosition))
-		{
-			resolvedPosition = m_lastSafePosition;
-		}
-
-		glm::vec3 remainingMovement = desiredPosition - resolvedPosition;
-		constexpr int maxSlideIterations = 3;
-		constexpr float collisionSkin = 0.05f;
-		for (int iteration = 0; iteration < maxSlideIterations && glm::length(remainingMovement) > 0.0001f; ++iteration)
-		{
-			m_collider->SetPosition(resolvedPosition);
-			const glm::vec3 radius(m_collider->Radius());
-			const glm::vec3 sweptMin = glm::min(resolvedPosition, resolvedPosition + remainingMovement) - radius;
-			const glm::vec3 sweptMax = glm::max(resolvedPosition, resolvedPosition + remainingMovement) + radius;
-			Physics::SweepCollision earliestHit;
-			Entity* hitObject = nullptr;
-			for (const auto& object : activeLevel->Objects())
-			{
-				if (!object || object.get() == target || object->IgnoreCameraCollision() || !object->GetMesh())
-				{
-					continue;
-				}
-
-				glm::vec3 boxMin;
-				glm::vec3 boxMax;
-				if (!object->WorldAABB(boxMin, boxMax))
-				{
-					continue;
-				}
-				if (sweptMax.x < boxMin.x || sweptMin.x > boxMax.x ||
-					sweptMax.y < boxMin.y || sweptMin.y > boxMax.y ||
-					sweptMax.z < boxMin.z || sweptMin.z > boxMax.z)
-				{
-					continue;
-				}
-
-				const Physics::SweepCollision hit = m_collider->SweepAgainstAABB(remainingMovement, boxMin, boxMax);
-				if (hit.hit && hit.time < earliestHit.time)
-				{
-					earliestHit = hit;
-					hitObject = object.get();
-				}
-			}
-
-			if (!earliestHit.hit)
-			{
-				resolvedPosition += remainingMovement;
-				remainingMovement = glm::vec3(0.0f);
-				break;
-			}
-
-			++collisionCount;
-			lastCollisionNormal = earliestHit.normal;
-			lastPenetration = 0.0f;
-			lastCollisionObject = hitObject ? hitObject->Name() : std::string();
-			const float movementLength = glm::length(remainingMovement);
-			const float safeTime = glm::max(0.0f, earliestHit.time - collisionSkin / movementLength);
-			resolvedPosition += remainingMovement * safeTime;
-
-			glm::vec3 slideMovement = remainingMovement * (1.0f - earliestHit.time);
-			const float intoSurface = glm::dot(slideMovement, earliestHit.normal);
-			if (intoSurface < 0.0f)
-			{
-				slideMovement -= earliestHit.normal * intoSurface;
-			}
-			remainingMovement = slideMovement;
-		}
-
-		if (positionBlocked(resolvedPosition))
-		{
-			resolvedPosition = frameStartPosition;
-		}
-		else
-		{
-			m_lastSafePosition = resolvedPosition;
-			m_hasSafePosition = true;
-		}
-	}
-	else
-	{
-		resolvedPosition = desiredPosition;
 		m_lastSafePosition = resolvedPosition;
 		m_hasSafePosition = true;
 	}
 
+	// Commit the resolved position and rebuild the view direction.
 	m_position = resolvedPosition;
 	m_collider->SetPosition(m_position);
 	m_front = glm::normalize(targetPos - m_position);
+
 	RebuildView();
+
+	// Publish collision information for the physics diagnostics UI.
 	Root::Current().Debugger().SetPhysicsDiagnostics(
 		m_position, desiredPosition, resolvedPosition, m_collider->Radius(),
-		collisionCount, lastCollisionNormal, lastPenetration, lastCollisionObject);
+		resolution.collisionCount, resolution.lastNormal, resolution.lastPenetration,
+		resolution.lastObject);
 }
 
 CameraCollider& GameCamera::Collider()
