@@ -91,6 +91,8 @@ set(SOURCES
     "include/Engine/Core/OpenGLGraphicsDevice.h" "src/Engine/Core/OpenGLGraphicsDevice.cpp"
     "include/Engine/Core/OpenGLGraphics.h" "src/Engine/Core/OpenGLGraphics.cpp"
     "include/Engine/Core/Physics.h" "src/Engine/Core/Physics.cpp"
+    "include/Engine/Core/PhysicsCollider.h"
+    "include/Engine/Core/PhysicsWorld.h" "src/Engine/Core/PhysicsWorld.cpp"
     "include/Engine/Core/MathUtils.h" "src/Engine/Core/MathUtils.cpp"
     "include/Engine/Core/Audio.h" "src/Engine/Core/Audio.cpp"
     "include/Engine/Core/RenderCommand.h"
