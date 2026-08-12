@@ -8,6 +8,7 @@
 #include "Engine/Core/Root.h"
 #include "Engine/Core/FrameProfiler.h"
 #include "Engine/Core/Input.h"
+#include "Engine/Core/PhysicsWorld.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -217,6 +218,13 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 	{
 		if (object)
 		{
+			if (object->GetController())
+			{
+				// Only controller entities are currently classified as dynamic. Static
+				// level geometry keeps the bounds captured during scene registration.
+				PhysicsWorld::Instance().Update(*object);
+			}
+
 			FrameProfiler::Scope controllerScope(Root::Current().Profiler(), "Controllers");
 			object->UpdateComponents(dt);
 			if (EntityStateMachine* animator = object->GetEntityState())

@@ -15,6 +15,7 @@ struct PhysicsCollider
 	glm::vec3 minBounds{ 0.0f };
 	glm::vec3 maxBounds{ 0.0f };
 
+	bool isStatic = true;
 	bool enabled = true;
 };
 
