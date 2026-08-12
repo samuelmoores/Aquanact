@@ -8,6 +8,20 @@
 
 namespace
 {
+	bool IsCameraCandidate(const PhysicsCollider& collider, const Entity* target)
+	{
+		return collider.enabled && collider.owner && collider.owner != target &&
+			!collider.owner->IgnoreCameraCollision();
+	}
+
+	bool OverlapsSweptBounds(const glm::vec3& sweptMin, const glm::vec3& sweptMax,
+		const PhysicsCollider& collider)
+	{
+		return !(sweptMax.x < collider.minBounds.x || sweptMin.x > collider.maxBounds.x ||
+			sweptMax.y < collider.minBounds.y || sweptMin.y > collider.maxBounds.y ||
+			sweptMax.z < collider.minBounds.z || sweptMin.z > collider.maxBounds.z);
+	}
+
 	void BuildVerticalCapsule(const glm::vec3& boxMin, const glm::vec3& boxMax,
 		glm::vec3& base, glm::vec3& tip, float& radius)
 	{
@@ -280,6 +294,62 @@ Physics::SweepCollision PhysicsWorld::Sweep(
 			{
 				// Keep the entity paired with the collision result whenever a nearer
 				// candidate replaces the previous earliest hit.
+				*hitEntity = candidate.owner;
+			}
+		}
+	}
+
+	return earliestHit;
+}
+
+Physics::SweepCollision PhysicsWorld::SweepCamera(
+	const glm::vec3& position,
+	float radius,
+	const glm::vec3& movement,
+	const Entity* target,
+	Entity** hitEntity) const
+{
+	// The camera owns position resolution, so this query only reports the
+	// nearest blocking contact and optionally identifies its entity.
+	if (hitEntity)
+	{
+		*hitEntity = nullptr;
+	}
+
+	Physics::SweepCollision earliestHit;
+
+	// Treat the camera as a sphere and build a bounds volume covering its entire
+	// movement. This is the cheap broadphase volume for candidate filtering.
+	const glm::vec3 sphereRadius(radius);
+	const glm::vec3 sweptMin = glm::min(position, position + movement) - sphereRadius;
+	const glm::vec3 sweptMax = glm::max(position, position + movement) + sphereRadius;
+
+	// Query only PhysicsWorld's collision records. Camera filtering is applied
+	// before any geometry calculation so excluded entities are never tested.
+	for (const PhysicsCollider& candidate : m_colliders)
+	{
+		if (!IsCameraCandidate(candidate, target))
+		{
+			continue;
+		}
+
+		// Reject candidates outside the camera sphere's swept broadphase bounds.
+		if (!OverlapsSweptBounds(sweptMin, sweptMax, candidate))
+		{
+			continue;
+		}
+
+		// The candidate passed broadphase, so run the sphere-vs-AABB narrow phase.
+		const Physics::SweepCollision hit = Physics::GetSphereAABBSweep(
+			position, radius, movement, candidate.minBounds, candidate.maxBounds);
+
+		// Several colliders may overlap the swept path. Keep the first contact so
+		// the camera resolves against the nearest obstruction.
+		if (hit.hit && hit.time < earliestHit.time)
+		{
+			earliestHit = hit;
+			if (hitEntity)
+			{
 				*hitEntity = candidate.owner;
 			}
 		}

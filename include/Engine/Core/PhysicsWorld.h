@@ -32,6 +32,16 @@ public:
 		const glm::vec3& movement,
 		Entity** hitEntity = nullptr) const;
 
+	// Sweeps the camera's sphere through registered colliders without moving it.
+	// The target and entities marked IgnoreCameraCollision() are excluded; an
+	// optional hitEntity receives the owner of the earliest blocking collider.
+	Physics::SweepCollision SweepCamera(
+		const glm::vec3& position,
+		float radius,
+		const glm::vec3& movement,
+		const Entity* target,
+		Entity** hitEntity = nullptr) const;
+
 	// Add only accepts entities with a mesh and a valid world AABB.
 	// The returned handle is InvalidColliderHandle when registration fails.
 	ColliderHandle Add(Entity& entity);
