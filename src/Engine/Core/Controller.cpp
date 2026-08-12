@@ -22,7 +22,7 @@ namespace
 	constexpr float groundProbeDistance = 20.0f;
 
 	void RecordCollisionContact(const Physics::SweepCollision& collision,
-		glm::vec3* lastCollisionNormal, bool* collidedWithGround)
+		const glm::vec3& movement, glm::vec3* lastCollisionNormal, bool* collidedWithGround)
 	{
 		// Preserve the latest contact for grounding and velocity response. The
 		// world has already selected the earliest hit for this slide iteration.
@@ -30,7 +30,8 @@ namespace
 		{
 			*lastCollisionNormal = collision.normal;
 		}
-		if (collidedWithGround && collision.normal.y > walkableGroundNormalY)
+		if (collidedWithGround && movement.y <= 0.0f &&
+			collision.normal.y > walkableGroundNormalY)
 		{
 			*collidedWithGround = true;
 		}
@@ -120,6 +121,10 @@ glm::vec3 Controller::MoveWithCollision(Entity& owner, const glm::vec3& delta,
 	// than attempting a sweep with incomplete shape data.
 	if (ownerCollider == InvalidColliderHandle || !owner.WorldAABB(startMin, startMax))
 	{
+		Root::Current().Debugger().LogOnce(
+			"ControllerCollisionData:" + owner.Name(),
+			"Controller collision data unavailable for " + owner.Name());
+
 		// Without a registered collider or valid bounds, preserve the old safe
 		// fallback: apply movement directly rather than dropping the input.
 		owner.Move(delta);
@@ -154,7 +159,7 @@ glm::vec3 Controller::MoveWithCollision(Entity& owner, const glm::vec3& delta,
 			break;
 		}
 
-		RecordCollisionContact(earliestHit, lastCollisionNormal, collidedWithGround);
+		RecordCollisionContact(earliestHit, remainingMovement, lastCollisionNormal, collidedWithGround);
 
 		remainingMovement = ResolveSlideCollision(
 			earliestHit, remainingMovement, resolvedDelta, collisionSkin);

@@ -26,7 +26,7 @@ namespace
 	{
 		// A convex collider needs the owning mesh and its current world transform.
 		// Invalid or incomplete meshes cannot provide a reliable plane set.
-		const Entity* object = collider.owner;
+		Entity* object = collider.owner;
 		const Mesh* mesh = object ? object->GetMesh() : nullptr;
 		if (!object || !mesh || mesh->Faces().size() < 3 || mesh->Vertices().empty())
 		{
@@ -195,10 +195,11 @@ Physics::SweepCollision PhysicsWorld::Sweep(
 	glm::vec3 capsuleBase;
 	glm::vec3 capsuleTip;
 
-	float capsuleRadius = 0.0f;
 	if (useCapsule)
 	{
-		BuildVerticalCapsule(minBounds, maxBounds, capsuleBase, capsuleTip, capsuleRadius);
+		const glm::vec3 center = (minBounds + maxBounds) * 0.5f;
+		capsuleBase = center - glm::vec3(0.0f, moving.capsuleHalfLength, 0.0f);
+		capsuleTip = center + glm::vec3(0.0f, moving.capsuleHalfLength, 0.0f);
 	}
 
 	// Query only the dedicated collision storage, not the full scene or entity
@@ -240,14 +241,14 @@ Physics::SweepCollision PhysicsWorld::Sweep(
 				? (capsuleBase + capsuleTip) * 0.5f
 				: (minBounds + maxBounds) * 0.5f;
 			const glm::vec3 movingHalfExtents = (maxBounds - minBounds) * 0.5f;
-			const float capsuleHalfLength = useCapsule ? glm::length(capsuleTip - capsuleBase) * 0.5f : 0.0f;
+			const float capsuleHalfLength = useCapsule ? moving.capsuleHalfLength : 0.0f;
 
 			// Expand every plane by the moving shape's support distance. Capsules
 			// use radius plus axial length; boxes use projected half-extents.
 			for (Physics::ConvexPlane& plane : planes)
 			{
 				const float support = useCapsule
-					? capsuleRadius + capsuleHalfLength * std::abs(plane.normal.y)
+					? moving.capsuleRadius + capsuleHalfLength * std::abs(plane.normal.y)
 					: glm::dot(glm::abs(plane.normal), movingHalfExtents);
 
 				plane.distance += support;
@@ -260,7 +261,7 @@ Physics::SweepCollision PhysicsWorld::Sweep(
 		else if (useCapsule)
 		{
 			hit = Physics::GetCapsuleAABBSweep(
-				capsuleBase, capsuleTip, capsuleRadius, movement,
+				capsuleBase, capsuleTip, moving.capsuleRadius, movement,
 				candidate.minBounds, candidate.maxBounds);
 		}
 		else
@@ -311,6 +312,13 @@ ColliderHandle PhysicsWorld::Add(Entity& entity)
 	collider.shape = entity.GetPhysicsColliderShape();
 	collider.minBounds = minBounds;
 	collider.maxBounds = maxBounds;
+	if (collider.shape == PhysicsColliderShape::Capsule)
+	{
+		glm::vec3 capsuleBase;
+		glm::vec3 capsuleTip;
+		BuildVerticalCapsule(minBounds, maxBounds, capsuleBase, capsuleTip, collider.capsuleRadius);
+		collider.capsuleHalfLength = glm::length(capsuleTip - capsuleBase) * 0.5f;
+	}
 	collider.isStatic = entity.GetController() == nullptr;
 
 	m_colliders.push_back(collider);

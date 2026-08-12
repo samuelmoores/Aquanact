@@ -22,6 +22,7 @@
 #include "Engine/Core/Scene.h"
 #include "Engine/Core/Entity.h"
 #include "Engine/Core/EntityStateMachine.h"
+#include "Engine/Core/PhysicsWorld.h"
 
 #include <imgui.h>
 #include <chrono>
@@ -142,6 +143,29 @@ namespace {
 		const float tipY = boxMax.y - radius;
 		base = glm::vec3(center.x, std::min(baseY, tipY), center.z);
 		tip = glm::vec3(center.x, std::max(baseY, tipY), center.z);
+	}
+
+	bool BuildPhysicsCapsule(const Entity& object, const glm::vec3& boxMin,
+		const glm::vec3& boxMax, glm::vec3& base, glm::vec3& tip, float& radius)
+	{
+		const PhysicsWorld& world = PhysicsWorld::Instance();
+		const ColliderHandle handle = world.Find(object);
+		if (handle == InvalidColliderHandle || handle >= world.Colliders().size())
+		{
+			return false;
+		}
+
+		const PhysicsCollider& collider = world.Colliders()[handle];
+		if (collider.shape != PhysicsColliderShape::Capsule || collider.capsuleRadius <= 0.0f)
+		{
+			return false;
+		}
+
+		const glm::vec3 center = (boxMin + boxMax) * 0.5f;
+		radius = collider.capsuleRadius;
+		base = center - glm::vec3(0.0f, collider.capsuleHalfLength, 0.0f);
+		tip = center + glm::vec3(0.0f, collider.capsuleHalfLength, 0.0f);
+		return true;
 	}
 
 	std::vector<LineVertex3D> MakeWireCapsuleVertices(
@@ -456,7 +480,10 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 			glm::vec3 base;
 			glm::vec3 tip;
 			float radius = 0.0f;
-			BuildVerticalCapsule(boxMin, boxMax, base, tip, radius);
+			if (!BuildPhysicsCapsule(*object, boxMin, boxMax, base, tip, radius))
+			{
+				BuildVerticalCapsule(boxMin, boxMax, base, tip, radius);
+			}
 			box->SetVertices(MakeWireCapsuleVertices(base, tip, radius, debugColor));
 		}
 		else if (object->GetPhysicsColliderShape() == PhysicsColliderShape::Convex)
@@ -897,7 +924,10 @@ void Debug::DrawPhysicsBoundingVolumes(const Camera& camera)
 			glm::vec3 base;
 			glm::vec3 tip;
 			float radius = 0.0f;
-			BuildVerticalCapsule(boxMin, boxMax, base, tip, radius);
+			if (!BuildPhysicsCapsule(*object, boxMin, boxMax, base, tip, radius))
+			{
+				BuildVerticalCapsule(boxMin, boxMax, base, tip, radius);
+			}
 			volume->SetVertices(MakeWireCapsuleVertices(base, tip, radius, debugColor));
 		}
 		else if (object->GetPhysicsColliderShape() == PhysicsColliderShape::Convex)
