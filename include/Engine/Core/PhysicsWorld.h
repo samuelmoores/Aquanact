@@ -12,8 +12,13 @@ public:
 	// Add only accepts entities with a mesh and a valid world AABB.
 	// The returned handle is InvalidColliderHandle when registration fails.
 	ColliderHandle Add(Entity& entity);
+
 	void Remove(ColliderHandle handle);
+
+	// Refreshes the entity's cached bounds and shape without changing its handle.
+	// Invalid or no-longer-collidable entities are disabled in world storage.
 	void Update(ColliderHandle handle);
+
 	void Clear();
 
 	const std::vector<PhysicsCollider>& Colliders() const;
