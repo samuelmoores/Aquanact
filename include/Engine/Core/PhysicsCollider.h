@@ -19,3 +19,6 @@ struct PhysicsCollider
 };
 
 using ColliderHandle = std::size_t;
+
+constexpr ColliderHandle InvalidColliderHandle =
+	static_cast<ColliderHandle>(-1);
