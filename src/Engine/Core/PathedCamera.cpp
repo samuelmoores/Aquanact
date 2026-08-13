@@ -48,6 +48,9 @@ void PathedCamera::SetPose(const glm::vec3& position, const glm::vec3& facing)
 		m_facing = glm::normalize(facing);
 	else
 		m_facing = {0.0f, 0.0f, 1.0f};
+	m_up = std::abs(glm::dot(m_facing, glm::vec3(0.0f, 1.0f, 0.0f))) > 0.999f
+		? glm::vec3(0.0f, 0.0f, 1.0f)
+		: glm::vec3(0.0f, 1.0f, 0.0f);
 	RebuildView();
 }
 
@@ -63,6 +66,10 @@ void PathedCamera::SetPath(const CameraPathData& path)
 
 void PathedCamera::SetTarget(Entity* target)
 {
+	if (m_target == target)
+	{
+		return;
+	}
 	m_target = target;
 	FaceTarget();
 	RebuildView();
@@ -108,13 +115,9 @@ void PathedCamera::Update(float deltaTime)
 	const float t = pathPosition - static_cast<float>(segment);
 	const glm::vec3 desiredPosition = EvaluateCameraPathSegment(m_path, segment, t);
 	m_position = glm::mix(m_position, desiredPosition, blend);
-	FaceTarget();
-	RebuildView();
-	return;
 
-	// Hold the final camera point after the player passes the path end.
-	m_position = glm::mix(m_position, m_path.points.back().position, blend);
 	FaceTarget();
+
 	RebuildView();
 }
 
@@ -138,10 +141,13 @@ void PathedCamera::FaceTarget()
 		std::isfinite(direction.z) && glm::dot(direction, direction) > 1e-8f)
 	{
 		m_facing = glm::normalize(direction);
+		m_up = std::abs(glm::dot(m_facing, glm::vec3(0.0f, 1.0f, 0.0f))) > 0.999f
+			? glm::vec3(0.0f, 0.0f, 1.0f)
+			: glm::vec3(0.0f, 1.0f, 0.0f);
 	}
 }
 
 void PathedCamera::RebuildView()
 {
-	m_viewMatrix = glm::lookAt(m_position, m_position + m_facing, {0.0f, 1.0f, 0.0f});
+	m_viewMatrix = glm::lookAt(m_position, m_position + m_facing, m_up);
 }

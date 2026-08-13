@@ -43,6 +43,7 @@ private:
 	glm::mat4 m_viewMatrix{1.0f};
 	glm::vec3 m_position{0.0f, 0.0f, -10.0f};
 	glm::vec3 m_facing{0.0f, 0.0f, 1.0f};
+	glm::vec3 m_up{0.0f, 1.0f, 0.0f};
 	CameraPathData m_path;
 	Entity* m_target = nullptr;
 	float m_playerProgress = 0.0f;
