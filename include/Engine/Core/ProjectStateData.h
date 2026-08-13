@@ -4,6 +4,7 @@
 #include <glm/glm.hpp>
 #include <string>
 #include <vector>
+#include "Engine/Core/CameraPathData.h"
 
 namespace ProjectStateData {
 	struct PendingController {
@@ -83,6 +84,7 @@ namespace ProjectStateData {
 	};
 
 	struct RenderStateData {
+		CameraPathData cameraPath;
 		glm::vec3 gameCameraPosition{ 0.0f };
 		glm::vec3 gameCameraFacing{ 0.0f };
 		unsigned int gameCameraTargetId = 0;

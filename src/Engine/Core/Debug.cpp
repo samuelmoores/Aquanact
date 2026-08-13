@@ -17,6 +17,8 @@
 #include "Engine/Core/GLHeaders.h"
 #include "Engine/Core/SceneManager.h"
 #include "Engine/Core/GameCamera.h"
+#include "Engine/Core/CameraPathData.h"
+#include "Engine/UI/CameraPathCreator.h"
 #include "Engine/Core/Mesh.h"
 #include "Engine/Core/Scene.h"
 #include "Engine/Core/Entity.h"
@@ -290,6 +292,10 @@ void Debug::shutDown()
 	}
 	m_pointLightDebugSpheres.clear();
 	m_pointLightDebugColors.clear();
+	for (Line* sphere : m_cameraPathSpheres) delete sphere;
+	for (Line* segment : m_cameraPathSegments) delete segment;
+	m_cameraPathSpheres.clear();
+	m_cameraPathSegments.clear();
 	ClearEntityBoundingBoxes();
 	delete m_cameraCollisionSphere;
 	m_cameraCollisionSphere = nullptr;
@@ -315,6 +321,48 @@ void Debug::DrawCameraCollisionDebug(const Camera& camera)
 	}
 
 	return;
+}
+
+void Debug::DrawCameraPath(const Camera& camera, const CameraPathData& path, int selectedPoint)
+{
+	// Rebuild each editor frame so dragging a point immediately moves its sphere
+	// and the connecting segments.
+	if (!path.points.empty() || !m_cameraPathSpheres.empty())
+	{
+		for (Line* sphere : m_cameraPathSpheres) delete sphere;
+		for (Line* segment : m_cameraPathSegments) delete segment;
+		m_cameraPathSpheres.clear();
+		m_cameraPathSegments.clear();
+		for (std::size_t i = 0; i < path.points.size(); ++i)
+		{
+			const glm::vec3 color = static_cast<int>(i) == selectedPoint
+				? glm::vec3(1.0f, 0.8f, 0.1f) : glm::vec3(0.2f, 0.7f, 1.0f);
+			m_cameraPathSpheres.push_back(new Line(MakeWireSphereVertices(color)));
+		}
+		for (std::size_t i = 1; i < path.points.size(); ++i)
+		{
+			const glm::vec3 color(0.2f, 0.7f, 1.0f);
+			m_cameraPathSegments.push_back(new Line({
+				{path.points[i - 1].position.x, path.points[i - 1].position.y, path.points[i - 1].position.z, color.r, color.g, color.b},
+				{path.points[i].position.x, path.points[i].position.y, path.points[i].position.z, color.r, color.g, color.b}}));
+		}
+	}
+	const glm::mat4 projection = camera.GetProjectionMatrix();
+	const glm::mat4 view = camera.GetViewMatrix();
+	constexpr float pointRadius = 7.5f;
+	for (std::size_t i = 0; i < path.points.size() && i < m_cameraPathSpheres.size(); ++i)
+	{
+		m_cameraPathSpheres[i]->UpdateProjection(projection);
+		const float radius = static_cast<int>(i) == selectedPoint
+			? pointRadius * 1.25f
+			: pointRadius;
+		m_cameraPathSpheres[i]->draw(view, glm::translate(glm::mat4(1.0f), path.points[i].position) * glm::scale(glm::mat4(1.0f), glm::vec3(radius)));
+	}
+	for (std::size_t i = 0; i + 1 < path.points.size() && i < m_cameraPathSegments.size(); ++i)
+	{
+		m_cameraPathSegments[i]->UpdateProjection(projection);
+		m_cameraPathSegments[i]->draw(view);
+	}
 }
 
 void Debug::RebuildGrid()
@@ -370,6 +418,7 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 	auto projection = camera.GetProjectionMatrix();
 	auto view = camera.GetViewMatrix();
 	DrawCameraCollisionDebug(camera);
+	DrawCameraPath(camera, gui.CameraPath().Data(), gui.CameraPath().SelectedPoint());
 
 	if (m_axis && gui.ShowAxis())
 	{

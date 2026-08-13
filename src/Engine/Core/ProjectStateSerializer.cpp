@@ -403,7 +403,7 @@ namespace ProjectStateSerializer {
 			try
 			{
 				const std::vector<std::string> fields = ProjectStateFormat::SplitFields(line);
-				if ((fields.size() >= 7 && fields[0] == "gamecamera") || (fields.size() == 3 && fields[0] == "editorview") || (fields.size() >= 3 && fields[0] == "debugwindows") || ((fields.size() >= 8 && fields.size() <= 11) && fields[0] == "sunlight") || ((fields.size() >= 12 && fields.size() <= 15) && fields[0] == "pointlight") || (fields.size() == 2 && fields[0] == "imguilayout"))
+				if ((fields.size() >= 7 && fields[0] == "gamecamera") || (fields.size() >= 2 && fields[0] == "camerapath") || (fields.size() == 3 && fields[0] == "editorview") || (fields.size() >= 3 && fields[0] == "debugwindows") || ((fields.size() >= 8 && fields.size() <= 11) && fields[0] == "sunlight") || ((fields.size() >= 12 && fields.size() <= 15) && fields[0] == "pointlight") || (fields.size() == 2 && fields[0] == "imguilayout"))
 				{
 					if (fields.size() >= 7 && fields[0] == "gamecamera")
 					{
@@ -437,6 +437,23 @@ namespace ProjectStateSerializer {
 						if (fields.size() >= 12)
 						{
 							renderState.gameCameraColliderRadius = std::stof(fields[11]);
+						}
+					}
+					else if (fields.size() >= 2 && fields[0] == "camerapath")
+					{
+						const std::size_t count = std::min<std::size_t>(std::stoul(fields[1]), 1000);
+						if (fields.size() >= 2 + count * 4)
+						{
+							renderState.cameraPath.points.clear();
+							for (std::size_t i = 0; i < count; ++i)
+							{
+								const std::size_t offset = 2 + i * 4;
+								CameraPathPoint point;
+								point.position = glm::vec3(std::stof(fields[offset]), std::stof(fields[offset + 1]), std::stof(fields[offset + 2]));
+								point.playerProgress = std::stof(fields[offset + 3]);
+								if (std::isfinite(point.position.x) && std::isfinite(point.position.y) && std::isfinite(point.position.z) && std::isfinite(point.playerProgress) && (renderState.cameraPath.points.empty() || point.playerProgress > renderState.cameraPath.points.back().playerProgress))
+									renderState.cameraPath.points.push_back(point);
+							}
 						}
 					}
 					else if (fields.size() == 3 && fields[0] == "editorview")
@@ -779,6 +796,13 @@ namespace ProjectStateSerializer {
 		contents += "0;0;0;";
 		contents += "0;";
 		contents += "0\n";
+		const CameraPathData& path = frontEndManager.EditorGUI().CameraPath().Data();
+		contents += "camerapath;" + std::to_string(path.points.size());
+		for (const CameraPathPoint& point : path.points)
+		{
+			contents += ";" + std::to_string(point.position.x) + ";" + std::to_string(point.position.y) + ";" + std::to_string(point.position.z) + ";" + std::to_string(point.playerProgress);
+		}
+		contents += "\n";
 
 		contents += "editorview;";
 		contents += frontEndManager.EditorGUI().ShowAxis() ? "1" : "0";

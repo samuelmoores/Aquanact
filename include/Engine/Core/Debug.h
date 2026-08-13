@@ -9,6 +9,7 @@ class EngineGUI;
 class Input;
 class Entity;
 class GameplayManager;
+struct CameraPathData;
 
 struct CameraDiagnosticsSnapshot
 {
@@ -74,6 +75,7 @@ public:
 	void shutDown();
 	// Editor-mode overlay: draws axis/grid plus the visible debug windows.
 	void draw(const Camera& camera, const EngineGUI& gui);
+	void DrawCameraPath(const Camera& camera, const CameraPathData& path, int selectedPoint);
 	// Game-mode overlay: shows only the runtime input and gameplay diagnostics.
 	void drawGameModeInput(const Input& input);
 	// Cached controller/object state that powers the gameplay diagnostic panel.
@@ -145,6 +147,8 @@ private:
 	class Axis* m_axis = nullptr;
 	class Grid* m_grid = nullptr;
 	std::vector<class Line*> m_pointLightDebugSpheres;
+	std::vector<class Line*> m_cameraPathSpheres;
+	std::vector<class Line*> m_cameraPathSegments;
 	std::vector<class Line*> m_entityBoundingBoxes;
 	std::vector<class Entity*> m_entityBoundingBoxObjects;
 	class Line* m_cameraCollisionSphere = nullptr;

@@ -155,7 +155,7 @@ void RenderManager::shutDown()
 void RenderManager::ApplyProjectState(const ProjectStateData::RenderStateData& renderState)
 {
 	m_gameCamera->SetPose(renderState.gameCameraPosition, renderState.gameCameraFacing);
-	m_gameCamera->SetOrbitAngles(renderState.gameCameraYaw, renderState.gameCameraPitch);
+	Root::Current().FrontEnd().EditorGUI().CameraPath().Data() = renderState.cameraPath;
 	m_lightingManager->SunLight().direction = renderState.sunLight.direction;
 	m_lightingManager->SunLight().color = renderState.sunLight.color;
 	m_lightingManager->SunLight().intensity = renderState.sunLight.intensity;

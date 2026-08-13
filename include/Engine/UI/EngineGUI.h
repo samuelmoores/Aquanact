@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Engine/Core/EntityStateMachine.h"
+#include "Engine/UI/CameraPathCreator.h"
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -40,6 +41,9 @@ public:
 	void SetShowFileExplorer(bool showFileExplorer);
 	void SetShowInputMapWindow(bool showInputMapWindow);
 	void SetShowCameraWindow(bool showCameraWindow);
+
+	CameraPathCreator& CameraPath();
+	const CameraPathCreator& CameraPath() const;
 
 private:
 	// Popup and window drawing helpers
@@ -130,6 +134,7 @@ private:
 	bool m_showFileExplorer = false;
 	bool m_showInputMapWindow = false;
 	bool m_showCameraWindow = false;
+	CameraPathCreator m_cameraPathCreator;
 
 	// Popup request flags
 	bool m_buildGamePopupRequested = false;

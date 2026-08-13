@@ -1815,6 +1815,16 @@ void EngineGUI::SetShowCameraWindow(bool showCameraWindow)
 	m_showCameraWindow = showCameraWindow;
 }
 
+CameraPathCreator& EngineGUI::CameraPath()
+{
+	return m_cameraPathCreator;
+}
+
+const CameraPathCreator& EngineGUI::CameraPath() const
+{
+	return m_cameraPathCreator;
+}
+
 // Popup and window drawing helpers
 void EngineGUI::DrawCameraWindow()
 {
@@ -1823,12 +1833,63 @@ void EngineGUI::DrawCameraWindow()
 		return;
 	}
 
-	// The camera window edits the runtime camera target and collision settings.
 	bool open = m_showCameraWindow;
 	if (ImGui::Begin("Camera", &open, ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize))
 	{
-		ImGui::TextUnformatted("The game camera is static.");
-		ImGui::TextUnformatted("Use Game > Set Game Camera to copy the editor pose.");
+		CameraPathData& path = m_cameraPathCreator.Data();
+		ImGui::TextUnformatted("Camera Path");
+
+		if (ImGui::Button("Add Point"))
+		{
+			const EngineCamera& editorCamera =
+				Root::Current().Render().GetEngineCamera();
+			m_cameraPathCreator.AddPoint(
+				editorCamera.GetPosition(),
+				m_cameraPathCreator.NextSuggestedProgress());
+		}
+		ImGui::SameLine();
+		const int selectedPoint = m_cameraPathCreator.SelectedPoint();
+		if (ImGui::Button("Remove Point") && selectedPoint >= 0)
+		{
+			m_cameraPathCreator.RemovePoint(
+				static_cast<std::size_t>(selectedPoint));
+		}
+
+		for (std::size_t i = 0; i < path.points.size(); ++i)
+		{
+			const std::string label = "Point " + std::to_string(i + 1);
+			if (ImGui::Selectable(
+				label.c_str(),
+				m_cameraPathCreator.SelectedPoint() == static_cast<int>(i)))
+			{
+				m_cameraPathCreator.SelectPoint(static_cast<int>(i));
+			}
+		}
+
+		const int editedPoint = m_cameraPathCreator.SelectedPoint();
+		if (editedPoint >= 0 && editedPoint < static_cast<int>(path.points.size()))
+		{
+			CameraPathPoint& point = path.points[static_cast<std::size_t>(editedPoint)];
+			ImGui::Separator();
+			ImGui::DragFloat3("Position", &point.position.x, 0.1f);
+
+			float progress = point.playerProgress;
+			if (ImGui::DragFloat("Player Progress", &progress, 0.1f, 0.0f))
+			{
+				const float previous = editedPoint > 0
+					? path.points[static_cast<std::size_t>(editedPoint - 1)].playerProgress + 0.001f
+					: 0.0f;
+				const float next = editedPoint + 1 < static_cast<int>(path.points.size())
+					? path.points[static_cast<std::size_t>(editedPoint + 1)].playerProgress - 0.001f
+					: progress;
+				point.playerProgress = glm::clamp(progress, previous, glm::max(previous, next));
+			}
+
+			if (ImGui::Button("Capture Editor Camera Position"))
+			{
+				point.position = Root::Current().Render().GetEngineCamera().GetPosition();
+			}
+		}
 	}
 	ImGui::End();
 	m_showCameraWindow = open;
