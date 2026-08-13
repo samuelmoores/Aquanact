@@ -168,6 +168,7 @@ private:
 	bool m_showPhysicsDiagnosticsWindow = true;
 	bool m_showMotionDiagnostics = false;
 	bool m_showCameraDiagnostics = false;
+	bool m_showPathedCameraDiagnostics = false;
 	unsigned int m_physicsDiagnosticsFrame = 0;
 	glm::vec3 m_physicsCameraPosition{ 0.0f };
 	glm::vec3 m_physicsDesiredPosition{ 0.0f };

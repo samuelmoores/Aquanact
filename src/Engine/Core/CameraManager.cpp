@@ -6,7 +6,7 @@
 #include "Engine/Core/GameCamera.h"
 #include "Engine/Core/Input.h"
 
-void CameraManager::startUp(EngineCamera& engineCamera, GameCamera& gameCamera)
+void CameraManager::startUp(EngineCamera& engineCamera, PathedCamera& gameCamera)
 {
 	m_engineCamera = &engineCamera;
 	m_gameCamera = &gameCamera;
@@ -46,7 +46,7 @@ void CameraManager::SetEditorMode(EngineCamera& engineCamera)
 	m_activeController = std::make_unique<EditorCameraController>(engineCamera);
 }
 
-void CameraManager::SetGameMode(GameCamera& gameCamera)
+void CameraManager::SetGameMode(PathedCamera& gameCamera)
 {
 	m_gameCamera = &gameCamera;
 	m_activeCamera = &gameCamera;

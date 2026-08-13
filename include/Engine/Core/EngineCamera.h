@@ -14,6 +14,7 @@ public:
 	glm::vec3 GetFacing() const override;
 	void FlyControl(glm::vec2 mouseDiff, glm::vec3 moveInput, float dt);
 	void UpdateFly(const class Input& input);
+	void SetPose(const glm::vec3& position, const glm::vec3& facing);
 	void PrintPosition();
 	glm::vec3 Forward() const;
 	glm::vec3 Right() const;

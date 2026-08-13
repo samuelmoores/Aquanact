@@ -112,6 +112,19 @@ void EngineCamera::UpdateFly(const Input& input)
 	}
 }
 
+void EngineCamera::SetPose(const glm::vec3& position, const glm::vec3& facing)
+{
+	if (!std::isfinite(position.x) || !std::isfinite(position.y) || !std::isfinite(position.z) ||
+		!std::isfinite(facing.x) || !std::isfinite(facing.y) || !std::isfinite(facing.z) ||
+		glm::dot(facing, facing) <= 1e-8f)
+	{
+		return;
+	}
+	m_position = position;
+	m_front = glm::normalize(facing);
+	SyncFlyOrientationFromFacing();
+}
+
 void EngineCamera::SyncFlyOrientationFromFacing()
 {
 	glm::vec3 facing = glm::normalize(m_front);

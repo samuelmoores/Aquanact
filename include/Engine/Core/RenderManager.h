@@ -80,6 +80,10 @@ private:
 
 	std::unique_ptr<EngineCamera> m_engineCamera;
 	std::unique_ptr<GameCamera> m_gameCamera;
+	Entity* m_cameraTarget = nullptr;
+	glm::vec3 m_cameraLastTargetPosition{0.0f};
+	float m_cameraPlayerProgress = 0.0f;
+	bool m_hasCameraTargetPosition = false;
 	CameraManager m_cameraManager;
 	CameraMode m_cameraMode = CameraMode::ThirdPerson;
 	OpenGLGraphicsDevice m_device;

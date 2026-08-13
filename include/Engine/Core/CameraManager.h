@@ -6,17 +6,17 @@
 
 class Input;
 class EngineCamera;
-class GameCamera;
+class PathedCamera;
 class Camera;
 class Window;
 
 class CameraManager {
 public:
-	void startUp(EngineCamera& engineCamera, GameCamera& gameCamera);
+	void startUp(EngineCamera& engineCamera, PathedCamera& gameCamera);
 	void shutDown();
 	void Update(const Input& input);
 	void SetEditorMode(EngineCamera& engineCamera);
-	void SetGameMode(GameCamera& gameCamera);
+	void SetGameMode(PathedCamera& gameCamera);
 	void SetController(std::unique_ptr<CameraController> controller);
 	void ClearController();
 
@@ -28,6 +28,6 @@ private:
 	std::unique_ptr<CameraController> m_activeController;
 	Camera* m_activeCamera = nullptr;
 	EngineCamera* m_engineCamera = nullptr;
-	GameCamera* m_gameCamera = nullptr;
+	PathedCamera* m_gameCamera = nullptr;
 };
 

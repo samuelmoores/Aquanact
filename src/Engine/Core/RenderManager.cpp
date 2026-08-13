@@ -155,7 +155,26 @@ void RenderManager::shutDown()
 void RenderManager::ApplyProjectState(const ProjectStateData::RenderStateData& renderState)
 {
 	m_gameCamera->SetPose(renderState.gameCameraPosition, renderState.gameCameraFacing);
+	m_gameCamera->SetPath(renderState.cameraPath);
 	Root::Current().FrontEnd().EditorGUI().CameraPath().Data() = renderState.cameraPath;
+	if (!renderState.cameraPath.points.empty())
+	{
+		glm::vec3 facing = m_engineCamera->GetFacing();
+		if (const Scene* scene = Root::Current().Scenes().ActiveLevel())
+		{
+			for (const auto& object : scene->Objects())
+			{
+				if (object && object->GetComponent<PlayerController>())
+				{
+					const glm::vec3 towardPlayer = object->WorldCenterPosition() - renderState.cameraPath.points.front().position;
+					if (glm::dot(towardPlayer, towardPlayer) > 1e-8f)
+						facing = glm::normalize(towardPlayer);
+					break;
+				}
+			}
+		}
+		m_engineCamera->SetPose(renderState.cameraPath.points.front().position, facing);
+	}
 	m_lightingManager->SunLight().direction = renderState.sunLight.direction;
 	m_lightingManager->SunLight().color = renderState.sunLight.color;
 	m_lightingManager->SunLight().intensity = renderState.sunLight.intensity;
@@ -212,6 +231,30 @@ void RenderManager::UpdateCameraPhase(const Input& input, const EngineState& eng
 		Root::Current().Gameplay().State() ==
 			GameplayManager::GameState::Playing)
 	{
+		Entity* target = nullptr;
+		if (const Scene* scene = Root::Current().Scenes().ActiveLevel())
+		{
+			for (const auto& object : scene->Objects())
+			{
+				if (object && object->GetComponent<PlayerController>())
+				{
+					target = object.get();
+					break;
+				}
+			}
+		}
+		if (target != m_cameraTarget)
+		{
+			m_cameraTarget = target;
+		}
+		m_gameCamera->SetTarget(target);
+		if (target)
+		{
+			const glm::vec3 position = target->WorldCenterPosition();
+			m_cameraPlayerProgress = m_gameCamera->ClosestPathDistance(position);
+			m_gameCamera->SetPlayerProgress(m_cameraPlayerProgress);
+		}
+		m_gameCamera->Update(input.DeltaTime());
 	}
 	if (engineState.IsEditorMode())
 	{

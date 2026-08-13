@@ -770,6 +770,27 @@ void Debug::drawGameModeInput(const Input& input)
 			}
 			ImGui::EndChild();
 		}
+		if (ImGui::Checkbox("Pathed Camera Diagnostics", &m_showPathedCameraDiagnostics))
+		{
+		}
+		if (m_showPathedCameraDiagnostics)
+		{
+			const PathedCamera& camera = Root::Current().Render().GetGameCamera();
+			const CameraPathData& path = camera.Path();
+			ImGui::Separator();
+			ImGui::Text("Path points: %zu", path.points.size());
+			ImGui::Text("Target: %s", camera.Target() ? "assigned" : "none");
+			ImGui::Text("Player progress: %.3f", camera.PlayerProgress());
+			ImGui::Text("Follow sharpness: %.3f", camera.FollowSharpness());
+			ImGui::Text("Position: %.3f, %.3f, %.3f", camera.GetPosition().x, camera.GetPosition().y, camera.GetPosition().z);
+			ImGui::Text("Facing: %.3f, %.3f, %.3f", camera.GetFacing().x, camera.GetFacing().y, camera.GetFacing().z);
+			if (!path.points.empty())
+			{
+				ImGui::Text("First progress: %.3f", path.points.front().playerProgress);
+				ImGui::Text("Last progress: %.3f", path.points.back().playerProgress);
+				ImGui::Text("State: %s", camera.PlayerProgress() <= path.points.front().playerProgress ? "before first" : camera.PlayerProgress() >= path.points.back().playerProgress ? "at final point" : "on path");
+			}
+		}
 		ImGui::End();
 		m_showGameplayDiagnosticsWindow = open;
 	}
