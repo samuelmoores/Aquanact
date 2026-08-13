@@ -21,6 +21,9 @@ void InputManager::shutDown()
 	m_input = nullptr;
 	m_bindings.clear();
 	m_states.clear();
+	m_vectorStates.clear();
+	m_vectorDeltaStates.clear();
+	m_vectorRateStates.clear();
 }
 
 void InputManager::Update()
@@ -76,6 +79,18 @@ glm::vec2 InputManager::VectorValue(const std::string& action) const
 {
 	const auto state = m_vectorStates.find(action);
 	return state == m_vectorStates.end() ? glm::vec2(0.0f) : state->second;
+}
+
+glm::vec2 InputManager::VectorDeltaValue(const std::string& action) const
+{
+	const auto state = m_vectorDeltaStates.find(action);
+	return state == m_vectorDeltaStates.end() ? glm::vec2(0.0f) : state->second;
+}
+
+glm::vec2 InputManager::VectorRateValue(const std::string& action) const
+{
+	const auto state = m_vectorRateStates.find(action);
+	return state == m_vectorRateStates.end() ? glm::vec2(0.0f) : state->second;
 }
 
 bool InputManager::IsDown(const std::string& action) const
@@ -154,6 +169,8 @@ bool InputManager::IsBindingDown(const InputBinding& binding) const
 void InputManager::EvaluateActions()
 {
 	m_vectorStates.clear();
+	m_vectorDeltaStates.clear();
+	m_vectorRateStates.clear();
 	const ImGuiIO& io = ImGui::GetIO();
 	const bool uiCapturesKeyboard = io.WantCaptureKeyboard || io.WantTextInput;
 	const bool uiCapturesMouse = io.WantCaptureMouse || ImGui::IsAnyItemActive();
@@ -162,6 +179,8 @@ void InputManager::EvaluateActions()
 		state.previousValue = state.value;
 		state.value = 0.0f;
 		glm::vec2 vectorValue(0.0f);
+		glm::vec2 deltaValue(0.0f);
+		glm::vec2 rateValue(0.0f);
 
 		const auto bindingIt = m_bindings.find(action);
 		if (!m_input || bindingIt == m_bindings.end())
@@ -179,7 +198,7 @@ void InputManager::EvaluateActions()
 				}
 				if (m_input->KeyDown(binding.code))
 				{
-					vectorValue += binding.vector * binding.scale;
+					rateValue += binding.vector * binding.scale;
 				}
 			}
 			else if (binding.type == InputBindingType::MouseButton)
@@ -190,7 +209,7 @@ void InputManager::EvaluateActions()
 				}
 				if (m_input->MouseButtonDown(binding.code))
 				{
-					vectorValue += binding.vector * binding.scale;
+					rateValue += binding.vector * binding.scale;
 				}
 			}
 			else if (binding.type == InputBindingType::MouseDelta)
@@ -199,13 +218,13 @@ void InputManager::EvaluateActions()
 				{
 					continue;
 				}
-				vectorValue += m_input->MouseDelta() * binding.vector;
+				deltaValue += m_input->MouseDelta() * binding.vector * binding.scale;
 			}
 			else if (binding.type == InputBindingType::ControllerDigital)
 			{
 				if (m_input->ControllerButtonDown(binding.code, binding.joystick))
 				{
-					vectorValue += binding.vector * binding.scale;
+					rateValue += binding.vector * binding.scale;
 				}
 			}
 			else if (binding.type == InputBindingType::ControllerStick)
@@ -220,12 +239,16 @@ void InputManager::EvaluateActions()
 				{
 					stick = glm::normalize(stick);
 				}
-				vectorValue += stick * binding.scale;
+				rateValue += stick * binding.scale;
 			}
 		}
 
+		vectorValue = rateValue + deltaValue;
 		state.value = glm::clamp(glm::length(vectorValue), 0.0f, 1.0f);
 		m_vectorStates[action] = glm::clamp(vectorValue, glm::vec2(-1.0f), glm::vec2(1.0f));
+		m_vectorDeltaStates[action] = deltaValue;
+		m_vectorRateStates[action] = glm::clamp(
+			rateValue, glm::vec2(-1.0f), glm::vec2(1.0f));
 		state.value = std::clamp(state.value, 0.0f, 1.0f);
 	}
 }

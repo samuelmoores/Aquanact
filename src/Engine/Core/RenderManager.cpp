@@ -12,6 +12,7 @@
 #include "Engine/Core/SceneManager.h"
 #include "Engine/Core/ProjectStateData.h"
 #include "Engine/Core/FrameProfiler.h"
+#include "Game/PlayerController.h"
 
 #include <chrono>
 #include <iomanip>
@@ -19,6 +20,10 @@
 #include <algorithm>
 #include <memory>
 #include <vector>
+
+namespace
+{
+}
 
 void RenderManager::startUp(Window& window)
 {
@@ -124,7 +129,6 @@ void RenderManager::shutDown()
 
 	if (m_gameCamera)
 	{
-		m_gameCamera->SetTarget(nullptr);
 	}
 
 	//Graphics
@@ -151,10 +155,7 @@ void RenderManager::shutDown()
 void RenderManager::ApplyProjectState(const ProjectStateData::RenderStateData& renderState)
 {
 	m_gameCamera->SetPose(renderState.gameCameraPosition, renderState.gameCameraFacing);
-	m_gameCamera->SetRadius(renderState.gameCameraRadius);
 	m_gameCamera->SetOrbitAngles(renderState.gameCameraYaw, renderState.gameCameraPitch);
-	m_gameCamera->SetColliderRadius(renderState.gameCameraColliderRadius);
-	m_gameCamera->SetTargetName(renderState.gameCameraTarget);
 	m_lightingManager->SunLight().direction = renderState.sunLight.direction;
 	m_lightingManager->SunLight().color = renderState.sunLight.color;
 	m_lightingManager->SunLight().intensity = renderState.sunLight.intensity;
@@ -207,9 +208,10 @@ void RenderManager::PresentFrame(Window& window)
 void RenderManager::UpdateCameraPhase(const Input& input, const EngineState& engineState)
 {
 	ApplyCameraMode(engineState);
-	if (engineState.IsGameMode())
+	if (engineState.IsGameMode() &&
+		Root::Current().Gameplay().State() ==
+			GameplayManager::GameState::Playing)
 	{
-		m_gameCamera->UpdateThirdPerson(input, input.DeltaTime());
 	}
 	if (engineState.IsEditorMode())
 	{
@@ -308,7 +310,6 @@ void RenderManager::DrawRuntimeFrame(FrontEndManager& frontEndManager, Debug& de
 	{
 		debug.drawGameModeInput(input);
 	}
-	debug.DrawPhysicsBoundingVolumes(*m_gameCamera);
 	frontEndManager.DrawRuntimeGUI();
 	const auto debugEnd = std::chrono::high_resolution_clock::now();
 	m_lastFrameDebugOverlayTime = debugEnd - debugStart;

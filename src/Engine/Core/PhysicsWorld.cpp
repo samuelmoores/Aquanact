@@ -14,6 +14,13 @@ namespace
 			!collider.owner->IgnoreCameraCollision();
 	}
 
+	bool IsCameraCollisionCandidate(
+		const PhysicsCollider& collider, const Entity* ignoredEntity)
+	{
+		return IsCameraCollisionCandidate(collider) &&
+			collider.owner != ignoredEntity;
+	}
+
 	bool OverlapsSweptBounds(const glm::vec3& sweptMin, const glm::vec3& sweptMax,
 		const PhysicsCollider& collider)
 	{
@@ -171,16 +178,61 @@ namespace
 		return planes;
 	}
 
+	bool CameraOverlapsCollider(
+		const glm::vec3& position,
+		float radius,
+		const PhysicsCollider& collider);
+
 	Physics::SweepCollision SweepCameraAgainstCollider(
 		const glm::vec3& position,
 		float radius,
 		const glm::vec3& movement,
 		const PhysicsCollider& collider)
 	{
-		// The camera is intentionally modeled as a sphere against collider AABBs.
-		// Do not dispatch this query into capsule or convex narrow-phase geometry.
-		return Physics::GetSphereAABBSweep(
-			position, radius, movement, collider.minBounds, collider.maxBounds);
+		if (CameraOverlapsCollider(position, radius, collider))
+		{
+			Physics::SweepCollision overlap;
+			if (glm::length(movement) > 1e-6f)
+			{
+				overlap.hit = true;
+				overlap.normal = -glm::normalize(movement);
+				overlap.time = 0.0f;
+			}
+			return overlap;
+		}
+
+		switch (collider.shape)
+		{
+		case PhysicsColliderShape::Capsule:
+		{
+			glm::vec3 base;
+			glm::vec3 tip;
+			float capsuleRadius = 0.0f;
+			BuildVerticalCapsule(
+				collider.minBounds, collider.maxBounds, base, tip, capsuleRadius);
+			return Physics::GetSphereCapsuleSweep(
+				position, radius, movement, base, tip, capsuleRadius);
+		}
+		case PhysicsColliderShape::Convex:
+		{
+			std::vector<Physics::ConvexPlane> planes = BuildConvexPlanes(collider);
+			if (planes.empty())
+			{
+				return Physics::GetSphereAABBSweep(
+					position, radius, movement,
+					collider.minBounds, collider.maxBounds);
+			}
+			for (Physics::ConvexPlane& plane : planes)
+			{
+				plane.distance += radius;
+			}
+			return Physics::GetConvexSweep(planes, position, movement);
+		}
+		case PhysicsColliderShape::Box:
+		default:
+			return Physics::GetSphereAABBSweep(
+				position, radius, movement, collider.minBounds, collider.maxBounds);
+		}
 	}
 
 	bool CameraOverlapsCollider(
@@ -188,9 +240,42 @@ namespace
 		float radius,
 		const PhysicsCollider& collider)
 	{
-		// Keep overlap checks consistent with the simple sphere/AABB sweep.
-		return Physics::SphereAABBOverlap(
-			position, radius, collider.minBounds, collider.maxBounds);
+		switch (collider.shape)
+		{
+		case PhysicsColliderShape::Capsule:
+		{
+			glm::vec3 base;
+			glm::vec3 tip;
+			float capsuleRadius = 0.0f;
+			BuildVerticalCapsule(
+				collider.minBounds, collider.maxBounds, base, tip, capsuleRadius);
+			return Physics::SphereCapsuleOverlap(
+				position, radius, base, tip, capsuleRadius);
+		}
+		case PhysicsColliderShape::Convex:
+		{
+			const std::vector<Physics::ConvexPlane> planes =
+				BuildConvexPlanes(collider);
+			if (planes.empty())
+			{
+				return Physics::SphereAABBOverlap(
+					position, radius, collider.minBounds, collider.maxBounds);
+			}
+			for (const Physics::ConvexPlane& plane : planes)
+			{
+				if (glm::dot(plane.normal, position) >
+					plane.distance + radius + 1e-5f)
+				{
+					return false;
+				}
+			}
+			return true;
+		}
+		case PhysicsColliderShape::Box:
+		default:
+			return Physics::SphereAABBOverlap(
+				position, radius, collider.minBounds, collider.maxBounds);
+		}
 	}
 
 }
@@ -364,7 +449,8 @@ Physics::SweepCollision PhysicsWorld::SweepCamera(
 	const glm::vec3& position,
 	float radius,
 	const glm::vec3& movement,
-	Entity** hitEntity) const
+	Entity** hitEntity,
+	const Entity* ignoredEntity) const
 {
 	// The camera owns position resolution, so this query only reports the
 	// nearest blocking contact and optionally identifies its entity.
@@ -385,7 +471,7 @@ Physics::SweepCollision PhysicsWorld::SweepCamera(
 	// before any geometry calculation so excluded entities are never tested.
 	for (const PhysicsCollider& candidate : m_colliders)
 	{
-		if (!IsCameraCollisionCandidate(candidate))
+		if (!IsCameraCollisionCandidate(candidate, ignoredEntity))
 		{
 			continue;
 		}
@@ -435,7 +521,7 @@ Physics::SweepCollision PhysicsWorld::SweepCameraAgainst(
 	}
 
 	const PhysicsCollider& collider = m_colliders[handle];
-	if (!IsCameraCollisionCandidate(collider))
+	if (!collider.enabled || !collider.owner)
 	{
 		return {};
 	}
@@ -445,13 +531,14 @@ Physics::SweepCollision PhysicsWorld::SweepCameraAgainst(
 
 bool PhysicsWorld::OverlapsCamera(
 	const glm::vec3& position,
-	float radius) const
+	float radius,
+	const Entity* ignoredEntity) const
 {
 	// Check only the collision records that are valid for camera queries. This
 	// keeps camera blocking behavior consistent with SweepCamera().
 	for (const PhysicsCollider& candidate : m_colliders)
 	{
-		if (!IsCameraCollisionCandidate(candidate))
+		if (!IsCameraCollisionCandidate(candidate, ignoredEntity))
 		{
 			continue;
 		}
@@ -500,13 +587,19 @@ bool PhysicsWorld::HasCameraLineOfSight(
 			continue;
 		}
 
-		// The collider AABB is the complete obstruction test for the basic LOS path.
+		// Use the AABB as a cheap broadphase, then test the candidate's actual
+		// configured shape with a zero-radius finite sweep.
 		if (!SegmentIntersectsBounds(cameraPosition, targetPosition,
 			candidate.minBounds, candidate.maxBounds))
 		{
 			continue;
 		}
-		return false;
+		const Physics::SweepCollision hit = SweepCameraAgainstCollider(
+			cameraPosition, 0.0f, ray, candidate);
+		if (hit.hit && hit.time < 1.0f - 1e-5f)
+		{
+			return false;
+		}
 	}
 
 	// No eligible collider intersected the finite camera-to-target segment.

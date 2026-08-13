@@ -17,7 +17,6 @@
 #include "Engine/Core/GLHeaders.h"
 #include "Engine/Core/SceneManager.h"
 #include "Engine/Core/GameCamera.h"
-#include "Engine/Core/CameraCollider.h"
 #include "Engine/Core/Mesh.h"
 #include "Engine/Core/Scene.h"
 #include "Engine/Core/Entity.h"
@@ -315,17 +314,7 @@ void Debug::DrawCameraCollisionDebug(const Camera& camera)
 		return;
 	}
 
-	const GameCamera& gameCamera = Root::Current().Render().GetGameCamera();
-	const CameraCollider& collider = gameCamera.Collider();
-	if (!m_cameraCollisionSphere)
-	{
-		m_cameraCollisionSphere = new Line(MakeWireSphereVertices(glm::vec3(1.0f, 1.0f, 0.0f)));
-	}
-
-	m_cameraCollisionSphere->UpdateProjection(camera.GetProjectionMatrix());
-	m_cameraCollisionSphere->draw(
-		camera.GetViewMatrix(),
-		glm::translate(glm::mat4(1.0f), collider.Position()) * glm::scale(glm::mat4(1.0f), glm::vec3(collider.Radius())));
+	return;
 }
 
 void Debug::RebuildGrid()

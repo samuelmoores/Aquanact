@@ -227,6 +227,13 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 
 			FrameProfiler::Scope controllerScope(Root::Current().Profiler(), "Controllers");
 			object->UpdateComponents(dt);
+			if (object->GetController())
+			{
+				// Camera queries run after gameplay. Refresh again after movement so
+				// the followed player and other dynamic blockers use this frame's
+				// transforms instead of the previous frame's cached bounds.
+				PhysicsWorld::Instance().Update(*object);
+			}
 			if (EntityStateMachine* animator = object->GetEntityState())
 			{
 				std::string stateListText;

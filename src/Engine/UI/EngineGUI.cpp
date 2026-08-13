@@ -961,7 +961,6 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 			{
 				Root::Current().FrontEnd().Creator().SaveAllRoleGUIs();
 				Root::Current().FrontEnd().RuntimeGUI().ReloadAssetsFromDisk();
-				Root::Current().Render().GetGameCamera().CaptureEditorState();
 
 				if (projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", SceneManager))
 				{
@@ -987,7 +986,6 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 			{
 				Root::Current().FrontEnd().Creator().SaveAllRoleGUIs();
 				Root::Current().FrontEnd().RuntimeGUI().ReloadAssetsFromDisk();
-				Root::Current().Render().GetGameCamera().CaptureEditorState();
 				if (projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", SceneManager))
 				{
 					Root::Current().FrontEnd().RestoreRuntimeLayout();
@@ -1377,6 +1375,9 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 					if (deleteEntity && activeLevel && activeLevel->RemoveObject(object.get()))
 					{
 						m_selectedLevelObjectIndex = -1;
+						ImGui::End();
+						m_showEntityWindow = open;
+						return;
 					}
 
 					// Transform editing is kept separate from components because it
@@ -1478,6 +1479,11 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 						if (ImGui::Checkbox("Draw Bounding Volume", &showBoundingBox))
 						{
 							object->SetShowPhysicsBoundingBox(showBoundingBox);
+						}
+						bool ignoreCameraCollision = object->IgnoreCameraCollision();
+						if (ImGui::Checkbox("Ignore Camera Collision", &ignoreCameraCollision))
+						{
+							object->SetIgnoreCameraCollision(ignoreCameraCollision);
 						}
 						bool blocksCameraView = object->BlocksCameraView();
 						if (ImGui::Checkbox("Blocks Camera View", &blocksCameraView))
@@ -1818,57 +1824,11 @@ void EngineGUI::DrawCameraWindow()
 	}
 
 	// The camera window edits the runtime camera target and collision settings.
-	Scene* activeLevel = Root::Current().Scenes().ActiveLevel();
-	static const std::vector<std::unique_ptr<Entity>> emptyObjects;
-	const std::vector<std::unique_ptr<Entity>>& objects = activeLevel ? activeLevel->Objects() : emptyObjects;
-
 	bool open = m_showCameraWindow;
 	if (ImGui::Begin("Camera", &open, ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize))
 	{
-		GameCamera& camera = Root::Current().Render().GetGameCamera();
-		ImGui::TextUnformatted("Target");
-
-		if (ImGui::BeginCombo("##CameraTarget", camera.Target() ? camera.Target()->Name().c_str() : "<select entity>"))
-		{
-			for (const std::unique_ptr<Entity>& object : objects)
-			{
-				if (!object)
-				{
-					continue;
-				}
-
-				const bool selected = camera.Target() == object.get();
-				if (ImGui::Selectable(object->Name().c_str(), selected))
-				{
-					camera.SetTarget(object.get());
-				}
-				if (selected)
-				{
-					ImGui::SetItemDefaultFocus();
-				}
-			}
-			ImGui::EndCombo();
-		}
-
-		float distance = camera.Radius();
-		ImGui::SetNextItemWidth(80.0f);
-		if (ImGui::InputFloat("Distance", &distance, 0.0f, 0.0f, "%.2f"))
-		{
-			camera.SetRadius(distance);
-		}
-		ImGui::Separator();
-		ImGui::TextUnformatted("Collider");
-		float colliderRadius = camera.ColliderRadius();
-		ImGui::SetNextItemWidth(80.0f);
-		if (ImGui::DragFloat("Sphere Radius", &colliderRadius, 0.1f, 0.01f, 10000.0f, "%.2f"))
-		{
-			camera.SetColliderRadius(colliderRadius);
-		}
-		bool showCameraCollisionDebug = Root::Current().Debugger().ShowCameraCollisionDebug();
-		if (ImGui::Checkbox("Camera Collision Debug", &showCameraCollisionDebug))
-		{
-			Root::Current().Debugger().SetShowCameraCollisionDebug(showCameraCollisionDebug);
-		}
+		ImGui::TextUnformatted("The game camera is static.");
+		ImGui::TextUnformatted("Use Game > Set Game Camera to copy the editor pose.");
 	}
 	ImGui::End();
 	m_showCameraWindow = open;

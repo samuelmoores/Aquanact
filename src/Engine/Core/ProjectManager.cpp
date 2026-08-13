@@ -25,11 +25,7 @@ namespace {
 		contents += "gamecamera;";
 		contents += std::to_string(gameCameraPosition.x) + ";" + std::to_string(gameCameraPosition.y) + ";" + std::to_string(gameCameraPosition.z) + ";";
 		contents += std::to_string(gameCameraFacing.x) + ";" + std::to_string(gameCameraFacing.y) + ";" + std::to_string(gameCameraFacing.z) + ";";
-		contents += std::to_string(gameCamera.Radius()) + ";";
-		contents += std::to_string(gameCamera.Yaw()) + ";";
-		contents += std::to_string(gameCamera.Pitch()) + ";";
-		contents += ProjectStateSerializer::EscapeField(gameCamera.TargetName()) + ";";
-		contents += (gameCamera.TargetName().empty() ? "0" : "1");
+		contents += "0;0;0;;0";
 		contents += "\n";
 	}
 
@@ -108,6 +104,7 @@ namespace {
 				object->SetRotation(pendingObject.rotation);
 				object->SetScale(pendingObject.scale);
 				object->SetIgnoreCameraCollision(pendingObject.ignoreCameraCollision);
+				object->SetBlocksCameraView(pendingObject.blocksCameraView);
 				object->SetShowPhysicsBoundingBox(pendingObject.showPhysicsBoundingBox);
 				object->SetPhysicsColliderShape(pendingObject.physicsColliderShape == 1
 					? PhysicsColliderShape::Capsule
@@ -152,7 +149,6 @@ namespace {
 	void RestoreGameCameraTarget(SceneManager& SceneManager, const ProjectStateData::RenderStateData& renderState)
 	{
 		GameCamera& gameCamera = Root::Current().Render().GetGameCamera();
-		gameCamera.SetTarget(nullptr);
 		Root::Current().Debugger().LogTagged(
 			"ProjectLoad",
 			"Restoring camera target id=" + std::to_string(renderState.gameCameraTargetId) + " hasTarget=" + std::string(renderState.gameCameraHasTarget ? "true" : "false"));
@@ -179,7 +175,6 @@ namespace {
 				continue;
 			}
 
-			gameCamera.SetTarget(object.get());
 			Root::Current().Debugger().LogTagged("ProjectLoad", "Camera target restored to id=" + std::to_string(object->Id()));
 			return;
 		}
@@ -277,7 +272,6 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 		Root::Current().Debugger().LogTagged("ProjectLoad", "Applying render state and camera settings");
 		// SetTarget establishes the default orbit distance. Apply the saved camera
 		// pose and radius afterward so loading cannot replace that saved radius.
-		RestoreGameCameraTarget(SceneManager, renderState);
 		Root::Current().Render().ApplyProjectState(renderState);
 		Root::Current().FrontEnd().ApplyProjectState(renderState.editorShowAxis, renderState.editorShowGrid, pendingGameGUIAssets, pendingActiveGameGUIAsset, pendingGameGUINavigationMode, renderState.imguiLayout);
 		Root::Current().Debugger().SetShowLogWindow(renderState.debugShowLogWindow);

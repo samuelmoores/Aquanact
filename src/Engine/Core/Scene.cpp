@@ -1,6 +1,9 @@
 #include "Engine/Core/Scene.h"
 #include "Engine/Core/EventManager.h"
 #include "Engine/Core/Root.h"
+#include "Engine/Core/RenderManager.h"
+#include "Engine/Core/GameCamera.h"
+#include "Engine/Core/PhysicsWorld.h"
 
 #include <iostream>
 #include <algorithm>
@@ -48,6 +51,9 @@ void Scene::FirstFrame()
 
 void Scene::Clear()
 {
+	if (Root::HasCurrent())
+	{
+	}
 	m_entities.clear();
 	Root::Current().Events().Clear();
 	m_firstFramePending = false;
@@ -81,6 +87,11 @@ bool Scene::RemoveObject(Entity* entity)
 		return false;
 	}
 
+	const ColliderHandle collider = PhysicsWorld::Instance().Find(*entity);
+	if (collider != InvalidColliderHandle)
+	{
+		PhysicsWorld::Instance().Remove(collider);
+	}
 	m_entities.erase(it);
 	return true;
 }

@@ -7,6 +7,9 @@
 #include "Game/PlayerController.h"
 #include "Engine/Core/ProjectStateData.h"
 #include "Engine/Core/PhysicsWorld.h"
+#include "Engine/Core/Root.h"
+#include "Engine/Core/RenderManager.h"
+#include "Engine/Core/GameCamera.h"
 #include "Game/Enemy.h"
 
 #include <fstream>
@@ -228,6 +231,9 @@ Scene* SceneManager::startUp()
 
 void SceneManager::Clear()
 {
+	if (Root::HasCurrent())
+	{
+	}
 	// PhysicsWorld stores non-owning entity pointers, so clear its scene-bound
 	// representation before destroying the scene entities below.
 	PhysicsWorld::Instance().Clear();

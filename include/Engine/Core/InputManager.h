@@ -54,6 +54,11 @@ public:
 
 	float Value(const std::string& action) const;
 	glm::vec2 VectorValue(const std::string& action) const;
+	// Delta values (for example mouse motion) are frame-local quantities and
+	// must not be multiplied by dt. Rate values (sticks/keys/buttons) are held
+	// inputs that callers normally integrate over time.
+	glm::vec2 VectorDeltaValue(const std::string& action) const;
+	glm::vec2 VectorRateValue(const std::string& action) const;
 	bool IsDown(const std::string& action) const;
 	bool WasPressed(const std::string& action) const;
 	bool WasReleased(const std::string& action) const;
@@ -68,4 +73,6 @@ private:
 	std::unordered_map<std::string, std::vector<InputBinding>> m_bindings;
 	std::unordered_map<std::string, InputActionState> m_states;
 	std::unordered_map<std::string, glm::vec2> m_vectorStates;
+	std::unordered_map<std::string, glm::vec2> m_vectorDeltaStates;
+	std::unordered_map<std::string, glm::vec2> m_vectorRateStates;
 };

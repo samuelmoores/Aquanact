@@ -703,7 +703,7 @@ namespace ProjectStateSerializer {
 					continue;
 				}
 
-				if (((fields.size() < 11 || fields.size() > 15) || fields[0] != "object"))
+				if (((fields.size() < 11 || fields.size() > 16) || fields[0] != "object"))
 				{
 					continue;
 				}
@@ -749,6 +749,13 @@ namespace ProjectStateSerializer {
 						object.physicsColliderShape = 0;
 					}
 				}
+				if (fields.size() >= 16)
+				{
+					object.blocksCameraView =
+						fields[15] == "1" ||
+						fields[15] == "true" ||
+						fields[15] == "True";
+				}
 				currentLevel->objects.push_back(std::move(object));
 			}
 			catch (const std::exception& ex)
@@ -769,11 +776,9 @@ namespace ProjectStateSerializer {
 		contents += "gamecamera;";
 		contents += std::to_string(gameCameraPosition.x) + ";" + std::to_string(gameCameraPosition.y) + ";" + std::to_string(gameCameraPosition.z) + ";";
 		contents += std::to_string(gameCameraFacing.x) + ";" + std::to_string(gameCameraFacing.y) + ";" + std::to_string(gameCameraFacing.z) + ";";
-		contents += std::to_string(gameCamera.Radius()) + ";";
-		contents += std::to_string(gameCamera.Yaw()) + ";";
-		contents += std::to_string(gameCamera.Pitch()) + ";";
-		contents += std::to_string(gameCamera.TargetId()) + ";";
-		contents += std::to_string(gameCamera.ColliderRadius()) + "\n";
+		contents += "0;0;0;";
+		contents += "0;";
+		contents += "0\n";
 
 		contents += "editorview;";
 		contents += frontEndManager.EditorGUI().ShowAxis() ? "1" : "0";

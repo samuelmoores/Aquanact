@@ -75,6 +75,7 @@ namespace ProjectStateData {
 			glm::vec3 scale{ 1.0f };
 			unsigned int id = 0;
 			bool ignoreCameraCollision = false;
+			bool blocksCameraView = true;
 			bool showPhysicsBoundingBox = false;
 			int physicsColliderShape = 0;
 		};
