@@ -41,6 +41,8 @@ public:
 	void SetShowFileExplorer(bool showFileExplorer);
 	void SetShowInputMapWindow(bool showInputMapWindow);
 	void SetShowCameraWindow(bool showCameraWindow);
+	bool ShowCameraPath() const;
+	void SetShowCameraPath(bool showCameraPath);
 
 	CameraPathCreator& CameraPath();
 	const CameraPathCreator& CameraPath() const;
@@ -134,6 +136,7 @@ private:
 	bool m_showFileExplorer = false;
 	bool m_showInputMapWindow = false;
 	bool m_showCameraWindow = false;
+	bool m_showCameraPath = false;
 	CameraPathCreator m_cameraPathCreator;
 
 	// Popup request flags

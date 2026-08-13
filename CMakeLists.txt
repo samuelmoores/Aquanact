@@ -40,7 +40,7 @@ set(SOURCES
     "include/Engine/Core/CameraManager.h" "src/Engine/Core/CameraManager.cpp"
     "include/Engine/Core/EngineCamera.h" "src/Engine/Core/EngineCamera.cpp"
     "include/Engine/Core/EditorCameraController.h" "src/Engine/Core/EditorCameraController.cpp"
-    "include/Engine/Core/GameCamera.h" "src/Engine/Core/GameCamera.cpp"
+    "include/Engine/Core/PathedCamera.h" "src/Engine/Core/PathedCamera.cpp"
     "include/Engine/Core/Renderer.h"
     "include/Engine/Core/Axis.h" "src/Engine/Core/Axis.cpp"
     "include/Engine/Core/Grid.h" "src/Engine/Core/Grid.cpp"

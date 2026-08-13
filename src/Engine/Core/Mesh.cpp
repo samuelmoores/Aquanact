@@ -111,7 +111,13 @@ void Mesh::AdoptImportedModel(ImportedModel&& importedModel)
 		m_minBounds.x <= m_maxBounds.x &&
 		m_minBounds.y <= m_maxBounds.y &&
 		m_minBounds.z <= m_maxBounds.z;
-	if (!hasValidBounds)
+	const bool hasValidMeshBounds =
+		!invalid(m_meshMinBounds.x) && !invalid(m_meshMinBounds.y) && !invalid(m_meshMinBounds.z) &&
+		!invalid(m_meshMaxBounds.x) && !invalid(m_meshMaxBounds.y) && !invalid(m_meshMaxBounds.z) &&
+		m_meshMinBounds.x <= m_meshMaxBounds.x &&
+		m_meshMinBounds.y <= m_meshMaxBounds.y &&
+		m_meshMinBounds.z <= m_meshMaxBounds.z;
+	if (!hasValidBounds || !hasValidMeshBounds)
 	{
 		m_minBounds = glm::vec3(-0.5f, -0.5f, -0.5f);
 		m_maxBounds = glm::vec3(0.5f, 0.5f, 0.5f);
@@ -153,14 +159,10 @@ void Mesh::DrawBoundingBox()
 
 void Mesh::updateAABB(glm::vec3 position, glm::vec3 scale)
 {
-	m_meshMinBounds += position;
-	m_meshMaxBounds += position;
-
-	for (int i = 0; i < 3; ++i)
-	{
-		if (m_minBounds[i] > m_maxBounds[i])
-			std::swap(m_minBounds[i], m_maxBounds[i]);
-	}
+	// Bounds are stored in mesh-local space. Entity translation and scale are
+	// applied by Entity::BuildModelMatrix/WorldAABB; mutating these bounds on
+	// every movement permanently corrupts the mesh after gameplay reloads.
+	(void)position;
 	(void)scale;
 }
 
@@ -168,8 +170,7 @@ glm::vec3 Mesh::centerAABB()
 {
 	auto invalid = [](float v) { return !std::isfinite(v); };
 	if (invalid(m_minBounds.x) || invalid(m_minBounds.y) || invalid(m_minBounds.z) ||
-		invalid(m_maxBounds.x) || invalid(m_maxBounds.y) || invalid(m_maxBounds.z) ||
-		m_minBounds.x > m_maxBounds.x || m_minBounds.y > m_maxBounds.y || m_minBounds.z > m_maxBounds.z)
+		invalid(m_maxBounds.x) || invalid(m_maxBounds.y) || invalid(m_maxBounds.z))
 	{
 		Root::Current().Debugger().LogTagged(
 			Debug::Severity::Warning,
@@ -180,6 +181,15 @@ glm::vec3 Mesh::centerAABB()
 				std::to_string(m_maxBounds.x) + "," + std::to_string(m_maxBounds.y) + "," + std::to_string(m_maxBounds.z) +
 				")");
 		return glm::vec3(0.0f);
+	}
+	// Normalize bounds that may have been reversed by a reload or transform
+	// update so callers receive a stable center instead of an invalid AABB.
+	for (int axis = 0; axis < 3; ++axis)
+	{
+		if (m_minBounds[axis] > m_maxBounds[axis])
+		{
+			std::swap(m_minBounds[axis], m_maxBounds[axis]);
+		}
 	}
 
 	return {

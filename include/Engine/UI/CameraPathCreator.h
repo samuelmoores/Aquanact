@@ -8,7 +8,7 @@ class CameraPathCreator final {
 public:
 	void Clear();
 
-	void AddPoint(const glm::vec3& position, float playerProgress);
+	void AddPoint(const glm::vec3& position);
 	bool RemovePoint(std::size_t index);
 
 	CameraPathData& Data() { return m_data; }
@@ -17,7 +17,6 @@ public:
 	int SelectedPoint() const { return m_selectedPoint; }
 	void SelectPoint(int index);
 
-	float NextSuggestedProgress() const;
 
 private:
 	CameraPathData m_data;

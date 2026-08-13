@@ -2,7 +2,7 @@
 #include "Engine/Core/EventManager.h"
 #include "Engine/Core/Root.h"
 #include "Engine/Core/RenderManager.h"
-#include "Engine/Core/GameCamera.h"
+#include "Engine/Core/PathedCamera.h"
 #include "Engine/Core/PhysicsWorld.h"
 
 #include <iostream>
@@ -53,6 +53,7 @@ void Scene::Clear()
 {
 	if (Root::HasCurrent())
 	{
+		Root::Current().Render().ClearPathedCameraTarget();
 	}
 	m_entities.clear();
 	Root::Current().Events().Clear();
@@ -85,6 +86,11 @@ bool Scene::RemoveObject(Entity* entity)
 	if (it == m_entities.end())
 	{
 		return false;
+	}
+	if (Root::HasCurrent() &&
+		Root::Current().Render().GetPathedCamera().Target() == entity)
+	{
+		Root::Current().Render().ClearPathedCameraTarget();
 	}
 
 	const ColliderHandle collider = PhysicsWorld::Instance().Find(*entity);

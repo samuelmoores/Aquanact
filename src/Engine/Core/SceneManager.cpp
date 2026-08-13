@@ -9,7 +9,7 @@
 #include "Engine/Core/PhysicsWorld.h"
 #include "Engine/Core/Root.h"
 #include "Engine/Core/RenderManager.h"
-#include "Engine/Core/GameCamera.h"
+#include "Engine/Core/PathedCamera.h"
 #include "Game/Enemy.h"
 
 #include <fstream>
@@ -233,6 +233,9 @@ void SceneManager::Clear()
 {
 	if (Root::HasCurrent())
 	{
+		// PathedCamera stores a non-owning target pointer. Invalidate it before
+		// clearing levels destroys the entity and its Mesh.
+		Root::Current().Render().ClearPathedCameraTarget();
 	}
 	// PhysicsWorld stores non-owning entity pointers, so clear its scene-bound
 	// representation before destroying the scene entities below.

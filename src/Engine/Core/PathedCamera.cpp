@@ -1,4 +1,4 @@
-#include "Engine/Core/GameCamera.h"
+#include "Engine/Core/PathedCamera.h"
 
 #include "Engine/Core/Root.h"
 #include "Engine/Core/Window.h"
@@ -53,11 +53,10 @@ void PathedCamera::SetPose(const glm::vec3& position, const glm::vec3& facing)
 
 void PathedCamera::SetPath(const CameraPathData& path)
 {
-	m_path = path;
+	m_path = IsValidCameraPath(path) ? path : CameraPathData{};
 	if (!m_path.points.empty())
 	{
 		m_position = m_path.points.front().position;
-		FaceTarget();
 		RebuildView();
 	}
 }
@@ -79,7 +78,12 @@ void PathedCamera::SetPlayerProgress(float progress)
 
 float PathedCamera::ClosestPathDistance(const glm::vec3& worldPosition) const
 {
-	return ProjectOntoCameraPath(m_path, worldPosition).normalizedProgress;
+	return ProjectOntoCameraPath(m_path, worldPosition, m_pathSamplesPerSegment).normalizedProgress;
+}
+
+void PathedCamera::SetPathSamplesPerSegment(int samples)
+{
+	m_pathSamplesPerSegment = std::clamp(samples, 4, 256);
 }
 
 void PathedCamera::Update(float deltaTime)
@@ -124,7 +128,7 @@ void PathedCamera::SetFollowSharpness(float sharpness)
 
 void PathedCamera::FaceTarget()
 {
-	if (!m_target)
+	if (!m_target || !m_target->GetMesh())
 	{
 		return;
 	}

@@ -3,7 +3,7 @@
 #include "Engine/Core/CameraController.h"
 #include "Engine/Core/EditorCameraController.h"
 #include "Engine/Core/EngineCamera.h"
-#include "Engine/Core/GameCamera.h"
+#include "Engine/Core/PathedCamera.h"
 #include "Engine/Core/Input.h"
 
 void CameraManager::startUp(EngineCamera& engineCamera, PathedCamera& gameCamera)

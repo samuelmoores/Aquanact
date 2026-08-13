@@ -5,11 +5,9 @@
 #include <vector>
 #include <cstddef>
 
-// One ordered position on the camera dolly path.  playerProgress identifies
-// where along the player's route this camera position is reached.
+// One ordered position on the camera dolly path.
 struct CameraPathPoint {
 	glm::vec3 position{0.0f};
-	float playerProgress = 0.0f;
 };
 
 // Points are stored in travel order.  The path is open: the final point does
@@ -17,6 +15,8 @@ struct CameraPathPoint {
 struct CameraPathData {
 	std::vector<CameraPathPoint> points;
 };
+
+bool IsValidCameraPath(const CameraPathData& path);
 
 struct CameraPathProjection {
 	glm::vec3 position{0.0f};

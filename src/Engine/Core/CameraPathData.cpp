@@ -2,6 +2,24 @@
 
 #include <algorithm>
 #include <limits>
+#include <cmath>
+
+bool IsValidCameraPath(const CameraPathData& path)
+{
+	for (std::size_t i = 0; i < path.points.size(); ++i)
+	{
+		const glm::vec3& position = path.points[i].position;
+		if (!std::isfinite(position.x) || !std::isfinite(position.y) || !std::isfinite(position.z))
+		{
+			return false;
+		}
+		if (i > 0 && glm::dot(position - path.points[i - 1].position, position - path.points[i - 1].position) <= 1e-8f)
+		{
+			return false;
+		}
+	}
+	return true;
+}
 
 glm::vec3 EvaluateCameraPathSegment(
 	const CameraPathData& path,

@@ -442,19 +442,25 @@ namespace ProjectStateSerializer {
 					else if (fields.size() >= 2 && fields[0] == "camerapath")
 					{
 						const std::size_t count = std::min<std::size_t>(std::stoul(fields[1]), 1000);
-						if (fields.size() >= 2 + count * 4)
+						const std::size_t stride = fields.size() >= 2 + count * 4 ? 4 : 3;
+						if (fields.size() >= 2 + count * stride)
 						{
 							renderState.cameraPath.points.clear();
 							for (std::size_t i = 0; i < count; ++i)
 							{
-								const std::size_t offset = 2 + i * 4;
+								const std::size_t offset = 2 + i * stride;
 								CameraPathPoint point;
 								point.position = glm::vec3(std::stof(fields[offset]), std::stof(fields[offset + 1]), std::stof(fields[offset + 2]));
-								point.playerProgress = std::stof(fields[offset + 3]);
-								if (std::isfinite(point.position.x) && std::isfinite(point.position.y) && std::isfinite(point.position.z) && std::isfinite(point.playerProgress) && (renderState.cameraPath.points.empty() || point.playerProgress > renderState.cameraPath.points.back().playerProgress))
+								if (std::isfinite(point.position.x) && std::isfinite(point.position.y) && std::isfinite(point.position.z))
 									renderState.cameraPath.points.push_back(point);
 							}
 						}
+					}
+					else if (fields.size() >= 4 && fields[0] == "camerapathsettings")
+					{
+						renderState.pathedCameraFollowSharpness = std::stof(fields[1]);
+						renderState.pathedCameraSamplesPerSegment = std::stoi(fields[2]);
+						renderState.showCameraPath = fields[3] == "1" || fields[3] == "true" || fields[3] == "True";
 					}
 					else if (fields.size() == 3 && fields[0] == "editorview")
 					{
@@ -787,9 +793,9 @@ namespace ProjectStateSerializer {
 
 	void AppendRenderState(std::string& contents, const FrontEndManager& frontEndManager, const RenderManager& renderManager)
 	{
-		const glm::vec3 gameCameraPosition = renderManager.GetGameCamera().GetPosition();
-		const glm::vec3 gameCameraFacing = renderManager.GetGameCamera().GetFacing();
-		const GameCamera& gameCamera = renderManager.GetGameCamera();
+		const glm::vec3 gameCameraPosition = renderManager.GetPathedCamera().GetPosition();
+		const glm::vec3 gameCameraFacing = renderManager.GetPathedCamera().GetFacing();
+		const PathedCamera& gameCamera = renderManager.GetPathedCamera();
 		contents += "gamecamera;";
 		contents += std::to_string(gameCameraPosition.x) + ";" + std::to_string(gameCameraPosition.y) + ";" + std::to_string(gameCameraPosition.z) + ";";
 		contents += std::to_string(gameCameraFacing.x) + ";" + std::to_string(gameCameraFacing.y) + ";" + std::to_string(gameCameraFacing.z) + ";";
@@ -797,12 +803,13 @@ namespace ProjectStateSerializer {
 		contents += "0;";
 		contents += "0\n";
 		const CameraPathData& path = frontEndManager.EditorGUI().CameraPath().Data();
-		contents += "camerapath;" + std::to_string(path.points.size());
+					contents += "camerapath;" + std::to_string(path.points.size());
 		for (const CameraPathPoint& point : path.points)
 		{
-			contents += ";" + std::to_string(point.position.x) + ";" + std::to_string(point.position.y) + ";" + std::to_string(point.position.z) + ";" + std::to_string(point.playerProgress);
+			contents += ";" + std::to_string(point.position.x) + ";" + std::to_string(point.position.y) + ";" + std::to_string(point.position.z);
 		}
 		contents += "\n";
+		contents += "camerapathsettings;" + std::to_string(renderManager.GetPathedCamera().FollowSharpness()) + ";" + std::to_string(renderManager.GetPathedCamera().PathSamplesPerSegment()) + ";" + (frontEndManager.EditorGUI().ShowCameraPath() ? "1" : "0") + "\n";
 
 		contents += "editorview;";
 		contents += frontEndManager.EditorGUI().ShowAxis() ? "1" : "0";

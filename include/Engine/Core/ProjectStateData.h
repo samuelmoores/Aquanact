@@ -85,6 +85,9 @@ namespace ProjectStateData {
 
 	struct RenderStateData {
 		CameraPathData cameraPath;
+		float pathedCameraFollowSharpness = 8.0f;
+		int pathedCameraSamplesPerSegment = 32;
+		bool showCameraPath = false;
 		glm::vec3 gameCameraPosition{ 0.0f };
 		glm::vec3 gameCameraFacing{ 0.0f };
 		unsigned int gameCameraTargetId = 0;

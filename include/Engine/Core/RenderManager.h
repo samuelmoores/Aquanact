@@ -7,7 +7,7 @@
 #include "Engine/Core/FrameAllocator.h"
 #include "Engine/Core/Camera.h"
 #include "Engine/Core/EngineCamera.h"
-#include "Engine/Core/GameCamera.h"
+#include "Engine/Core/PathedCamera.h"
 #include "Engine/Core/CameraManager.h"
 #include "Engine/Core/RenderCommand.h"
 #include "Engine/Core/OpenGLGraphicsDevice.h"
@@ -38,8 +38,8 @@ public:
 	// while still allowing mutable access where the renderer owns the state.
 	EngineCamera& GetEngineCamera();
 	const EngineCamera& GetEngineCamera() const;
-	GameCamera& GetGameCamera();
-	const GameCamera& GetGameCamera() const;
+	PathedCamera& GetPathedCamera();
+	const PathedCamera& GetPathedCamera() const;
 	void SetEditorMode();
 	void SetGameMode();
 	void SetCameraMode(CameraMode mode);
@@ -54,6 +54,8 @@ public:
 	void Flush(const Camera& camera);
 	void Loop(FrontEndManager& frontEndManager, FileManager& fileManager, SceneManager& SceneManager, ProjectManager& projectManager, Debug& debug, Input& input, Window& window, EngineState& engineState);
 	void UpdateCameraPhase(const Input& input, const EngineState& engineState);
+	// Clear non-owning entity references before a scene destroys its entities.
+	void ClearPathedCameraTarget();
 
 	std::size_t LastFrameCommandCount() const;
 	std::size_t LastFrameSkippedObjects() const;
@@ -79,11 +81,12 @@ private:
 	void PresentFrame(Window& window);
 
 	std::unique_ptr<EngineCamera> m_engineCamera;
-	std::unique_ptr<GameCamera> m_gameCamera;
+	std::unique_ptr<PathedCamera> m_gameCamera;
 	Entity* m_cameraTarget = nullptr;
 	glm::vec3 m_cameraLastTargetPosition{0.0f};
 	float m_cameraPlayerProgress = 0.0f;
 	bool m_hasCameraTargetPosition = false;
+	bool m_engineCameraPathInitialized = false;
 	CameraManager m_cameraManager;
 	CameraMode m_cameraMode = CameraMode::ThirdPerson;
 	OpenGLGraphicsDevice m_device;

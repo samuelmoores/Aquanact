@@ -10,24 +10,25 @@ void CameraPathCreator::Clear()
 }
 
 void CameraPathCreator::AddPoint(
-	const glm::vec3& position,
-	float playerProgress)
+	const glm::vec3& position)
 {
 	if (!std::isfinite(position.x) ||
 		!std::isfinite(position.y) ||
-		!std::isfinite(position.z) ||
-		!std::isfinite(playerProgress))
+		!std::isfinite(position.z))
 	{
 		return;
 	}
-
-	const float minimumProgress = m_data.points.empty()
-		? 0.0f
-		: m_data.points.back().playerProgress + 0.001f;
+	if (!m_data.points.empty())
+	{
+		const glm::vec3 delta = position - m_data.points.back().position;
+		if (glm::dot(delta, delta) <= 1e-8f)
+		{
+			return;
+		}
+	}
 
 	CameraPathPoint point;
 	point.position = position;
-	point.playerProgress = std::max(playerProgress, minimumProgress);
 	m_data.points.push_back(point);
 	m_selectedPoint = static_cast<int>(m_data.points.size()) - 1;
 }
@@ -72,11 +73,4 @@ void CameraPathCreator::SelectPoint(int index)
 	}
 
 	m_selectedPoint = index;
-}
-
-float CameraPathCreator::NextSuggestedProgress() const
-{
-	return m_data.points.empty()
-		? 0.0f
-		: m_data.points.back().playerProgress + 10.0f;
 }

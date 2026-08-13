@@ -16,7 +16,7 @@
 #include "Engine/Core/FrameProfiler.h"
 #include "Engine/Core/GLHeaders.h"
 #include "Engine/Core/SceneManager.h"
-#include "Engine/Core/GameCamera.h"
+#include "Engine/Core/PathedCamera.h"
 #include "Engine/Core/CameraPathData.h"
 #include "Engine/UI/CameraPathCreator.h"
 #include "Engine/Core/Mesh.h"
@@ -339,7 +339,7 @@ void Debug::DrawCameraPath(const Camera& camera, const CameraPathData& path, int
 				? glm::vec3(1.0f, 0.8f, 0.1f) : glm::vec3(0.2f, 0.7f, 1.0f);
 			m_cameraPathSpheres.push_back(new Line(MakeWireSphereVertices(color)));
 		}
-		constexpr int curveSamples = 24;
+		const int curveSamples = Root::Current().Render().GetPathedCamera().PathSamplesPerSegment();
 		for (std::size_t segment = 0; segment + 1 < path.points.size(); ++segment)
 		{
 			const glm::vec3 color(0.2f, 0.7f, 1.0f);
@@ -426,7 +426,10 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 	auto projection = camera.GetProjectionMatrix();
 	auto view = camera.GetViewMatrix();
 	DrawCameraCollisionDebug(camera);
-	DrawCameraPath(camera, gui.CameraPath().Data(), gui.CameraPath().SelectedPoint());
+	if (gui.ShowCameraPath())
+	{
+		DrawCameraPath(camera, gui.CameraPath().Data(), gui.CameraPath().SelectedPoint());
+	}
 
 	if (m_axis && gui.ShowAxis())
 	{
@@ -697,7 +700,7 @@ void Debug::drawGameModeInput(const Input& input)
 		}
 		if (m_showMotionDiagnostics)
 		{
-			const GameCamera& camera = Root::Current().Render().GetGameCamera();
+			const PathedCamera& camera = Root::Current().Render().GetPathedCamera();
 			ImGui::Separator();
 			ImGui::Text("Render dt: %.5f s (%.3f ms)", input.DeltaTime(), input.DeltaTime() * 1000.0f);
 			ImGui::Text("Input move: %.3f, %.3f, %.3f", input.MoveInput().x, input.MoveInput().y, input.MoveInput().z);
@@ -783,20 +786,19 @@ void Debug::drawGameModeInput(const Input& input)
 		}
 		if (m_showPathedCameraDiagnostics)
 		{
-			const PathedCamera& camera = Root::Current().Render().GetGameCamera();
+			const PathedCamera& camera = Root::Current().Render().GetPathedCamera();
 			const CameraPathData& path = camera.Path();
 			ImGui::Separator();
 			ImGui::Text("Path points: %zu", path.points.size());
 			ImGui::Text("Target: %s", camera.Target() ? "assigned" : "none");
 			ImGui::Text("Player progress: %.3f", camera.PlayerProgress());
 			ImGui::Text("Follow sharpness: %.3f", camera.FollowSharpness());
+			ImGui::Text("Curve samples/segment: %d", camera.PathSamplesPerSegment());
 			ImGui::Text("Position: %.3f, %.3f, %.3f", camera.GetPosition().x, camera.GetPosition().y, camera.GetPosition().z);
 			ImGui::Text("Facing: %.3f, %.3f, %.3f", camera.GetFacing().x, camera.GetFacing().y, camera.GetFacing().z);
 			if (!path.points.empty())
 			{
-				ImGui::Text("First progress: %.3f", path.points.front().playerProgress);
-				ImGui::Text("Last progress: %.3f", path.points.back().playerProgress);
-				ImGui::Text("State: %s", camera.PlayerProgress() <= path.points.front().playerProgress ? "before first" : camera.PlayerProgress() >= path.points.back().playerProgress ? "at final point" : "on path");
+				ImGui::Text("Normalized progress: %.3f", camera.PlayerProgress());
 			}
 		}
 		ImGui::End();

@@ -15,7 +15,7 @@
 #include "Engine/Core/ProjectManager.h"
 #include "Engine/Core/Window.h"
 #include "Engine/Core/Camera.h"
-#include "Engine/Core/GameCamera.h"
+#include "Engine/Core/PathedCamera.h"
 #include "Engine/Core/Entity.h"
 #include "Engine/Core/ComponentFactory.h"
 #include "Engine/Core/Controller.h"
@@ -1006,7 +1006,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 			}
 			if (ImGui::MenuItem("Set Game Camera"))
 			{
-				Root::Current().Render().GetGameCamera().SetPose(
+				Root::Current().Render().GetPathedCamera().SetPose(
 					Root::Current().Render().GetEngineCamera().GetPosition(),
 					Root::Current().Render().GetEngineCamera().GetFacing());
 			}
@@ -1815,6 +1815,16 @@ void EngineGUI::SetShowCameraWindow(bool showCameraWindow)
 	m_showCameraWindow = showCameraWindow;
 }
 
+bool EngineGUI::ShowCameraPath() const
+{
+	return m_showCameraPath;
+}
+
+void EngineGUI::SetShowCameraPath(bool showCameraPath)
+{
+	m_showCameraPath = showCameraPath;
+}
+
 CameraPathCreator& EngineGUI::CameraPath()
 {
 	return m_cameraPathCreator;
@@ -1838,14 +1848,25 @@ void EngineGUI::DrawCameraWindow()
 	{
 		CameraPathData& path = m_cameraPathCreator.Data();
 		ImGui::TextUnformatted("Camera Path");
+		ImGui::Checkbox("Show Camera Path", &m_showCameraPath);
+		PathedCamera& pathedCamera = Root::Current().Render().GetPathedCamera();
+		float followSharpness = pathedCamera.FollowSharpness();
+		if (ImGui::DragFloat("Follow Sharpness", &followSharpness, 0.1f, 0.0f, 50.0f))
+		{
+			pathedCamera.SetFollowSharpness(followSharpness);
+		}
+		int curveSamples = pathedCamera.PathSamplesPerSegment();
+		if (ImGui::SliderInt("Curve Samples", &curveSamples, 4, 256))
+		{
+			pathedCamera.SetPathSamplesPerSegment(curveSamples);
+		}
 
 		if (ImGui::Button("Add Point"))
 		{
 			const EngineCamera& editorCamera =
 				Root::Current().Render().GetEngineCamera();
 			m_cameraPathCreator.AddPoint(
-				editorCamera.GetPosition(),
-				m_cameraPathCreator.NextSuggestedProgress());
+				editorCamera.GetPosition());
 		}
 		ImGui::SameLine();
 		const int selectedPoint = m_cameraPathCreator.SelectedPoint();
@@ -1872,18 +1893,6 @@ void EngineGUI::DrawCameraWindow()
 			CameraPathPoint& point = path.points[static_cast<std::size_t>(editedPoint)];
 			ImGui::Separator();
 			ImGui::DragFloat3("Position", &point.position.x, 0.1f);
-
-			float progress = point.playerProgress;
-			if (ImGui::DragFloat("Player Progress", &progress, 0.1f, 0.0f))
-			{
-				const float previous = editedPoint > 0
-					? path.points[static_cast<std::size_t>(editedPoint - 1)].playerProgress + 0.001f
-					: 0.0f;
-				const float next = editedPoint + 1 < static_cast<int>(path.points.size())
-					? path.points[static_cast<std::size_t>(editedPoint + 1)].playerProgress - 0.001f
-					: progress;
-				point.playerProgress = glm::clamp(progress, previous, glm::max(previous, next));
-			}
 
 			if (ImGui::Button("Capture Editor Camera Position"))
 			{

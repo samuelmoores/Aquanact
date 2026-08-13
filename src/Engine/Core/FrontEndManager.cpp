@@ -166,7 +166,7 @@ void FrontEndManager::OpenGameGUICreator()
 		// separate from the runtime asset library used by the game.
 		m_uiCreator->PreviewSelectedGUI();
 	}
-	Root::Current().Render().SetActiveCamera(Root::Current().Render().GetGameCamera());
+	Root::Current().Render().SetActiveCamera(Root::Current().Render().GetPathedCamera());
 }
 
 void FrontEndManager::CaptureRuntimeLayout()

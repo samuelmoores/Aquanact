@@ -16,7 +16,7 @@ namespace
 	// degenerate orientation, fall back to world axes so movement still works.
 	glm::vec3 CameraForwardVector()
 	{
-		glm::vec3 forward = Root::Current().Render().GetGameCamera().GetFacing();
+		glm::vec3 forward = Root::Current().Render().GetPathedCamera().GetFacing();
 		forward.y = 0.0f;
 		if (glm::length(forward) <= 0.0001f)
 		{

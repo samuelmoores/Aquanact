@@ -4,7 +4,7 @@
 #include "Engine/Core/GameplayManager.h"
 #include "Engine/Core/Debug.h"
 #include "Engine/Core/EngineCamera.h"
-#include "Engine/Core/GameCamera.h"
+#include "Engine/Core/PathedCamera.h"
 #include "Engine/Core/Window.h"
 #include "Engine/Core/Entity.h"
 #include "Engine/Core/Input.h"
@@ -45,7 +45,7 @@ void RenderManager::startUp(Window& window)
 	//Cameras
 	if (!m_gameCamera)
 	{
-		m_gameCamera = std::make_unique<GameCamera>();
+		m_gameCamera = std::make_unique<PathedCamera>();
 		m_gameCamera->startUp();
 	}
 
@@ -81,12 +81,12 @@ const EngineCamera& RenderManager::GetEngineCamera() const
 	return *m_engineCamera;
 }
 
-GameCamera& RenderManager::GetGameCamera()
+PathedCamera& RenderManager::GetPathedCamera()
 {
 	return *m_gameCamera;
 }
 
-const GameCamera& RenderManager::GetGameCamera() const
+const PathedCamera& RenderManager::GetPathedCamera() const
 {
 	return *m_gameCamera;
 }
@@ -109,6 +109,18 @@ void RenderManager::SetCameraMode(CameraMode mode)
 void RenderManager::SetActiveCamera(Camera& camera)
 {
 	m_cameraManager.SetActiveCamera(camera);
+}
+
+void RenderManager::ClearPathedCameraTarget()
+{
+	m_cameraTarget = nullptr;
+	m_cameraLastTargetPosition = glm::vec3(0.0f);
+	m_cameraPlayerProgress = 0.0f;
+	m_hasCameraTargetPosition = false;
+	if (m_gameCamera)
+	{
+		m_gameCamera->SetTarget(nullptr);
+	}
 }
 
 RenderManager::~RenderManager()
@@ -156,7 +168,11 @@ void RenderManager::ApplyProjectState(const ProjectStateData::RenderStateData& r
 {
 	m_gameCamera->SetPose(renderState.gameCameraPosition, renderState.gameCameraFacing);
 	m_gameCamera->SetPath(renderState.cameraPath);
+	m_engineCameraPathInitialized = false;
+	m_gameCamera->SetFollowSharpness(renderState.pathedCameraFollowSharpness);
+	m_gameCamera->SetPathSamplesPerSegment(renderState.pathedCameraSamplesPerSegment);
 	Root::Current().FrontEnd().EditorGUI().CameraPath().Data() = renderState.cameraPath;
+	Root::Current().FrontEnd().EditorGUI().SetShowCameraPath(renderState.showCameraPath);
 	if (!renderState.cameraPath.points.empty())
 	{
 		glm::vec3 facing = m_engineCamera->GetFacing();
@@ -258,6 +274,31 @@ void RenderManager::UpdateCameraPhase(const Input& input, const EngineState& eng
 	}
 	if (engineState.IsEditorMode())
 	{
+		if (!m_engineCameraPathInitialized)
+		{
+			const CameraPathData& path = m_gameCamera->Path();
+			if (!path.points.empty())
+			{
+				glm::vec3 facing = m_engineCamera->GetFacing();
+				if (const Scene* scene = Root::Current().Scenes().ActiveLevel())
+				{
+					for (const auto& object : scene->Objects())
+					{
+						if (object && object->GetComponent<PlayerController>())
+						{
+							const glm::vec3 direction = object->WorldCenterPosition() - path.points.front().position;
+							if (glm::dot(direction, direction) > 1e-8f)
+							{
+								facing = glm::normalize(direction);
+							}
+							break;
+						}
+					}
+				}
+				m_engineCamera->SetPose(path.points.front().position, facing);
+				m_engineCameraPathInitialized = true;
+			}
+		}
 		m_cameraManager.Update(input);
 	}
 }

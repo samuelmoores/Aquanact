@@ -19,7 +19,7 @@
 namespace {
 	void AppendCurrentCameraState(std::string& contents)
 	{
-		const GameCamera& gameCamera = Root::Current().Render().GetGameCamera();
+		const PathedCamera& gameCamera = Root::Current().Render().GetPathedCamera();
 		const glm::vec3 gameCameraPosition = gameCamera.GetPosition();
 		const glm::vec3 gameCameraFacing = gameCamera.GetFacing();
 		contents += "gamecamera;";
@@ -146,9 +146,9 @@ namespace {
 		}
 	}
 
-	void RestoreGameCameraTarget(SceneManager& SceneManager, const ProjectStateData::RenderStateData& renderState)
+	void RestorePathedCameraTarget(SceneManager& SceneManager, const ProjectStateData::RenderStateData& renderState)
 	{
-		GameCamera& gameCamera = Root::Current().Render().GetGameCamera();
+		PathedCamera& gameCamera = Root::Current().Render().GetPathedCamera();
 		Root::Current().Debugger().LogTagged(
 			"ProjectLoad",
 			"Restoring camera target id=" + std::to_string(renderState.gameCameraTargetId) + " hasTarget=" + std::string(renderState.gameCameraHasTarget ? "true" : "false"));

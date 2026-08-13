@@ -26,6 +26,8 @@ public:
 	void SetPlayerProgress(float progress);
 	float PlayerProgress() const { return m_playerProgress; }
 	float ClosestPathDistance(const glm::vec3& worldPosition) const;
+	void SetPathSamplesPerSegment(int samples);
+	int PathSamplesPerSegment() const { return m_pathSamplesPerSegment; }
 	void Update(float deltaTime);
 	void SetFollowSharpness(float sharpness);
 	float FollowSharpness() const { return m_followSharpness; }
@@ -45,8 +47,5 @@ private:
 	Entity* m_target = nullptr;
 	float m_playerProgress = 0.0f;
 	float m_followSharpness = 8.0f;
+	int m_pathSamplesPerSegment = 32;
 };
-
-// Temporary source-compatibility alias while dependent systems migrate to the
-// PathedCamera name.
-using GameCamera = PathedCamera;
