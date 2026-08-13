@@ -17,6 +17,7 @@
 #include "Engine/Core/GLHeaders.h"
 #include "Engine/Core/SceneManager.h"
 #include "Engine/Core/PathedCamera.h"
+#include "Engine/Core/TriggerSphere.h"
 #include "Engine/Core/CameraPathData.h"
 #include "Engine/UI/CameraPathCreator.h"
 #include "Engine/Core/Mesh.h"
@@ -296,6 +297,8 @@ void Debug::shutDown()
 	for (Line* segment : m_cameraPathSegments) delete segment;
 	m_cameraPathSpheres.clear();
 	m_cameraPathSegments.clear();
+	for (auto& entry : m_triggerSpheres) delete entry.second;
+	m_triggerSpheres.clear();
 	ClearEntityBoundingBoxes();
 	delete m_cameraCollisionSphere;
 	m_cameraCollisionSphere = nullptr;
@@ -426,6 +429,24 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 	auto projection = camera.GetProjectionMatrix();
 	auto view = camera.GetViewMatrix();
 	DrawCameraCollisionDebug(camera);
+	if (m_showTriggerSpheres)
+	{
+		const Scene* scene = Root::Current().Scenes().ActiveLevel();
+		if (scene)
+		{
+			for (const auto& object : scene->Objects())
+			{
+				if (!object) continue;
+				const TriggerSphere* trigger = object->GetComponent<TriggerSphere>();
+				if (!trigger || !trigger->Enabled()) continue;
+				if (!m_triggerSpheres.contains(object.get()))
+					m_triggerSpheres.emplace(object.get(), new Line(MakeWireSphereVertices(glm::vec3(1.0f, 0.45f, 0.1f))));
+				Line* sphere = m_triggerSpheres[object.get()];
+				sphere->UpdateProjection(camera.GetProjectionMatrix());
+				sphere->draw(camera.GetViewMatrix(), glm::translate(glm::mat4(1.0f), object->WorldCenterPosition()) * glm::scale(glm::mat4(1.0f), glm::vec3(trigger->Radius())));
+			}
+		}
+	}
 	if (gui.ShowCameraPath())
 	{
 		DrawCameraPath(camera, gui.CameraPath().Data(), gui.CameraPath().SelectedPoint());
@@ -687,8 +708,15 @@ void Debug::drawGameModeInput(const Input& input)
 	ImGui::Text("Active Scene: %s", m_activeLevelName.empty() ? "<none>" : m_activeLevelName.c_str());
 	ImGui::Text("Engine mode: %s", m_engineMode.empty() ? "<none>" : m_engineMode.c_str());
 	ImGui::Text("Active Scene objects: %zu", m_activeLevelObjects);
-	ImGui::Text("Controller component count: %zu", m_controllerCount);
-	ImGui::Separator();
+		ImGui::Text("Controller component count: %zu", m_controllerCount);
+		ImGui::Separator();
+		ImGui::TextUnformatted("Component Diagnostics");
+		bool showTriggerSpheres = m_showTriggerSpheres;
+		if (ImGui::Checkbox("TriggerSphere Debug Draw", &showTriggerSpheres))
+		{
+			m_showTriggerSpheres = showTriggerSpheres;
+		}
+		ImGui::Separator();
 	ImGui::Text("Move input: %.2f, %.2f, %.2f", m_gameplayMoveInput.x, m_gameplayMoveInput.y, m_gameplayMoveInput.z);
 	ImGui::Text("Move speed: %.2f", m_gameplayMoveSpeed);
 	ImGui::Text("Delta time: %.4f", m_gameplayDt);
@@ -1246,6 +1274,8 @@ bool Debug::ShowGameInputWindow() const { return m_showGameInputWindow; }
 void Debug::SetShowGameInputWindow(bool show) { m_showGameInputWindow = show; }
 bool Debug::ShowGameplayDiagnosticsWindow() const { return m_showGameplayDiagnosticsWindow; }
 void Debug::SetShowGameplayDiagnosticsWindow(bool show) { m_showGameplayDiagnosticsWindow = show; }
+bool Debug::ShowTriggerSpheres() const { return m_showTriggerSpheres; }
+void Debug::SetShowTriggerSpheres(bool show) { m_showTriggerSpheres = show; }
 bool Debug::ShowEntityStateDiagnosticsWindow() const { return m_showEntityStateDiagnosticsWindow; }
 void Debug::SetShowEntityStateDiagnosticsWindow(bool show) { m_showEntityStateDiagnosticsWindow = show; }
 bool Debug::ShowAnimationDiagnosticsWindow() const { return m_showAnimationDiagnosticsWindow; }

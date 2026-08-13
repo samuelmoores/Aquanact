@@ -16,6 +16,7 @@
 #include "Engine/Core/Window.h"
 #include "Engine/Core/Camera.h"
 #include "Engine/Core/PathedCamera.h"
+#include "Engine/Core/TriggerSphere.h"
 #include "Engine/Core/Entity.h"
 #include "Engine/Core/ComponentFactory.h"
 #include "Engine/Core/Controller.h"
@@ -1585,6 +1586,25 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 							{
 								ImGui::TextUnformatted("Enemy behavior component");
 								(void)enemy;
+							}
+							else if (TriggerSphere* trigger = dynamic_cast<TriggerSphere*>(component))
+							{
+								float radius = trigger->Radius();
+								ImGui::SetNextItemWidth(140.0f);
+								if (ImGui::DragFloat("Radius", &radius, 0.1f, 0.0f, 10000.0f, "%.2f"))
+								{
+									trigger->SetRadius(radius);
+								}
+								bool enabled = trigger->Enabled();
+								if (ImGui::Checkbox("Enabled", &enabled))
+								{
+									trigger->SetEnabled(enabled);
+								}
+								bool showTriggers = Root::Current().Debugger().ShowTriggerSpheres();
+								if (ImGui::Checkbox("Debug Draw", &showTriggers))
+								{
+									Root::Current().Debugger().SetShowTriggerSpheres(showTriggers);
+								}
 							}
 							else
 							{

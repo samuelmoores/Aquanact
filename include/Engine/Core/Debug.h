@@ -3,6 +3,7 @@
 #include "glm/glm.hpp"
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 class Camera;
 class EngineGUI;
@@ -126,6 +127,8 @@ public:
 	void SetShowAnimationDiagnosticsWindow(bool show);
 	bool ShowCameraCollisionDebug() const;
 	void SetShowCameraCollisionDebug(bool show);
+	bool ShowTriggerSpheres() const;
+	void SetShowTriggerSpheres(bool show);
 	void DrawCameraCollisionDebug(const Camera& camera);
 	void DrawPhysicsBoundingVolumes(const Camera& camera);
 	void SetPhysicsDiagnostics(const glm::vec3& cameraPosition, const glm::vec3& desiredPosition, const glm::vec3& resolvedPosition, float colliderRadius, int collisionCount, const glm::vec3& collisionNormal, float penetration, const std::string& collisionObject);
@@ -147,6 +150,7 @@ private:
 	class Axis* m_axis = nullptr;
 	class Grid* m_grid = nullptr;
 	std::vector<class Line*> m_pointLightDebugSpheres;
+	std::unordered_map<Entity*, class Line*> m_triggerSpheres;
 	std::vector<class Line*> m_cameraPathSpheres;
 	std::vector<class Line*> m_cameraPathSegments;
 	std::vector<class Line*> m_entityBoundingBoxes;
@@ -165,6 +169,7 @@ private:
 	bool m_showEntityStateDiagnosticsWindow = false;
 	bool m_showAnimationDiagnosticsWindow = true;
 	bool m_showCameraCollisionDebug = false;
+	bool m_showTriggerSpheres = false;
 	bool m_showPhysicsDiagnosticsWindow = true;
 	bool m_showMotionDiagnostics = false;
 	bool m_showCameraDiagnostics = false;

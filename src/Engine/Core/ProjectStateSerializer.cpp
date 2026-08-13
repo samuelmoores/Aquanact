@@ -1,4 +1,5 @@
 #include "Engine/Core/ProjectStateSerializer.h"
+#include "Engine/Core/TriggerSphere.h"
 #include "Engine/Core/ProjectStateFormat.h"
 
 #include "Engine/Core/EntityStateMachine.h"
@@ -336,6 +337,11 @@ namespace ProjectStateSerializer {
 					}
 					contents += "\n";
 				}
+				else if (const TriggerSphere* trigger = dynamic_cast<const TriggerSphere*>(component))
+				{
+					AppendComponentLine(contents, projectPath, object, "gamecomponent");
+					contents += ";TriggerSphere;" + std::to_string(trigger->Radius()) + ";" + std::to_string(trigger->Enabled() ? 1 : 0) + "\n";
+				}
 				else if (const char* componentName = component->Name(); componentName && componentName[0] != '\0')
 				{
 					// Game-defined components are reconstructed by their registered factory name.
@@ -670,6 +676,11 @@ namespace ProjectStateSerializer {
 							return false;
 						}
 						component.componentClassName = ProjectStateFormat::UnescapeField(fields[componentLayout.dataIndex]);
+						if (component.componentClassName == "TriggerSphere")
+						{
+							if (fields.size() > componentLayout.dataIndex + 1) component.triggerRadius = std::stof(fields[componentLayout.dataIndex + 1]);
+							if (fields.size() > componentLayout.dataIndex + 2) component.triggerEnabled = fields[componentLayout.dataIndex + 2] == "1";
+						}
 						if (component.componentClassName.empty())
 						{
 							return false;

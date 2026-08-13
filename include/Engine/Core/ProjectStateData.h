@@ -22,6 +22,8 @@ namespace ProjectStateData {
 		std::string levelName;
 		std::string type;
 		std::string componentClassName;
+		float triggerRadius = 90.0f;
+		bool triggerEnabled = true;
 		std::string initialState;
 		struct EntityStateData {
 			std::string name;

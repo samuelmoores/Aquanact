@@ -38,6 +38,14 @@ void TriggerSphere::Update(Entity& owner, float deltaTime)
 			DispatchBindableEvent("Entered");
 		}
 	}
+	for (Entity* entity : m_overlapping)
+	{
+		if (!currentSet.contains(entity) && m_onExit)
+		{
+			m_onExit(owner, *entity);
+			DispatchBindableEvent("Exited");
+		}
+	}
 
 	// Replace the previous frame's occupants so exits are naturally forgotten
 	// and a later re-entry can fire the callback again.

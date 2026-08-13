@@ -10,6 +10,7 @@
 #include "Engine/Core/Root.h"
 #include "Engine/Core/RenderManager.h"
 #include "Engine/Core/PathedCamera.h"
+#include "Engine/Core/TriggerSphere.h"
 #include "Game/Enemy.h"
 
 #include <fstream>
@@ -453,6 +454,11 @@ void SceneManager::ApplyProjectState(
 					std::unique_ptr<Component> component = ComponentFactory::Instance().Create(pendingComponent.componentClassName, *object);
 					if (component)
 					{
+						if (auto* trigger = dynamic_cast<TriggerSphere*>(component.get()))
+						{
+							if (pendingComponent.triggerRadius >= 0.0f) trigger->SetRadius(pendingComponent.triggerRadius);
+							trigger->SetEnabled(pendingComponent.triggerEnabled);
+						}
 						object->AddComponent(std::move(component));
 					}
 				}
