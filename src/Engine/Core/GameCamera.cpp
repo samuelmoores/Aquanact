@@ -73,36 +73,13 @@ void PathedCamera::SetPlayerProgress(float progress)
 {
 	if (std::isfinite(progress))
 	{
-		m_playerProgress = std::max(0.0f, progress);
+		m_playerProgress = glm::clamp(progress, 0.0f, 1.0f);
 	}
 }
 
 float PathedCamera::ClosestPathDistance(const glm::vec3& worldPosition) const
 {
-	if (m_path.points.empty()) return 0.0f;
-	if (m_path.points.size() == 1) return 0.0f;
-
-	float bestDistanceSquared = std::numeric_limits<float>::max();
-	float bestPathDistance = m_path.points.front().playerProgress;
-	float accumulatedDistance = 0.0f;
-	for (std::size_t i = 1; i < m_path.points.size(); ++i)
-	{
-		const glm::vec3 start = m_path.points[i - 1].position;
-		const glm::vec3 segment = m_path.points[i].position - start;
-		const float segmentLengthSquared = glm::dot(segment, segment);
-		const float t = segmentLengthSquared > 1e-8f
-			? glm::clamp(glm::dot(worldPosition - start, segment) / segmentLengthSquared, 0.0f, 1.0f)
-			: 0.0f;
-		const glm::vec3 closest = start + segment * t;
-		const float distanceSquared = glm::dot(worldPosition - closest, worldPosition - closest);
-		if (distanceSquared < bestDistanceSquared)
-		{
-			bestDistanceSquared = distanceSquared;
-			bestPathDistance = accumulatedDistance + glm::length(segment) * t;
-		}
-		accumulatedDistance += glm::length(segment);
-	}
-	return bestPathDistance;
+	return ProjectOntoCameraPath(m_path, worldPosition).normalizedProgress;
 }
 
 void PathedCamera::Update(float deltaTime)
@@ -113,8 +90,7 @@ void PathedCamera::Update(float deltaTime)
 		return;
 	}
 
-	if (m_path.points.size() == 1 ||
-		m_playerProgress <= 0.0f)
+	if (m_path.points.size() == 1 || m_playerProgress <= 0.0f)
 	{
 		m_position = glm::mix(m_position, m_path.points.front().position, blend);
 		FaceTarget();
@@ -122,26 +98,15 @@ void PathedCamera::Update(float deltaTime)
 		return;
 	}
 
-	float segmentStartDistance = 0.0f;
-	for (std::size_t i = 1; i < m_path.points.size(); ++i)
-	{
-		const CameraPathPoint& end = m_path.points[i];
-		const CameraPathPoint& start = m_path.points[i - 1];
-		const float segmentLength = glm::length(end.position - start.position);
-		if (m_playerProgress <= segmentStartDistance + segmentLength)
-		{
-			const float range = segmentLength;
-			const float t = range > 0.0f
-				? glm::clamp((m_playerProgress - segmentStartDistance) / range, 0.0f, 1.0f)
-				: 1.0f;
-			const glm::vec3 desiredPosition = glm::mix(start.position, end.position, t);
-			m_position = glm::mix(m_position, desiredPosition, blend);
-			FaceTarget();
-			RebuildView();
-			return;
-		}
-		segmentStartDistance += segmentLength;
-	}
+	const std::size_t segmentCount = m_path.points.size() - 1;
+	const float pathPosition = glm::clamp(m_playerProgress, 0.0f, 1.0f) * static_cast<float>(segmentCount);
+	const std::size_t segment = std::min(static_cast<std::size_t>(pathPosition), segmentCount - 1);
+	const float t = pathPosition - static_cast<float>(segment);
+	const glm::vec3 desiredPosition = EvaluateCameraPathSegment(m_path, segment, t);
+	m_position = glm::mix(m_position, desiredPosition, blend);
+	FaceTarget();
+	RebuildView();
+	return;
 
 	// Hold the final camera point after the player passes the path end.
 	m_position = glm::mix(m_position, m_path.points.back().position, blend);

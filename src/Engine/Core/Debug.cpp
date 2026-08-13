@@ -339,12 +339,20 @@ void Debug::DrawCameraPath(const Camera& camera, const CameraPathData& path, int
 				? glm::vec3(1.0f, 0.8f, 0.1f) : glm::vec3(0.2f, 0.7f, 1.0f);
 			m_cameraPathSpheres.push_back(new Line(MakeWireSphereVertices(color)));
 		}
-		for (std::size_t i = 1; i < path.points.size(); ++i)
+		constexpr int curveSamples = 24;
+		for (std::size_t segment = 0; segment + 1 < path.points.size(); ++segment)
 		{
 			const glm::vec3 color(0.2f, 0.7f, 1.0f);
-			m_cameraPathSegments.push_back(new Line({
-				{path.points[i - 1].position.x, path.points[i - 1].position.y, path.points[i - 1].position.z, color.r, color.g, color.b},
-				{path.points[i].position.x, path.points[i].position.y, path.points[i].position.z, color.r, color.g, color.b}}));
+			for (int sample = 0; sample < curveSamples; ++sample)
+			{
+				const float t0 = static_cast<float>(sample) / curveSamples;
+				const float t1 = static_cast<float>(sample + 1) / curveSamples;
+				const glm::vec3 a = EvaluateCameraPathSegment(path, segment, t0);
+				const glm::vec3 b = EvaluateCameraPathSegment(path, segment, t1);
+				m_cameraPathSegments.push_back(new Line({
+					{a.x, a.y, a.z, color.r, color.g, color.b},
+					{b.x, b.y, b.z, color.r, color.g, color.b}}));
+			}
 		}
 	}
 	const glm::mat4 projection = camera.GetProjectionMatrix();
@@ -358,7 +366,7 @@ void Debug::DrawCameraPath(const Camera& camera, const CameraPathData& path, int
 			: pointRadius;
 		m_cameraPathSpheres[i]->draw(view, glm::translate(glm::mat4(1.0f), path.points[i].position) * glm::scale(glm::mat4(1.0f), glm::vec3(radius)));
 	}
-	for (std::size_t i = 0; i + 1 < path.points.size() && i < m_cameraPathSegments.size(); ++i)
+	for (std::size_t i = 0; i < m_cameraPathSegments.size(); ++i)
 	{
 		m_cameraPathSegments[i]->UpdateProjection(projection);
 		m_cameraPathSegments[i]->draw(view);
