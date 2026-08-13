@@ -26,24 +26,22 @@ void TriggerSphere::Update(Entity& owner, float deltaTime)
 		owner.WorldCenterPosition(), m_radius, &owner);
 
 	// Convert the query result to a set so membership checks are constant-time
-	// and each entity can produce at most one enter event per update.
+	// and each entity can produce at most one enter callback per update.
 	std::unordered_set<Entity*> currentSet(current.begin(), current.end());
 
 	// An entity is entering when it is present now but was absent last update.
 	for (Entity* entity : currentSet)
 	{
-		if (!m_overlapping.contains(entity) && m_onEnter)
+		if (!m_overlapping.contains(entity))
 		{
-			m_onEnter(owner, *entity);
-			DispatchBindableEvent("Entered");
+			entity->OnTriggerEnter(owner);
 		}
 	}
 	for (Entity* entity : m_overlapping)
 	{
-		if (!currentSet.contains(entity) && m_onExit)
+		if (!currentSet.contains(entity))
 		{
-			m_onExit(owner, *entity);
-			DispatchBindableEvent("Exited");
+			entity->OnTriggerExit(owner);
 		}
 	}
 

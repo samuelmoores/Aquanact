@@ -160,6 +160,10 @@ public:
 	virtual void startUp(Entity&) {}
 	virtual void Update(Entity&, float) {}
 	virtual void FirstFrame(Entity&) {}
+	// Components may override these hooks to react when their owning entity
+	// enters or exits a TriggerSphere.
+	virtual void OnTriggerEnter(Entity&) {}
+	virtual void OnTriggerExit(Entity&) {}
 	virtual std::vector<BindableMember> GetBindableMembers() const { return {}; }
 	virtual bool TryGetBindableValue(const std::string&, float&) const { return false; }
 	virtual std::vector<BindableEvent> GetBindableEvents() const { return {}; }

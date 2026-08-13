@@ -241,6 +241,29 @@ void Entity::startUp()
 		component->startUp(*this);
 	}
 }
+
+void Entity::OnTriggerEnter(Entity& triggerOwner)
+{
+	for (Component* component : Components())
+	{
+		if (component)
+		{
+			component->OnTriggerEnter(triggerOwner);
+		}
+	}
+}
+
+void Entity::OnTriggerExit(Entity& triggerOwner)
+{
+	for (Component* component : Components())
+	{
+		if (component)
+		{
+			component->OnTriggerExit(triggerOwner);
+		}
+	}
+}
+
 glm::mat4 Entity::BuildModelMatrix()
 {
 	auto m = glm::translate(glm::mat4(1), m_position);

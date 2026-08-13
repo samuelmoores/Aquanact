@@ -50,6 +50,9 @@ private:
 	void Move(Entity& owner, const glm::vec2& move2D, float dt);
 	void MoveWithWorldDirection(Entity& owner, const glm::vec3& movement, const glm::vec3& diagnosticInput, float dt);
 
+	// Trigger
+	void OnTriggerEnter(Entity& triggerOwner) override;
+
 	// External input sources.
 	const Input* m_inputDevice = nullptr;
 	const InputManager* m_inputActions = nullptr;

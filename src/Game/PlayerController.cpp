@@ -132,6 +132,13 @@ void PlayerController::startUp(Entity& owner)
 	m_inputActions = &Root::Current().InputActions();
 }
 
+void PlayerController::OnTriggerEnter(Entity& triggerOwner)
+{
+	// Trigger behavior is intentionally empty until gameplay-specific effects
+	// are assigned. The override provides a concrete hook for player triggers.
+	std::cout << "Player Controller entered trigger sphere owned by: " << triggerOwner.Name() << std::endl;
+}
+
 void PlayerController::FirstFrame(Entity& owner)
 {
 	m_entityState = owner.GetComponent<EntityStateMachine>();

@@ -42,6 +42,8 @@ public:
 	virtual std::vector<BindableEvent> GetBindableEvents() const { return {}; }
 	virtual void startUp();
 	virtual void FirstFrame() {}
+	virtual void OnTriggerEnter(Entity& triggerOwner);
+	virtual void OnTriggerExit(Entity& triggerOwner);
 	void FirstFrameComponents();
 
 	Mesh* GetMesh();
