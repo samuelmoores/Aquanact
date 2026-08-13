@@ -10,6 +10,49 @@ class Input;
 class Entity;
 class GameplayManager;
 
+struct CameraDiagnosticsSnapshot
+{
+	glm::vec2 lookInput{ 0.0f };
+	glm::vec3 cameraPositionBefore{ 0.0f };
+	glm::vec3 targetPosition{ 0.0f };
+	glm::vec3 orbitPosition{ 0.0f };
+	glm::vec3 solverPosition{ 0.0f };
+	glm::vec3 committedPosition{ 0.0f };
+	glm::vec3 lastValidPosition{ 0.0f };
+	glm::vec3 requestedMovement{ 0.0f };
+	glm::vec3 appliedMovement{ 0.0f };
+	glm::vec3 lastSweepNormal{ 0.0f };
+	float dt = 0.0f;
+	float yaw = 0.0f;
+	float pitch = 0.0f;
+	float orbitRadius = 0.0f;
+	float colliderRadius = 0.0f;
+	float selectedYawOffset = 0.0f;
+	float targetClearanceDistance = 0.0f;
+	float availableBoomDistance = 0.0f;
+	int previousAvoidanceSide = 0;
+	int selectedAvoidanceSide = 0;
+	int collisionCount = 0;
+	int sweepHitCount = 0;
+	bool solverValid = false;
+	bool resolutionActiveBefore = false;
+	bool resolutionActiveAfter = false;
+	bool smoothingAttempted = false;
+	bool usedImmediateEscape = false;
+	bool smoothedPositionRejected = false;
+	bool currentOverlaps = false;
+	bool currentHasLineOfSight = false;
+	bool solverOverlaps = false;
+	bool solverHasLineOfSight = false;
+	bool committedOverlaps = false;
+	bool committedHasLineOfSight = false;
+	bool hasLastValidPosition = false;
+	std::string targetShape;
+	std::string collisionObject;
+	std::string lastSweepObject;
+	std::string lastSweepShape;
+};
+
 class Debug {
 public:
 	// Severity is a lightweight categorization for log messages.
@@ -35,6 +78,8 @@ public:
 	void drawGameModeInput(const Input& input);
 	// Cached controller/object state that powers the gameplay diagnostic panel.
 	void SetGameplayDiagnostics(const std::string& objectName, const glm::vec3& moveInput, float moveSpeed, float dt, const glm::vec3& delta, const glm::vec3& position);
+	// Cached third-person camera resolver state shown by the opt-in gameplay panel.
+	void SetCameraDiagnostics(const CameraDiagnosticsSnapshot& diagnostics);
 	// Cached animation state shown in the gameplay debugger.
 	void SetAnimationDiagnostics(const std::string& currentState, const std::string& desiredState, const std::string& lastTransitionDebug, const std::string& lastTransitionFrom, const std::string& lastTransitionTo, const std::string& lastTransitionLeftOperandText, const std::string& lastTransitionComparatorText, const std::string& lastTransitionRightOperandText, float lastTransitionLeftValue, float lastTransitionRightValue, bool lastTransitionPassed, const std::string& lastResolvedTargetState, int lastResolvedTargetClipIndex, bool lastResolvedTargetFound, const std::string& stateListText);
 	// Basic logging writes to the in-memory debug log window.
@@ -118,6 +163,7 @@ private:
 	bool m_showCameraCollisionDebug = false;
 	bool m_showPhysicsDiagnosticsWindow = true;
 	bool m_showMotionDiagnostics = false;
+	bool m_showCameraDiagnostics = false;
 	unsigned int m_physicsDiagnosticsFrame = 0;
 	glm::vec3 m_physicsCameraPosition{ 0.0f };
 	glm::vec3 m_physicsDesiredPosition{ 0.0f };
@@ -141,6 +187,9 @@ private:
 	float m_gameplayDt = 0.0f;
 	glm::vec3 m_gameplayDelta{ 0.0f };
 	glm::vec3 m_gameplayPosition{ 0.0f };
+	CameraDiagnosticsSnapshot m_cameraDiagnostics;
+	std::vector<std::string> m_cameraDiagnosticsEvents;
+	unsigned int m_cameraDiagnosticsEventSequence = 0;
 	std::string m_animationCurrentState;
 	std::string m_animationDesiredState;
 	std::string m_animationLastTransitionDebug;

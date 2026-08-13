@@ -659,6 +659,79 @@ void Debug::drawGameModeInput(const Input& input)
 			ImGui::Text("Player position: %.5f, %.5f, %.5f", m_gameplayPosition.x, m_gameplayPosition.y, m_gameplayPosition.z);
 			ImGui::Text("Camera position: %.5f, %.5f, %.5f", camera.GetPosition().x, camera.GetPosition().y, camera.GetPosition().z);
 		}
+		if (ImGui::Checkbox("Camera Diagnostics", &m_showCameraDiagnostics) &&
+			m_showCameraDiagnostics)
+		{
+			m_cameraDiagnosticsEvents.clear();
+			m_cameraDiagnosticsEventSequence = 0;
+		}
+		if (m_showCameraDiagnostics)
+		{
+			const CameraDiagnosticsSnapshot& camera = m_cameraDiagnostics;
+			ImGui::Separator();
+			ImGui::TextUnformatted("Control");
+			ImGui::Text("Look: %.3f, %.3f | yaw: %.2f | dt: %.4f",
+				camera.lookInput.x, camera.lookInput.y, camera.yaw, camera.dt);
+			ImGui::Text("Camera before: %.3f, %.3f, %.3f",
+				camera.cameraPositionBefore.x, camera.cameraPositionBefore.y,
+				camera.cameraPositionBefore.z);
+
+			ImGui::Separator();
+			ImGui::TextUnformatted("Solver");
+			ImGui::Text("Valid: %s | side: %d -> %d | offset: %.2f",
+				camera.solverValid ? "yes" : "no",
+				camera.previousAvoidanceSide, camera.selectedAvoidanceSide,
+				camera.selectedYawOffset);
+			ImGui::Text("Resolution active: %s -> %s",
+				camera.resolutionActiveBefore ? "yes" : "no",
+				camera.resolutionActiveAfter ? "yes" : "no");
+			ImGui::Text("Solver position: %.3f, %.3f, %.3f",
+				camera.solverPosition.x, camera.solverPosition.y, camera.solverPosition.z);
+			ImGui::Text("Solver overlap: %s | LOS: %s",
+				camera.solverOverlaps ? "yes" : "no",
+				camera.solverHasLineOfSight ? "yes" : "no");
+
+			ImGui::Separator();
+			ImGui::TextUnformatted("Collision");
+			ImGui::Text("Smoothing: %s | escape: %s | rejected: %s",
+				camera.smoothingAttempted ? "yes" : "no",
+				camera.usedImmediateEscape ? "yes" : "no",
+				camera.smoothedPositionRejected ? "yes" : "no");
+			ImGui::Text("Applied movement: %.3f, %.3f, %.3f",
+				camera.appliedMovement.x, camera.appliedMovement.y,
+				camera.appliedMovement.z);
+			ImGui::Text("Sweep hits: %d | object: %s | shape: %s",
+				camera.sweepHitCount,
+				camera.lastSweepObject.empty() ? "<none>" : camera.lastSweepObject.c_str(),
+				camera.lastSweepShape.empty() ? "<none>" : camera.lastSweepShape.c_str());
+
+			ImGui::Separator();
+			ImGui::TextUnformatted("Committed");
+			ImGui::Text("Position: %.3f, %.3f, %.3f",
+				camera.committedPosition.x, camera.committedPosition.y,
+				camera.committedPosition.z);
+			ImGui::Text("Overlap: %s | LOS: %s | last valid: %s",
+				camera.committedOverlaps ? "yes" : "no",
+				camera.committedHasLineOfSight ? "yes" : "no",
+				camera.hasLastValidPosition ? "yes" : "no");
+
+			ImGui::Separator();
+			ImGui::TextUnformatted("Recent Camera Transitions");
+			ImGui::BeginChild("CameraDiagnosticsEvents", ImVec2(0.0f, 150.0f), true);
+			if (m_cameraDiagnosticsEvents.empty())
+			{
+				ImGui::TextDisabled("No resolver state changes captured yet.");
+			}
+			else
+			{
+				for (auto event = m_cameraDiagnosticsEvents.rbegin();
+					event != m_cameraDiagnosticsEvents.rend(); ++event)
+				{
+					ImGui::TextWrapped("%s", event->c_str());
+				}
+			}
+			ImGui::EndChild();
+		}
 		ImGui::End();
 		m_showGameplayDiagnosticsWindow = open;
 	}
@@ -1010,6 +1083,63 @@ void Debug::SetGameplayDiagnostics(const std::string& objectName, const glm::vec
 	m_gameplayDt = dt;
 	m_gameplayDelta = delta;
 	m_gameplayPosition = position;
+}
+
+void Debug::SetCameraDiagnostics(const CameraDiagnosticsSnapshot& diagnostics)
+{
+	if (m_showCameraDiagnostics)
+	{
+		const bool stateChanged =
+			diagnostics.solverValid != m_cameraDiagnostics.solverValid ||
+			diagnostics.selectedAvoidanceSide != m_cameraDiagnostics.selectedAvoidanceSide ||
+			std::abs(diagnostics.selectedYawOffset -
+				m_cameraDiagnostics.selectedYawOffset) > 0.1f ||
+			diagnostics.resolutionActiveAfter != m_cameraDiagnostics.resolutionActiveAfter ||
+			diagnostics.currentOverlaps != m_cameraDiagnostics.currentOverlaps ||
+			diagnostics.currentHasLineOfSight != m_cameraDiagnostics.currentHasLineOfSight ||
+			diagnostics.committedOverlaps != m_cameraDiagnostics.committedOverlaps ||
+			diagnostics.committedHasLineOfSight != m_cameraDiagnostics.committedHasLineOfSight ||
+			diagnostics.usedImmediateEscape != m_cameraDiagnostics.usedImmediateEscape ||
+			diagnostics.smoothedPositionRejected !=
+				m_cameraDiagnostics.smoothedPositionRejected ||
+			diagnostics.sweepHitCount != m_cameraDiagnostics.sweepHitCount ||
+			diagnostics.lastSweepObject != m_cameraDiagnostics.lastSweepObject;
+
+		if (stateChanged)
+		{
+			std::ostringstream event;
+			event << '#' << ++m_cameraDiagnosticsEventSequence << std::fixed
+				<< std::setprecision(2)
+				<< " look=(" << diagnostics.lookInput.x << ',' << diagnostics.lookInput.y << ')'
+				<< " yaw=" << diagnostics.yaw
+				<< " valid=" << (diagnostics.solverValid ? "Y" : "N")
+				<< " side=" << diagnostics.previousAvoidanceSide << "->"
+				<< diagnostics.selectedAvoidanceSide
+				<< " offset=" << diagnostics.selectedYawOffset
+				<< " active=" << (diagnostics.resolutionActiveBefore ? "Y" : "N")
+				<< "->" << (diagnostics.resolutionActiveAfter ? "Y" : "N")
+				<< " current[overlap=" << (diagnostics.currentOverlaps ? "Y" : "N")
+				<< ",los=" << (diagnostics.currentHasLineOfSight ? "Y" : "N") << ']'
+				<< " committed[overlap=" << (diagnostics.committedOverlaps ? "Y" : "N")
+				<< ",los=" << (diagnostics.committedHasLineOfSight ? "Y" : "N") << ']'
+				<< " sweepHits=" << diagnostics.sweepHitCount
+				<< " immediate=" << (diagnostics.usedImmediateEscape ? "Y" : "N")
+				<< " rejected=" << (diagnostics.smoothedPositionRejected ? "Y" : "N");
+			if (!diagnostics.lastSweepObject.empty())
+			{
+				event << " hit=" << diagnostics.lastSweepObject
+					<< '(' << diagnostics.lastSweepShape << ')';
+			}
+
+			constexpr std::size_t maximumEvents = 16;
+			if (m_cameraDiagnosticsEvents.size() == maximumEvents)
+			{
+				m_cameraDiagnosticsEvents.erase(m_cameraDiagnosticsEvents.begin());
+			}
+			m_cameraDiagnosticsEvents.push_back(event.str());
+		}
+	}
+	m_cameraDiagnostics = diagnostics;
 }
 
 void Debug::SetAnimationDiagnostics(const std::string& currentState, const std::string& desiredState, const std::string& lastTransitionDebug, const std::string& lastTransitionFrom, const std::string& lastTransitionTo, const std::string& lastTransitionLeftOperandText, const std::string& lastTransitionComparatorText, const std::string& lastTransitionRightOperandText, float lastTransitionLeftValue, float lastTransitionRightValue, bool lastTransitionPassed, const std::string& lastResolvedTargetState, int lastResolvedTargetClipIndex, bool lastResolvedTargetFound, const std::string& stateListText)

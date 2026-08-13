@@ -41,6 +41,11 @@ public:
 		const glm::vec3& center, float radius,
 		const glm::vec3& boxMin, const glm::vec3& boxMax);
 
+	static bool SphereCapsuleOverlap(
+		const glm::vec3& center, float sphereRadius,
+		const glm::vec3& capsuleBase, const glm::vec3& capsuleTip,
+		float capsuleRadius);
+
 	static bool SweepSphereAABB(
 		const glm::vec3& center, float radius,
 		const glm::vec3& movement,
@@ -50,6 +55,12 @@ public:
 		const glm::vec3& center, float radius,
 		const glm::vec3& movement,
 		const glm::vec3& boxMin, const glm::vec3& boxMax);
+
+	static SweepCollision GetSphereCapsuleSweep(
+		const glm::vec3& center, float sphereRadius,
+		const glm::vec3& movement,
+		const glm::vec3& capsuleBase, const glm::vec3& capsuleTip,
+		float capsuleRadius);
 
 	static Collision GetSphereAABBCollision(
 		const glm::vec3& center, float radius,

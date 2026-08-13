@@ -99,6 +99,8 @@ public:
 
 	void SetIgnoreCameraCollision(bool ignore) { m_ignoreCameraCollision = ignore; }
 	bool IgnoreCameraCollision() const { return m_ignoreCameraCollision; }
+	void SetBlocksCameraView(bool blocks) { m_blocksCameraView = blocks; }
+	bool BlocksCameraView() const { return m_blocksCameraView; }
 	void SetShowPhysicsBoundingBox(bool show) { m_showPhysicsBoundingBox = show; }
 	bool ShowPhysicsBoundingBox() const { return m_showPhysicsBoundingBox; }
 	void SetPhysicsColliderShape(PhysicsColliderShape shape) { m_physicsColliderShape = shape; }
@@ -116,6 +118,7 @@ protected:
 	glm::vec3 m_defaultRotation{0.0f};
 	bool m_skinned = false;
 	bool m_ignoreCameraCollision = false;
+	bool m_blocksCameraView = true;
 	bool m_showPhysicsBoundingBox = false;
 	PhysicsColliderShape m_physicsColliderShape = PhysicsColliderShape::Box;
 	std::string m_name;

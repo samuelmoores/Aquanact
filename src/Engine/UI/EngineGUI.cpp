@@ -1479,6 +1479,11 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 						{
 							object->SetShowPhysicsBoundingBox(showBoundingBox);
 						}
+						bool blocksCameraView = object->BlocksCameraView();
+						if (ImGui::Checkbox("Blocks Camera View", &blocksCameraView))
+						{
+							object->SetBlocksCameraView(blocksCameraView);
+						}
 
 					}
 

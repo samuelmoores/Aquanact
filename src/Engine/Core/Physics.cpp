@@ -242,6 +242,141 @@ static glm::vec3 ClosestPointOnSegment(const glm::vec3& a, const glm::vec3& b, c
 	return a + t * ab;
 }
 
+bool Physics::SphereCapsuleOverlap(
+	const glm::vec3& center, float sphereRadius,
+	const glm::vec3& capsuleBase, const glm::vec3& capsuleTip,
+	float capsuleRadius)
+{
+	const float combinedRadius = glm::max(sphereRadius + capsuleRadius, 0.0f);
+	const glm::vec3 closest = ClosestPointOnSegment(capsuleBase, capsuleTip, center);
+	const glm::vec3 offset = center - closest;
+	return glm::dot(offset, offset) <= combinedRadius * combinedRadius;
+}
+
+Physics::SweepCollision Physics::GetSphereCapsuleSweep(
+	const glm::vec3& center, float sphereRadius,
+	const glm::vec3& movement,
+	const glm::vec3& capsuleBase, const glm::vec3& capsuleTip,
+	float capsuleRadius)
+{
+	SweepCollision result;
+	const float combinedRadius = glm::max(sphereRadius + capsuleRadius, 0.0f);
+	const float combinedRadiusSquared = combinedRadius * combinedRadius;
+
+	// A sphere swept against a capsule is equivalent to a point swept against a
+	// capsule whose radius has been expanded by the sphere radius.
+	const glm::vec3 startClosest = ClosestPointOnSegment(capsuleBase, capsuleTip, center);
+	const glm::vec3 startOffset = center - startClosest;
+	const float startDistanceSquared = glm::dot(startOffset, startOffset);
+	if (startDistanceSquared <= combinedRadiusSquared)
+	{
+		glm::vec3 normal = startOffset;
+		if (glm::dot(normal, normal) <= 1e-10f)
+		{
+			normal = -movement;
+		}
+		if (glm::dot(normal, normal) > 1e-10f)
+		{
+			normal = glm::normalize(normal);
+			if (glm::dot(movement, normal) < -1e-5f)
+			{
+				result.hit = true;
+				result.normal = normal;
+				result.time = 0.0f;
+			}
+		}
+		return result;
+	}
+
+	const float movementLength = glm::length(movement);
+	if (movementLength <= 1e-6f)
+	{
+		return result;
+	}
+
+	const glm::vec3 direction = movement / movementLength;
+	float nearestDistance = std::numeric_limits<float>::max();
+
+	// Test the cylindrical body of the expanded capsule.
+	const glm::vec3 axis = capsuleTip - capsuleBase;
+	const glm::vec3 fromBase = center - capsuleBase;
+	const float axisLengthSquared = glm::dot(axis, axis);
+	if (axisLengthSquared > 1e-10f)
+	{
+		const float axisDirection = glm::dot(axis, direction);
+		const float axisOrigin = glm::dot(axis, fromBase);
+		const float directionOrigin = glm::dot(direction, fromBase);
+		const float originSquared = glm::dot(fromBase, fromBase);
+		const float quadraticA = axisLengthSquared - axisDirection * axisDirection;
+		const float quadraticB = axisLengthSquared * directionOrigin -
+			axisOrigin * axisDirection;
+		const float quadraticC = axisLengthSquared * originSquared -
+			axisOrigin * axisOrigin - combinedRadiusSquared * axisLengthSquared;
+		const float discriminant = quadraticB * quadraticB - quadraticA * quadraticC;
+
+		if (quadraticA > 1e-10f && discriminant >= 0.0f)
+		{
+			const float distance = (-quadraticB - std::sqrt(discriminant)) / quadraticA;
+			const float axialPosition = axisOrigin + distance * axisDirection;
+			if (distance >= 0.0f && axialPosition >= 0.0f &&
+				axialPosition <= axisLengthSquared)
+			{
+				nearestDistance = distance;
+			}
+		}
+	}
+
+	// The two spherical caps complete the capsule and also handle a capsule with
+	// a zero-length spine.
+	const auto testCap = [&](const glm::vec3& capCenter)
+	{
+		const glm::vec3 offset = center - capCenter;
+		const float projected = glm::dot(direction, offset);
+		const float discriminant = projected * projected -
+			(glm::dot(offset, offset) - combinedRadiusSquared);
+		if (discriminant < 0.0f)
+		{
+			return;
+		}
+
+		const float distance = -projected - std::sqrt(discriminant);
+		if (distance >= 0.0f)
+		{
+			nearestDistance = glm::min(nearestDistance, distance);
+		}
+	};
+	testCap(capsuleBase);
+	testCap(capsuleTip);
+
+	if (nearestDistance > movementLength)
+	{
+		return result;
+	}
+
+	const glm::vec3 contactCenter = center + direction * nearestDistance;
+	const glm::vec3 contactPoint = ClosestPointOnSegment(
+		capsuleBase, capsuleTip, contactCenter);
+	glm::vec3 normal = contactCenter - contactPoint;
+	if (glm::dot(normal, normal) <= 1e-10f)
+	{
+		normal = -direction;
+	}
+	else
+	{
+		normal = glm::normalize(normal);
+	}
+
+	if (glm::dot(movement, normal) >= -1e-5f)
+	{
+		return result;
+	}
+
+	result.hit = true;
+	result.normal = normal;
+	result.time = glm::clamp(nearestDistance / movementLength, 0.0f, 1.0f);
+	return result;
+}
+
 bool Physics::CapsuleAABBOverlap(
 	const glm::vec3& capBase, const glm::vec3& capTip, float radius,
 	const glm::vec3& boxMin, const glm::vec3& boxMax)

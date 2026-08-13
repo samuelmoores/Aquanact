@@ -67,8 +67,11 @@ private:
 	float m_editorColliderRadius = 25.0f;
 	bool m_hasEditorState = false;
 	std::unique_ptr<CameraCollider> m_collider;
-	glm::vec3 m_lastSafePosition{ 0.0f, 0.0f, -10.0f };
-	bool m_hasSafePosition = false;
+	glm::vec3 m_lastValidPosition{ 0.0f, 0.0f, -10.0f };
+	bool m_hasLastValidPosition = false;
+	// Preserve the side used to orbit around an obstruction while resolving the
+	// current input-driven orbit.
+	int m_cameraAvoidanceSide = 0;
 };
 
 
