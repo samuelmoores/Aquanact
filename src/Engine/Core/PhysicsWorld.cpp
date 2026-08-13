@@ -561,49 +561,34 @@ bool PhysicsWorld::OverlapsCamera(
 	return false;
 }
 
-bool PhysicsWorld::HasCameraLineOfSight(
-	const glm::vec3& cameraPosition,
-	const glm::vec3& targetPosition,
-	const Entity* target) const
+std::vector<Entity*> PhysicsWorld::QuerySphere(const glm::vec3& center, float radius, const Entity* ignoredEntity) const
 {
-	// Build a finite ray from the camera to the target. The target distance is
-	// used to ensure objects behind the player do not count as obstructions.
-	const glm::vec3 ray = targetPosition - cameraPosition;
-	const float distance = glm::length(ray);
-	if (distance <= 0.0001f)
-	{
-		// Coincident positions are visible by definition because there is no
-		// segment that another object could obstruct.
-		return true;
-	}
+	// Return non-owning entity pointers for every enabled collider whose cached
+	// world AABB overlaps the query sphere. The caller must not retain these
+	// pointers beyond the owning scene's lifetime.
+	std::vector<Entity*> result;
+	const float safeRadius = std::max(radius, 0.0f);
 
-	for (const PhysicsCollider& candidate : m_colliders)
+	for (const PhysicsCollider& collider : m_colliders)
 	{
-		// Only enabled mesh colliders that explicitly block camera view can
-		// obstruct this segment. The target is never considered an obstruction.
-		if (!candidate.enabled || !candidate.owner || candidate.owner == target ||
-			!candidate.owner->BlocksCameraView() || !candidate.owner->GetMesh())
-		{
+		// Disabled, ownerless, and explicitly ignored colliders cannot enter a
+		// trigger query.
+		if (!collider.enabled || !collider.owner || collider.owner == ignoredEntity) 
 			continue;
-		}
 
-		// Use the AABB as a cheap broadphase, then test the candidate's actual
-		// configured shape with a zero-radius finite sweep.
-		if (!SegmentIntersectsBounds(cameraPosition, targetPosition,
-			candidate.minBounds, candidate.maxBounds))
+		// Find the closest point on the collider AABB to the sphere center. The
+		// sphere overlaps when that distance is within the sphere radius.
+		const glm::vec3 closest = glm::clamp(center, collider.minBounds, collider.maxBounds);
+		const glm::vec3 delta = center - closest;
+
+		if (glm::dot(delta, delta) <= safeRadius * safeRadius)
 		{
-			continue;
-		}
-		const Physics::SweepCollision hit = SweepCameraAgainstCollider(
-			cameraPosition, 0.0f, ray, candidate);
-		if (hit.hit && hit.time < 1.0f - 1e-5f)
-		{
-			return false;
+			// PhysicsWorld does not own entities; only report the collider owner.
+			result.push_back(collider.owner);
 		}
 	}
 
-	// No eligible collider intersected the finite camera-to-target segment.
-	return true;
+	return result;
 }
 
 ColliderHandle PhysicsWorld::Add(Entity& entity)

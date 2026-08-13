@@ -36,6 +36,7 @@ set(SOURCES
     "include/Engine/Core/Camera.h"
     "include/Engine/Core/CameraPathData.h"
     "src/Engine/Core/CameraPathData.cpp"
+    "include/Engine/Core/TriggerSphere.h" "src/Engine/Core/TriggerSphere.cpp"
     "include/Engine/Core/CameraController.h"
     "include/Engine/Core/CameraManager.h" "src/Engine/Core/CameraManager.cpp"
     "include/Engine/Core/EngineCamera.h" "src/Engine/Core/EngineCamera.cpp"

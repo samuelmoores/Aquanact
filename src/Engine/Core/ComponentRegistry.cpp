@@ -7,6 +7,7 @@
 #include "Game/PlayerCombat.h"
 #include "Game/PlayerController.h"
 #include "Game/PlayerHealth.h"
+#include "Engine/Core/TriggerSphere.h"
 
 #include <memory>
 
@@ -31,5 +32,9 @@ void RegisterGameComponents()
 	ComponentFactory::Instance().Register("PlayerHealth", [](Entity&) -> std::unique_ptr<Component>
 	{
 		return std::make_unique<PlayerHealth>();
+	});
+	ComponentFactory::Instance().Register("TriggerSphere", [](Entity&) -> std::unique_ptr<Component>
+	{
+		return std::make_unique<TriggerSphere>();
 	});
 }

@@ -59,6 +59,7 @@ public:
 		const glm::vec3& position,
 		float radius,
 		const Entity* ignoredEntity = nullptr) const;
+	std::vector<Entity*> QuerySphere(const glm::vec3& center, float radius, const Entity* ignoredEntity = nullptr) const;
 	// Tests the segment from cameraPosition to targetPosition against each
 	// blocker's box, capsule, or convex shape. The target itself and non-blocking
 	// entities are ignored; true means no other collider obscures the target.
