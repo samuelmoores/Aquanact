@@ -20,7 +20,7 @@ public:
 	// Movement intent. These expose what the controller is trying to do this frame.
 	const glm::vec3& MovementDirection() const { return m_movementDirection; }
 	bool IsMoving() const { return m_isMoving; }
-	bool IsGrounded() const { return m_isGrounded; }
+	bool IsGrounded() const { return m_grounded; }
 	float GroundSurfaceAngle() const;
 
 	// Bindable names used by entity state transitions and editor condition pickers.
@@ -40,6 +40,7 @@ protected:
 	// retaining the shared collision and grounding implementation.
 	virtual float GravityScale() const { return 1.0f; }
 	virtual float MaxWalkableSlopeAngle() const { return 45.0f; }
+	bool IsWalkableSurface(const glm::vec3& normal) const;
 
 	// Internal helpers used by the controller update pipeline.
 	void SetDiagnosticInput(const glm::vec3& input) { m_diagnosticInput = input; }
@@ -54,8 +55,8 @@ protected:
 	glm::vec3 m_pendingMovement{ 0.0f };
 	glm::vec3 m_velocity{ 0.0f };
 	float m_groundedLossTimer = 0.0f;
+	bool m_rawGrounded = false;
 	bool m_grounded = false;
-	bool m_isGrounded = false;
 	bool m_isMoving = false;
 	glm::vec3 m_groundNormal{ 0.0f, 1.0f, 0.0f };
 

@@ -101,7 +101,7 @@ void PlayerController::TryJump(const InputManager& input)
 {
 	// Step 1: accept only a new Jump press while grounded. This prevents held
 	// input from creating repeated jumps and leaves landing to the physics code.
-	if (!input.WasPressed("Jump") || !m_isGrounded)
+	if (!input.WasPressed("Jump") || !m_grounded)
 	{
 		return;
 	}

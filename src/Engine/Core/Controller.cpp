@@ -77,11 +77,18 @@ float Controller::GroundSurfaceAngle() const
 	return glm::degrees(std::acos(std::clamp(m_groundNormal.y, -1.0f, 1.0f)));
 }
 
+bool Controller::IsWalkableSurface(const glm::vec3& normal) const
+{
+	const float minimumNormalY = std::cos(glm::radians(MaxWalkableSlopeAngle()));
+	return normal.y >= minimumNormalY;
+}
+
 void Controller::startUp(Entity&)
 {
 	m_velocity = glm::vec3(0.0f);
 	m_groundedLossTimer = 0.0f;
-	m_isGrounded = false;
+	m_rawGrounded = false;
+	m_grounded = false;
 }
 
 void Controller::Update(Entity& owner, float dt)
@@ -92,8 +99,23 @@ void Controller::Update(Entity& owner, float dt)
 		return;
 	}
 
-	m_isGrounded = false;
-	m_velocity.y = gravity * GravityScale();
+	// Grounding is a result of this frame's collision solve. Clear the previous
+	// contact before applying gravity so walking off an edge can produce a fall.
+	m_rawGrounded = false;
+	m_grounded = false;
+
+	if (m_rawGrounded)
+	{
+		m_velocity.y = 0.0f;
+	}
+	else
+	{
+		m_velocity.y = std::max(
+			m_velocity.y + gravity * GravityScale() * dt,
+			terminalFallSpeed);
+	}
+
+	m_grounded = m_rawGrounded;
 	m_pendingMovement = glm::vec3(0.0f, m_velocity.y * dt, 0.0f);
 }
 
@@ -141,7 +163,9 @@ void Controller::MoveWithCollisions(Entity& owner, const glm::vec3& desiredMovem
 	}
 
 	constexpr int maxSlideIterations = 4;
-	constexpr float collisionSkin = 0.0f;
+	// Keep subsequent sweeps slightly separated from the contacted surface so
+	// slopes do not repeatedly report the same zero-time collision.
+	constexpr float collisionSkin = 0.1f;
 	glm::vec3 remainingMovement = desiredMovement;
 	glm::vec3 resolvedMovement(0.0f);
 
@@ -164,13 +188,15 @@ void Controller::MoveWithCollisions(Entity& owner, const glm::vec3& desiredMovem
 			break;
 		}
 
-		bool collidedWithGround = false;
-		RecordCollisionContact(
-			collision, remainingMovement, &m_groundNormal, &collidedWithGround);
+		const bool walkableSurface = IsWalkableSurface(collision.normal);
+		const bool collidedWithGround = remainingMovement.y <= 0.0f && walkableSurface;
+
+		m_groundNormal = collision.normal;
+
 		if (collidedWithGround)
 		{
+			m_rawGrounded = true;
 			m_grounded = true;
-			m_isGrounded = true;
 			m_groundedLossTimer = 0.0f;
 			m_velocity.y = 0.0f;
 		}
@@ -178,11 +204,28 @@ void Controller::MoveWithCollisions(Entity& owner, const glm::vec3& desiredMovem
 		const glm::vec3 previousResolvedMovement = resolvedMovement;
 		remainingMovement = ResolveSlideCollision(
 			collision, remainingMovement, resolvedMovement, collisionSkin);
+		if (collision.time <= 0.0001f)
+		{
+			// Separate from an existing contact before the next sweep. This is
+			// especially important where a slope transitions into flat ground.
+			resolvedMovement += collision.normal * collisionSkin;
+		}
+		if (walkableSurface && m_isMoving)
+		{
+			remainingMovement = ProjectMovementOntoWalkableGround(
+				remainingMovement, collision.normal, MaxWalkableSlopeAngle());
+		}
+		else if (collidedWithGround)
+		{
+			// Do not turn gravity into downhill locomotion when the player has no
+			// movement input. Keep the controller planted on the slope.
+			remainingMovement = glm::vec3(0.0f);
+		}
 
 		// Avoid repeatedly resolving a zero-time contact that produces no useful
 		// change, which can otherwise consume every iteration at a corner.
-		if (glm::length(resolvedMovement - previousResolvedMovement) <= 0.0001f &&
-			glm::length(remainingMovement) >= glm::length(desiredMovement) - 0.0001f)
+		const bool madeNoProgress = glm::length(resolvedMovement - previousResolvedMovement) <= 0.0001f;
+		if (madeNoProgress && glm::length(remainingMovement) <= 0.0001f)
 		{
 			break;
 		}
@@ -190,4 +233,29 @@ void Controller::MoveWithCollisions(Entity& owner, const glm::vec3& desiredMovem
 
 	owner.Move(resolvedMovement);
 	PhysicsWorld::Instance().Update(owner);
+
+	// Keep the controller attached to nearby walkable surfaces when moving
+	// downhill or across small gaps in collision geometry.
+	if (m_velocity.y <= 0.0f && !m_rawGrounded)
+	{
+		glm::vec3 probeMin;
+		glm::vec3 probeMax;
+		if (owner.WorldAABB(probeMin, probeMax))
+		{
+			const glm::vec3 probeMovement(0.0f, -groundProbeDistance, 0.0f);
+			const Physics::SweepCollision probe = PhysicsWorld::Instance().Sweep(
+				collider, probeMin, probeMax, probeMovement);
+
+			if (probe.hit && IsWalkableSurface(probe.normal))
+			{
+				owner.Move(probeMovement * glm::clamp(probe.time, 0.0f, 1.0f));
+				m_rawGrounded = true;
+				m_grounded = true;
+				m_groundNormal = probe.normal;
+				m_groundedLossTimer = 0.0f;
+				m_velocity.y = 0.0f;
+				PhysicsWorld::Instance().Update(owner);
+			}
+		}
+	}
 }
