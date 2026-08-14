@@ -701,33 +701,21 @@ void Debug::drawGameModeInput(const Input& input)
 	{
 		bool open = m_showGameplayDiagnosticsWindow;
 		ImGui::Begin("Gameplay Diagnostics", &open);
-	ImGui::Text("FPS: %.1f", m_lastFps);
-	ImGui::Text("Frame: %.3f ms", Root::Current().Profiler().FrameMs());
-	ImGui::Text("Controller owner bound: %s", m_controllerOwnerBound ? "yes" : "no");
 	ImGui::Text("Object: %s", m_gameplayObjectName.empty() ? "<none>" : m_gameplayObjectName.c_str());
 	ImGui::Text("Active Scene: %s", m_activeLevelName.empty() ? "<none>" : m_activeLevelName.c_str());
-	ImGui::Text("Engine mode: %s", m_engineMode.empty() ? "<none>" : m_engineMode.c_str());
 	ImGui::Text("Active Scene objects: %zu", m_activeLevelObjects);
-		ImGui::Text("Controller component count: %zu", m_controllerCount);
 		ImGui::Separator();
-		ImGui::TextUnformatted("Component Diagnostics");
-		bool showTriggerSpheres = m_showTriggerSpheres;
-		if (ImGui::Checkbox("TriggerSphere Debug Draw", &showTriggerSpheres))
-		{
-			m_showTriggerSpheres = showTriggerSpheres;
-		}
 		ImGui::Separator();
 	ImGui::Text("Move input: %.2f, %.2f, %.2f", m_gameplayMoveInput.x, m_gameplayMoveInput.y, m_gameplayMoveInput.z);
 	ImGui::Text("Move speed: %.2f", m_gameplayMoveSpeed);
 	ImGui::Text("Delta time: %.4f", m_gameplayDt);
 	ImGui::Text("Applied delta: %.3f, %.3f, %.3f", m_gameplayDelta.x, m_gameplayDelta.y, m_gameplayDelta.z);
+		ImGui::Text("Ground surface angle: %.2f degrees", m_gameplayGroundSurfaceAngle);
+		ImGui::Text("Is grounded: %s", m_gameplayGrounded ? "true" : "false");
 		ImGui::Text("Position: %.3f, %.3f, %.3f", m_gameplayPosition.x, m_gameplayPosition.y, m_gameplayPosition.z);
-		if (ImGui::Checkbox("Motion diagnostics", &m_showMotionDiagnostics))
-		{
-			// Keep the detailed motion readout opt-in because it is intentionally verbose.
-		}
 		if (m_showMotionDiagnostics)
 		{
+			ImGui::Begin("Motion Diagnostics");
 			const PathedCamera& camera = Root::Current().Render().GetPathedCamera();
 			ImGui::Separator();
 			ImGui::Text("Render dt: %.5f s (%.3f ms)", input.DeltaTime(), input.DeltaTime() * 1000.0f);
@@ -735,15 +723,11 @@ void Debug::drawGameModeInput(const Input& input)
 			ImGui::Text("Applied movement: %.5f, %.5f, %.5f", m_gameplayDelta.x, m_gameplayDelta.y, m_gameplayDelta.z);
 			ImGui::Text("Player position: %.5f, %.5f, %.5f", m_gameplayPosition.x, m_gameplayPosition.y, m_gameplayPosition.z);
 			ImGui::Text("Camera position: %.5f, %.5f, %.5f", camera.GetPosition().x, camera.GetPosition().y, camera.GetPosition().z);
-		}
-		if (ImGui::Checkbox("Camera Diagnostics", &m_showCameraDiagnostics) &&
-			m_showCameraDiagnostics)
-		{
-			m_cameraDiagnosticsEvents.clear();
-			m_cameraDiagnosticsEventSequence = 0;
+			ImGui::End();
 		}
 		if (m_showCameraDiagnostics)
 		{
+			ImGui::Begin("Camera Diagnostics");
 			const CameraDiagnosticsSnapshot& camera = m_cameraDiagnostics;
 			ImGui::Separator();
 			ImGui::TextUnformatted("Control");
@@ -808,12 +792,11 @@ void Debug::drawGameModeInput(const Input& input)
 				}
 			}
 			ImGui::EndChild();
-		}
-		if (ImGui::Checkbox("Pathed Camera Diagnostics", &m_showPathedCameraDiagnostics))
-		{
+			ImGui::End();
 		}
 		if (m_showPathedCameraDiagnostics)
 		{
+			ImGui::Begin("Pathed Camera Diagnostics");
 			const PathedCamera& camera = Root::Current().Render().GetPathedCamera();
 			const CameraPathData& path = camera.Path();
 			ImGui::Separator();
@@ -828,6 +811,7 @@ void Debug::drawGameModeInput(const Input& input)
 			{
 				ImGui::Text("Normalized progress: %.3f", camera.PlayerProgress());
 			}
+			ImGui::End();
 		}
 		ImGui::End();
 		m_showGameplayDiagnosticsWindow = open;
@@ -1169,7 +1153,7 @@ void Debug::RecordGroundedTransition(const std::string& objectName, bool grounde
 	LogTagged("Physics", "IsGrounded switched " + state + ": " + m_lastGroundedTransition);
 }
 
-void Debug::SetGameplayDiagnostics(const std::string& objectName, const glm::vec3& moveInput, float moveSpeed, float dt, const glm::vec3& delta, const glm::vec3& position)
+void Debug::SetGameplayDiagnostics(const std::string& objectName, const glm::vec3& moveInput, float moveSpeed, float dt, const glm::vec3& delta, const glm::vec3& position, float groundSurfaceAngle, bool grounded)
 {
 	// Gameplay systems push their latest state here so the debug overlay can show it without
 	// reaching back into the controller or object layer every frame.
@@ -1180,6 +1164,8 @@ void Debug::SetGameplayDiagnostics(const std::string& objectName, const glm::vec
 	m_gameplayDt = dt;
 	m_gameplayDelta = delta;
 	m_gameplayPosition = position;
+	m_gameplayGroundSurfaceAngle = groundSurfaceAngle;
+	m_gameplayGrounded = grounded;
 }
 
 void Debug::SetCameraDiagnostics(const CameraDiagnosticsSnapshot& diagnostics)
@@ -1274,6 +1260,20 @@ bool Debug::ShowGameInputWindow() const { return m_showGameInputWindow; }
 void Debug::SetShowGameInputWindow(bool show) { m_showGameInputWindow = show; }
 bool Debug::ShowGameplayDiagnosticsWindow() const { return m_showGameplayDiagnosticsWindow; }
 void Debug::SetShowGameplayDiagnosticsWindow(bool show) { m_showGameplayDiagnosticsWindow = show; }
+bool Debug::ShowMotionDiagnostics() const { return m_showMotionDiagnostics; }
+void Debug::SetShowMotionDiagnostics(bool show) { m_showMotionDiagnostics = show; }
+bool Debug::ShowCameraDiagnostics() const { return m_showCameraDiagnostics; }
+void Debug::SetShowCameraDiagnostics(bool show)
+{
+	if (show && !m_showCameraDiagnostics)
+	{
+		m_cameraDiagnosticsEvents.clear();
+		m_cameraDiagnosticsEventSequence = 0;
+	}
+	m_showCameraDiagnostics = show;
+}
+bool Debug::ShowPathedCameraDiagnostics() const { return m_showPathedCameraDiagnostics; }
+void Debug::SetShowPathedCameraDiagnostics(bool show) { m_showPathedCameraDiagnostics = show; }
 bool Debug::ShowTriggerSpheres() const { return m_showTriggerSpheres; }
 void Debug::SetShowTriggerSpheres(bool show) { m_showTriggerSpheres = show; }
 bool Debug::ShowEntityStateDiagnosticsWindow() const { return m_showEntityStateDiagnosticsWindow; }

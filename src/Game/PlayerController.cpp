@@ -146,43 +146,9 @@ void PlayerController::FirstFrame(Entity& owner)
 
 void PlayerController::Move(Entity& owner, const glm::vec2& move2D, float dt)
 {
-	// Keep a 3D version of the input around for diagnostics and animation.
-	const glm::vec3 moveInput(move2D.x, 0.0f, move2D.y);
-	MoveWithWorldDirection(owner, BuildWorldMovement(move2D), moveInput, dt);
+	//Controller.Move(move2D)
 }
 
-void PlayerController::MoveWithWorldDirection(
-	Entity& owner,
-	const glm::vec3& movement,
-	const glm::vec3& diagnosticInput,
-	float dt)
-{
-	SetDiagnosticInput(diagnosticInput);
-	SetMovementDirection(movement);
-
-	// Exact zero input means no movement this frame, but we still skip the
-	// normalization step to avoid dividing by zero.
-	if (movement == glm::vec3(0.0f))
-	{
-		m_isMoving = false;
-		const glm::vec3 appliedDelta = MoveWithPhysics(owner, glm::vec3(0.0f), dt);
-		Root::Current().Debugger().SetGameplayDiagnostics(owner.Name(), diagnosticInput, m_moveSpeed, dt, appliedDelta, owner.Position());
-		return;
-	}
-
-	const glm::vec3 normalizedMovement = glm::normalize(movement);
-	m_isMoving = true;
-
-	// Turn toward the travel direction so the character faces the way it is
-	// moving, including while airborne.
-	FaceMovementDirection(owner, normalizedMovement, m_turnSpeed, dt);
-
-	// Apply the final horizontal velocity through the physics path so collision
-	// and diagnostics stay consistent with the rest of the controller.
-	const glm::vec3 desiredHorizontalVelocity = normalizedMovement * m_moveSpeed;
-	const glm::vec3 appliedDelta = MoveWithPhysics(owner, desiredHorizontalVelocity, dt);
-	Root::Current().Debugger().SetGameplayDiagnostics(owner.Name(), diagnosticInput, m_moveSpeed, dt, appliedDelta, owner.Position());
-}
 
 void PlayerController::Update(Entity& owner, float dt)
 {

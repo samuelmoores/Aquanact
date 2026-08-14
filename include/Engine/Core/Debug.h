@@ -80,7 +80,7 @@ public:
 	// Game-mode overlay: shows only the runtime input and gameplay diagnostics.
 	void drawGameModeInput(const Input& input);
 	// Cached controller/object state that powers the gameplay diagnostic panel.
-	void SetGameplayDiagnostics(const std::string& objectName, const glm::vec3& moveInput, float moveSpeed, float dt, const glm::vec3& delta, const glm::vec3& position);
+	void SetGameplayDiagnostics(const std::string& objectName, const glm::vec3& moveInput, float moveSpeed, float dt, const glm::vec3& delta, const glm::vec3& position, float groundSurfaceAngle, bool grounded);
 	// Cached third-person camera resolver state shown by the opt-in gameplay panel.
 	void SetCameraDiagnostics(const CameraDiagnosticsSnapshot& diagnostics);
 	// Cached animation state shown in the gameplay debugger.
@@ -121,6 +121,12 @@ public:
 	void SetShowGameInputWindow(bool show);
 	bool ShowGameplayDiagnosticsWindow() const;
 	void SetShowGameplayDiagnosticsWindow(bool show);
+	bool ShowMotionDiagnostics() const;
+	void SetShowMotionDiagnostics(bool show);
+	bool ShowCameraDiagnostics() const;
+	void SetShowCameraDiagnostics(bool show);
+	bool ShowPathedCameraDiagnostics() const;
+	void SetShowPathedCameraDiagnostics(bool show);
 	bool ShowEntityStateDiagnosticsWindow() const;
 	void SetShowEntityStateDiagnosticsWindow(bool show);
 	bool ShowAnimationDiagnosticsWindow() const;
@@ -197,6 +203,8 @@ private:
 	float m_gameplayDt = 0.0f;
 	glm::vec3 m_gameplayDelta{ 0.0f };
 	glm::vec3 m_gameplayPosition{ 0.0f };
+	float m_gameplayGroundSurfaceAngle = 0.0f;
+	bool m_gameplayGrounded = false;
 	CameraDiagnosticsSnapshot m_cameraDiagnostics;
 	std::vector<std::string> m_cameraDiagnosticsEvents;
 	unsigned int m_cameraDiagnosticsEventSequence = 0;

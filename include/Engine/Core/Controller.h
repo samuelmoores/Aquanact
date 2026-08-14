@@ -19,10 +19,9 @@ public:
 
 	// Movement intent. These expose what the controller is trying to do this frame.
 	const glm::vec3& MovementDirection() const { return m_movementDirection; }
-	void SetMovementDirection(const glm::vec3& direction);
 	bool IsMoving() const { return m_isMoving; }
 	bool IsGrounded() const { return m_isGrounded; }
-	void StopMoving();
+	float GroundSurfaceAngle() const;
 
 	// Bindable names used by entity state transitions and editor condition pickers.
 	// These stay stable so saved state machine graphs continue to resolve.
@@ -40,24 +39,21 @@ protected:
 	// Allows game-specific controllers to customize vertical acceleration while
 	// retaining the shared collision and grounding implementation.
 	virtual float GravityScale() const { return 1.0f; }
+	virtual float MaxWalkableSlopeAngle() const { return 45.0f; }
 
 	// Internal helpers used by the controller update pipeline.
 	void SetDiagnosticInput(const glm::vec3& input) { m_diagnosticInput = input; }
-	void ApplyMovement(Entity& owner, float dt);
-	glm::vec3 MoveWithPhysics(Entity& owner, const glm::vec3& desiredHorizontalVelocity, float dt);
-	glm::vec3 MoveWithCollision(Entity& owner, const glm::vec3& delta,
-		glm::vec3* lastCollisionNormal = nullptr, bool* collidedWithGround = nullptr);
+	void Move(glm::vec2 direction);
 
 	// Tunable movement settings.
 	float m_moveSpeed = 50.0f;
 
 	// Runtime movement state.
-	glm::vec3 m_velocity{ 0.0f };
 	glm::vec3 m_movementDirection{ 0.0f };
 	bool m_grounded = false;
 	bool m_isGrounded = false;
 	bool m_isMoving = false;
-	float m_groundedLossTimer = 0.0f;
+	glm::vec3 m_groundNormal{ 0.0f, 1.0f, 0.0f };
 
 	// Diagnostics and editor-facing helper data.
 	glm::vec3 m_diagnosticInput{ 0.0f };

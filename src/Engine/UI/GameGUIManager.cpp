@@ -746,6 +746,9 @@ void GameGUIManager::DrawReturnButton()
 	bool showEntityStateDiagnostics = Root::Current().Debugger().ShowEntityStateDiagnosticsWindow();
 	bool showAnimationDiagnostics = Root::Current().Debugger().ShowAnimationDiagnosticsWindow();
 	bool showPhysicsDiagnostics = Root::Current().Debugger().ShowPhysicsDiagnosticsWindow();
+	bool showMotionDiagnostics = Root::Current().Debugger().ShowMotionDiagnostics();
+	bool showCameraDiagnostics = Root::Current().Debugger().ShowCameraDiagnostics();
+	bool showPathedCameraDiagnostics = Root::Current().Debugger().ShowPathedCameraDiagnostics();
 	bool showGameGUIDiagnostics = Root::Current().FrontEnd().RuntimeGUI().ShowDiagnosticsWindow();
 	bool profilerEnabled = Root::Current().Profiler().IsEnabled();
 	ImGui::Checkbox("Game Input", &showGameInput);
@@ -753,6 +756,9 @@ void GameGUIManager::DrawReturnButton()
 	ImGui::Checkbox("Entity State Diagnostics", &showEntityStateDiagnostics);
 	ImGui::Checkbox("Animation Diagnostics", &showAnimationDiagnostics);
 	ImGui::Checkbox("Physics Diagnostics", &showPhysicsDiagnostics);
+	ImGui::Checkbox("Motion Diagnostics", &showMotionDiagnostics);
+	ImGui::Checkbox("Camera Diagnostics", &showCameraDiagnostics);
+	ImGui::Checkbox("Pathed Camera Diagnostics", &showPathedCameraDiagnostics);
 	ImGui::Checkbox("GameGUI Diagnostics", &showGameGUIDiagnostics);
 	ImGui::Checkbox("Profiler", &profilerEnabled);
 	Root::Current().Debugger().SetShowGameInputWindow(showGameInput);
@@ -760,6 +766,9 @@ void GameGUIManager::DrawReturnButton()
 	Root::Current().Debugger().SetShowEntityStateDiagnosticsWindow(showEntityStateDiagnostics);
 	Root::Current().Debugger().SetShowAnimationDiagnosticsWindow(showAnimationDiagnostics);
 	Root::Current().Debugger().SetShowPhysicsDiagnosticsWindow(showPhysicsDiagnostics);
+	Root::Current().Debugger().SetShowMotionDiagnostics(showMotionDiagnostics);
+	Root::Current().Debugger().SetShowCameraDiagnostics(showCameraDiagnostics);
+	Root::Current().Debugger().SetShowPathedCameraDiagnostics(showPathedCameraDiagnostics);
 	Root::Current().FrontEnd().RuntimeGUI().SetShowDiagnosticsWindow(showGameGUIDiagnostics);
 	Root::Current().Profiler().SetEnabled(profilerEnabled);
 	ImGui::End();

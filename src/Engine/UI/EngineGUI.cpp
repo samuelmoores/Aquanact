@@ -1572,6 +1572,13 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 								{
 									playerController->SetTurnSpeed(turnSpeed);
 								}
+
+								float maxSlopeAngle = playerController->MaxSlopeAngle();
+								ImGui::SetNextItemWidth(140.0f);
+								if (ImGui::DragFloat("Max Slope Angle", &maxSlopeAngle, 0.5f, 0.0f, 89.0f, "%.1f degrees"))
+								{
+									playerController->SetMaxSlopeAngle(maxSlopeAngle);
+								}
 							}
 							else if (Controller* controller = dynamic_cast<Controller*>(component))
 							{

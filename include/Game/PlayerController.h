@@ -2,6 +2,8 @@
 
 #include "Engine/Core/Controller.h"
 
+#include <algorithm>
+
 class Input;
 class InputManager;
 class EntityStateMachine;
@@ -21,6 +23,8 @@ public:
 	// Editor-facing tuning values.
 	float TurnSpeed() const { return m_turnSpeed; }
 	void SetTurnSpeed(float turnSpeed) { m_turnSpeed = turnSpeed; }
+	float MaxSlopeAngle() const { return m_maxSlopeAngle; }
+	void SetMaxSlopeAngle(float angle) { m_maxSlopeAngle = std::clamp(angle, 0.0f, 89.0f); }
 	bool WantsToMove() const { return m_wantsToMove; }
 
 	// Bindable player-controller settings shown in the editor.
@@ -30,7 +34,8 @@ public:
 		FUNCTION(WantsToMove) \
 		FUNCTION(IsGrounded) \
 		VALUE(m_moveSpeed) \
-		VALUE(m_turnSpeed) 
+		VALUE(m_turnSpeed) \
+		VALUE(m_maxSlopeAngle) 
 	AQUA_DECLARE_BINDABLES(PLAYER_CONTROLLER_BINDABLES)
 	#undef PLAYER_CONTROLLER_BINDABLES
 
@@ -42,13 +47,13 @@ public:
 
 private:
 	float GravityScale() const override;
+	float MaxWalkableSlopeAngle() const override { return m_maxSlopeAngle; }
 
 	// Shared helpers for movement and facing math.
 	static float WrapAngle(float angle);
 	static float ShortestAngleDelta(float from, float to);
 	void TryJump(const InputManager& input);
 	void Move(Entity& owner, const glm::vec2& move2D, float dt);
-	void MoveWithWorldDirection(Entity& owner, const glm::vec3& movement, const glm::vec3& diagnosticInput, float dt);
 
 	// Trigger
 	void OnTriggerEnter(Entity& triggerOwner) override;
@@ -62,5 +67,6 @@ private:
 	// Player-specific tuning.
 	float m_turnSpeed = 8.0f;
 	float m_jumpSpeed = 840.0f;
+	float m_maxSlopeAngle = 45.0f;
 };
 
