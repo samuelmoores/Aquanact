@@ -93,7 +93,8 @@ float PlayerController::GravityScale() const
 {
 	// Increase gravity during both halves of the jump so the full arc completes
 	// faster. The stronger downward scale still makes the descent decisive.
-	return m_velocity.y > 0.0f ? 1.875f : 5.0f;
+	//return m_velocity.y > 0.0f ? 1.875f : 5.0f;
+	return 3.0f;
 }
 
 void PlayerController::TryJump(const InputManager& input)
@@ -120,8 +121,8 @@ void PlayerController::TryJump(const InputManager& input)
 	// required for the jump impulse to survive the movement step.
 	m_grounded = false;
 	m_isGrounded = false;
-	m_groundedLossTimer = 0.0f;
-	m_velocity.y = m_jumpSpeed;
+	//m_groundedLossTimer = 0.0f;
+	//m_velocity.y = m_jumpSpeed;
 
 }
 
@@ -146,7 +147,7 @@ void PlayerController::FirstFrame(Entity& owner)
 
 void PlayerController::Move(Entity& owner, const glm::vec2& move2D, float dt)
 {
-	//Controller.Move(move2D)
+	Controller::Move(owner, move2D, dt);
 }
 
 
@@ -168,6 +169,7 @@ void PlayerController::Update(Entity& owner, float dt)
 	// A jump can only be requested after state-based movement blocking has been
 	// handled. This prevents attacks or other blocking states from launching.
 	TryJump(input);
+	Controller::Update(owner, dt);
 	// Use live input for horizontal movement and facing throughout the jump.
 	Move(owner, move2D, dt);
 }

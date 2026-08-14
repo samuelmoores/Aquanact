@@ -43,13 +43,15 @@ protected:
 
 	// Internal helpers used by the controller update pipeline.
 	void SetDiagnosticInput(const glm::vec3& input) { m_diagnosticInput = input; }
-	void Move(glm::vec2 direction);
+	void Move(Entity& owner, const glm::vec2& direction, float dt);
 
 	// Tunable movement settings.
 	float m_moveSpeed = 50.0f;
 
 	// Runtime movement state.
 	glm::vec3 m_movementDirection{ 0.0f };
+	glm::vec3 m_velocity{ 0.0f };
+	float m_groundedLossTimer = 0.0f;
 	bool m_grounded = false;
 	bool m_isGrounded = false;
 	bool m_isMoving = false;

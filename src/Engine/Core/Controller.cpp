@@ -82,20 +82,63 @@ float Controller::GroundSurfaceAngle() const
 
 void Controller::startUp(Entity&)
 {
+	m_velocity = glm::vec3(0.0f);
+	m_groundedLossTimer = 0.0f;
 	m_grounded = false;
 	m_isGrounded = false;
 }
 
 void Controller::Update(Entity& owner, float dt)
 {
-	
+	if (dt <= 0.0f)
+	{
+		return;
+	}
+
+	if (m_grounded)
+	{
+		m_velocity.y = 0.0f;
+	}
+	else
+	{
+		m_velocity.y = std::max(m_velocity.y + gravity * GravityScale() * dt, terminalFallSpeed);
+	}
+
+	owner.Move(glm::vec3(0.0f, m_velocity.y * dt, 0.0f));
 }
 
-void Controller::Move(glm::vec2 direction)
+void Controller::Move(Entity& owner, const glm::vec2& direction, float dt)
 {
-	//TODO: move in direction multiplied by speed
+	// Keep diagonal input from moving faster than cardinal input.
+	const float inputLength = glm::length(direction);
 
+	const glm::vec2 clampedDirection = inputLength > 1.0f ? direction / inputLength : direction;
+	const glm::vec3 movementDirection(clampedDirection.x, 0.0f, clampedDirection.y);
 
+	const bool hasMovementInput = glm::length(movementDirection) > 0.0001f;
+	m_movementDirection = hasMovementInput ? glm::normalize(movementDirection) : glm::vec3(0.0f);
+
+	m_isMoving = hasMovementInput;
+
+	SetDiagnosticInput(movementDirection);
+
+	if (dt <= 0.0f || !hasMovementInput)
+	{
+		return;
+	}
+
+	const ColliderHandle collider = PhysicsWorld::Instance().Find(owner);
+	glm::vec3 minBounds;
+	glm::vec3 maxBounds;
+	const bool hasValidBounds = owner.WorldAABB(minBounds, maxBounds);
+
+	// Collision sweeping is added in the next movement step. Until then, keep
+	// direct movement as the fallback for entities without registered geometry.
+	if (collider == InvalidColliderHandle || !hasValidBounds)
+	{
+		owner.Move(movementDirection * m_moveSpeed * dt);
+		return;
+	}
+
+	owner.Move(movementDirection * m_moveSpeed * dt);
 }
-
-
