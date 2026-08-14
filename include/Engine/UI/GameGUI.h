@@ -98,6 +98,7 @@ private:
 	MyGUI::Widget* m_menuBox = nullptr;
 	std::vector<MyGUI::Button*> m_controllerButtons;
 	int m_focusedControllerButton = -1;
+	MyGUI::Button* m_lastFocusSoundButton = nullptr;
 
 	// Widget styling and selection state
 	std::unordered_map<MyGUI::Button*, MyGUI::Colour> m_buttonDefaultTextColours;

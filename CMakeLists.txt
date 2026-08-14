@@ -98,6 +98,7 @@ set(SOURCES
     "include/Engine/Core/PhysicsWorld.h" "src/Engine/Core/PhysicsWorld.cpp"
     "include/Engine/Core/MathUtils.h" "src/Engine/Core/MathUtils.cpp"
     "include/Engine/Core/Audio.h" "src/Engine/Core/Audio.cpp"
+    "src/Engine/miniaudio_impl.c"
     "include/Engine/Core/RenderCommand.h"
     "include/Engine/Core/FrameAllocator.h"
     "include/Engine/Core/FrameProfiler.h" "src/Engine/Core/FrameProfiler.cpp"
@@ -151,10 +152,7 @@ if (MSVC)
     )
 endif()
 
-find_package(SFML COMPONENTS system window graphics audio CONFIG REQUIRED)
-target_link_libraries(AquanactEngine PRIVATE sfml-system sfml-network sfml-graphics sfml-window sfml-audio)
 target_link_libraries(AquanactEngine PRIVATE Psapi)
-target_link_libraries(AquanactGame PRIVATE sfml-system sfml-network sfml-graphics sfml-window sfml-audio)
 target_link_libraries(AquanactGame PRIVATE Psapi)
 
 find_package(glfw3 CONFIG REQUIRED)
@@ -224,6 +222,8 @@ target_link_libraries(AquanactGame PRIVATE
 target_include_directories(AquanactEngine PUBLIC "./include")
 target_include_directories(AquanactGame PUBLIC "./include")
 target_include_directories(AquanactBuildTool PUBLIC "./include")
+target_include_directories(AquanactEngine PRIVATE "${CMAKE_SOURCE_DIR}/external/miniaudio")
+target_include_directories(AquanactGame PRIVATE "${CMAKE_SOURCE_DIR}/external/miniaudio")
 target_compile_features(AquanactBuildTool PRIVATE cxx_std_20)
 
 set_target_properties(AquanactEngine

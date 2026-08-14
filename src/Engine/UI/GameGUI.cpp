@@ -15,6 +15,7 @@
 #include "Engine/Core/FileSystem.h"
 #include "Engine/Core/Scene.h"
 #include "Engine/Core/SceneManager.h"
+#include "Engine/Core/Audio.h"
 
 #include <MYGUI/MyGUI_Button.h>
 #include <MYGUI/MyGUI_Colour.h>
@@ -615,6 +616,7 @@ void GameGUI::startUp(Window& window)
 	}
 
 	m_window = &window;
+	Audio::LoadSound("ui_button_focus", "assets/audio/sfx/button_focus.mp3");
 
 	// MyGUI's OpenGL backend needs a platform object plus an image loader before the
 	// main Gui singleton can initialize. Earlier crashes came from creating Gui
@@ -870,6 +872,7 @@ void GameGUI::ClearUI()
 		m_buttonDefaultTextColours.clear();
 		m_buttonLabels.clear();
 		m_focusedControllerButton = -1;
+		m_lastFocusSoundButton = nullptr;
 		return;
 	}
 
@@ -896,6 +899,7 @@ void GameGUI::ClearUI()
 	m_controllerButtons.clear();
 	m_runtimeWidgetLookup.clear();
 	m_focusedControllerButton = -1;
+	m_lastFocusSoundButton = nullptr;
 }
 
 MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* parent)
@@ -1005,6 +1009,11 @@ void GameGUI::PositionMenuPointer(MyGUI::Widget* button)
 	if (!menuButton)
 	{
 		return;
+	}
+	if (m_lastFocusSoundButton != menuButton)
+	{
+		Audio::PlayUISound("ui_button_focus", 65.0f);
+		m_lastFocusSoundButton = menuButton;
 	}
 	ApplyTextHighlight(menuButton, true);
 	if (m_menuPointer)

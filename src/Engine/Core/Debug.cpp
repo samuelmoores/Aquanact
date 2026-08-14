@@ -1442,10 +1442,6 @@ void Debug::VerifyDependencies()
 
 	const DependencyProbe probes[] =
 	{
-		{ "SFML system", "sfml-system-d-2.dll" },
-		{ "SFML window", "sfml-window-d-2.dll" },
-		{ "SFML graphics", "sfml-graphics-d-2.dll" },
-		{ "SFML audio", "sfml-audio-d-2.dll" },
 		{ "GLFW", "glfw3.dll" },
 		{ "FreeType", "freetyped.dll" },
 		{ "MyGUI OpenGL", "MyGUI.OpenGLPlatform_d.dll" }

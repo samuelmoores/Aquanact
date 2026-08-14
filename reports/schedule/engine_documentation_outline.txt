@@ -455,7 +455,7 @@ Audio System
 Source Files: `src/Engine/Audio.cpp`, `src/Engine/miniaudio_impl.c`, `include/Engine/Audio.h`
 Book Reference: Chapter 15, Audio
 Engine Notes:
-	-loads, plays, stops, sets volume using sfml
+	-loads, plays, stops, sets volume using miniaudio
 	-not in runtime yet
 
 Gregory Alignment:
@@ -637,7 +637,7 @@ Engine Notes:
 	-build is MSVC oriented, custom runtime settings, hardcoded visual studio and windows sdk library paths
 	-WIN32 entrypoint for game
 	-externals
-		-SFML, GLFW, Assimp, GLAD, OpenGL, ImGUI, MyGUI, FreeType
+		-GLFW, Assimp, GLAD, OpenGL, ImGUI, MyGUI, FreeType, miniaudio
 	-MyGUI manual, no Cmake package target warrants extra maintenance
 	-runtime assets have hardcoded path	
 

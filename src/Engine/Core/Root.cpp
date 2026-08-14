@@ -14,6 +14,7 @@
 #include "Engine/Core/Input.h"
 #include "Engine/Core/InputManager.h"
 #include "Engine/Core/FrameProfiler.h"
+#include "Engine/Core/Audio.h"
 #include "Engine/Core/GLHeaders.h"
 #include "Engine/Core/ComponentRegistry.h"
 
@@ -120,6 +121,7 @@ void Root::startUp(int argc, char** argv)
 
 	m_window->startUp();
 	m_targetFrameRate = m_window->RefreshRate();
+	Audio::Init();
 	m_renderManager->startUp(*m_window);
 	m_frontEndManager->startUp(*m_window);
 	m_input->startUp(*m_window);
@@ -229,6 +231,7 @@ void Root::shutDown()
 	}
 
 	m_gameplayManager->shutDown();
+	Audio::Shutdown();
 	m_fileManager->shutDown();
 	m_debug->shutDown();
 	m_inputManager->shutDown();

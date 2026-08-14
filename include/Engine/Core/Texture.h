@@ -16,7 +16,7 @@ struct Texture {
 	std::string samplerName;
 
 	/**
-	 * @brief Loads an SFML Image into VRAM and returns a Texture object identifying it.
+	 * @brief Loads image data into VRAM and returns a Texture object identifying it.
 	 */
 	static Texture loadImage(const StbImage& texture, const std::string& samplerName) {
 		uint32_t texId;
