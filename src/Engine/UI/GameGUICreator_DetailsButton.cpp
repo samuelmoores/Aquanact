@@ -1,9 +1,20 @@
 #include "Engine/UI/GameGUICreator.h"
+#include "Engine/UI/GameGUICreatorHelpers.h"
 
 #include <imgui.h>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
+
+namespace
+{
+	bool IsAudioFile(const std::filesystem::path& path)
+	{
+		const std::string extension = path.extension().string();
+		return extension == ".wav" || extension == ".mp3" || extension == ".ogg" || extension == ".flac";
+	}
+}
 
 namespace
 {
@@ -54,6 +65,34 @@ void GameGUICreator::DrawButtonWidgetDetails(GameGUIAsset& asset, GameGUIWidgetD
 	{
 		SyncRuntimePreview();
 		SaveSelectedRoleGUI();
+	}
+
+	const auto audioRoot = GameGUICreatorHelpers::SourceRoot() / "assets";
+	std::string focusSoundLabel = widget.focusSound.empty() ? "<No focus sound>" : widget.focusSound;
+	if (ImGui::BeginCombo("Focus sound", focusSoundLabel.c_str()))
+	{
+		if (ImGui::Selectable("<No focus sound>", widget.focusSound.empty()))
+		{
+			widget.focusSound.clear();
+			SyncRuntimePreview();
+			SaveSelectedRoleGUI();
+		}
+		std::error_code ec;
+		if (std::filesystem::exists(audioRoot, ec))
+		{
+			for (const auto& entry : std::filesystem::recursive_directory_iterator(audioRoot, ec))
+			{
+				if (ec || !entry.is_regular_file() || !IsAudioFile(entry.path())) continue;
+				const auto relative = std::filesystem::relative(entry.path(), audioRoot, ec).generic_string();
+				if (ImGui::Selectable(relative.c_str(), widget.focusSound == relative))
+				{
+					widget.focusSound = relative;
+					SyncRuntimePreview();
+					SaveSelectedRoleGUI();
+				}
+			}
+		}
+		ImGui::EndCombo();
 	}
 
 	if (!controlledByPanel)

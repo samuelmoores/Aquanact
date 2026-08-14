@@ -250,12 +250,14 @@ namespace {
 			widget.alpha = ReadFloatField(readField("\"alpha\":", widgetPos), 1.0f);
 			widget.highlightColor = readField("\"highlightColor\":", widgetPos);
 			widget.clickedColor = readField("\"clickedColor\":", widgetPos);
+			widget.focusSound = readField("\"focusSound\":", widgetPos);
 			widget.action = StringToAction(readField("\"action\":", widgetPos));
 			widget.launchLevel = readField("\"launchLevel\":", widgetPos);
 			widget.bindEntity = readField("\"bindEntity\":", widgetPos);
 			widget.bindComponent = readField("\"bindComponent\":", widgetPos);
 			widget.bindMember = readField("\"bindMember\":", widgetPos);
 			widget.bindEvent = readField("\"bindEvent\":", widgetPos);
+			widget.panelButtonFocusSound = readField("\"panelButtonFocusSound\":", widgetPos);
 			asset.widgets.push_back(widget);
 			widgetPos = contents.find("\"type\": \"", widgetPos + 1);
 		}

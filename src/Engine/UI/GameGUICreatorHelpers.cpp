@@ -355,7 +355,7 @@ namespace GameGUICreatorHelpers {
 				return {};
 			}
 
-			const std::size_t valueStart = contents.find_first_not_of(" \t", keyPos + key.size());
+			std::size_t valueStart = contents.find_first_not_of(" \t", keyPos + key.size());
 			if (valueStart == std::string::npos)
 			{
 				return {};
@@ -673,12 +673,14 @@ namespace GameGUICreatorHelpers {
 			try { widget.alpha = std::stof(readField("\"alpha\":", widgetPos)); } catch (...) {}
 			widget.highlightColor = readField("\"highlightColor\":", widgetPos);
 			widget.clickedColor = readField("\"clickedColor\":", widgetPos);
+			widget.focusSound = readField("\"focusSound\":", widgetPos);
 			widget.action = StringToAction(readField("\"action\":", widgetPos));
 			widget.launchLevel = readField("\"launchLevel\":", widgetPos);
 			widget.bindEntity = readField("\"bindEntity\":", widgetPos);
 			widget.bindComponent = readField("\"bindComponent\":", widgetPos);
 			widget.bindMember = readField("\"bindMember\":", widgetPos);
 			widget.bindEvent = readField("\"bindEvent\":", widgetPos);
+			widget.panelButtonFocusSound = readField("\"panelButtonFocusSound\":", widgetPos);
 
 			asset.widgets.push_back(widget);
 			widgetPos = contents.find("\"type\": \"", widgetPos + 1);

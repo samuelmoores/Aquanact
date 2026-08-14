@@ -34,6 +34,7 @@
 #include <iostream>
 #include <sstream>
 #include <functional>
+#include <cctype>
 #include <unordered_map>
 #include "Engine/Core/Texture.h"
 
@@ -489,6 +490,20 @@ MyGUI::Button* GameGUI::CreateButtonWidget(const GameGUIWidgetDef& def, MyGUI::W
 	SetButtonVisualState(button, def);
 	SetButtonFocusState(button, def);
 	SetButtonLabel(button, def, buttonWidth, buttonHeight);
+	std::string focusSound = def.focusSound;
+	if (focusSound.empty())
+	{
+		if (const GameGUIWidgetDef* parentPanel = FindWidgetDef(m_loadedAsset, def.parentName))
+		{
+			focusSound = parentPanel->panelButtonFocusSound;
+		}
+	}
+	if (!focusSound.empty() && Root::Current().State().IsGameMode())
+	{
+		const std::string soundName = "ui_focus_" + def.name;
+		Audio::LoadSound(soundName, "assets/" + focusSound);
+		m_buttonFocusSounds[button] = soundName;
+	}
 	HookButtonClick(button, def);
 	// Button widgets are interactive, so they keep mouse focus and pick behavior.
 	FinalizeAndLogWidget(button, def, parent == nullptr, true, true);
@@ -616,7 +631,6 @@ void GameGUI::startUp(Window& window)
 	}
 
 	m_window = &window;
-	Audio::LoadSound("ui_button_focus", "assets/audio/sfx/button_focus.mp3");
 
 	// MyGUI's OpenGL backend needs a platform object plus an image loader before the
 	// main Gui singleton can initialize. Earlier crashes came from creating Gui
@@ -871,6 +885,7 @@ void GameGUI::ClearUI()
 		m_runtimeWidgetLookup.clear();
 		m_buttonDefaultTextColours.clear();
 		m_buttonLabels.clear();
+		m_buttonFocusSounds.clear();
 		m_focusedControllerButton = -1;
 		m_lastFocusSoundButton = nullptr;
 		return;
@@ -895,6 +910,7 @@ void GameGUI::ClearUI()
 	m_menuBox = nullptr;
 	m_buttonDefaultTextColours.clear();
 	m_buttonLabels.clear();
+	m_buttonFocusSounds.clear();
 	m_runtimeWidgets.clear();
 	m_controllerButtons.clear();
 	m_runtimeWidgetLookup.clear();
@@ -1010,9 +1026,13 @@ void GameGUI::PositionMenuPointer(MyGUI::Widget* button)
 	{
 		return;
 	}
-	if (m_lastFocusSoundButton != menuButton)
+	if (m_lastFocusSoundButton != menuButton && Root::Current().State().IsGameMode())
 	{
-		Audio::PlayUISound("ui_button_focus", 65.0f);
+		const auto soundIt = m_buttonFocusSounds.find(menuButton);
+		if (soundIt != m_buttonFocusSounds.end())
+		{
+			Audio::PlayUISound(soundIt->second, 65.0f);
+		}
 		m_lastFocusSoundButton = menuButton;
 	}
 	ApplyTextHighlight(menuButton, true);

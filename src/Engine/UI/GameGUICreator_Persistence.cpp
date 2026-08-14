@@ -92,6 +92,7 @@ void GameGUICreator::SaveSelectedRoleGUI()
 		json << "      \"panelButtonTextColor\": \"" << widget.panelButtonTextColor << "\",\n";
 		json << "      \"panelButtonFontName\": \"" << widget.panelButtonFontName << "\",\n";
 		json << "      \"panelButtonFontSize\": " << widget.panelButtonFontSize << ",\n";
+		json << "      \"panelButtonFocusSound\": \"" << widget.panelButtonFocusSound << "\",\n";
 		json << "      \"text\": \"" << widget.text << "\",\n";
 		json << "      \"textColor\": \"" << widget.textColor << "\",\n";
 		json << "      \"texture\": \"" << widget.texture << "\",\n";
@@ -108,6 +109,7 @@ void GameGUICreator::SaveSelectedRoleGUI()
 			json << "      \"alpha\": " << widget.alpha << ",\n";
 		json << "      \"highlightColor\": \"" << widget.highlightColor << "\",\n";
 		json << "      \"clickedColor\": \"" << widget.clickedColor << "\",\n";
+		json << "      \"focusSound\": \"" << widget.focusSound << "\",\n";
 		json << "      \"action\": \"" << GameGUICreatorHelpers::ActionToString(widget.action) << "\",\n";
 		json << "      \"launchLevel\": \"" << widget.launchLevel << "\",\n";
 		json << "      \"bindEntity\": \"" << widget.bindEntity << "\",\n";

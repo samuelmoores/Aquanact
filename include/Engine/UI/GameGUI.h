@@ -103,6 +103,7 @@ private:
 	// Widget styling and selection state
 	std::unordered_map<MyGUI::Button*, MyGUI::Colour> m_buttonDefaultTextColours;
 	std::unordered_map<MyGUI::Button*, MyGUI::TextBox*> m_buttonLabels;
+	std::unordered_map<MyGUI::Button*, std::string> m_buttonFocusSounds;
 	MenuNavigationMode m_menuNavigationMode = MenuNavigationMode::Pointer;
 	int m_boxPadding = 8;
 	int m_boxOffsetX = 0;

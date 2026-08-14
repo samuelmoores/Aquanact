@@ -1,9 +1,11 @@
 #include "Engine/UI/GameGUICreator.h"
+#include "Engine/UI/GameGUICreatorHelpers.h"
 
 #include <imgui.h>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
 
 namespace
 {
@@ -122,10 +124,62 @@ void GameGUICreator::DrawPanelWidgetDetails(GameGUIAsset& asset, GameGUIWidgetDe
 
 	ImGui::Separator();
 	ImGui::TextUnformatted("Button controls");
+	bool panelSoundChanged = false;
 
 	// These settings control the buttons the panel owns, not the panel frame itself.
 	layoutChanged |= ImGui::Checkbox("Show button skins", &widget.panelButtonUseSkin);
 	layoutChanged |= ImGui::Checkbox("Uniform button spacing", &widget.uniformButtonSpacing);
+
+	const auto audioRoot = GameGUICreatorHelpers::SourceRoot() / "assets";
+	const std::string panelSoundFileName = widget.panelButtonFocusSound.empty()
+		? std::string("<No panel focus sound>")
+		: std::filesystem::path(widget.panelButtonFocusSound).filename().string();
+	if (ImGui::BeginCombo("Button focus sound", panelSoundFileName.c_str()))
+	{
+		if (ImGui::Selectable("<No panel focus sound>", widget.panelButtonFocusSound.empty()))
+		{
+			widget.panelButtonFocusSound.clear();
+			panelSoundChanged = true;
+		}
+		std::error_code ec;
+		if (std::filesystem::exists(audioRoot, ec))
+		{
+			// Walk the entire audio asset tree so sounds can be organized into
+			// folders such as audio/sfx and audio/music without extra UI code.
+			for (const auto& entry : std::filesystem::recursive_directory_iterator(audioRoot, ec))
+			{
+				// Ignore directory-iterator errors and folders; only playable files
+				// should appear as selectable sound assets.
+				if (ec || !entry.is_regular_file()) 
+					continue;
+
+				const std::string extension = entry.path().extension().string();
+
+				// Restrict the picker to formats currently supported by miniaudio.
+				if (extension != ".wav" && extension != ".mp3" && extension != ".ogg" && extension != ".flac") 
+					continue;
+
+				// Store paths relative to assets/ so the saved GUI file remains
+				// portable between source trees and build output directories.
+				const std::string relative = std::filesystem::relative(entry.path(), audioRoot, ec).generic_string();
+				const std::string fileName = entry.path().filename().string();
+
+				// Mark the current sound in the combo; selecting a new item updates
+				// the panel default used by child buttons.
+				if (ImGui::Selectable(fileName.c_str(), widget.panelButtonFocusSound == relative))
+				{
+					widget.panelButtonFocusSound = relative;
+					panelSoundChanged = true;
+				}
+			}
+		}
+		ImGui::EndCombo();
+	}
+	if (panelSoundChanged)
+	{
+		SyncRuntimePreview();
+		SaveSelectedRoleGUI();
+	}
 
 	// Keep the size edit box stable when the selected panel changes.
 	if (m_dimensionRequestWidgetName != widget.name)

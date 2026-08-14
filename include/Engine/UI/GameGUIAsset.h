@@ -68,11 +68,13 @@ struct GameGUIWidgetDef
 	std::string panelButtonTextColor = "0 0 0";
 	std::string panelButtonFontName;
 	int panelButtonFontSize = 10;
+	std::string panelButtonFocusSound;
 
 	// Button interaction and progress-bar styling
 	// These fields are used by interactive widgets and progress bars.
 	std::string highlightColor;
 	std::string clickedColor;
+	std::string focusSound;
 	GameGUIActionType action = GameGUIActionType::None;
 	std::string launchLevel;
 

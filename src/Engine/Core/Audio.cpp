@@ -112,6 +112,19 @@ void Audio::LoadSound(const std::string& name, const std::string& path) {
 		return;
 	}
 
+	// A reload may happen when a GUI preview changes its assigned sound. Release
+	// every pooled UI voice for this name so none can play the previous asset.
+	for (auto& voice : m_state->uiVoices)
+	{
+		if (voice.name == name && voice.sound)
+		{
+			ma_sound_stop(voice.sound.get());
+			ma_sound_uninit(voice.sound.get());
+			voice.sound.reset();
+			voice.name.clear();
+		}
+	}
+
 	auto existing = m_state->sounds.find(name);
 	if (existing != m_state->sounds.end())
 	{
