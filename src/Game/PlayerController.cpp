@@ -119,7 +119,10 @@ void PlayerController::TryJump(const InputManager& input)
 	// Step 3: leave the grounded state before applying vertical launch velocity.
 	// MoveWithPhysics() clears vertical velocity while grounded, so this order is
 	// required for the jump impulse to survive the movement step.
-	//m_velocity.y = m_jumpSpeed;
+	m_rawGrounded = false;
+	m_grounded = false;
+	m_groundedLossTimer = 0.0f;
+	m_velocity.y = m_jumpSpeed;
 
 }
 
@@ -144,7 +147,17 @@ void PlayerController::FirstFrame(Entity& owner)
 
 void PlayerController::Move(Entity& owner, const glm::vec2& move2D, float dt)
 {
-	Controller::Move(owner, move2D, dt);
+	const glm::vec3 worldMovement = BuildWorldMovement(move2D);
+	const bool hasMovement = glm::length(worldMovement) > 0.0001f;
+
+	if (hasMovement)
+	{
+		FaceMovementDirection(owner, worldMovement, m_turnSpeed, dt);
+	}
+
+	// Controller::Move expects a horizontal X/Z vector. Convert the
+	// camera-relative world direction back into that shared representation.
+	Controller::Move(owner, glm::vec2(worldMovement.x, worldMovement.z), dt);
 }
 
 
