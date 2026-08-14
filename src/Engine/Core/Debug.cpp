@@ -673,6 +673,15 @@ void Debug::drawGameModeInput(const Input& input)
 		ImGui::Text("IsGrounded true transitions: %d", m_groundedTrueCount);
 		ImGui::Text("IsGrounded false transitions: %d", m_groundedFalseCount);
 		ImGui::TextWrapped("Last grounded transition: %s", m_lastGroundedTransition.empty() ? "<none>" : m_lastGroundedTransition.c_str());
+		ImGui::Separator();
+		ImGui::Text("Controller: %s", m_controllerPhysicsObject.empty() ? "<none>" : m_controllerPhysicsObject.c_str());
+		ImGui::Text("Controller collider: %s", m_controllerColliderValid ? "valid" : "missing");
+		ImGui::Text("Controller bounds: %s", m_controllerBoundsValid ? "valid" : "invalid");
+		ImGui::Text("Vertical sweep hit: %s", m_controllerVerticalSweepHit ? "true" : "false");
+		ImGui::Text("Vertical sweep time: %.4f", m_controllerVerticalSweepTime);
+		ImGui::Text("Sweep normal: %.3f, %.3f, %.3f", m_controllerSweepNormal.x, m_controllerSweepNormal.y, m_controllerSweepNormal.z);
+		ImGui::Text("Controller velocity: %.3f, %.3f, %.3f", m_controllerVelocity.x, m_controllerVelocity.y, m_controllerVelocity.z);
+		ImGui::Text("Controller grounded: %s", m_controllerGrounded ? "true" : "false");
 		ImGui::End();
 		m_showPhysicsDiagnosticsWindow = open;
 	}
@@ -1151,6 +1160,20 @@ void Debug::RecordGroundedTransition(const std::string& objectName, bool grounde
 		"\ngrounded loss timer: " + std::to_string(groundedLossTimer) +
 		"\ndt: " + std::to_string(dt);
 	LogTagged("Physics", "IsGrounded switched " + state + ": " + m_lastGroundedTransition);
+}
+
+void Debug::SetControllerPhysicsDiagnostics(const std::string& objectName, bool colliderValid,
+	bool boundsValid, bool verticalSweepHit, float verticalSweepTime,
+	const glm::vec3& sweepNormal, const glm::vec3& velocity, bool grounded)
+{
+	m_controllerPhysicsObject = objectName;
+	m_controllerColliderValid = colliderValid;
+	m_controllerBoundsValid = boundsValid;
+	m_controllerVerticalSweepHit = verticalSweepHit;
+	m_controllerVerticalSweepTime = verticalSweepTime;
+	m_controllerSweepNormal = sweepNormal;
+	m_controllerVelocity = velocity;
+	m_controllerGrounded = grounded;
 }
 
 void Debug::SetGameplayDiagnostics(const std::string& objectName, const glm::vec3& moveInput, float moveSpeed, float dt, const glm::vec3& delta, const glm::vec3& position, float groundSurfaceAngle, bool grounded)

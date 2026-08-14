@@ -35,21 +35,7 @@ namespace
 		return projected;
 	}
 
-	void RecordCollisionContact(const Physics::SweepCollision& collision,
-		const glm::vec3& movement, glm::vec3* lastCollisionNormal, bool* collidedWithGround)
-	{
-		// Preserve the latest contact for grounding and velocity response. The
-		// world has already selected the earliest hit for this slide iteration.
-		if (lastCollisionNormal)
-		{
-			*lastCollisionNormal = collision.normal;
-		}
-		if (collidedWithGround && movement.y <= 0.0f &&
-			collision.normal.y > walkableGroundNormalY)
-		{
-			*collidedWithGround = true;
-		}
-	}
+	
 
 	glm::vec3 ResolveSlideCollision(const Physics::SweepCollision& collision,
 		const glm::vec3& remainingMovement, glm::vec3& resolvedDelta, float collisionSkin)
@@ -84,45 +70,59 @@ void Controller::startUp(Entity&)
 {
 	m_velocity = glm::vec3(0.0f);
 	m_groundedLossTimer = 0.0f;
-	m_grounded = false;
 	m_isGrounded = false;
 }
 
 void Controller::Update(Entity& owner, float dt)
 {
+	// is the game running
 	if (dt <= 0.0f)
 	{
 		return;
 	}
 
-	if (m_grounded)
+	m_isGrounded = false;
+	m_velocity.y = gravity * GravityScale();
+
+	// create local movement vector with y velocity
+	const glm::vec3 movement(0.0f, m_velocity.y * dt, 0.0f);
+
+	// get this entities collider from physics world
+	const ColliderHandle collider = PhysicsWorld::Instance().Find(owner);
+	glm::vec3 minBounds;
+	glm::vec3 maxBounds;
+	owner.WorldAABB(minBounds, maxBounds);
+
+	// compute collision for this frame
+	const Physics::SweepCollision collision = PhysicsWorld::Instance().Sweep(collider, minBounds, maxBounds, movement);
+
+	// Move normal or with a collision scalar?
+	owner.Move(collision.hit ? movement * glm::clamp(collision.time, 0.0f, 1.0f) : movement);
+
+	// if we hit something
+	if (collision.hit)
 	{
-		m_velocity.y = 0.0f;
-	}
-	else
-	{
-		m_velocity.y = std::max(m_velocity.y + gravity * GravityScale() * dt, terminalFallSpeed);
+		glm::vec3 lastCollisionNormal = collision.normal;
+
+		// check if we are on the ground
+		// walkableGroundNormalY is 0.25
+		// floor normal is 1.0
+		if (collision.normal.y > walkableGroundNormalY)
+		{
+			m_isGrounded = true;
+		}
 	}
 
-	owner.Move(glm::vec3(0.0f, m_velocity.y * dt, 0.0f));
+	Root::Current().Debugger().SetControllerPhysicsDiagnostics(
+		owner.Name(), true, true, collision.hit, collision.time, collision.normal,
+		m_velocity, m_isGrounded);
+
+	PhysicsWorld::Instance().Update(owner);
 }
 
-void Controller::Move(Entity& owner, const glm::vec2& direction, float dt)
+void Controller::MoveWithCollisions(Entity& owner, const glm::vec3& desiredMovement, float dt)
 {
-	// Keep diagonal input from moving faster than cardinal input.
-	const float inputLength = glm::length(direction);
-
-	const glm::vec2 clampedDirection = inputLength > 1.0f ? direction / inputLength : direction;
-	const glm::vec3 movementDirection(clampedDirection.x, 0.0f, clampedDirection.y);
-
-	const bool hasMovementInput = glm::length(movementDirection) > 0.0001f;
-	m_movementDirection = hasMovementInput ? glm::normalize(movementDirection) : glm::vec3(0.0f);
-
-	m_isMoving = hasMovementInput;
-
-	SetDiagnosticInput(movementDirection);
-
-	if (dt <= 0.0f || !hasMovementInput)
+	if (dt <= 0.0f || glm::length(desiredMovement) <= 0.0001f)
 	{
 		return;
 	}
@@ -130,15 +130,63 @@ void Controller::Move(Entity& owner, const glm::vec2& direction, float dt)
 	const ColliderHandle collider = PhysicsWorld::Instance().Find(owner);
 	glm::vec3 minBounds;
 	glm::vec3 maxBounds;
-	const bool hasValidBounds = owner.WorldAABB(minBounds, maxBounds);
-
-	// Collision sweeping is added in the next movement step. Until then, keep
-	// direct movement as the fallback for entities without registered geometry.
-	if (collider == InvalidColliderHandle || !hasValidBounds)
+	if (collider == InvalidColliderHandle || !owner.WorldAABB(minBounds, maxBounds))
 	{
-		owner.Move(movementDirection * m_moveSpeed * dt);
+		owner.Move(desiredMovement);
 		return;
 	}
 
-	owner.Move(movementDirection * m_moveSpeed * dt);
+	// This is intentionally a one-pass solver for now. The next step will
+	// combine horizontal and vertical movement here and add iterative sliding.
+	const Physics::SweepCollision collision = PhysicsWorld::Instance().Sweep(
+		collider, minBounds, maxBounds, desiredMovement);
+	const glm::vec3 resolvedMovement = collision.hit
+		? desiredMovement * glm::clamp(collision.time, 0.0f, 1.0f)
+		: desiredMovement;
+
+	owner.Move(resolvedMovement);
+	PhysicsWorld::Instance().Update(owner);
+}
+
+void Controller::Move(Entity& owner, const glm::vec2& direction, float dt)
+{
+	// create input magnitude
+	const float inputLength = glm::length(direction);
+
+	// Keep diagonal input from moving faster than cardinal input.
+	const glm::vec2 clampedDirection = inputLength > 1.0f ? direction / inputLength : direction;
+
+	// create movement vector
+	const glm::vec3 movementDirection(clampedDirection.x, 0.0f, clampedDirection.y);
+
+	// are we moving?
+	m_isMoving = glm::length(movementDirection) > 0.0001f;
+
+	// normalize or set to zero
+	m_movementDirection = m_isMoving ? glm::normalize(movementDirection) : glm::vec3(0.0f);
+
+	SetDiagnosticInput(movementDirection);
+
+	// skip the collision check if we are not moving
+	if (!m_isMoving)
+		return;
+
+	// get bounding box coordinates
+	const ColliderHandle collider = PhysicsWorld::Instance().Find(owner);
+	glm::vec3 minBounds;
+	glm::vec3 maxBounds;
+	owner.WorldAABB(minBounds, maxBounds);
+
+	// multiply speed and delta time
+	const glm::vec3 movement = movementDirection * m_moveSpeed * dt;
+
+	// check for a collision
+	const Physics::SweepCollision collision = PhysicsWorld::Instance().Sweep(
+		collider, minBounds, maxBounds, movement);
+
+	// move
+	if(!collision.hit)
+		owner.Move(movement);
+
+	PhysicsWorld::Instance().Update(owner);
 }

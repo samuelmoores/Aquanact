@@ -119,9 +119,6 @@ void PlayerController::TryJump(const InputManager& input)
 	// Step 3: leave the grounded state before applying vertical launch velocity.
 	// MoveWithPhysics() clears vertical velocity while grounded, so this order is
 	// required for the jump impulse to survive the movement step.
-	m_grounded = false;
-	m_isGrounded = false;
-	//m_groundedLossTimer = 0.0f;
 	//m_velocity.y = m_jumpSpeed;
 
 }

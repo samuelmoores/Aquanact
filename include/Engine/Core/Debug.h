@@ -141,6 +141,9 @@ public:
 	void RecordGroundedTransition(const std::string& objectName, bool grounded, bool rawGrounded,
 		bool mainGroundContact, bool probeGroundContact, const glm::vec3& collisionNormal,
 		const glm::vec3& position, const glm::vec3& velocity, float groundedLossTimer, float dt);
+	void SetControllerPhysicsDiagnostics(const std::string& objectName, bool colliderValid,
+		bool boundsValid, bool verticalSweepHit, float verticalSweepTime,
+		const glm::vec3& sweepNormal, const glm::vec3& velocity, bool grounded);
 	bool ShowPhysicsDiagnosticsWindow() const;
 	void SetShowPhysicsDiagnosticsWindow(bool show);
 
@@ -205,6 +208,14 @@ private:
 	glm::vec3 m_gameplayPosition{ 0.0f };
 	float m_gameplayGroundSurfaceAngle = 0.0f;
 	bool m_gameplayGrounded = false;
+	std::string m_controllerPhysicsObject;
+	bool m_controllerColliderValid = false;
+	bool m_controllerBoundsValid = false;
+	bool m_controllerVerticalSweepHit = false;
+	float m_controllerVerticalSweepTime = 1.0f;
+	glm::vec3 m_controllerSweepNormal{ 0.0f };
+	glm::vec3 m_controllerVelocity{ 0.0f };
+	bool m_controllerGrounded = false;
 	CameraDiagnosticsSnapshot m_cameraDiagnostics;
 	std::vector<std::string> m_cameraDiagnosticsEvents;
 	unsigned int m_cameraDiagnosticsEventSequence = 0;
