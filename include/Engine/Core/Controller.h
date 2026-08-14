@@ -51,8 +51,10 @@ protected:
 
 	// Runtime movement state.
 	glm::vec3 m_movementDirection{ 0.0f };
+	glm::vec3 m_pendingMovement{ 0.0f };
 	glm::vec3 m_velocity{ 0.0f };
 	float m_groundedLossTimer = 0.0f;
+	bool m_grounded = false;
 	bool m_isGrounded = false;
 	bool m_isMoving = false;
 	glm::vec3 m_groundNormal{ 0.0f, 1.0f, 0.0f };
