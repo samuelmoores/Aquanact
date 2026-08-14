@@ -190,6 +190,28 @@ namespace ProjectStateSerializer {
 					result.states.push_back(std::move(state));
 				}
 
+				// Optional section added after the original state fields. Older project
+				// files omit this marker and continue directly with transitionCount.
+				if (index < fields.size() && (fields[index] == "soundevents" || fields[index] == "soundevents2"))
+				{
+					const bool hasRandomSample = fields[index] == "soundevents2";
+					++index;
+					for (auto& state : result.states)
+					{
+						const int eventCount = std::stoi(fields.at(index++));
+						for (int eventIndex = 0; eventIndex < eventCount; ++eventIndex)
+						{
+							PendingComponent::EntityStateData::SoundEventData event;
+							event.soundName = ProjectStateFormat::UnescapeField(fields.at(index++));
+							event.frame = std::stof(fields.at(index++));
+							event.volume = std::stof(fields.at(index++));
+							if (hasRandomSample)
+								event.randomSample = fields.at(index++) == "1";
+							state.soundEvents.push_back(std::move(event));
+						}
+					}
+				}
+
 				int transitionCount = std::stoi(fields.at(index++));
 				if (transitionCount < 0)
 				{
@@ -307,6 +329,18 @@ namespace ProjectStateSerializer {
 						contents += ";" + ProjectStateFormat::EscapeField(state.animationName);
 						contents += ";" + std::to_string(state.blocksMovement ? 1 : 0);
 						contents += ";" + std::to_string(state.blocksInput ? 1 : 0);
+					}
+					contents += ";soundevents2";
+					for (const auto& state : animator->States())
+					{
+						contents += ";" + std::to_string(state.soundEvents.size());
+						for (const auto& event : state.soundEvents)
+						{
+							contents += ";" + ProjectStateFormat::EscapeField(event.soundName);
+							contents += ";" + std::to_string(event.frame);
+							contents += ";" + std::to_string(event.volume);
+							contents += ";" + std::to_string(event.randomSample ? 1 : 0);
+						}
 					}
 
 					contents += ";" + std::to_string(animator->Transitions().size());
@@ -732,6 +766,10 @@ namespace ProjectStateSerializer {
 					{
 						Scene.isMainMenu = fields[4] == "1" || fields[4] == "true" || fields[4] == "True";
 					}
+					if (fields.size() >= 6)
+						Scene.musicPath = ProjectStateFormat::UnescapeField(fields[5]);
+					if (fields.size() >= 7)
+						Scene.musicVolume = std::stof(fields[6]);
 					pendingLevels.push_back(std::move(Scene));
 					currentLevel = &pendingLevels.back();
 					continue;

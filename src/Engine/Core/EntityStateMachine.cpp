@@ -3,9 +3,13 @@
 #include "Engine/Core/Entity.h"
 #include "Engine/Core/Animation.h"
 #include "Engine/Core/Controller.h"
+#include "Engine/Core/Audio.h"
+#include "Engine/Core/Root.h"
 
 #include <algorithm>
 #include <cassert>
+#include <filesystem>
+#include <random>
 #include <sstream>
 
 // -----------------------------------------------------------------------------
@@ -58,8 +62,150 @@ void EntityStateMachine::Update(Entity& entity, float dt)
 		EvaluateTransitions(entity);
 	}
 
-	// Step 3: advance the animator after state selection for this frame.
+	// Step 3: capture the animation cursor before advancing it so timeline events
+	// can be detected across this update, including loop wraparound.
+	const int previousClip = m_animator->CurrentClipIndex();
+	const float previousTicks = m_animator->CurrentTimeTicks();
+
+	// Step 4: advance the animator after state selection for this frame.
+	//***************************************
+	//-----------------------------
+	//|       animator update     |
+	//-----------------------------
 	m_animator->Update(dt);
+	//-----------------------------
+	//|       animator update     |
+	//-----------------------------
+	//***************************************
+
+	const State* currentState = FindCurrentState();
+
+	// play sound events after animation update
+	if (!currentState->soundEvents.empty())
+	{
+		// get the animation clip index and the current tick
+		const int currentClip = m_animator->CurrentClipIndex();
+		const float currentTicks = m_animator->CurrentTimeTicks();
+
+		// Only process events when the animator remained on the same clip for the
+		// entire update and that clip still belongs to the current state. State
+		// transitions can change clips during this frame, in which case comparing
+		// the old and new cursors could trigger an event at the wrong time.
+		if (currentClip == previousClip && currentClip == ResolveAnimationClipIndex(*currentState))
+		{
+			PlaySoundEventsCrossed(previousTicks, currentTicks, m_animator->CurrentClipDurationTicks());
+		}
+	}
+}
+
+void EntityStateMachine::PlaySoundEventsCrossed(float previousTicks, float currentTicks, float duration)
+{
+	if (!Root::Current().State().IsGameMode() || duration <= 0.0f)
+	{
+		return;
+	}
+
+	const State* state = FindCurrentState();
+	if (!state)
+	{
+		return;
+	}
+
+	// Check every sound event belonging to the active state. Events are stored
+	// as animation-frame positions, while Animator reports its cursor in ticks.
+	for (const SoundEvent& event : state->soundEvents)
+	{
+		// Convert the authored frame index into the corresponding animation tick.
+		// The final frame maps to the end of the clip, so frameCount - 1 is used
+		// as the divisor. A one-frame clip has no range to convert.
+		const int frameCount = m_animator->CurrentClipFrameCount();
+		const float eventTicks = frameCount > 1
+			? duration * (std::max(0.0f, event.frame - 1.0f) / static_cast<float>(frameCount - 1))
+			: event.frame;
+
+		// An event is crossed when the cursor moves past it during this update.
+		// If currentTicks is lower than previousTicks, the animation wrapped from
+		// the end back to the beginning, so the comparison spans both ranges.
+		const bool crossed = previousTicks <= currentTicks
+			? (eventTicks > previousTicks && eventTicks <= currentTicks)
+			: (eventTicks > previousTicks || eventTicks <= currentTicks);
+		if (crossed)
+			PlaySoundEvent(event);
+	}
+}
+
+void EntityStateMachine::PlaySoundEvent(const SoundEvent& event)
+{
+	const auto resolveAssetPath = [](const std::string& relativePath)
+	{
+		std::filesystem::path path = std::filesystem::path("assets") / relativePath;
+#ifdef AQUANACT_SOURCE_ROOT
+		if (!std::filesystem::exists(path))
+			path = std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets" / relativePath;
+#endif
+		return path;
+	};
+
+	if (!event.randomSample)
+	{
+		if (!Audio::IsSoundLoaded(event.soundName))
+		{
+			const std::filesystem::path path = resolveAssetPath(event.soundName);
+			if (std::filesystem::exists(path))
+				Audio::LoadSound(event.soundName, path.string());
+		}
+		Audio::PlaySound(event.soundName, event.volume);
+		return;
+	}
+
+	const std::filesystem::path folder = resolveAssetPath(event.soundName);
+	std::vector<std::filesystem::path> samples;
+	std::error_code error;
+	if (!std::filesystem::is_directory(folder, error))
+		return;
+	for (const auto& entry : std::filesystem::directory_iterator(folder, error))
+	{
+		if (error || !entry.is_regular_file()) continue;
+		const std::string extension = entry.path().extension().string();
+		if (extension == ".wav" || extension == ".mp3" || extension == ".ogg" || extension == ".flac")
+			samples.push_back(entry.path());
+	}
+	if (samples.empty()) return;
+
+	static std::mt19937 generator(std::random_device{}());
+	const auto selected = samples[std::uniform_int_distribution<std::size_t>(0, samples.size() - 1)(generator)];
+	const std::string soundName = std::filesystem::relative(selected, "assets").generic_string();
+	if (!Audio::IsSoundLoaded(soundName))
+		Audio::LoadSound(soundName, std::filesystem::absolute(selected).string());
+	Audio::PlaySound(soundName, event.volume);
+}
+
+void EntityStateMachine::PlaySoundEventsAtStateStart()
+{
+	if (!Root::Current().State().IsGameMode())
+	{
+		return;
+	}
+
+	const State* state = FindCurrentState();
+	if (!state)
+	{
+		return;
+	}
+
+	// Frame numbers in the editor are one-based. Trigger every event assigned
+	// to frame 1 immediately when the state becomes active, before the first
+	// animator update can move the cursor past the start of the clip.
+	for (const SoundEvent& event : state->soundEvents)
+	{
+		if (event.frame > 1.0f)
+		{
+			continue;
+		}
+
+		PlaySoundEvent(event);
+		std::cout << "played sound at volume: " << event.volume << std::endl;
+	}
 }
 
 // -----------------------------------------------------------------------------
@@ -359,6 +505,93 @@ bool EntityStateMachine::RemoveState(std::size_t index)
 			return transition.from == removedName || transition.to == removedName;
 		}),
 		m_transitions.end());
+	return true;
+}
+
+bool EntityStateMachine::AddStateSoundEvent(const std::string& stateName, SoundEvent event)
+{
+	State* state = nullptr;
+
+	// is there a stateName state?
+	for (State& candidate : m_states)
+	{
+		if (candidate.name == stateName)
+		{
+			state = &candidate;
+			break;
+		}
+	}
+
+	// is the state valid, does sound exists, is frame non negative
+	if (!state || event.soundName.empty() || event.frame < 0.0f || event.volume < 0.0f)
+	{
+		return false;
+	}
+
+	// set volume
+	event.volume = std::min(event.volume, 100.0f);
+
+	// add the event
+	state->soundEvents.push_back(std::move(event));
+
+	// Keep events in animation order so the runtime can process them from the
+	// earliest frame to the latest. A stable sort preserves insertion order when
+	// multiple sounds share the same frame, making their playback order predictable.
+	std::stable_sort(state->soundEvents.begin(), state->soundEvents.end(), [](const SoundEvent& left, const SoundEvent& right)
+	{
+		return left.frame < right.frame;
+	});
+
+	return true;
+}
+
+bool EntityStateMachine::UpdateStateSoundEvent(const std::string& stateName, std::size_t eventIndex, SoundEvent event)
+{
+	State* state = nullptr;
+
+	for (State& candidate : m_states)
+	{
+		if (candidate.name == stateName)
+		{
+			state = &candidate;
+			break;
+		}
+	}
+
+	if (!state || eventIndex >= state->soundEvents.size()
+		|| event.soundName.empty() || event.frame < 0.0f || event.volume < 0.0f)
+	{
+		return false;
+	}
+
+	event.volume = std::min(event.volume, 100.0f);
+	state->soundEvents[eventIndex] = std::move(event);
+
+	std::stable_sort(state->soundEvents.begin(), state->soundEvents.end(), [](const SoundEvent& left, const SoundEvent& right)
+	{
+		return left.frame < right.frame;
+	});
+
+	return true;
+}
+
+bool EntityStateMachine::RemoveStateSoundEvent(const std::string& stateName, std::size_t eventIndex)
+{
+	State* state = nullptr;
+	for (State& candidate : m_states)
+	{
+		if (candidate.name == stateName)
+		{
+			state = &candidate;
+			break;
+		}
+	}
+	if (!state || eventIndex >= state->soundEvents.size())
+	{
+		return false;
+	}
+
+	state->soundEvents.erase(state->soundEvents.begin() + static_cast<std::ptrdiff_t>(eventIndex));
 	return true;
 }
 
@@ -666,6 +899,7 @@ void EntityStateMachine::StartInitialState()
 	if (clipIndex >= 0 && m_animator)
 	{
 		m_animator->Play(clipIndex, 0.0f);
+		PlaySoundEventsAtStateStart();
 	}
 }
 
@@ -683,6 +917,7 @@ void EntityStateMachine::ActivateState(const std::string& stateName)
 	m_desiredState = state->name;
 	m_currentStateElapsed = 0.0f;
 	m_currentStateLockedUntilComplete = false;
+	PlaySoundEventsAtStateStart();
 }
 
 int EntityStateMachine::ResolveAnimationClipIndex(const State& state) const

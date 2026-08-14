@@ -14,6 +14,25 @@ Animation::Animation(aiAnimation* anim)
 float Animation::Duration() const { return m_duration; }
 float Animation::TicksPerSecond() const { return m_ticksPerSecond; }
 
+int Animation::FrameCount() const
+{
+	if (!m_anim)
+	{
+		return 0;
+	}
+
+	unsigned int frameCount = 0;
+	for (unsigned int channelIndex = 0; channelIndex < m_anim->mNumChannels; ++channelIndex)
+	{
+		const aiNodeAnim* channel = m_anim->mChannels[channelIndex];
+		if (!channel) continue;
+		frameCount = std::max(frameCount, channel->mNumPositionKeys);
+		frameCount = std::max(frameCount, channel->mNumRotationKeys);
+		frameCount = std::max(frameCount, channel->mNumScalingKeys);
+	}
+	return static_cast<int>(frameCount);
+}
+
 const aiNodeAnim* Animation::FindChannel(const std::string& name) const
 {
 	auto it = m_channelMap.find(name);

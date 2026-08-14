@@ -10,6 +10,7 @@
 #include "Engine/Core/Input.h"
 #include "Engine/Core/SceneManager.h"
 #include "Engine/Core/FrameProfiler.h"
+#include "Engine/Core/Audio.h"
 #include "Engine/Core/FileSystem.h"
 
 #include <algorithm>
@@ -712,6 +713,7 @@ void GameGUIManager::DrawReturnButton()
 	ImGui::Text("Frame: %.3f ms", Root::Current().Profiler().FrameMs());
 	if (ImGui::Button("Return"))
 	{
+		Audio::StopMusic();
 		Root::Current().FrontEnd().CaptureRuntimeLayout();
 		Root::Current().Scenes().RestoreActiveLevelEditorTransforms();
 		const auto gameplayLevels = Root::Current().Scenes().SceneNames(SceneManager::SceneKind::Level);

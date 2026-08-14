@@ -27,8 +27,15 @@ public:
 	// Playback
 	void Play(int clipIndex, float blendSeconds = 0.33f);
 	void Update(float dt);
+
 	// Returns the full clip length in seconds.
 	float ClipDuration(int clipIndex) const;
+
+	// Current playback position, expressed in the active clip's animation ticks.
+	int CurrentClipIndex() const;
+	float CurrentTimeTicks() const;
+	float CurrentClipDurationTicks() const;
+	int CurrentClipFrameCount() const;
 
 	// Clip management
 	void AddClip(Animation* clip);

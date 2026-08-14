@@ -164,6 +164,8 @@ namespace ProjectStateFormat {
 			contents += SceneManager.SceneKindFor(Scene->Name()) == SceneManager::SceneKind::Cutscene ? "cutscene" : "Scene";
 			contents += ";";
 			contents += SceneManager.IsMainMenuScene(Scene->Name()) ? "1" : "0";
+			contents += ";" + EscapeField(Scene->MusicPath());
+			contents += ";" + std::to_string(Scene->MusicVolume());
 			contents += "\n";
 			for (const auto& object : Scene->Objects())
 			{

@@ -119,36 +119,38 @@ void Root::startUp(int argc, char** argv)
 #endif
 	m_editorLaunchedGameSession = false;
 
+	// window
 	m_window->startUp();
+
+	// TODO: have window set this in its startUp
 	m_targetFrameRate = m_window->RefreshRate();
+
+	//TODO: make an audiomanager and call its startUp function here
 	Audio::Init();
+
+	// render -> frontend -> input -> input -> debug -> files
 	m_renderManager->startUp(*m_window);
 	m_frontEndManager->startUp(*m_window);
 	m_input->startUp(*m_window);
 	m_inputManager->startUp(*m_input);
 	m_debug->startUp();
 	m_fileManager->startUp();
+
+	// TODO: put this into a startUp function for projectmanager
 	RegisterGameComponents();
 	const std::filesystem::path projectPath = DefaultProjectPath();
 	m_projectManager->LoadProject(projectPath, *m_sceneManager);
+
+	// scene
 	m_sceneManager->startUp();
+
+	// TODO: put this into scenemanager
 	if (m_sceneManager->AppliedNewClassConfigurationOnStartup())
 	{
 		m_projectManager->SaveProject(projectPath, *m_sceneManager);
 	}
 
-	StartInitialSession();
-	m_started = true;
-}
-
-void Root::StartEditorSession()
-{
-	m_editorLaunchedGameSession = false;
-	m_frontEndManager->RuntimeGUI().SetUIMode(GameGUIManager::UIMode::MainMenu);
-}
-
-void Root::StartInitialSession()
-{
+	// launch game or editor
 	if (m_engineState.IsGameMode())
 	{
 		m_gameplayManager->startUp(*m_sceneManager, *m_frontEndManager, *m_debug, m_engineState);
@@ -156,8 +158,11 @@ void Root::StartInitialSession()
 	}
 	else
 	{
-		StartEditorSession();
+		m_editorLaunchedGameSession = false;
+		m_frontEndManager->RuntimeGUI().SetUIMode(GameGUIManager::UIMode::MainMenu);
 	}
+
+	m_started = true;
 }
 
 void Root::run()
@@ -166,15 +171,30 @@ void Root::run()
 	{
 		const auto frameStart = std::chrono::steady_clock::now();
 		m_profiler->BeginFrame();
+
+		// input
 		{
 			FrameProfiler::Scope scope(*m_profiler, "Input");
 			m_input->Update();
 			m_inputManager->Update();
 		}
+
+		// gameplay
+		if (m_engineState.IsGameMode())
 		{
 			FrameProfiler::Scope scope(*m_profiler, "Gameplay");
-			UpdateFrame(m_input->DeltaTime());
+
+			// main menu, HUD or pause menu
+			m_gameplayManager->SyncRuntimeUI(*m_frontEndManager);
+
+			// are we playing?
+			if (m_gameplayManager->State() == GameplayManager::GameState::Playing)
+			{
+				m_gameplayManager->Update(m_input->DeltaTime(), *m_frontEndManager, *m_debug, m_engineState);
+			}
 		}
+
+		// render
 		{
 			FrameProfiler::Scope scope(*m_profiler, "Render");
 			m_renderManager->Loop(*m_frontEndManager, *m_fileManager, *m_sceneManager, *m_projectManager, *m_debug, *m_input, *m_window, m_engineState);
@@ -204,30 +224,11 @@ void Root::run()
 	}
 }
 
-void Root::UpdateFrame(float dt)
-{
-	if (m_engineState.IsGameMode())
-	{
-		m_gameplayManager->SyncRuntimeUI(*m_frontEndManager);
-		if (m_gameplayManager->State() == GameplayManager::GameState::Playing)
-		{
-			m_gameplayManager->Update(dt, *m_frontEndManager, *m_debug, m_engineState);
-		}
-	}
-
-	//RenderManager loop handles frontendmanager which handles editor side UI
-}
-
 void Root::shutDown()
 {
 	if (!m_started)
 	{
 		return;
-	}
-
-	m_debug->LogMessage("Main loop exiting because the window close flag was set.");
-	if (m_renderManager)
-	{
 	}
 
 	m_gameplayManager->shutDown();

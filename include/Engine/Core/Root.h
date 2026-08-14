@@ -63,9 +63,6 @@ public:
 	bool& EditorLaunchedGameSession();
 
 private:
-	void StartEditorSession();
-	void StartInitialSession();
-	void UpdateFrame(float dt);
 	void InitializeOwnedSystems();
 
 	std::unique_ptr<Window> m_window;

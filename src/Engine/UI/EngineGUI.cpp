@@ -875,6 +875,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 
 			ToggleMenuItem("Axis", m_showAxis);
 			ToggleMenuItem("Camera Window", m_showCameraWindow);
+			ToggleMenuItem("Audio Window", m_showAudioWindow);
 
 			if (ImGui::BeginMenu("EngineCamera"))
 			{
@@ -1111,6 +1112,7 @@ void EngineGUI::Draw(const Camera&, FileManager& fileManager, SceneManager& Scen
 	DrawNewLevelPopup();
 	DrawInputMapWindow();
 	DrawCameraWindow();
+	DrawAudioWindow(SceneManager, projectManager);
 	if (m_componentDeletePopupRequested)
 	{
 		ImGui::OpenPopup("Delete Component Type##AquanactDeleteComponentType");
@@ -1863,6 +1865,62 @@ const CameraPathCreator& EngineGUI::CameraPath() const
 }
 
 // Popup and window drawing helpers
+void EngineGUI::DrawAudioWindow(SceneManager& sceneManager, ProjectManager& projectManager)
+{
+	if (!m_showAudioWindow) return;
+	bool open = true;
+	if (ImGui::Begin("Audio", &open))
+	{
+		Scene* scene = sceneManager.ActiveLevel();
+		if (scene)
+		{
+			ImGui::Text("Level Music");
+			const std::filesystem::path musicRoot =
+#ifdef AQUANACT_SOURCE_ROOT
+				std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets" / "audio" / "music";
+#else
+				std::filesystem::current_path() / "assets" / "audio" / "music";
+#endif
+			const std::string label = scene->MusicPath().empty()
+				? "<Select music>"
+				: std::filesystem::path(scene->MusicPath()).filename().string();
+			if (ImGui::BeginCombo("Music", label.c_str()))
+			{
+				std::error_code error;
+				if (std::filesystem::exists(musicRoot, error))
+				{
+					for (const auto& entry : std::filesystem::directory_iterator(musicRoot, error))
+					{
+						if (error || !entry.is_regular_file()) continue;
+						const std::string extension = entry.path().extension().string();
+						if (extension != ".wav" && extension != ".mp3" && extension != ".ogg" && extension != ".flac") continue;
+						const std::string relative = "audio/music/" + entry.path().filename().generic_string();
+						if (ImGui::Selectable(entry.path().filename().string().c_str(), scene->MusicPath() == relative))
+						{
+							scene->SetMusicPath(relative);
+								const std::filesystem::path projectPath = projectManager.CurrentProjectPath();
+								if (!projectPath.empty()) projectManager.SaveProject(projectPath, sceneManager);
+						}
+					}
+				}
+				ImGui::EndCombo();
+			}
+			float volume = scene->MusicVolume();
+			ImGui::SetNextItemWidth(220.0f);
+			if (ImGui::SliderFloat("Volume", &volume, 0.0f, 100.0f))
+			{
+				scene->SetMusicVolume(volume);
+				const std::filesystem::path projectPath = projectManager.CurrentProjectPath();
+				if (!projectPath.empty()) projectManager.SaveProject(projectPath, sceneManager);
+			}
+		}
+		else
+			ImGui::TextUnformatted("No active scene.");
+	}
+	ImGui::End();
+	m_showAudioWindow = open;
+}
+
 void EngineGUI::DrawCameraWindow()
 {
 	if (!m_showCameraWindow)
@@ -2196,6 +2254,12 @@ void EngineGUI::DrawEntityStateMachinePopup(EntityStateMachine& entityStateMachi
 				ui.editStatePopupRequested = true;
 			}
 			ImGui::SameLine();
+			if (ImGui::SmallButton("Sounds"))
+			{
+				ui.selectedSoundStateIndex = static_cast<int>(stateIndex);
+				ui.selectedSoundEventIndex = -1;
+			}
+			ImGui::SameLine();
 			if (ImGui::SmallButton("Delete"))
 			{
 				ui.visibleStateTransitions.erase(state.name);
@@ -2204,6 +2268,147 @@ void EngineGUI::DrawEntityStateMachinePopup(EntityStateMachine& entityStateMachi
 				break;
 			}
 			ImGui::PopID();
+		}
+
+		if (ui.selectedSoundStateIndex >= 0 && ui.selectedSoundStateIndex < static_cast<int>(states.size()))
+		{
+			const EntityStateMachine::State& soundState = states[static_cast<std::size_t>(ui.selectedSoundStateIndex)];
+			auto saveSoundEventChanges = []()
+			{
+				const std::filesystem::path projectPath = Root::Current().Projects().CurrentProjectPath();
+				if (!projectPath.empty())
+				{
+					Root::Current().Projects().SaveProject(projectPath, Root::Current().Scenes());
+				}
+			};
+			ImGui::SeparatorText(("Sound Events: " + soundState.name).c_str());
+			for (std::size_t eventIndex = 0; eventIndex < soundState.soundEvents.size(); ++eventIndex)
+			{
+				const EntityStateMachine::SoundEvent& event = soundState.soundEvents[eventIndex];
+				ImGui::PushID(static_cast<int>(eventIndex));
+				EntityStateMachine::SoundEvent editedEvent = event;
+				ImGui::Checkbox("Random Sample", &editedEvent.randomSample);
+				int eventFrame = static_cast<int>(std::lround(editedEvent.frame));
+				ImGui::SetNextItemWidth(80.0f);
+				if (ImGui::InputInt("Frame", &eventFrame))
+				{
+					editedEvent.frame = static_cast<float>(std::max(0, eventFrame));
+				}
+
+				const std::filesystem::path soundRoot =
+#ifdef AQUANACT_SOURCE_ROOT
+					std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets" / "audio" / "sfx";
+#else
+					std::filesystem::current_path() / "assets" / "audio" / "sfx";
+#endif
+				const std::string eventSoundLabel = editedEvent.soundName.empty()
+					? "<Select sound>"
+					: std::filesystem::path(editedEvent.soundName).filename().string();
+				ImGui::SetNextItemWidth(180.0f);
+				if (ImGui::BeginCombo("Sound", eventSoundLabel.c_str()))
+				{
+					std::error_code soundError;
+					if (std::filesystem::exists(soundRoot, soundError))
+					{
+						for (const auto& entry : std::filesystem::directory_iterator(soundRoot, soundError))
+						{
+							if (soundError || (editedEvent.randomSample ? !entry.is_directory() : !entry.is_regular_file())) continue;
+							if (editedEvent.randomSample == entry.is_directory())
+							{
+								const std::string relative = "audio/sfx/" + entry.path().filename().generic_string();
+								const std::string fileName = entry.path().filename().string();
+								if (ImGui::Selectable(fileName.c_str(), editedEvent.soundName == relative))
+									editedEvent.soundName = relative;
+								continue;
+							}
+							const std::string extension = entry.path().extension().string();
+							if (extension != ".wav" && extension != ".mp3" && extension != ".ogg" && extension != ".flac") continue;
+							const std::string relative = "audio/sfx/" + entry.path().filename().generic_string();
+							const std::string fileName = entry.path().filename().string();
+							if (ImGui::Selectable(fileName.c_str(), editedEvent.soundName == relative))
+							{
+								editedEvent.soundName = relative;
+							}
+						}
+					}
+					ImGui::EndCombo();
+				}
+
+				ImGui::SetNextItemWidth(110.0f);
+				ImGui::SliderFloat("Volume", &editedEvent.volume, 0.0f, 100.0f);
+				if (editedEvent.soundName != event.soundName
+					|| editedEvent.randomSample != event.randomSample
+					|| editedEvent.frame != event.frame
+					|| editedEvent.volume != event.volume)
+				{
+					entityStateMachine.UpdateStateSoundEvent(soundState.name, eventIndex, editedEvent);
+					saveSoundEventChanges();
+				}
+				ImGui::SameLine();
+				if (ImGui::SmallButton("Delete##SoundEvent"))
+				{
+					entityStateMachine.RemoveStateSoundEvent(soundState.name, eventIndex);
+					saveSoundEventChanges();
+					ImGui::PopID();
+					break;
+				}
+				ImGui::PopID();
+			}
+
+			ImGui::SetNextItemWidth(90.0f);
+			ImGui::InputInt("Frame##NewSoundEvent", &ui.soundEventFrame);
+			ui.soundEventFrame = std::max(0, ui.soundEventFrame);
+			ImGui::Checkbox("Random Sample##NewSoundEvent", &ui.soundEventRandomSample);
+
+			const std::filesystem::path soundRoot =
+#ifdef AQUANACT_SOURCE_ROOT
+				std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets" / "audio" / "sfx";
+#else
+				std::filesystem::current_path() / "assets" / "audio" / "sfx";
+#endif
+			const std::string soundLabel = ui.soundEventSoundPath.empty()
+				? "<Select sound>"
+				: std::filesystem::path(ui.soundEventSoundPath).filename().string();
+			ImGui::SetNextItemWidth(220.0f);
+			if (ImGui::BeginCombo("Sound##NewSoundEvent", soundLabel.c_str()))
+			{
+				std::error_code soundError;
+				if (std::filesystem::exists(soundRoot, soundError))
+				{
+					for (const auto& entry : std::filesystem::directory_iterator(soundRoot, soundError))
+					{
+							if (soundError || (ui.soundEventRandomSample ? !entry.is_directory() : !entry.is_regular_file())) continue;
+							if (ui.soundEventRandomSample == entry.is_directory())
+							{
+								const std::string relative = "audio/sfx/" + entry.path().filename().generic_string();
+								const std::string fileName = entry.path().filename().string();
+								if (ImGui::Selectable(fileName.c_str(), ui.soundEventSoundPath == relative))
+									ui.soundEventSoundPath = relative;
+								continue;
+							}
+							const std::string extension = entry.path().extension().string();
+						if (extension != ".wav" && extension != ".mp3" && extension != ".ogg" && extension != ".flac") continue;
+						const std::string relative = "audio/sfx/" + entry.path().filename().generic_string();
+						const std::string fileName = entry.path().filename().string();
+						if (ImGui::Selectable(fileName.c_str(), ui.soundEventSoundPath == relative))
+						{
+							ui.soundEventSoundPath = relative;
+						}
+					}
+				}
+				ImGui::EndCombo();
+			}
+			ImGui::SetNextItemWidth(120.0f);
+			ImGui::SliderFloat("Volume##NewSoundEvent", &ui.soundEventVolume, 0.0f, 100.0f);
+			if (ImGui::Button("Add Sound Event") && !ui.soundEventSoundPath.empty())
+			{
+				entityStateMachine.AddStateSoundEvent(soundState.name,
+					{ ui.soundEventSoundPath, static_cast<float>(ui.soundEventFrame), ui.soundEventVolume, ui.soundEventRandomSample });
+				saveSoundEventChanges();
+				ui.soundEventSoundPath.clear();
+				ui.soundEventFrame = 0;
+				ui.soundEventRandomSample = false;
+			}
 		}
 
 		auto stateTransitionsAreVisible = [](const std::map<std::string, bool>& visibility, const std::string& stateName)

@@ -26,10 +26,17 @@ namespace ProjectStateData {
 		bool triggerEnabled = true;
 		std::string initialState;
 		struct EntityStateData {
+			struct SoundEventData {
+				std::string soundName;
+				float frame = 0.0f;
+				float volume = 100.0f;
+				bool randomSample = false;
+			};
 			std::string name;
 			std::string animationName;
 			bool blocksMovement = false;
 			bool blocksInput = false;
+			std::vector<SoundEventData> soundEvents;
 		};
 		struct EntityStateConditionData {
 			struct OperandData {
@@ -71,6 +78,8 @@ namespace ProjectStateData {
 		bool active = false;
 		bool isCutscene = false;
 		bool isMainMenu = false;
+		std::string musicPath;
+		float musicVolume = 50.0f;
 		struct PendingObject {
 			std::filesystem::path sourcePath;
 			glm::vec3 position{ 0.0f };

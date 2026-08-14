@@ -138,6 +138,38 @@ float Animator::ClipDuration(int clipIndex) const
 	return ticksPerSecond > 0.0f ? clip.Duration() / ticksPerSecond : 0.0f;
 }
 
+int Animator::CurrentClipIndex() const
+{
+	return m_currentClip;
+}
+
+float Animator::CurrentTimeTicks() const
+{
+	if (m_currentClip < 0 || m_currentClip >= static_cast<int>(m_clips.size()) || !m_clips[m_currentClip])
+	{
+		return 0.0f;
+	}
+	return LoopTicks(m_currentTime, m_clips[m_currentClip].get());
+}
+
+float Animator::CurrentClipDurationTicks() const
+{
+	if (m_currentClip < 0 || m_currentClip >= static_cast<int>(m_clips.size()) || !m_clips[m_currentClip])
+	{
+		return 0.0f;
+	}
+	return m_clips[m_currentClip]->Duration();
+}
+
+int Animator::CurrentClipFrameCount() const
+{
+	if (m_currentClip < 0 || m_currentClip >= static_cast<int>(m_clips.size()) || !m_clips[m_currentClip])
+	{
+		return 0;
+	}
+	return m_clips[m_currentClip]->FrameCount();
+}
+
 void Animator::Traverse(float timeTicks, const aiNode* node, const aiMatrix4x4& parent, Animation* anim)
 {
 	const std::string name = node->mName.C_Str();

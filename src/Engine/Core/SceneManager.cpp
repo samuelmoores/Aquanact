@@ -479,6 +479,12 @@ void SceneManager::ApplyProjectState(
 							ResolveSavedAnimationSource(*object, state.animationName),
 							state.blocksMovement,
 							state.blocksInput);
+						for (const auto& event : state.soundEvents)
+						{
+							entityStateMachine->AddStateSoundEvent(
+								state.name,
+								{ event.soundName, event.frame, event.volume, event.randomSample });
+						}
 					}
 					entityStateMachine->SetInitialState(pendingComponent.initialState);
 
@@ -558,6 +564,11 @@ void SceneManager::ApplyProjectState(
 		}
 		for (const ProjectStateData::PendingLevel& pendingLevel : pendingLevels)
 		{
+			if (Scene* level = FindLevel(pendingLevel.name))
+			{
+				level->SetMusicPath(pendingLevel.musicPath);
+				level->SetMusicVolume(pendingLevel.musicVolume);
+			}
 			SetSceneKind(pendingLevel.name, pendingLevel.isCutscene ? SceneKind::Cutscene : SceneKind::Level);
 		}
 		SetActiveLevel(activeLevel->Name());

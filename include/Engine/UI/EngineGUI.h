@@ -54,6 +54,7 @@ private:
 	void DrawNewLevelPopup();
 	void DrawInputMapWindow();
 	void DrawCameraWindow();
+	void DrawAudioWindow(SceneManager& sceneManager, ProjectManager& projectManager);
 	void DrawEntityStateMachinePopup(EntityStateMachine& entityState);
 
 	// File and name helpers
@@ -103,6 +104,13 @@ private:
 		char stateEditAnimationName[64] = "";
 		bool stateEditBlocksMovement = false;
 		bool stateEditBlocksInput = false;
+		// Draft controls for the sound event editor of the selected state.
+		int selectedSoundEventIndex = -1;
+		int soundEventFrame = 0;
+		float soundEventVolume = 100.0f;
+		std::string soundEventSoundPath;
+		bool soundEventRandomSample = false;
+		int selectedSoundStateIndex = -1;
 		bool addTransitionPopupInitialized = false;
 		bool editTransitionPopupRequested = false;
 		bool transitionListNeedsRefresh = false;
@@ -136,6 +144,7 @@ private:
 	bool m_showFileExplorer = false;
 	bool m_showInputMapWindow = false;
 	bool m_showCameraWindow = false;
+	bool m_showAudioWindow = false;
 	bool m_showCameraPath = false;
 	CameraPathCreator m_cameraPathCreator;
 

@@ -13,6 +13,7 @@ public:
 	// Clip timing
 	float Duration() const;
 	float TicksPerSecond() const;
+	int FrameCount() const;
 
 	// Channel lookup
 	const aiNodeAnim* FindChannel(const std::string& name) const;

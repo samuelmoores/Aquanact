@@ -1,4 +1,5 @@
 #include "Engine/Core/GameplayManager.h"
+#include "Engine/Core/Audio.h"
 
 #include "Engine/Core/Controller.h"
 #include "Engine/Core/EntityStateMachine.h"
@@ -58,6 +59,7 @@ void GameplayManager::startUp(SceneManager& SceneManager, FrontEndManager& front
 
 void GameplayManager::shutDown()
 {
+	Audio::StopMusic();
 	m_levelManager = nullptr;
 	m_state = GameState::MainMenu;
 }
@@ -109,6 +111,8 @@ bool GameplayManager::BootPlayableLevel(FrontEndManager& frontEndManager, Debug&
 	m_levelManager->startUp();
 	m_levelManager->CaptureActiveLevelEditorTransforms();
 	playableLevel->FirstFrame();
+	if (!playableLevel->MusicPath().empty())
+		Audio::PlayMusic("assets/" + playableLevel->MusicPath(), true, playableLevel->MusicVolume());
 	m_state = GameState::Playing;
 	Root::Current().InputRef().CaptureCursorForLevel();
 	debug.LogMessage("GameplayManager::BootPlayableLevel() state=Playing Scene=" + playableLevel->Name());
@@ -143,6 +147,8 @@ void GameplayManager::StartGameSession(FrontEndManager& frontEndManager, Debug& 
 	if (activeLevel)
 	{
 		activeLevel->FirstFrame();
+		if (!activeLevel->MusicPath().empty())
+			Audio::PlayMusic("assets/" + activeLevel->MusicPath(), true, activeLevel->MusicVolume());
 	}
 	m_state = GameState::Playing;
 	Root::Current().InputRef().CaptureCursorForLevel();

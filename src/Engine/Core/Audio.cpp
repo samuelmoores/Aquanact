@@ -146,6 +146,11 @@ void Audio::LoadSound(const std::string& name, const std::string& path) {
 	m_state->soundPaths[name] = path;
 }
 
+bool Audio::IsSoundLoaded(const std::string& name)
+{
+	return m_state && m_state->sounds.find(name) != m_state->sounds.end();
+}
+
 void Audio::PlaySound(const std::string& name, float volume) {
 	if (!m_state)
 	{
@@ -155,6 +160,15 @@ void Audio::PlaySound(const std::string& name, float volume) {
 	if (it == m_state->sounds.end()) {
 		std::cerr << "Audio: sound '" << name << "' not loaded\n";
 		return;
+	}
+
+	ma_sound_set_volume(it->second.get(), ToGain(volume));
+	ma_sound_seek_to_pcm_frame(it->second.get(), 0);
+	const ma_result result = ma_sound_start(it->second.get());
+	if (result != MA_SUCCESS)
+	{
+		std::cerr << "Audio: failed to play sound '" << name
+		          << "' (error " << result << ")\n";
 	}
 }
 

@@ -48,12 +48,22 @@ public:
 		Operand right;
 	};
 
+	// A sound scheduled against a frame in the state's animation clip.
+	// Playback is intentionally handled separately from this data model.
+	struct SoundEvent {
+		std::string soundName;
+		float frame = 0.0f;
+		float volume = 100.0f;
+		bool randomSample = false;
+	};
+
 	// A named animation state owned by the machine.
 	struct State {
 		std::string name;
 		std::string animationName;
 		bool blocksMovement = false;
 		bool blocksInput = false;
+		std::vector<SoundEvent> soundEvents;
 	};
 
 	// A transition between states. Multiple conditions are supported.
@@ -80,6 +90,9 @@ public:
 	bool AddState(std::string name, std::string animationName = {}, bool blocksMovement = false, bool blocksInput = false);
 	bool UpdateState(std::size_t index, std::string name, std::string animationName = {}, bool blocksMovement = false, bool blocksInput = false);
 	bool RemoveState(std::size_t index);
+	bool AddStateSoundEvent(const std::string& stateName, SoundEvent event);
+	bool UpdateStateSoundEvent(const std::string& stateName, std::size_t eventIndex, SoundEvent event);
+	bool RemoveStateSoundEvent(const std::string& stateName, std::size_t eventIndex);
 
 	// Transition editing.
 	bool AddTransition(std::string from, std::string to, float blendSeconds, bool waitForCurrentStateComplete, Condition condition = {});
@@ -136,6 +149,9 @@ private:
 	bool FireTransition(const Transition& transition);
 	void StartInitialState();
 	void ActivateState(const std::string& stateName);
+	void PlaySoundEventsAtStateStart();
+	void PlaySoundEvent(const SoundEvent& event);
+	void PlaySoundEventsCrossed(float previousTicks, float currentTicks, float duration);
 	int ResolveAnimationClipIndex(const State& state) const;
 	bool TransitionConditionPasses(const Transition& transition, const Entity& owner, float& leftValue, float& rightValue, bool& operandsResolved) const;
 	bool ResolveOperand(const Operand& operand, const Entity& owner, float& value) const;
