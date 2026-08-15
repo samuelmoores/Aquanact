@@ -536,7 +536,9 @@ namespace {
 		EntityStateMachine::Operand& operand,
 		const std::vector<EntityStateBindingSource>& sources,
 		bool useBooleanConstant = false,
-		bool horizontal = false)
+		bool horizontal = false,
+		bool drawType = true,
+		bool drawValue = true)
 	{
 		ImGui::PushID(label);
 		auto setComboWidthToContents = [](const char* text)
@@ -551,17 +553,24 @@ namespace {
 
 		const char* operandTypes[] = { "Constant", "Entity" };
 		int operandType = static_cast<int>(operand.type);
-		setComboWidthToContents(operandTypes[operandType]);
-		if (ImGui::Combo(horizontal ? "##OperandType" : "Type", &operandType, operandTypes, IM_ARRAYSIZE(operandTypes)))
+		if (drawType)
 		{
-			operand.type = static_cast<EntityStateMachine::OperandType>(operandType);
-			if (operand.type == EntityStateMachine::OperandType::Binding && operand.memberName.empty())
+			setComboWidthToContents(operandTypes[operandType]);
+			if (ImGui::Combo("##OperandType", &operandType, operandTypes, IM_ARRAYSIZE(operandTypes)))
 			{
-				SetDefaultEntityStateOperand(operand, sources);
-				operand.type = EntityStateMachine::OperandType::Binding;
+				operand.type = static_cast<EntityStateMachine::OperandType>(operandType);
+				if (operand.type == EntityStateMachine::OperandType::Binding && operand.memberName.empty())
+				{
+					SetDefaultEntityStateOperand(operand, sources);
+					operand.type = EntityStateMachine::OperandType::Binding;
+				}
 			}
 		}
-		if (horizontal) ImGui::SameLine();
+		if (!drawValue)
+		{
+			ImGui::PopID();
+			return;
+		}
 
 		if (operand.type == EntityStateMachine::OperandType::Constant)
 		{
@@ -574,14 +583,14 @@ namespace {
 				int booleanValue = operand.constantValue != 0.0f ? 1 : 0;
 				operand.constantValue = booleanValue == 1 ? 1.0f : 0.0f;
 				setComboWidthToContents(booleanValues[booleanValue]);
-				if (ImGui::Combo(horizontal ? "##OperandValue" : "Value", &booleanValue, booleanValues, IM_ARRAYSIZE(booleanValues)))
+				if (ImGui::Combo("##OperandValue", &booleanValue, booleanValues, IM_ARRAYSIZE(booleanValues)))
 				{
 					operand.constantValue = booleanValue == 1 ? 1.0f : 0.0f;
 				}
 			}
 			else
 			{
-				ImGui::InputFloat(horizontal ? "##OperandValue" : "Value", &operand.constantValue, 0.0f, 0.0f, "%.3f");
+				ImGui::InputFloat("##OperandValue", &operand.constantValue, 0.0f, 0.0f, "%.3f");
 			}
 			ImGui::PopID();
 			return;
@@ -599,7 +608,7 @@ namespace {
 
 		const char* sourceLabel = selectedSource ? selectedSource->label.c_str() : "<select variable>";
 		setComboWidthToContents(sourceLabel);
-		if (ImGui::BeginCombo(horizontal ? "##OperandVariable" : "Variable", sourceLabel))
+		if (ImGui::BeginCombo("##OperandVariable", sourceLabel))
 		{
 			for (const EntityStateBindingSource& source : sources)
 			{
@@ -638,7 +647,7 @@ namespace {
 			? (selectedMember->displayName.empty() ? selectedMember->name.c_str() : selectedMember->displayName.c_str())
 			: "<select variable>";
 		setComboWidthToContents(memberLabel);
-		if (ImGui::BeginCombo(horizontal ? "##OperandMember" : "Variable Value", memberLabel))
+		if (ImGui::BeginCombo("##OperandMember", memberLabel))
 		{
 			for (const BindableMember& member : selectedSource->members)
 			{
@@ -2606,7 +2615,6 @@ void EngineGUI::DrawEntityStateMachinePopup(EntityStateMachine& entityStateMachi
 				ui.addTransitionPopupInitialized = true;
 			}
 
-			ImGui::TextUnformatted("From");
 			setComboWidthToText(ui.transitionFromState[0] != '\0' ? ui.transitionFromState : "<from>");
 			if (ImGui::BeginCombo("##TransitionFrom", ui.transitionFromState[0] != '\0' ? ui.transitionFromState : "<from>"))
 			{
@@ -2622,9 +2630,8 @@ void EngineGUI::DrawEntityStateMachinePopup(EntityStateMachine& entityStateMachi
 				ImGui::EndCombo();
 			}
 			ImGui::SameLine();
-			ImGui::Checkbox("Wait to finish", &ui.transitionWaitForCurrentStateComplete);
-
-			ImGui::TextUnformatted("To");
+			ImGui::TextUnformatted("->");
+			ImGui::SameLine();
 			setComboWidthToText(ui.transitionToState[0] != '\0' ? ui.transitionToState : "<to>");
 			if (ImGui::BeginCombo("##TransitionTo", ui.transitionToState[0] != '\0' ? ui.transitionToState : "<to>"))
 			{
@@ -2639,9 +2646,7 @@ void EngineGUI::DrawEntityStateMachinePopup(EntityStateMachine& entityStateMachi
 				}
 				ImGui::EndCombo();
 			}
-
-			ImGui::SetNextItemWidth(120.0f);
-			ImGui::InputFloat("Blend Seconds", &ui.transitionBlendSeconds, 0.0f, 0.0f, "%.2f");
+			ImGui::Checkbox("No interrupt", &ui.transitionWaitForCurrentStateComplete);
 			ImGui::Separator();
 
 			for (std::size_t conditionIndex = 0; conditionIndex < ui.conditions.size(); ++conditionIndex)
@@ -2651,20 +2656,51 @@ void EngineGUI::DrawEntityStateMachinePopup(EntityStateMachine& entityStateMachi
 				{
 					ImGui::Separator();
 				}
+				// Condition layout:
+				//   1. Left operand type: choose whether the left value is a constant
+				//      or a value read from an entity component.
+				//   2. Left operand selectors: when the left operand is entity-backed,
+				//      choose its component and member on the following control row.
+				//   3. Comparator: choose how the resolved left value is compared;
+				//      boolean operands are restricted to Equal and Not Equal.
+				//   4. Right operand: starts on its own row and uses the same constant
+				//      or entity-backed controls as the left operand.
+				//   5. Condition summary: displays the resulting expression below the
+				//      editors so the user can verify the condition in plain text.
 				ImGui::PushID(static_cast<int>(conditionIndex));
-				ImGui::PushID("Left");
-				const bool isBooleanCondition = IsBooleanEntityStateCondition(condition, bindingSources);
-				DrawEntityStateOperandEditor("", condition.left, bindingSources, isBooleanCondition, true);
-				ImGui::PopID();
-				if (isBooleanCondition && condition.comparator != EntityStateMachine::Comparator::Equal && condition.comparator != EntityStateMachine::Comparator::NotEqual)
+				// Reuse the condition index to keep widget IDs unique when multiple
+				// conditions contain controls with the same labels.
+				// The binding metadata determines whether this condition represents a
+				// boolean value, which changes the available constant/comparator choices.
+				const bool conditionUsesBooleanValues = IsBooleanEntityStateCondition(condition, bindingSources);
+				// A boolean operand cannot use numeric comparisons. Normalize an older
+				// or previously edited condition before drawing the comparator.
+				if (conditionUsesBooleanValues
+					&& condition.comparator != EntityStateMachine::Comparator::Equal
+					&& condition.comparator != EntityStateMachine::Comparator::NotEqual)
 				{
 					condition.comparator = EntityStateMachine::Comparator::Equal;
 				}
-				ImGui::SameLine();
+				// Left operand group: label, type selector, and resolved value/component.
+				ImGui::BeginTable("ConditionOperandLayout", 3, ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingStretchProp);
+				ImGui::TableNextRow();
+				ImGui::TableSetColumnIndex(0);
+				ImGui::BeginGroup();
+				ImGui::PushID("Left");
+				DrawEntityStateOperandEditor("", condition.left, bindingSources, conditionUsesBooleanValues, false, true, false);
+				DrawEntityStateOperandEditor("", condition.left, bindingSources, conditionUsesBooleanValues, false, false, true);
+				ImGui::PopID();
+				ImGui::EndGroup();
+
+				// Comparator group: the comparison operator between both operands.
+				ImGui::TableSetColumnIndex(1);
+				ImGui::BeginGroup();
+				ImGui::PushID("LeftValue");
 				const char* comparatorOptions[] = { "Equal", "Not Equal", "Greater", "Less", "Greater Equal", "Less Equal" };
 				int comparatorIndex = static_cast<int>(condition.comparator);
-				if (isBooleanCondition)
+				if (conditionUsesBooleanValues)
 				{
+					// Boolean conditions expose only equality and inequality options.
 					const char* booleanComparatorOptions[] = { "Equal", "Not Equal" };
 					comparatorIndex = condition.comparator == EntityStateMachine::Comparator::NotEqual ? 1 : 0;
 					const ImGuiStyle& style = ImGui::GetStyle();
@@ -2676,16 +2712,27 @@ void EngineGUI::DrawEntityStateMachinePopup(EntityStateMachine& entityStateMachi
 				}
 				else
 				{
+					// Numeric conditions expose the complete comparator list and write the
+					// selected combo index back to the condition enum.
 					const ImGuiStyle& style = ImGui::GetStyle();
 					ImGui::SetNextItemWidth(ImGui::CalcTextSize(comparatorOptions[comparatorIndex]).x + style.FramePadding.x * 2.0f + ImGui::GetFrameHeight());
 					if (ImGui::Combo("##Comparator", &comparatorIndex, comparatorOptions, IM_ARRAYSIZE(comparatorOptions)))
 						condition.comparator = static_cast<EntityStateMachine::Comparator>(comparatorIndex);
 				}
-				ImGui::SameLine();
-				ImGui::PushID("Right");
-				DrawEntityStateOperandEditor("", condition.right, bindingSources, isBooleanCondition, true);
 				ImGui::PopID();
+				ImGui::EndGroup();
+
+				// Right operand group: same controls as the left operand.
+				ImGui::TableSetColumnIndex(2);
+				ImGui::BeginGroup();
+				ImGui::PushID("RightValue");
+				DrawEntityStateOperandEditor("", condition.right, bindingSources, conditionUsesBooleanValues, false, true, false);
+				DrawEntityStateOperandEditor("", condition.right, bindingSources, conditionUsesBooleanValues, false, false, true);
+				ImGui::PopID();
+				ImGui::EndGroup();
+				ImGui::EndTable();
 				ImGui::Separator();
+				// Show the resolved expression without changing the stored operands.
 				ImGui::TextUnformatted(conditionToBrowserText(condition).c_str());
 				ImGui::Separator();
 				if (ui.conditions.size() > 1 && ImGui::SmallButton("Remove Condition"))
@@ -2704,6 +2751,9 @@ void EngineGUI::DrawEntityStateMachinePopup(EntityStateMachine& entityStateMachi
 				condition.right.constantValue = 1.0f;
 				ui.conditions.push_back(std::move(condition));
 			}
+
+			ImGui::SetNextItemWidth(120.0f);
+			ImGui::InputFloat("Blend Seconds", &ui.transitionBlendSeconds, 0.0f, 0.0f, "%.2f");
 
 			if (ImGui::Button("Create"))
 			{
