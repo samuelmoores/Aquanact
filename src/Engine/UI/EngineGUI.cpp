@@ -535,9 +535,15 @@ namespace {
 		const char* label,
 		EntityStateMachine::Operand& operand,
 		const std::vector<EntityStateBindingSource>& sources,
-		bool useBooleanConstant = false)
+		bool useBooleanConstant = false,
+		bool horizontal = false)
 	{
 		ImGui::PushID(label);
+		auto setComboWidthToContents = [](const char* text)
+		{
+			const ImGuiStyle& style = ImGui::GetStyle();
+			ImGui::SetNextItemWidth(ImGui::CalcTextSize(text).x + style.FramePadding.x * 2.0f + ImGui::GetFrameHeight());
+		};
 		if (label && label[0] != '\0')
 		{
 			ImGui::TextUnformatted(label);
@@ -545,7 +551,8 @@ namespace {
 
 		const char* operandTypes[] = { "Constant", "Entity" };
 		int operandType = static_cast<int>(operand.type);
-		if (ImGui::Combo("Type", &operandType, operandTypes, IM_ARRAYSIZE(operandTypes)))
+		setComboWidthToContents(operandTypes[operandType]);
+		if (ImGui::Combo(horizontal ? "##OperandType" : "Type", &operandType, operandTypes, IM_ARRAYSIZE(operandTypes)))
 		{
 			operand.type = static_cast<EntityStateMachine::OperandType>(operandType);
 			if (operand.type == EntityStateMachine::OperandType::Binding && operand.memberName.empty())
@@ -554,6 +561,7 @@ namespace {
 				operand.type = EntityStateMachine::OperandType::Binding;
 			}
 		}
+		if (horizontal) ImGui::SameLine();
 
 		if (operand.type == EntityStateMachine::OperandType::Constant)
 		{
@@ -565,14 +573,15 @@ namespace {
 				const char* booleanValues[] = { "false", "true" };
 				int booleanValue = operand.constantValue != 0.0f ? 1 : 0;
 				operand.constantValue = booleanValue == 1 ? 1.0f : 0.0f;
-				if (ImGui::Combo("Value", &booleanValue, booleanValues, IM_ARRAYSIZE(booleanValues)))
+				setComboWidthToContents(booleanValues[booleanValue]);
+				if (ImGui::Combo(horizontal ? "##OperandValue" : "Value", &booleanValue, booleanValues, IM_ARRAYSIZE(booleanValues)))
 				{
 					operand.constantValue = booleanValue == 1 ? 1.0f : 0.0f;
 				}
 			}
 			else
 			{
-				ImGui::InputFloat("Value", &operand.constantValue, 0.0f, 0.0f, "%.3f");
+				ImGui::InputFloat(horizontal ? "##OperandValue" : "Value", &operand.constantValue, 0.0f, 0.0f, "%.3f");
 			}
 			ImGui::PopID();
 			return;
@@ -589,7 +598,8 @@ namespace {
 		}
 
 		const char* sourceLabel = selectedSource ? selectedSource->label.c_str() : "<select variable>";
-		if (ImGui::BeginCombo("Variable", sourceLabel))
+		setComboWidthToContents(sourceLabel);
+		if (ImGui::BeginCombo(horizontal ? "##OperandVariable" : "Variable", sourceLabel))
 		{
 			for (const EntityStateBindingSource& source : sources)
 			{
@@ -606,6 +616,7 @@ namespace {
 			}
 			ImGui::EndCombo();
 		}
+		if (horizontal) ImGui::SameLine();
 
 		if (!selectedSource)
 		{
@@ -626,7 +637,8 @@ namespace {
 		const char* memberLabel = selectedMember
 			? (selectedMember->displayName.empty() ? selectedMember->name.c_str() : selectedMember->displayName.c_str())
 			: "<select variable>";
-		if (ImGui::BeginCombo("Variable Value", memberLabel))
+		setComboWidthToContents(memberLabel);
+		if (ImGui::BeginCombo(horizontal ? "##OperandMember" : "Variable Value", memberLabel))
 		{
 			for (const BindableMember& member : selectedSource->members)
 			{
@@ -2043,26 +2055,6 @@ void EngineGUI::DrawEntityStateMachinePopup(EntityStateMachine& entityStateMachi
 		ImGui::PushID(static_cast<int>(transitionIndex));
 		ImGui::Text("%s -> %s", transition.from.c_str(), transition.to.c_str());
 		ImGui::SameLine();
-		if (ImGui::SmallButton("Edit"))
-		{
-			copyStateName(ui.transitionFromState, sizeof(ui.transitionFromState), transition.from);
-			copyStateName(ui.transitionToState, sizeof(ui.transitionToState), transition.to);
-			ui.transitionBlendSeconds = transition.blendSeconds;
-			ui.transitionWaitForCurrentStateComplete = transition.waitForCurrentStateComplete;
-			ui.conditions = transition.conditions.empty() ? std::vector<EntityStateMachine::Condition>{ transition.condition } : transition.conditions;
-			ui.editingTransitionIndex = static_cast<int>(transitionIndex);
-			ui.addTransitionPopupInitialized = true;
-			ui.editTransitionPopupRequested = true;
-		}
-		ImGui::SameLine();
-		if (ImGui::SmallButton("Delete"))
-		{
-			ui.expandedTransitionConditions.erase(transitionKey);
-			entityStateMachine.RemoveTransition(transitionIndex);
-			ImGui::PopID();
-			return;
-		}
-		ImGui::SameLine();
 		if (ImGui::SmallButton("Condition"))
 		{
 			showConditions = !showConditions;
@@ -2107,7 +2099,8 @@ void EngineGUI::DrawEntityStateMachinePopup(EntityStateMachine& entityStateMachi
 	}
 
 	ImGui::SetNextWindowSize(ImVec2(900.0f, 0.0f), ImGuiCond_FirstUseEver);
-	if (ImGui::BeginPopupModal("State Machine##AquanactEntityStateMachine", nullptr))
+	bool entityStateMachinePopupOpen = true;
+	if (ImGui::BeginPopupModal("State Machine##AquanactEntityStateMachine", &entityStateMachinePopupOpen))
 	{
 		auto setComboWidthToText = [](const char* text)
 		{
@@ -2122,14 +2115,112 @@ void EngineGUI::DrawEntityStateMachinePopup(EntityStateMachine& entityStateMachi
 			ui.addStatePopupInitialized = false;
 			ui.editStatePopupRequested = true;
 		}
+		ImGui::SameLine();
+		if (ImGui::Button("Create Transition"))
+		{
+			ui.editingTransitionIndex = -1;
+			ui.addTransitionPopupInitialized = false;
+			ImGui::OpenPopup("Edit Transition##AquanactEntityStateMachine");
+		}
+		ImGui::SameLine();
+		const bool canAddSoundEvent = ui.selectedSoundStateIndex >= 0
+			&& ui.selectedSoundStateIndex < static_cast<int>(states.size())
+			&& !ui.soundEventSoundPath.empty();
+		if (ImGui::Button("Add Sound Event"))
+		{
+			ui.selectedSoundEventIndex = -1;
+			for (std::size_t stateIndex = 0; stateIndex < states.size(); ++stateIndex)
+			{
+				const auto visibleState = ui.visibleStateTransitions.find(states[stateIndex].name);
+				if (visibleState != ui.visibleStateTransitions.end() && visibleState->second)
+				{
+					ui.selectedSoundStateIndex = static_cast<int>(stateIndex);
+					break;
+				}
+			}
+			ImGui::OpenPopup("Add Sound Event##AquanactEntityStateMachine");
+		}
+
+		if (ImGui::BeginPopupModal("Add Sound Event##AquanactEntityStateMachine", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+		{
+			ImGui::SetNextItemWidth(90.0f);
+			ImGui::InputInt("Frame", &ui.soundEventFrame);
+			ui.soundEventFrame = std::max(0, ui.soundEventFrame);
+			ImGui::Checkbox("Random Sample", &ui.soundEventRandomSample);
+
+			const std::filesystem::path soundRoot =
+#ifdef AQUANACT_SOURCE_ROOT
+				std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets" / "audio" / "sfx";
+#else
+				std::filesystem::current_path() / "assets" / "audio" / "sfx";
+#endif
+			const std::string soundLabel = ui.soundEventSoundPath.empty()
+				? "<Select sound>"
+				: std::filesystem::path(ui.soundEventSoundPath).filename().string();
+			ImGui::SetNextItemWidth(220.0f);
+			if (ImGui::BeginCombo("Sound", soundLabel.c_str()))
+			{
+				std::error_code soundError;
+				if (std::filesystem::exists(soundRoot, soundError))
+				{
+					for (const auto& entry : std::filesystem::directory_iterator(soundRoot, soundError))
+					{
+						if (soundError || (ui.soundEventRandomSample ? !entry.is_directory() : !entry.is_regular_file())) continue;
+						if (ui.soundEventRandomSample == entry.is_directory())
+						{
+							const std::string relative = "audio/sfx/" + entry.path().filename().generic_string();
+							const std::string fileName = entry.path().filename().string();
+							if (ImGui::Selectable(fileName.c_str(), ui.soundEventSoundPath == relative))
+								ui.soundEventSoundPath = relative;
+							continue;
+						}
+						const std::string extension = entry.path().extension().string();
+						if (extension != ".wav" && extension != ".mp3" && extension != ".ogg" && extension != ".flac") continue;
+						const std::string relative = "audio/sfx/" + entry.path().filename().generic_string();
+						const std::string fileName = entry.path().filename().string();
+						if (ImGui::Selectable(fileName.c_str(), ui.soundEventSoundPath == relative))
+							ui.soundEventSoundPath = relative;
+					}
+				}
+				ImGui::EndCombo();
+			}
+			ImGui::SetNextItemWidth(120.0f);
+			ImGui::SliderFloat("Volume", &ui.soundEventVolume, 0.0f, 100.0f);
+
+			if (ImGui::Button("Create") && canAddSoundEvent)
+			{
+				const EntityStateMachine::State& soundState = states[static_cast<std::size_t>(ui.selectedSoundStateIndex)];
+				const EntityStateMachine::SoundEvent event =
+					{ ui.soundEventSoundPath, static_cast<float>(ui.soundEventFrame), ui.soundEventVolume, ui.soundEventRandomSample };
+				if (ui.selectedSoundEventIndex >= 0)
+					entityStateMachine.UpdateStateSoundEvent(soundState.name, static_cast<std::size_t>(ui.selectedSoundEventIndex), event);
+				else
+					entityStateMachine.AddStateSoundEvent(soundState.name, event);
+				const std::filesystem::path projectPath = Root::Current().Projects().CurrentProjectPath();
+				if (!projectPath.empty())
+				{
+					Root::Current().Projects().SaveProject(projectPath, Root::Current().Scenes());
+				}
+				ui.soundEventSoundPath.clear();
+				ui.soundEventFrame = 0;
+				ui.soundEventRandomSample = false;
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Cancel"))
+			{
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::EndPopup();
+		}
 
 		if (ui.editStatePopupRequested)
 		{
-			ImGui::OpenPopup("Add State##AquanactEntityStateMachine");
+			ImGui::OpenPopup("Edit State##AquanactEntityStateMachine");
 			ui.editStatePopupRequested = false;
 		}
 
-		if (ImGui::BeginPopupModal("Add State##AquanactEntityStateMachine", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+		if (ImGui::BeginPopupModal("Edit State##AquanactEntityStateMachine", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 		{
 			if (!ui.addStatePopupInitialized)
 			{
@@ -2174,7 +2265,68 @@ void EngineGUI::DrawEntityStateMachinePopup(EntityStateMachine& entityStateMachi
 			ImGui::Checkbox("Block Movement", &ui.stateEditBlocksMovement);
 			ImGui::Checkbox("Blocks Input", &ui.stateEditBlocksInput);
 
-			if (ImGui::Button("Create"))
+			if (ui.editingStateIndex >= 0 && static_cast<std::size_t>(ui.editingStateIndex) < states.size())
+			{
+				const EntityStateMachine::State& editedState = states[static_cast<std::size_t>(ui.editingStateIndex)];
+				ImGui::SeparatorText("Transitions");
+				for (std::size_t transitionIndex = 0; transitionIndex < transitions.size(); ++transitionIndex)
+				{
+					const EntityStateMachine::Transition& transition = transitions[transitionIndex];
+					if (transition.from != editedState.name && transition.to != editedState.name)
+						continue;
+					ImGui::PushID(static_cast<int>(transitionIndex));
+					ImGui::Text("%s -> %s", transition.from.c_str(), transition.to.c_str());
+					ImGui::SameLine();
+					if (ImGui::SmallButton("Edit"))
+					{
+						copyStateName(ui.transitionFromState, sizeof(ui.transitionFromState), transition.from);
+						copyStateName(ui.transitionToState, sizeof(ui.transitionToState), transition.to);
+						ui.transitionBlendSeconds = transition.blendSeconds;
+						ui.transitionWaitForCurrentStateComplete = transition.waitForCurrentStateComplete;
+						ui.conditions = transition.conditions.empty() ? std::vector<EntityStateMachine::Condition>{ transition.condition } : transition.conditions;
+						ui.editingTransitionIndex = static_cast<int>(transitionIndex);
+						ui.addTransitionPopupInitialized = true;
+						ui.editTransitionPopupRequested = true;
+					}
+					ImGui::SameLine();
+					if (ImGui::SmallButton("Delete"))
+					{
+						entityStateMachine.RemoveTransition(transitionIndex);
+						ImGui::PopID();
+						break;
+					}
+					ImGui::PopID();
+				}
+
+				ImGui::SeparatorText("Sound Events");
+				for (std::size_t eventIndex = 0; eventIndex < editedState.soundEvents.size(); ++eventIndex)
+				{
+					const EntityStateMachine::SoundEvent& event = editedState.soundEvents[eventIndex];
+					ImGui::PushID(static_cast<int>(eventIndex));
+					ImGui::Text("Frame %.0f: %s", event.frame, event.soundName.c_str());
+					ImGui::SameLine();
+					if (ImGui::SmallButton("Edit"))
+					{
+						ui.selectedSoundStateIndex = ui.editingStateIndex;
+						ui.selectedSoundEventIndex = static_cast<int>(eventIndex);
+						ui.soundEventFrame = static_cast<int>(event.frame);
+						ui.soundEventSoundPath = event.soundName;
+						ui.soundEventVolume = event.volume;
+						ui.soundEventRandomSample = event.randomSample;
+						ImGui::OpenPopup("Add Sound Event##AquanactEntityStateMachine");
+					}
+					ImGui::SameLine();
+					if (ImGui::SmallButton("Delete"))
+					{
+						entityStateMachine.RemoveStateSoundEvent(editedState.name, eventIndex);
+						ImGui::PopID();
+						break;
+					}
+					ImGui::PopID();
+				}
+			}
+
+			if (ImGui::Button(ui.editingStateIndex >= 0 ? "Update" : "Create"))
 			{
 				if (ui.editingStateIndex >= 0)
 				{
@@ -2254,12 +2406,6 @@ void EngineGUI::DrawEntityStateMachinePopup(EntityStateMachine& entityStateMachi
 				ui.editStatePopupRequested = true;
 			}
 			ImGui::SameLine();
-			if (ImGui::SmallButton("Sounds"))
-			{
-				ui.selectedSoundStateIndex = static_cast<int>(stateIndex);
-				ui.selectedSoundEventIndex = -1;
-			}
-			ImGui::SameLine();
 			if (ImGui::SmallButton("Delete"))
 			{
 				ui.visibleStateTransitions.erase(state.name);
@@ -2270,7 +2416,7 @@ void EngineGUI::DrawEntityStateMachinePopup(EntityStateMachine& entityStateMachi
 			ImGui::PopID();
 		}
 
-		if (ui.selectedSoundStateIndex >= 0 && ui.selectedSoundStateIndex < static_cast<int>(states.size()))
+		if (false && ui.selectedSoundStateIndex >= 0 && ui.selectedSoundStateIndex < static_cast<int>(states.size()))
 		{
 			const EntityStateMachine::State& soundState = states[static_cast<std::size_t>(ui.selectedSoundStateIndex)];
 			auto saveSoundEventChanges = []()
@@ -2355,60 +2501,6 @@ void EngineGUI::DrawEntityStateMachinePopup(EntityStateMachine& entityStateMachi
 				ImGui::PopID();
 			}
 
-			ImGui::SetNextItemWidth(90.0f);
-			ImGui::InputInt("Frame##NewSoundEvent", &ui.soundEventFrame);
-			ui.soundEventFrame = std::max(0, ui.soundEventFrame);
-			ImGui::Checkbox("Random Sample##NewSoundEvent", &ui.soundEventRandomSample);
-
-			const std::filesystem::path soundRoot =
-#ifdef AQUANACT_SOURCE_ROOT
-				std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets" / "audio" / "sfx";
-#else
-				std::filesystem::current_path() / "assets" / "audio" / "sfx";
-#endif
-			const std::string soundLabel = ui.soundEventSoundPath.empty()
-				? "<Select sound>"
-				: std::filesystem::path(ui.soundEventSoundPath).filename().string();
-			ImGui::SetNextItemWidth(220.0f);
-			if (ImGui::BeginCombo("Sound##NewSoundEvent", soundLabel.c_str()))
-			{
-				std::error_code soundError;
-				if (std::filesystem::exists(soundRoot, soundError))
-				{
-					for (const auto& entry : std::filesystem::directory_iterator(soundRoot, soundError))
-					{
-							if (soundError || (ui.soundEventRandomSample ? !entry.is_directory() : !entry.is_regular_file())) continue;
-							if (ui.soundEventRandomSample == entry.is_directory())
-							{
-								const std::string relative = "audio/sfx/" + entry.path().filename().generic_string();
-								const std::string fileName = entry.path().filename().string();
-								if (ImGui::Selectable(fileName.c_str(), ui.soundEventSoundPath == relative))
-									ui.soundEventSoundPath = relative;
-								continue;
-							}
-							const std::string extension = entry.path().extension().string();
-						if (extension != ".wav" && extension != ".mp3" && extension != ".ogg" && extension != ".flac") continue;
-						const std::string relative = "audio/sfx/" + entry.path().filename().generic_string();
-						const std::string fileName = entry.path().filename().string();
-						if (ImGui::Selectable(fileName.c_str(), ui.soundEventSoundPath == relative))
-						{
-							ui.soundEventSoundPath = relative;
-						}
-					}
-				}
-				ImGui::EndCombo();
-			}
-			ImGui::SetNextItemWidth(120.0f);
-			ImGui::SliderFloat("Volume##NewSoundEvent", &ui.soundEventVolume, 0.0f, 100.0f);
-			if (ImGui::Button("Add Sound Event") && !ui.soundEventSoundPath.empty())
-			{
-				entityStateMachine.AddStateSoundEvent(soundState.name,
-					{ ui.soundEventSoundPath, static_cast<float>(ui.soundEventFrame), ui.soundEventVolume, ui.soundEventRandomSample });
-				saveSoundEventChanges();
-				ui.soundEventSoundPath.clear();
-				ui.soundEventFrame = 0;
-				ui.soundEventRandomSample = false;
-			}
 		}
 
 		auto stateTransitionsAreVisible = [](const std::map<std::string, bool>& visibility, const std::string& stateName)
@@ -2459,22 +2551,41 @@ void EngineGUI::DrawEntityStateMachinePopup(EntityStateMachine& entityStateMachi
 		}
 		ImGui::EndChild();
 
+		ImGui::SeparatorText("Sound Events");
+		for (const EntityStateMachine::State& state : states)
+		{
+			const auto visibleState = ui.visibleStateTransitions.find(state.name);
+			if (visibleState == ui.visibleStateTransitions.end() || !visibleState->second)
+			{
+				continue;
+			}
+			ImGui::TextUnformatted(state.name.c_str());
+			if (state.soundEvents.empty())
+			{
+				ImGui::TextDisabled("  No sound events");
+				continue;
+			}
+			for (const EntityStateMachine::SoundEvent& event : state.soundEvents)
+			{
+				ImGui::PushID(static_cast<int>(&event - state.soundEvents.data()));
+				const std::string soundName = std::filesystem::path(event.soundName).filename().string();
+				ImGui::BulletText("Frame %.0f: %s (Volume %.0f)%s",
+					event.frame,
+					soundName.c_str(),
+					event.volume,
+					event.randomSample ? " [Random]" : "");
+				ImGui::PopID();
+			}
+		}
+
 		if (ui.editTransitionPopupRequested)
 		{
-			ImGui::OpenPopup("Add Transition##AquanactEntityStateMachine");
+			ImGui::OpenPopup("Edit Transition##AquanactEntityStateMachine");
 			ui.editTransitionPopupRequested = false;
 		}
 
-		ImGui::Separator();
-		if (ImGui::Button("Create Transition"))
-		{
-			ui.editingTransitionIndex = -1;
-			ui.addTransitionPopupInitialized = false;
-			ImGui::OpenPopup("Add Transition##AquanactEntityStateMachine");
-		}
-
 		ImGui::SetNextWindowSize(ImVec2(720.0f, 0.0f), ImGuiCond_FirstUseEver);
-		if (ImGui::BeginPopupModal("Add Transition##AquanactEntityStateMachine", nullptr))
+		if (ImGui::BeginPopupModal("Edit Transition##AquanactEntityStateMachine", nullptr))
 		{
 			if (!ui.addTransitionPopupInitialized)
 			{
@@ -2510,6 +2621,8 @@ void EngineGUI::DrawEntityStateMachinePopup(EntityStateMachine& entityStateMachi
 				}
 				ImGui::EndCombo();
 			}
+			ImGui::SameLine();
+			ImGui::Checkbox("Wait to finish", &ui.transitionWaitForCurrentStateComplete);
 
 			ImGui::TextUnformatted("To");
 			setComboWidthToText(ui.transitionToState[0] != '\0' ? ui.transitionToState : "<to>");
@@ -2529,7 +2642,6 @@ void EngineGUI::DrawEntityStateMachinePopup(EntityStateMachine& entityStateMachi
 
 			ImGui::SetNextItemWidth(120.0f);
 			ImGui::InputFloat("Blend Seconds", &ui.transitionBlendSeconds, 0.0f, 0.0f, "%.2f");
-			ImGui::Checkbox("Wait for source state to finish before transitioning", &ui.transitionWaitForCurrentStateComplete);
 			ImGui::Separator();
 
 			for (std::size_t conditionIndex = 0; conditionIndex < ui.conditions.size(); ++conditionIndex)
@@ -2540,36 +2652,38 @@ void EngineGUI::DrawEntityStateMachinePopup(EntityStateMachine& entityStateMachi
 					ImGui::Separator();
 				}
 				ImGui::PushID(static_cast<int>(conditionIndex));
-				ImGui::TextUnformatted("Left Operand");
 				ImGui::PushID("Left");
 				const bool isBooleanCondition = IsBooleanEntityStateCondition(condition, bindingSources);
-				DrawEntityStateOperandEditor("", condition.left, bindingSources, isBooleanCondition);
+				DrawEntityStateOperandEditor("", condition.left, bindingSources, isBooleanCondition, true);
 				ImGui::PopID();
 				if (isBooleanCondition && condition.comparator != EntityStateMachine::Comparator::Equal && condition.comparator != EntityStateMachine::Comparator::NotEqual)
 				{
 					condition.comparator = EntityStateMachine::Comparator::Equal;
 				}
-				ImGui::Separator();
-				ImGui::TextUnformatted("Comparator");
+				ImGui::SameLine();
 				const char* comparatorOptions[] = { "Equal", "Not Equal", "Greater", "Less", "Greater Equal", "Less Equal" };
 				int comparatorIndex = static_cast<int>(condition.comparator);
 				if (isBooleanCondition)
 				{
 					const char* booleanComparatorOptions[] = { "Equal", "Not Equal" };
 					comparatorIndex = condition.comparator == EntityStateMachine::Comparator::NotEqual ? 1 : 0;
+					const ImGuiStyle& style = ImGui::GetStyle();
+					ImGui::SetNextItemWidth(ImGui::CalcTextSize(booleanComparatorOptions[comparatorIndex]).x + style.FramePadding.x * 2.0f + ImGui::GetFrameHeight());
 					if (ImGui::Combo("##Comparator", &comparatorIndex, booleanComparatorOptions, IM_ARRAYSIZE(booleanComparatorOptions)))
 					{
 						condition.comparator = comparatorIndex == 1 ? EntityStateMachine::Comparator::NotEqual : EntityStateMachine::Comparator::Equal;
 					}
 				}
-				else if (ImGui::Combo("##Comparator", &comparatorIndex, comparatorOptions, IM_ARRAYSIZE(comparatorOptions)))
+				else
 				{
-					condition.comparator = static_cast<EntityStateMachine::Comparator>(comparatorIndex);
+					const ImGuiStyle& style = ImGui::GetStyle();
+					ImGui::SetNextItemWidth(ImGui::CalcTextSize(comparatorOptions[comparatorIndex]).x + style.FramePadding.x * 2.0f + ImGui::GetFrameHeight());
+					if (ImGui::Combo("##Comparator", &comparatorIndex, comparatorOptions, IM_ARRAYSIZE(comparatorOptions)))
+						condition.comparator = static_cast<EntityStateMachine::Comparator>(comparatorIndex);
 				}
-				ImGui::Separator();
-				ImGui::TextUnformatted("Right Operand");
+				ImGui::SameLine();
 				ImGui::PushID("Right");
-				DrawEntityStateOperandEditor("", condition.right, bindingSources, isBooleanCondition);
+				DrawEntityStateOperandEditor("", condition.right, bindingSources, isBooleanCondition, true);
 				ImGui::PopID();
 				ImGui::Separator();
 				ImGui::TextUnformatted(conditionToBrowserText(condition).c_str());
@@ -2617,14 +2731,12 @@ void EngineGUI::DrawEntityStateMachinePopup(EntityStateMachine& entityStateMachi
 			ImGui::EndPopup();
 		}
 
-		ImGui::Separator();
-		if (ImGui::Button("Close"))
+		ImGui::EndPopup();
+		if (!entityStateMachinePopupOpen)
 		{
 			m_entityStateMachinePopupRequested = false;
 			m_entityStateUiState.erase(&entityStateMachine);
-			ImGui::CloseCurrentPopup();
 		}
-		ImGui::EndPopup();
 	}
 	else if (m_entityStateMachinePopupRequested && !ImGui::IsPopupOpen("State Machine##AquanactEntityStateMachine"))
 	{

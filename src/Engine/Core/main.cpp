@@ -14,7 +14,7 @@ static int RunApplication(int argc, char** argv)
 }
 
 #ifdef AQUANACT_GAME
-int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
+int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR, int) 
 {
     return RunApplication(__argc, __argv);
 }
