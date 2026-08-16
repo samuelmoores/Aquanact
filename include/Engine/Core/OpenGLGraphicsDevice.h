@@ -29,6 +29,8 @@ public:
 	void RenderShadowMaps(const RenderCommand* commands, std::size_t commandCount, const LightingManager& lightingManager);
 
 	void Draw(const RenderCommand& command, const Camera& camera, const LightingManager& lightingManager) override;
+	void DrawSelected(const RenderCommand& command, const Camera& camera, const LightingManager& lightingManager);
+	void DrawSelectionOutline(const RenderCommand& command, const Camera& camera);
 
 private:
 	void startUp() override;
@@ -37,6 +39,7 @@ private:
 	std::unique_ptr<OpenGLGraphics> m_platform;
 	std::unique_ptr<class ShaderProgram> m_shadowShader;
 	std::unique_ptr<class ShaderProgram> m_pointShadowShader;
+	std::unique_ptr<class ShaderProgram> m_selectionOutlineShader;
 	Window* m_window = nullptr;
 	uint32_t m_shadowFramebuffer = 0;
 	uint32_t m_shadowDepthTexture = 0;

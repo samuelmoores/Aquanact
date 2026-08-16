@@ -55,6 +55,7 @@ public:
 	bool IsGameMode() const;
 	EngineGUI& EditorGUI();
 	const EngineGUI& EditorGUI() const;
+	unsigned int SelectedEditorEntityId() const;
 	GameGUIManager& RuntimeGUI();
 	const GameGUIManager& RuntimeGUI() const;
 	GameGUICreator& Creator();

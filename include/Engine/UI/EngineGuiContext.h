@@ -8,7 +8,9 @@ class Window;
 
 struct EngineGuiSelection
 {
-	int entityIndex = -1;
+	// Entity IDs remain stable when the scene vector is reordered or an earlier
+	// object is removed. Zero is reserved for no selection.
+	unsigned int entityId = 0;
 };
 
 // Visibility owned by EngineGUI and shared with the menu and window dispatch.

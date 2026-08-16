@@ -1,0 +1,362 @@
+Aquanact Editor Scene Selection, Mesh Outline, and Translation Gizmo Plan
+========================================================================
+
+Goal
+----
+
+Allow an editor user to click an object in the 3D scene, show a highlighted
+border around the selected mesh, and display a three-axis translation gizmo
+that can move the entity.
+
+Recommended approach
+--------------------
+
+Implement this as an editor-only interaction system using:
+
+- A mouse-generated world ray for object picking.
+- Stable entity IDs for shared editor selection.
+- A stencil-based, mesh-shaped selection outline.
+- ImGuizmo for the three-dimensional translation arrows.
+
+The project already provides most of the required foundations: shared editor
+selection, entity transforms, mesh bounds, camera matrices, ImGui, and an
+eight-bit stencil buffer.
+
+
+Step 1: Centralize editor selection
+-----------------------------------
+
+Replace the index-based EngineGuiSelection with a stable selected entity ID.
+Use zero as the invalid/no-selection value.
+
+Add helper functions that resolve the selected ID against the active scene.
+Update the Scene window and Entity inspector to use this shared selection.
+Clear selection when the selected entity is deleted or the active scene
+changes.
+
+Relevant files:
+
+- include/Engine/UI/EngineGuiContext.h
+- src/Engine/UI/EngineGUI.cpp
+- src/Engine/UI/SceneWindow.cpp
+- src/Engine/UI/EntityWindow.cpp
+
+This prevents selection from silently moving to another entity when an item is
+removed from the scene vector or when another scene becomes active.
+
+
+Step 2: Add an editor scene-interaction class
+---------------------------------------------
+
+Create an editor-only class, such as:
+
+- include/Engine/UI/EditorSceneInteraction.h
+- src/Engine/UI/EditorSceneInteraction.cpp
+
+This class should own:
+
+- Mouse picking logic.
+- Gizmo operation and state.
+- Selection changes originating in the scene.
+- Gizmo hover and drag suppression.
+- Optional outline color and thickness settings.
+
+EngineGUI should call the interaction class after drawing the editor windows.
+At that point, ImGui can reliably report whether an editor window or control
+owns the mouse.
+
+
+Step 3: Convert a mouse click into a world ray
+----------------------------------------------
+
+When the left mouse button is clicked:
+
+1. Ignore the click when an ImGui window or active control owns the mouse.
+2. Ignore the click when the translation gizmo is hovered or being dragged.
+3. Read the cursor position from ImGuiIO::MousePos.
+4. Convert the cursor position from window coordinates to OpenGL normalized
+   device coordinates.
+5. Unproject near and far clip-space points with the inverse of:
+
+       projection * view
+
+6. Construct a normalized world-space ray from the two unprojected points.
+
+Use logical window/display dimensions for this calculation. These match the
+coordinate system used by ImGui and the editor camera projection. Framebuffer
+dimensions remain relevant to OpenGL rendering but should not be mixed into
+the mouse-ray calculation without applying the appropriate DPI scale.
+
+Relevant camera code:
+
+- include/Engine/Core/Camera.h
+- src/Engine/Core/EngineCamera.cpp
+
+
+Step 4: Test the ray against scene entities
+-------------------------------------------
+
+For every entity in the active scene that owns a mesh:
+
+1. Obtain its model matrix.
+2. Invert the model matrix.
+3. Transform the ray origin into mesh-local space with a position transform.
+4. Transform the ray direction into mesh-local space with a direction
+   transform. Do not normalize the local direction before comparing hit
+   parameters; retaining its scale preserves a comparable world-ray parameter.
+5. Test the local ray against the mesh's local bounding box.
+6. Keep the entity with the smallest positive hit distance.
+
+Select the nearest hit entity. Clear selection when the ray hits nothing.
+
+Transforming the ray into mesh-local space correctly accounts for entity
+translation, rotation, and nonuniform scale.
+
+Relevant code:
+
+- Entity::BuildModelMatrix in src/Engine/Core/Entity.cpp
+- Entity::WorldAABB in src/Engine/Core/Entity.cpp
+- Mesh::RayHit in src/Engine/Core/Mesh.cpp
+
+First milestone:
+
+Use local bounding-box picking. It is fast and is already supported by the
+mesh data.
+
+Follow-up hardening:
+
+Add Moller-Trumbore ray/triangle tests for static meshes after the bounding-box
+broad phase. This prevents selecting a mesh by clicking empty space contained
+inside a large bounding box. Skinned meshes can continue using bounds-based
+picking until posed vertex data is available to the picking system.
+
+
+Step 5: Synchronize scene clicks with existing editor UI
+--------------------------------------------------------
+
+When selection changes from a scene click:
+
+- Highlight the matching entry in the Scene window.
+- Populate the Entity inspector with the selected entity.
+- Optionally open the Entity inspector automatically.
+- Deselect when empty scene space is clicked.
+- Leave selection unchanged when editor UI consumes the click.
+
+Scene-list clicks and scene-view clicks should both update exactly the same
+selection object.
+
+
+Step 6: Carry entity identity into rendering
+--------------------------------------------
+
+Extend RenderCommand with the originating entity ID. Populate it in
+RenderManager::BuildRenderCommands.
+
+Expose the selected entity ID from EngineGUI or an editor selection service so
+RenderManager can identify the selected render command.
+
+Keep all selection rendering disabled when:
+
+- The engine is in game mode.
+- The GUI creator rather than the scene editor is active.
+- The selection is invalid or has no mesh.
+
+Relevant files:
+
+- include/Engine/Core/RenderCommand.h
+- include/Engine/Core/RenderManager.h
+- src/Engine/Core/RenderManager.cpp
+
+
+Step 7: Implement the mesh-shaped highlighter outline
+-----------------------------------------------------
+
+Use a stencil outline rather than drawing an entity bounding box.
+
+Rendering sequence:
+
+1. Clear the stencil buffer together with the color and depth buffers.
+2. Render ordinary scene commands normally.
+3. While rendering the selected mesh, enable stencil writes and write a value
+   of one for its visible fragments.
+4. Render the selected mesh a second time with an outline shader.
+5. Configure the outline pass to draw only where the stencil value is not one.
+6. Keep depth testing enabled so foreground scene objects can occlude the
+   selected outline.
+7. Disable depth writes during the outline pass.
+8. Restore stencil, depth, culling, color-mask, shader, texture, and vertex
+   array state before debug and GUI rendering.
+
+The window already requests eight stencil bits in src/Engine/Core/Window.cpp.
+OpenGLGraphicsDevice::Clear currently clears only the color and depth buffers,
+so it must also clear GL_STENCIL_BUFFER_BIT.
+
+Add:
+
+- shaders/selection_outline.vert
+- shaders/selection_outline.frag
+- OpenGLGraphicsDevice::DrawSelectionOutline or an equivalent editor pass
+
+The outline vertex shader should:
+
+- Use the normal mesh position for the stencil-writing pass.
+- Expand back-facing vertices along projected normals for the outline pass.
+- Receive viewport dimensions and an outline width measured in pixels.
+- Produce a consistent two-to-four-pixel border as camera distance changes.
+- Support the same bone transforms and skinned flag as the standard mesh
+  shaders so animated entities outline correctly.
+
+The outline fragment shader should output a configurable high-visibility color,
+such as yellow, orange, or cyan, without normal scene lighting.
+
+
+Step 8: Integrate a translation gizmo
+-------------------------------------
+
+Use ImGuizmo for the first gizmo implementation. Vendor its source and license
+under external/ImGuizmo, or add it through the dependency manager after
+confirming the desired packaging approach.
+
+Compile and link it only into AquanactEngine. Do not include editor gizmo code
+in AquanactGame.
+
+For a valid selected entity:
+
+1. Supply ImGuizmo with the editor camera view and projection matrices.
+2. Set the operation to ImGuizmo::TRANSLATE.
+3. Start with world-space axes.
+4. Set the gizmo rectangle to ImGuiIO::DisplaySize.
+5. Draw the gizmo through an ImGui background draw list so editor panels remain
+   above it.
+6. Suppress picking while ImGuizmo::IsOver() or ImGuizmo::IsUsing() is true.
+
+The existing CMake configuration already locates and links ImGui. Add a
+separate editor-only source list or target_sources call for ImGuizmo so it is
+not added to the shared editor/game source list.
+
+
+Step 9: Apply gizmo translation safely
+--------------------------------------
+
+Place the gizmo at Entity::WorldCenterPosition rather than blindly at the
+model origin. This keeps its arrows visually centered for imported models whose
+origin is offset from the visible mesh.
+
+When the gizmo moves, calculate:
+
+    translationDelta = newGizmoPosition - previousGizmoPosition
+
+Then call:
+
+    entity.Translate(translationDelta)
+
+Only extract translation from the manipulated matrix in the first version. Do
+not decompose and reapply rotation or scale yet. Entity::BuildModelMatrix uses
+rotation values directly as radians, while the current inspector presents
+degree-like ranges. Translation-only manipulation avoids making that existing
+rotation-unit ambiguity worse.
+
+The Entity inspector reads the entity's transform every frame, so it will
+automatically show the new position. The existing project serializer already
+saves entity transforms when the project is saved.
+
+
+Step 10: Manage lifecycle and input conflicts
+---------------------------------------------
+
+Explicitly handle these state transitions:
+
+- Clear selection after selected-entity deletion.
+- Clear or re-resolve selection when changing scenes.
+- Stop an active gizmo drag if its entity disappears.
+- Disable scene picking while editor windows own the mouse.
+- Disable picking while manipulating the gizmo.
+- Ensure left-click selection does not interfere with right-button editor
+  camera look.
+- Disable selection interaction, outlines, and gizmos in game mode.
+- Disable them while the Game GUI Creator is active.
+
+The current renderer draws the scene before EngineGUI processes interaction.
+With the least invasive implementation, a newly selected outline or gizmo move
+will become visible on the following frame. At 60 to 120 frames per second this
+is an approximately 8-to-16 millisecond delay and should be imperceptible. Only
+reorder the frame pipeline if testing shows a visible interaction problem.
+
+
+Step 11: Verification
+---------------------
+
+Automated math checks:
+
+- Center-screen ray points along the camera's facing direction.
+- Corner rays point into the correct view-frustum quadrants.
+- Rays reject boxes behind the camera.
+- A transformed local-space ray correctly hits rotated entities.
+- Nearest positive hit wins when objects overlap.
+- Parallel rays do not produce NaN or false intersections.
+
+Manual editor checks:
+
+- Clicking an isolated object selects it.
+- Clicking overlapping objects selects the nearest visible candidate.
+- Rotated and nonuniformly scaled entities pick correctly.
+- Clicking empty scene space clears selection.
+- Clicking Scene, Entity, menu, or other editor windows does not alter scene
+  selection.
+- Right-drag camera movement does not select or move entities.
+- Each gizmo arrow changes only its corresponding world axis.
+- The inspector position updates while dragging.
+- Deleting a selected entity clears the outline and gizmo safely.
+- Switching scenes clears or correctly restores selection.
+- Static and skinned meshes both receive mesh-shaped outlines.
+- Foreground objects correctly occlude the outline.
+- The outline stays visually consistent after window resizing and DPI changes.
+- Outline rendering does not corrupt shadow maps, debug geometry, ImGui, or
+  MyGUI rendering state.
+- Selection tools do not appear in game mode or the Game GUI Creator.
+- Saving and reopening the project preserves gizmo-driven movement.
+
+
+Implementation milestones
+-------------------------
+
+Milestone 1: Scene picking
+
+- Stable entity selection.
+- Mouse-to-world ray construction.
+- Nearest local-bounds intersection.
+- Scene list and Entity inspector synchronization.
+
+Milestone 2: Highlighter outline
+
+- Entity identity in render commands.
+- Stencil clear and selected-mesh stencil write.
+- Fixed-pixel outline shaders.
+- Strict OpenGL state restoration.
+
+Milestone 3: Translation gizmo
+
+- Editor-only ImGuizmo integration.
+- World-space X, Y, and Z translation arrows.
+- Centered gizmo placement.
+- Picking and camera conflict suppression.
+
+Milestone 4: Hardening and editor polish
+
+- Static-mesh triangle picking.
+- Translation snapping.
+- W hotkey for translation mode.
+- Configurable outline color and thickness.
+- Future rotate and scale modes after transform rotation units are made
+  consistent.
+- Undo/redo integration when the editor gains a command-history system.
+
+
+Definition of done
+------------------
+
+The feature is complete when an editor user can click the visible portion of a
+scene entity, see that entity synchronized across the scene list and inspector,
+see a clear mesh-shaped border, and drag X/Y/Z arrows to move the entity without
+interfering with camera navigation, UI input, rendering state, scene changes,
+or game mode.

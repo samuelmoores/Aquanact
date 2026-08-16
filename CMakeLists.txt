@@ -52,6 +52,7 @@ set(SOURCES
     "include/Engine/UI/EngineGUI.h" "src/Engine/UI/EngineGUI.cpp"
     "include/Engine/UI/EngineMenuBar.h" "src/Engine/UI/EngineMenuBar.cpp"
     "include/Engine/UI/SceneWindow.h" "src/Engine/UI/SceneWindow.cpp"
+    "include/Engine/UI/EditorSceneInteraction.h" "src/Engine/UI/EditorSceneInteraction.cpp"
     "include/Engine/UI/EntityWindow.h" "src/Engine/UI/EntityWindow.cpp"
     "include/Engine/UI/InputMapWindow.h" "src/Engine/UI/InputMapWindow.cpp"
     "include/Engine/UI/CodeCreationWindow.h" "src/Engine/UI/CodeCreationWindow.cpp"
@@ -121,6 +122,7 @@ set(SOURCES
 )
 
 add_executable (AquanactEngine ${SOURCES} ${GAME_SOURCES} "include/Engine/Core/LightingManager.h" "src/Engine/Core/LightingManager.cpp" "src/Engine/UI/GameGUICreator_DetailsProgressBar.cpp")
+target_sources(AquanactEngine PRIVATE "external/imguizmo/src/ImGuizmo.cpp")
 target_compile_definitions(AquanactEngine PRIVATE AQUANACT_EDITOR)
 target_compile_definitions(AquanactEngine PRIVATE AQUANACT_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
 target_compile_definitions(AquanactEngine PRIVATE MYGUI_STATIC)
@@ -234,6 +236,7 @@ target_link_libraries(AquanactGame PRIVATE
 )
 
 target_include_directories(AquanactEngine PUBLIC "./include")
+target_include_directories(AquanactEngine PRIVATE "${CMAKE_SOURCE_DIR}/external/imguizmo/src")
 target_include_directories(AquanactGame PUBLIC "./include")
 target_include_directories(AquanactBuildTool PUBLIC "./include")
 target_include_directories(AquanactEngine PRIVATE "${CMAKE_SOURCE_DIR}/external/miniaudio")

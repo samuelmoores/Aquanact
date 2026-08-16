@@ -350,7 +350,8 @@ void RenderManager::BuildRenderCommands(FrontEndManager& frontEndManager, SceneM
 			object->GetMesh(),
 			object->GetShader(),
 			object->BuildModelMatrix(),
-			object->skinned()
+			object->skinned(),
+			object->Id()
 		});
 	}
 }
@@ -464,7 +465,7 @@ void RenderManager::Submit(const RenderCommand& command)
 	m_commands[m_commandCount++] = command;
 }
 
-void RenderManager::Flush(const Camera& camera)
+void RenderManager::Flush(const Camera& camera, unsigned int /*selectedEntityId*/)
 {
 	const auto flushStart = std::chrono::high_resolution_clock::now();
 	m_lastFrameCommandCount = m_commandCount;
@@ -498,7 +499,10 @@ void RenderManager::Loop(FrontEndManager& frontEndManager, FileManager& fileMana
 	}
 	{
 		FrameProfiler::Scope scope(Root::Current().Profiler(), "Flush");
-		Flush(ActiveCamera());
+	unsigned int selectedEntityId = 0;
+	if (engineState.IsEditorMode() && frontEndManager.FrontEndModeValue() == FrontEndMode::EngineEditor)
+		selectedEntityId = frontEndManager.SelectedEditorEntityId();
+	Flush(ActiveCamera(), selectedEntityId);
 	}
 
 	{

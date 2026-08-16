@@ -18,6 +18,8 @@ public:
 	// GUI rendering needs a different state than the 3D scene pass. This helper
 	// exists so overlays like MyGUI can draw without inheriting depth or shader state.
 	void ConfigureGuiState();
+	int ViewportWidth() const { return m_lastViewportWidth; }
+	int ViewportHeight() const { return m_lastViewportHeight; }
 
 	bool IsInitialized() const { return m_initialized; }
 

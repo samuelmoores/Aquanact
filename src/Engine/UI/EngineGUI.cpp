@@ -13,6 +13,9 @@
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
+#ifdef AQUANACT_EDITOR
+#include "ImGuizmo.h"
+#endif
 
 #include <cstdint>
 #include <exception>
@@ -170,11 +173,13 @@ void EngineGUI::BeginFrame()
 	ImGui_ImplOpenGL3_NewFrame();
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
+#ifdef AQUANACT_EDITOR
+	ImGuizmo::BeginFrame();
+#endif
 }
 
 void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManager& SceneManager, ProjectManager& projectManager)
 {
-	m_selection.entityIndex = m_selectedLevelObjectIndex;
 	EngineGuiFrameContext context{
 		m_window,
 		&camera,
@@ -184,11 +189,20 @@ void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManage
 		&m_selection };
 
 	Scene* activeLevel = SceneManager.ActiveLevel();
-	const std::size_t objectCount = activeLevel ? activeLevel->Objects().size() : 0;
-	if (m_selectedLevelObjectIndex >= static_cast<int>(objectCount))
+	bool selectedEntityStillExists = false;
+	if (activeLevel && m_selection.entityId != 0)
 	{
-		m_selectedLevelObjectIndex = -1;
+		for (const auto& object : activeLevel->Objects())
+		{
+			if (object && object->Id() == m_selection.entityId)
+			{
+				selectedEntityStillExists = true;
+				break;
+			}
+		}
 	}
+	if (!selectedEntityStillExists)
+		m_selection.entityId = 0;
 
 	const EngineMenuBarResult viewResult =
 		m_menuBar.Draw(context, m_showAxis, m_showGrid, m_windowState, m_popupRequests);
@@ -208,7 +222,6 @@ void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManage
 	if (m_windowState.showSceneWindow)
 	{
 		m_sceneWindow.Draw(context, m_windowState.showSceneWindow, m_windowState.showEntityWindow);
-		m_selectedLevelObjectIndex = m_selection.entityIndex;
 	}
 
 	// EntityWindow owns the complete entity inspector.
@@ -225,6 +238,11 @@ void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManage
 	}
 
 	m_lightingWindow.Draw(Root::Current().Render().Lights(), m_windowState.showLightingWindow);
+
+	// Evaluate scene interaction after every editor window has been submitted so
+	// real UI ownership can be distinguished from ImGuizmo's next-frame mouse
+	// capture request.
+	m_sceneInteraction.Draw(context);
 
 	// Apply menu changes after engine windows have been drawn. A window opened
 	// from the menu therefore cannot cover or close that menu in this frame.
@@ -244,8 +262,6 @@ void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManage
 	{
 		m_windowState.showLightingWindow = *viewResult.showLightingWindow;
 	}
-
-	m_selection.entityIndex = m_selectedLevelObjectIndex;
 
 }
 

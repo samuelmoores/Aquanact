@@ -33,23 +33,32 @@ EntityWindowResult EntityWindow::Draw(const EngineGuiFrameContext& context, bool
 		return result;
 
 	const std::vector<std::unique_ptr<Entity>>& objects = activeScene->Objects();
-	int& selectedIndex = context.selection->entityIndex;
-	if (selectedIndex < 0 || selectedIndex >= static_cast<int>(objects.size()))
-		selectedIndex = -1;
+	unsigned int& selectedEntityId = context.selection->entityId;
+	std::size_t selectedIndex = objects.size();
+	for (std::size_t index = 0; index < objects.size(); ++index)
+	{
+		if (objects[index] && objects[index]->Id() == selectedEntityId)
+		{
+			selectedIndex = index;
+			break;
+		}
+	}
+	if (selectedIndex == objects.size())
+		selectedEntityId = 0;
 
 	if (ImGui::Begin("Entity", &open, ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_AlwaysAutoResize))
 	{
-		if (selectedIndex < 0)
+		if (selectedEntityId == 0)
 		{
 			ImGui::TextUnformatted("No entity selected.");
 		}
-		else if (!objects[static_cast<std::size_t>(selectedIndex)])
+		else if (!objects[selectedIndex])
 		{
 			ImGui::TextUnformatted("Selected object is null.");
 		}
 		else
 		{
-			Entity& object = *objects[static_cast<std::size_t>(selectedIndex)];
+			Entity& object = *objects[selectedIndex];
 			const bool cutscene = sceneManager.SceneKindFor(activeScene->Name()) == SceneManager::SceneKind::Cutscene;
 			if (ImGui::Button("Delete"))
 				ImGui::OpenPopup("Delete Entity##Confirm");
@@ -58,7 +67,7 @@ EntityWindowResult EntityWindow::Draw(const EngineGuiFrameContext& context, bool
 
 			if (DrawDeletePopup(object) && activeScene->RemoveObject(&object))
 			{
-				selectedIndex = -1;
+				selectedEntityId = 0;
 				result.entityDeleted = true;
 			}
 			else

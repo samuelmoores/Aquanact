@@ -243,6 +243,11 @@ const EngineGUI& FrontEndManager::EditorGUI() const
 	return *m_engineGUI;
 }
 
+unsigned int FrontEndManager::SelectedEditorEntityId() const
+{
+	return m_engineGUI ? m_engineGUI->SelectedEntityId() : 0;
+}
+
 GameGUIManager& FrontEndManager::RuntimeGUI()
 {
 	return *m_gameGUI;

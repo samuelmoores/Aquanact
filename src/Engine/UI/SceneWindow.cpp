@@ -77,7 +77,7 @@ void SceneWindow::Draw(
 	if (!context.sceneManager || !context.selection)
 		return;
 	SceneManager& sceneManager = *context.sceneManager;
-	int& selectedEntityIndex = context.selection->entityIndex;
+	unsigned int& selectedEntityId = context.selection->entityId;
 	const Scene* activeScene = sceneManager.ActiveLevel();
 	const std::string title = activeScene ? activeScene->Name() : "Scene";
 	if (ImGui::Begin(title.c_str(), &open, ImGuiWindowFlags_NoFocusOnAppearing))
@@ -91,9 +91,9 @@ void SceneWindow::Draw(
 				const std::string label = object ? object->Name() : "<null>";
 				const std::string visibleLabel = label.empty() ? "<unnamed>" : label;
 				const std::string selectableId = visibleLabel + "##LevelObject" + std::to_string(i);
-				if (ImGui::Selectable(selectableId.c_str(), selectedEntityIndex == static_cast<int>(i)))
+				if (ImGui::Selectable(selectableId.c_str(), object && selectedEntityId == object->Id()))
 				{
-					selectedEntityIndex = static_cast<int>(i);
+					selectedEntityId = object ? object->Id() : 0;
 					entityWindowOpen = true;
 				}
 			}

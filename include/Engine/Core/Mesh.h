@@ -51,6 +51,7 @@ class Mesh {
 		glm::vec3 centerAABB();
 		glm::vec3 dimensionAABB();
 		bool intersectsRay(const glm::vec3& rayOrigin, const glm::vec3& rayDir) const;
+		bool IntersectsTriangles(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, float& tHit) const;
 		glm::vec3 minBounds();
 		glm::vec3 maxBounds();
 		const glm::vec3& LocalMinBounds() const { return m_minBounds; }

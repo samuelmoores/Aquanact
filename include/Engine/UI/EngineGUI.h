@@ -14,6 +14,7 @@
 #include "Engine/UI/CameraWindow.h"
 #include "Engine/UI/LightingWindow.h"
 #include "Engine/UI/FileExplorerWindow.h"
+#include "Engine/UI/EditorSceneInteraction.h"
 
 class Window; 
 class Camera; 
@@ -53,6 +54,7 @@ public:
 
 	CameraPathCreator& CameraPath();
 	const CameraPathCreator& CameraPath() const;
+	unsigned int SelectedEntityId() const { return m_selection.entityId; }
 
 private:
 	// EngineGUI runtime state
@@ -61,11 +63,11 @@ private:
 	unsigned int m_bootTexture = 0;
 	int m_bootTextureWidth = 0;
 	int m_bootTextureHeight = 0;
-	int m_selectedLevelObjectIndex = -1;
 	EngineGuiSelection m_selection;
 	EngineMenuBar m_menuBar;
 	SceneWindow m_sceneWindow;
 	EntityWindow m_entityWindow;
+	EditorSceneInteraction m_sceneInteraction;
 
 	// Visibility toggles
 	bool m_showAxis = true;

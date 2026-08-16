@@ -8,6 +8,7 @@ struct RenderCommand {
 	const ShaderProgram* shader;
 	glm::mat4 modelMatrix;
 	bool isSkinned;
+	unsigned int entityId = 0;
 };
 
 

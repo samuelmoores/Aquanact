@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cfloat>
+#include <cmath>
 #include <iomanip>
 #include <stdexcept>
 #include <filesystem>
@@ -248,19 +249,101 @@ bool Mesh::SphereAABBOverlap(const glm::vec3& center, float radius)
 
 bool Mesh::RayHit(const glm::vec3& ro, const glm::vec3& rd, float& tHit)
 {
-	glm::vec3 invDir = 1.0f / rd;
-	glm::vec3 t0 = (m_meshMinBounds - ro) * invDir;
-	glm::vec3 t1 = (m_meshMaxBounds - ro) * invDir;
-	glm::vec3 tmin = glm::min(t0, t1);
-	glm::vec3 tmax = glm::max(t0, t1);
-
-	float tNear = std::max({ tmin.x, tmin.y, tmin.z });
-	float tFar = std::min({ tmax.x, tmax.y, tmax.z });
-	if (tNear > tFar || tFar < 0.0f)
+	const float directionLength = glm::length(rd);
+	if (!std::isfinite(directionLength) || directionLength <= 0.0f)
 		return false;
 
+	// The ray is transformed into mesh-local space without normalization so its
+	// hit parameter remains a world-space distance. Use a relative parallel test;
+	// an absolute epsilon incorrectly rejects rays for heavily scaled entities.
+	const float parallelThreshold = directionLength * 1e-7f;
+	float tNear = 0.0f;
+	float tFar = std::numeric_limits<float>::max();
+	for (int axis = 0; axis < 3; ++axis)
+	{
+		if (std::abs(rd[axis]) <= parallelThreshold)
+		{
+			if (ro[axis] < m_meshMinBounds[axis] || ro[axis] > m_meshMaxBounds[axis])
+				return false;
+			continue;
+		}
+
+		float nearDistance = (m_meshMinBounds[axis] - ro[axis]) / rd[axis];
+		float farDistance = (m_meshMaxBounds[axis] - ro[axis]) / rd[axis];
+		if (nearDistance > farDistance)
+			std::swap(nearDistance, farDistance);
+		tNear = std::max(tNear, nearDistance);
+		tFar = std::min(tFar, farDistance);
+		if (tNear > tFar)
+			return false;
+	}
+
+	if (tFar < 0.0f)
+		return false;
 	tHit = tNear >= 0.0f ? tNear : tFar;
-	return true;
+	return std::isfinite(tHit);
+}
+
+bool Mesh::IntersectsTriangles(
+	const glm::vec3& rayOrigin,
+	const glm::vec3& rayDirection,
+	float& tHit) const
+{
+	// Moller-Trumbore intersection in mesh-local space. The caller deliberately
+	// leaves rayDirection unnormalized after applying inverse(model), so the hit
+	// parameter remains comparable across entities with different scales.
+	constexpr float relativeEpsilon = 1e-7f;
+	constexpr float barycentricTolerance = 1e-5f;
+	const float directionLength = glm::length(rayDirection);
+	if (!std::isfinite(directionLength) || directionLength <= 0.0f)
+		return false;
+
+	bool hit = false;
+	float closest = std::numeric_limits<float>::max();
+	for (std::size_t index = 0; index + 2 < m_faces.size(); index += 3)
+	{
+		const uint32_t index0 = m_faces[index];
+		const uint32_t index1 = m_faces[index + 1];
+		const uint32_t index2 = m_faces[index + 2];
+		if (index0 >= m_vertices.size() || index1 >= m_vertices.size() || index2 >= m_vertices.size())
+			continue;
+
+		const glm::vec3& vertex0 = m_vertices[index0].position;
+		const glm::vec3& vertex1 = m_vertices[index1].position;
+		const glm::vec3& vertex2 = m_vertices[index2].position;
+		const glm::vec3 edge1 = vertex1 - vertex0;
+		const glm::vec3 edge2 = vertex2 - vertex0;
+		const float determinantTolerance = relativeEpsilon *
+			glm::length(edge1) * glm::length(edge2) * directionLength;
+		const glm::vec3 p = glm::cross(rayDirection, edge2);
+		const float determinant = glm::dot(edge1, p);
+		if (!std::isfinite(determinant) ||
+			std::abs(determinant) <= determinantTolerance)
+			continue;
+
+		const float inverseDeterminant = 1.0f / determinant;
+		const glm::vec3 offset = rayOrigin - vertex0;
+		const float u = glm::dot(offset, p) * inverseDeterminant;
+		if (u < -barycentricTolerance || u > 1.0f + barycentricTolerance)
+			continue;
+
+		const glm::vec3 q = glm::cross(offset, edge1);
+		const float v = glm::dot(rayDirection, q) * inverseDeterminant;
+		if (v < -barycentricTolerance ||
+			u + v > 1.0f + barycentricTolerance)
+			continue;
+
+		const float distance = glm::dot(edge2, q) * inverseDeterminant;
+		if (distance >= 0.0f && distance < closest)
+		{
+			closest = distance;
+			hit = true;
+		}
+	}
+
+	if (hit)
+		tHit = closest;
+	return hit;
 }
 
 const Skeleton& Mesh::GetSkeleton() const

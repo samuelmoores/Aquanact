@@ -146,6 +146,10 @@ void OpenGLGraphicsDevice::InitializeShadowMap()
 	m_shadowShader->load("shaders/shadow_depth.vert", "shaders/shadow_depth.frag");
 	m_pointShadowShader = std::make_unique<ShaderProgram>();
 	m_pointShadowShader->load("shaders/point_shadow_depth.vert", "shaders/point_shadow_depth.frag");
+#ifdef AQUANACT_EDITOR
+	m_selectionOutlineShader = std::make_unique<ShaderProgram>();
+	m_selectionOutlineShader->load("shaders/selection_outline.vert", "shaders/selection_outline.frag");
+#endif
 
 	glGenFramebuffers(1, &m_shadowFramebuffer);
 	glGenTextures(1, &m_shadowDepthTexture);
@@ -231,6 +235,7 @@ void OpenGLGraphicsDevice::ReleaseShadowMap()
 	}
 	m_shadowShader.reset();
 	m_pointShadowShader.reset();
+	m_selectionOutlineShader.reset();
 	m_shadowMapReady = false;
 	m_pointShadowMapsReady.fill(false);
 	m_pointShadowFarPlanes.fill(1.0f);
@@ -267,7 +272,11 @@ void OpenGLGraphicsDevice::BeginFrame()
 void OpenGLGraphicsDevice::Clear(float r, float g, float b, float a)
 {
 	glClearColor(r, g, b, a);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	// Selection rendering temporarily sets the stencil write mask to zero.
+	// Restore it before clearing so stale outlines cannot survive into the next
+	// camera frame.
+	glStencilMask(0xFF);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 }
 
 void OpenGLGraphicsDevice::EndFrame()
@@ -464,6 +473,90 @@ void OpenGLGraphicsDevice::Draw(const RenderCommand& command, const Camera& came
 		glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 	}
 	glActiveTexture(GL_TEXTURE0);
+}
+
+void OpenGLGraphicsDevice::DrawSelected(const RenderCommand& command, const Camera& camera, const LightingManager& lightingManager)
+{
+	glEnable(GL_STENCIL_TEST);
+	glStencilMask(0xFF);
+	glStencilFunc(GL_ALWAYS, 1, 0xFF);
+	glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+	Draw(command, camera, lightingManager);
+	glStencilMask(0x00);
+	glDisable(GL_STENCIL_TEST);
+}
+
+void OpenGLGraphicsDevice::DrawSelectionOutline(const RenderCommand& command, const Camera& camera)
+{
+	if (!m_selectionOutlineShader || !command.mesh)
+		return;
+
+	GLboolean previousDepthMask = GL_TRUE;
+	glGetBooleanv(GL_DEPTH_WRITEMASK, &previousDepthMask);
+	const GLboolean depthTestWasEnabled = glIsEnabled(GL_DEPTH_TEST);
+	const GLboolean blendWasEnabled = glIsEnabled(GL_BLEND);
+	const GLboolean cullWasEnabled = glIsEnabled(GL_CULL_FACE);
+	const GLboolean stencilWasEnabled = glIsEnabled(GL_STENCIL_TEST);
+	GLint previousDepthFunction = GL_LESS;
+	GLint previousCullFace = GL_BACK;
+	glGetIntegerv(GL_DEPTH_FUNC, &previousDepthFunction);
+	glGetIntegerv(GL_CULL_FACE_MODE, &previousCullFace);
+
+	glEnable(GL_DEPTH_TEST);
+	glDepthMask(GL_FALSE);
+	glDepthFunc(GL_LEQUAL);
+
+	m_selectionOutlineShader->activate();
+	m_selectionOutlineShader->setUniform("model", command.modelMatrix);
+	m_selectionOutlineShader->setUniform("view", camera.GetViewMatrix());
+	m_selectionOutlineShader->setUniform("projection", camera.GetProjectionMatrix());
+	m_selectionOutlineShader->setUniform("skinned", command.isSkinned);
+	m_selectionOutlineShader->setUniform("viewportSize", glm::vec2(
+		static_cast<float>(m_platform ? m_platform->ViewportWidth() : 1),
+		static_cast<float>(m_platform ? m_platform->ViewportHeight() : 1)));
+	UploadSkinning(command, m_selectionOutlineShader.get());
+	const auto drawSelectedMesh = [&command]()
+	{
+		for (int bufferIndex = 0; bufferIndex < command.mesh->NumBuffers(); ++bufferIndex)
+		{
+			command.mesh->Bind(bufferIndex);
+			glDrawElements(GL_TRIANGLES, command.mesh->FacesSize(bufferIndex), GL_UNSIGNED_INT,
+				reinterpret_cast<void*>(static_cast<uintptr_t>(command.mesh->FacesOffset(bufferIndex) * sizeof(uint32_t))));
+			command.mesh->UnBind();
+		}
+	};
+
+	// A silhouette alone is invisible when a large floor extends past every
+	// viewport edge. Add a light transparent tint over visible selected surfaces
+	// so selection remains obvious without obscuring materials.
+	glDisable(GL_STENCIL_TEST);
+	glDisable(GL_CULL_FACE);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	m_selectionOutlineShader->setUniform("outlineWidth", 0.0f);
+	m_selectionOutlineShader->setUniform("outlineColor", glm::vec4(1.0f, 0.72f, 0.05f, 0.16f));
+	drawSelectedMesh();
+
+	// Draw the fixed-pixel silhouette border outside the selected stencil mask.
+	glDisable(GL_BLEND);
+	glEnable(GL_CULL_FACE);
+	glCullFace(GL_FRONT);
+	glEnable(GL_STENCIL_TEST);
+	glStencilMask(0x00);
+	glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+	m_selectionOutlineShader->setUniform("outlineWidth", 3.0f);
+	m_selectionOutlineShader->setUniform("outlineColor", glm::vec4(1.0f, 0.78f, 0.05f, 1.0f));
+	drawSelectedMesh();
+
+	glStencilMask(0xFF);
+	glCullFace(previousCullFace);
+	glDepthFunc(previousDepthFunction);
+	glDepthMask(previousDepthMask);
+	if (depthTestWasEnabled) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
+	if (blendWasEnabled) glEnable(GL_BLEND); else glDisable(GL_BLEND);
+	if (cullWasEnabled) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE);
+	if (stencilWasEnabled) glEnable(GL_STENCIL_TEST); else glDisable(GL_STENCIL_TEST);
 }
 
 
