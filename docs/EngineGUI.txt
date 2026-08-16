@@ -1,0 +1,440 @@
+Aquanact Engine GUI Programmer Reference
+========================================
+
+Purpose
+-------
+
+The editor GUI is split into small objects under include/Engine/UI and
+src/Engine/UI. EngineGUI owns these objects and coordinates them once per
+frame. Individual window classes own panel-specific ImGui rendering and local
+draft state. EngineGUI should not contain panel-specific controls.
+
+This document covers the Engine GUI orchestration layer, every extracted
+window, and the shared support types introduced by the refactor.
+
+
+Architecture at a Glance
+------------------------
+
+EngineGUI
+  |-- EngineMenuBar
+  |-- SceneWindow
+  |-- EntityWindow
+  |-- EntityStateMachineWindow
+  |-- InputMapWindow
+  |-- CodeCreationWindow
+  |-- ComponentDeletionWindow
+  |-- BuildGameWindow
+  |-- AudioWindow
+  |-- CameraWindow
+  |     `-- uses EngineGUI-owned CameraPathCreator
+  |-- LightingWindow
+  `-- FileExplorerWindow
+
+Supporting types:
+
+  EngineGuiFrameContext    Non-owning services available during one frame.
+  EngineGuiSelection       Shared editor selection state.
+  EngineGuiWindowState     Persistent open/closed window state.
+  EngineGuiPopupRequests   Menu-to-popup request flags.
+  EngineGuiWidgets         Reusable ImGui controls and scope guards.
+  GameCodeMaintenance     File-generation/deletion service used by code UI.
+
+
+Frame Lifecycle
+---------------
+
+The frontend calls EngineGUI in this order:
+
+  1. startUp(window)       Create ImGui and backend state; show boot splash.
+  2. BeginFrame()          Start a new ImGui frame.
+  3. Draw(...)             Draw the menu, popups, and owned windows.
+  4. EndFrame()            Render ImGui draw data.
+  5. shutDown()            Release splash texture and ImGui backend state.
+
+startUp() and shutDown() are guarded against repeated calls. Draw() assumes a
+valid ImGui frame is active and must run on the thread that owns the graphics
+context.
+
+EngineGUI::Draw() constructs an EngineGuiFrameContext, draws EngineMenuBar once,
+dispatches each owned window, and applies deferred window visibility changes at
+the end of the frame. Keep this function as orchestration code.
+
+
+Shared Contracts
+----------------
+
+EngineGuiSelection
+
+  Holds the selected scene entity index. SceneWindow writes it and EntityWindow
+  reads it through EngineGuiFrameContext. An index of -1 means no selection.
+
+EngineGuiFrameContext
+
+  Contains non-owning pointers to Window, Camera, FileManager, SceneManager,
+  ProjectManager, and EngineGuiSelection. It is valid only for the current
+  EngineGUI::Draw() call. Windows must not retain these pointers beyond Draw().
+
+  A window should check required context pointers before dereferencing them.
+
+EngineGuiWindowState
+
+  Stores persistent visibility for Scene, Entity, Lighting, File Explorer,
+  Input Map, Camera, and Audio windows. EngineGUI owns the structure. Existing
+  EngineGUI Show...()/SetShow...() functions remain the serialization-facing
+  API; project code should use those accessors instead of reaching into the
+  state directly.
+
+EngineGuiPopupRequests
+
+  Stores requests for Build Game, Add Code File, New Scene, and Delete
+  Component. EngineMenuBar sets these flags. The popup owner consumes and resets
+  its flag with EngineGuiWidgets::ConsumePopupRequest(). A request is an event,
+  not persistent visibility state.
+
+EngineMenuBarResult
+
+  Carries optional visibility updates for File Explorer, Scene, Entity, and
+  Lighting. These updates are applied after windows draw so opening a panel from
+  the menu does not alter that panel's behavior partway through the frame.
+
+
+Core Orchestrator
+-----------------
+
+EngineGUI
+  Header: include/Engine/UI/EngineGUI.h
+  Source: src/Engine/UI/EngineGUI.cpp
+
+Responsibilities:
+
+  - Own the ImGui context and GLFW/OpenGL backends.
+  - Own and release the boot splash texture.
+  - Own all editor window objects and persistent GUI state.
+  - Construct the per-frame context.
+  - Call the top menu and each window exactly once per frame as appropriate.
+  - Preserve public visibility accessors used by project serialization.
+  - Expose CameraPathCreator to systems that serialize or debug the path.
+
+EngineGUI should not:
+
+  - Implement controls belonging to a specific editor panel.
+  - Store draft form data for an extracted window.
+  - Retain pointers taken from EngineGuiFrameContext.
+  - Perform game-code generation directly.
+
+
+Top Menu
+--------
+
+EngineMenuBar
+  Header: include/Engine/UI/EngineMenuBar.h
+  Source: src/Engine/UI/EngineMenuBar.cpp
+
+Draw() owns ImGui::BeginMainMenuBar()/EndMainMenuBar() and the complete editor
+menu order:
+
+  Aquanact, File, View, Lighting, Game, Scene, Code, UI
+
+It updates immediate state such as Axis, Grid, Camera, Audio, and Input Map. It
+emits popup requests and returns deferred visibility changes for the major
+panels. Private Draw...Menu() methods keep each menu section readable.
+
+When adding a menu action, choose its output type deliberately:
+
+  - Persistent on/off panel: EngineGuiWindowState or EngineMenuBarResult.
+  - One-shot modal action: EngineGuiPopupRequests.
+  - Immediate engine operation: call the owning manager from the menu section.
+
+
+Editor Windows
+--------------
+
+SceneWindow
+  Header: include/Engine/UI/SceneWindow.h
+  Source: src/Engine/UI/SceneWindow.cpp
+
+Draw(context, open, entityWindowOpen) lists entities in the active scene. A
+selection updates context.selection and opens the Entity window.
+
+DrawNewLevelPopup(sceneManager, requested) owns the New Scene modal, scene-name
+normalization, creation status, and its draft name buffer.
+
+
+EntityWindow
+  Header: include/Engine/UI/EntityWindow.h
+  Source: src/Engine/UI/EntityWindow.cpp
+
+Draw(context, open) inspects the selected entity and returns EntityWindowResult.
+It owns transform controls, physics controls, component add/remove UI, entity
+deletion confirmation, and component-specific controls.
+
+EntityWindowResult communicates events without giving EntityWindow ownership
+of other windows:
+
+  stateMachineToDraw  EntityStateMachine belonging to the selected entity.
+  openStateMachine    User requested the state-machine modal.
+  entityDeleted       The selected entity was removed.
+
+EngineGUI consumes this result and delegates state-machine rendering to
+EntityStateMachineWindow.
+
+EntityComponentHeaderResult is an internal row result used to report whether a
+component section is expanded and whether its Remove button was pressed.
+
+
+EntityStateMachineWindow
+  Header: include/Engine/UI/EntityStateMachineWindow.h
+  Source: src/Engine/UI/EntityStateMachineWindow.cpp
+
+Owns the complete EntityStateMachine modal and a per-machine UI-state cache.
+Open(machine) selects a machine and requests the modal. Draw(machine) snapshots
+states/transitions, builds binding metadata, initializes draft state, and draws
+the editor.
+
+Main modal behavior:
+
+  - Select the initial state.
+  - Add, edit, and delete states.
+  - Check a state to display its incoming/outgoing transitions.
+  - Show transition conditions with the Conditions button.
+  - Show sound events for checked states.
+
+Edit State behavior:
+
+  - Edit name, animation, movement blocking, and input blocking.
+  - List every incoming and outgoing transition involving that state.
+  - Edit or delete each related transition.
+
+Transition editor behavior:
+
+  - Select from/to states, blend time, and interruption behavior.
+  - Add/remove conditions and edit constant or bound operands.
+  - Restrict boolean comparisons to Equal/Not Equal.
+  - Display boolean constants as true/false and numeric constants as numbers.
+
+EntityStateMachineUiState is draft UI state, not runtime state-machine data.
+The cache is keyed by EntityStateMachine pointer and is erased when its modal is
+closed. Do not serialize this structure.
+
+
+InputMapWindow
+  Header: include/Engine/UI/InputMapWindow.h
+  Source: src/Engine/UI/InputMapWindow.cpp
+
+Owns its open flag and InputMapUiState. Call SetOpen() before Draw(), then copy
+IsOpen() back into EngineGuiWindowState after Draw(). It owns action selection,
+binding capture, add-action workflow, and status text.
+
+
+CodeCreationWindow
+  Header: include/Engine/UI/CodeCreationWindow.h
+  Source: src/Engine/UI/CodeCreationWindow.cpp
+
+Consumes the Add Code File popup request. It normalizes a class name, lets the
+programmer choose whether to attach to an existing entity, writes the new-class
+configuration, calls GameCodeMaintenance::CreateComponent(), and saves the
+current project when possible.
+
+This workflow may intentionally request that the editor exits after generated
+code changes. Keep file generation in GameCodeMaintenance rather than adding it
+to this window.
+
+
+ComponentDeletionWindow
+  Header: include/Engine/UI/ComponentDeletionWindow.h
+  Source: src/Engine/UI/ComponentDeletionWindow.cpp
+
+Consumes the Delete Component Type request. It lists registered component
+types, counts/removes live instances across scenes, unregisters the type,
+deletes its generated source files, and regenerates build files. This is a
+destructive workflow and must retain explicit confirmation.
+
+
+BuildGameWindow
+  Header: include/Engine/UI/BuildGameWindow.h
+  Source: src/Engine/UI/BuildGameWindow.cpp
+
+Consumes the Build Game request and owns output-path/status state. It invokes
+AquanactBuildSystem with the source root, current project, output directory, and
+packaged executable path. Build work is triggered after the button press is
+recorded, keeping modal rendering straightforward.
+
+
+AudioWindow
+  Header: include/Engine/UI/AudioWindow.h
+  Source: src/Engine/UI/AudioWindow.cpp
+
+Edits music path and volume on the active scene. Asset selection uses
+EngineGuiWidgets::AssetFileCombo(). A successful change saves the current
+project when a project path exists. The bool& open argument is the authoritative
+visibility state.
+
+
+CameraWindow
+  Header: include/Engine/UI/CameraWindow.h
+  Source: src/Engine/UI/CameraWindow.cpp
+
+Edits the EngineGUI-owned CameraPathCreator. It controls path visibility,
+pathed-camera follow sharpness, curve samples, path-point add/remove, point
+selection, and point position capture from the editor camera.
+
+CameraWindow does not own CameraPathCreator because project serialization and
+debug rendering need access through EngineGUI::CameraPath().
+
+
+LightingWindow
+  Header: include/Engine/UI/LightingWindow.h
+  Source: src/Engine/UI/LightingWindow.cpp
+
+Edits a supplied LightingManager. It owns controls for global shadow enablement,
+sun direction/color/intensity/ambient/shadow casting, sun reset, and all point
+light properties. It does not own lighting data.
+
+
+FileExplorerWindow
+  Header: include/Engine/UI/FileExplorerWindow.h
+  Source: src/Engine/UI/FileExplorerWindow.cpp
+
+Displays non-directory entries from FileManager, tracks selection through that
+manager, and exposes Import Selected when valid. The Models shortcut currently
+uses the project model-assets path configured in the implementation.
+
+
+Supporting Services
+-------------------
+
+CameraPathCreator
+  Header: include/Engine/UI/CameraPathCreator.h
+  Source: src/Engine/UI/CameraPathCreator.cpp
+
+Owns CameraPathData and the selected point index. It validates selection when
+points are selected or removed. CameraWindow edits this object; EngineGUI
+exposes it to serialization/debug systems.
+
+
+GameCodeMaintenance
+  Header: include/Engine/UI/GameCodeMaintenance.h
+  Source: src/Engine/UI/GameCodeMaintenance.cpp
+
+Stateless service for generated gameplay component files:
+
+  CreateComponent(className)  Writes header/source, registry, and source list.
+  DeleteComponentFiles(name)  Removes generated component source files.
+  RegenerateBuildFiles()      Rewrites generated CMake/registry inputs.
+
+CreateComponent returns GameCodeGenerationResult with success and a programmer-
+readable status message. UI classes should display this result and avoid
+duplicating templates or filesystem logic.
+
+
+Shared ImGui Helpers
+--------------------
+
+EngineGuiWidgets is defined in include/Engine/UI/EngineGuiWidgets.h.
+
+Scope guards:
+
+  WindowScope    Always pairs ImGui::Begin() with ImGui::End().
+  ModalScope     Pairs a visible BeginPopupModal() with EndPopup().
+
+Use them like this:
+
+  if (!open) return;
+  EngineGuiWidgets::WindowScope window("Example", &open);
+  if (!window) return;
+  // Draw visible contents.
+
+Popup helpers:
+
+  ConsumePopupRequest(id, requested)  Opens once and resets the request.
+  ConfirmationButtons(...)           Returns None, Confirm, or Cancel.
+  CloseButton(...)                    Closes the current popup when clicked.
+
+Control/layout helpers:
+
+  SetComboWidthToContents, ToggleMenuItem, StringCombo, SectionHeading,
+  StatusMessage, LabeledFloat, and Vector3Editor.
+
+Asset helpers:
+
+  SourceAssetDirectory(relativePath) resolves from AQUANACT_SOURCE_ROOT when
+  available. AssetFileCombo() enumerates and sorts matching assets and stores a
+  project-relative path configured by AssetFilePickerOptions.
+
+ImGui invariant: every successful Begin/BeginPopup call must have its matching
+End/EndPopup call. Prefer WindowScope and ModalScope where their behavior fits.
+
+
+Adding a New Engine Window
+--------------------------
+
+1. Create include/Engine/UI/MyWindow.h and src/Engine/UI/MyWindow.cpp.
+
+2. Give the class a narrow Draw contract. Prefer manager references and a
+   bool& open parameter over access to EngineGUI internals:
+
+     class MyWindow
+     {
+     public:
+         void Draw(MyManager& manager, bool& open);
+     };
+
+3. Put persistent form/draft state in MyWindow. Keep engine-owned data in its
+   owning manager.
+
+4. Add a visibility field to EngineGuiWindowState. If project persistence is
+   required, add EngineGUI getter/setter accessors and update project state
+   serialization.
+
+5. If opened by a one-shot modal action, add a field to
+   EngineGuiPopupRequests and consume it in the new window. Do not use a popup
+   request as a persistent open flag.
+
+6. Add a MyWindow member to EngineGUI and dispatch it from EngineGUI::Draw().
+
+7. Add the menu item inside EngineMenuBar. Return deferred panel visibility in
+   EngineMenuBarResult when the existing draw-order behavior is required.
+
+8. Register both files in CMakeLists.txt for AquanactEngine and AquanactGame.
+
+9. Build both targets and manually verify opening, closing, project restore,
+   and manager-side effects.
+
+
+Programming Rules and Pitfalls
+------------------------------
+
+  - EngineGUI owns GUI objects; GUI objects generally do not own engine data.
+  - EngineGuiFrameContext pointers are frame-local and non-owning.
+  - A bool& open parameter is both input and output; ImGui may set it false.
+  - Popup request booleans must be consumed/reset, or the popup reopens.
+  - Keep draft character buffers and status messages in the owning window.
+  - Use unique ImGui IDs when rows can share visible labels.
+  - Snapshot vectors before UI mutation when deletion can invalidate iteration.
+  - Do not serialize transient ImGui state or pointers.
+  - Save the project after user changes that mutate persistent scene data.
+  - Keep filesystem/code-generation logic out of rendering classes.
+  - Keep EngineGUI::Draw() free of panel-specific ImGui controls.
+
+
+Runtime Test Checklist
+----------------------
+
+  [ ] Main menu opens every editor window and popup.
+  [ ] Window close buttons update EngineGuiWindowState.
+  [ ] Saved projects restore serialized window visibility.
+  [ ] Scene selection opens the correct entity inspector.
+  [ ] Entity component add/remove and entity deletion work.
+  [ ] Griff's state list, initial state, transitions, and sound events appear.
+  [ ] Edit State lists related transitions with Edit/Delete controls.
+  [ ] Main transition rows expose only Conditions.
+  [ ] Boolean conditions display true/false; numeric conditions remain numeric.
+  [ ] Input actions and bindings can be created and edited.
+  [ ] Code creation/deletion updates generated files and build inputs.
+  [ ] Build Game reports success/failure and writes to the selected directory.
+  [ ] Audio, camera path, lighting, and file importing retain their behavior.
+
+Build verification command:
+
+  cmake --build out/build/x64-debug --config Debug --parallel 4
