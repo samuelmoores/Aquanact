@@ -26,7 +26,15 @@ namespace ProjectStateFormat {
 
 		std::filesystem::path AssetsRoot()
 		{
-			return std::filesystem::path("C:/dev/Aquanact/assets");
+#ifdef AQUANACT_GAME
+			return Root::Current().FileSystemRef().ExecutableDirectory() / "assets";
+#else
+#ifdef AQUANACT_SOURCE_ROOT
+			return std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets";
+#else
+			return Root::Current().FileSystemRef().ExecutableDirectory() / "assets";
+#endif
+#endif
 		}
 
 		std::filesystem::path ModelsRoot() { return AssetsRoot() / "models"; }
@@ -127,6 +135,18 @@ namespace ProjectStateFormat {
 	std::filesystem::path ResolveSourcePath(const std::filesystem::path& projectPath, const std::filesystem::path& sourcePath)
 	{
 		if (Root::Current().FileSystemRef().Exists(sourcePath)) return sourcePath;
+		// Projects created by older builds may contain an absolute development
+		// path such as C:/dev/Aquanact/assets/models/foo.fbx.  Preserve the
+		// assets-relative suffix when loading a packaged game.
+		const std::string normalized = sourcePath.generic_string();
+		const std::string assetsMarker = "/assets/";
+		const std::size_t assetsPos = normalized.find(assetsMarker);
+		if (assetsPos != std::string::npos)
+		{
+			const std::filesystem::path remapped = AssetsRoot() /
+				std::filesystem::path(normalized.substr(assetsPos + assetsMarker.size()));
+			if (Root::Current().FileSystemRef().Exists(remapped)) return remapped;
+		}
 		const std::filesystem::path projectDir = projectPath.parent_path();
 		const std::filesystem::path projectRelative = projectDir / sourcePath;
 		if (Root::Current().FileSystemRef().Exists(projectRelative)) return projectRelative;

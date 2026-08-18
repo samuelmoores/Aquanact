@@ -1,7 +1,7 @@
 {
   "name": "hud",
-  "navigationMode": "TextHighlight",
-  "boxSkin": "WindowFrameSkin",
+  "navigationMode": "Boxed",
+  "boxSkin": "PanelSkin",
   "pointerSkin": "NavigationArrowRight1",
   "boxPadding": 8,
   "boxOffsetX": 0,

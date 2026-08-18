@@ -27,18 +27,22 @@ void FrontEndManager::startUp(Window& window)
 		m_gameGUI = std::make_unique<GameGUIManager>();
 	}
 
-	// only the engine needs the engine and ui creator ui
+	// Dear ImGui is also used by the game-side diagnostics and input handling.
+	// Keep the editor windows disabled in game mode, but initialize the shared
+	// engine ImGui backend so those game-side calls always have a context.
+	if (!m_engineGUI)
+	{
+		m_engineGUI = std::make_unique<EngineGUI>();
+	}
+	m_engineGUI->startUp(window);
+
+	// only the editor needs the engine creator UI
 	if (Root::Current().State().IsEditorMode())
 	{
-		if (!m_engineGUI)
-		{
-			m_engineGUI = std::make_unique<EngineGUI>();
-		}
 		if (!m_uiCreator)
 		{
 			m_uiCreator = std::make_unique<GameGUICreator>();
 		}
-		m_engineGUI->startUp(window);
 		m_uiCreator->startUp(window);
 	}
 	else

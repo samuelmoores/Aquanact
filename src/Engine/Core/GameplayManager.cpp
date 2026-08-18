@@ -85,11 +85,7 @@ void GameplayManager::BootMainMenu(FrontEndManager& frontEndManager, Debug& debu
 		m_levelManager->CaptureActiveLevelEditorTransforms();
 		mainMenuLevel->FirstFrame();
 	}
-	m_state = GameState::MainMenu;
-	if (frontEndManager.RuntimeGUI().HasRuntime())
-	{
-		frontEndManager.RuntimeGUI().SetUIMode(GameGUIManager::UIMode::MainMenu);
-	}
+	EnterMainMenu(frontEndManager, debug);
 }
 
 bool GameplayManager::BootPlayableLevel(FrontEndManager& frontEndManager, Debug& debug)
@@ -113,10 +109,8 @@ bool GameplayManager::BootPlayableLevel(FrontEndManager& frontEndManager, Debug&
 	playableLevel->FirstFrame();
 	if (!playableLevel->MusicPath().empty())
 		Audio::PlayMusic("assets/" + playableLevel->MusicPath(), true, playableLevel->MusicVolume());
-	m_state = GameState::Playing;
-	Root::Current().InputRef().CaptureCursorForLevel();
+	EnterGameplay(frontEndManager, debug);
 	debug.LogMessage("GameplayManager::BootPlayableLevel() state=Playing Scene=" + playableLevel->Name());
-	SyncRuntimeUI(frontEndManager);
 	return true;
 }
 
@@ -150,10 +144,42 @@ void GameplayManager::StartGameSession(FrontEndManager& frontEndManager, Debug& 
 		if (!activeLevel->MusicPath().empty())
 			Audio::PlayMusic("assets/" + activeLevel->MusicPath(), true, activeLevel->MusicVolume());
 	}
+	EnterGameplay(frontEndManager, debug);
+	debug.LogMessage("GameplayManager::StartGameSession() state=Playing");
+}
+
+void GameplayManager::EnterMainMenu(FrontEndManager& frontEndManager, Debug& debug)
+{
+	m_state = GameState::MainMenu;
+	Root::Current().InputRef().ReleaseCursorForUI();
+	SyncRuntimeUI(frontEndManager);
+	debug.LogMessage("GameplayManager state=MainMenu");
+	if (frontEndManager.RuntimeGUI().HasRuntime())
+	{
+		// Reapply the asset for editor play and hot-reloaded menus.
+		frontEndManager.RuntimeGUI().RefreshUIMode();
+	}
+}
+
+void GameplayManager::EnterGameplay(FrontEndManager& frontEndManager, Debug& debug)
+{
 	m_state = GameState::Playing;
 	Root::Current().InputRef().CaptureCursorForLevel();
-	debug.LogMessage("GameplayManager::StartGameSession() state=Playing");
 	SyncRuntimeUI(frontEndManager);
+	debug.LogMessage("GameplayManager state=Playing");
+}
+
+void GameplayManager::EnterPauseMenu(FrontEndManager& frontEndManager, Debug& debug)
+{
+	m_state = GameState::Paused;
+	Root::Current().InputRef().ReleaseCursorForUI();
+	SyncRuntimeUI(frontEndManager);
+	debug.LogMessage("GameplayManager state=Paused");
+}
+
+void GameplayManager::LeavePauseMenu(FrontEndManager& frontEndManager, Debug& debug)
+{
+	EnterGameplay(frontEndManager, debug);
 }
 
 void GameplayManager::SyncRuntimeUI(FrontEndManager& frontEndManager) const
@@ -280,30 +306,12 @@ void GameplayManager::SetPaused(bool paused, FrontEndManager& frontEndManager, D
 	{
 		if (m_state == GameState::Playing)
 		{
-			m_state = GameState::Paused;
-			debug.LogMessage("GameplayManager state=Paused");
+			EnterPauseMenu(frontEndManager, debug);
 		}
 	}
 	else if (m_state == GameState::Paused)
 	{
-		m_state = GameState::Playing;
-		debug.LogMessage("GameplayManager state=Playing");
-	}
-
-	if (frontEndManager.RuntimeGUI().HasRuntime())
-	{
-		if (m_state == GameState::Paused)
-		{
-			frontEndManager.RuntimeGUI().SetUIMode(GameGUIManager::UIMode::PauseMenu);
-		}
-		else if (m_state == GameState::Playing)
-		{
-			frontEndManager.RuntimeGUI().SetUIMode(GameGUIManager::UIMode::GameplayHUD);
-		}
-		else if (m_state == GameState::MainMenu)
-		{
-			frontEndManager.RuntimeGUI().SetUIMode(GameGUIManager::UIMode::MainMenu);
-		}
+		LeavePauseMenu(frontEndManager, debug);
 	}
 }
 

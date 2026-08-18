@@ -1,8 +1,26 @@
 #include "Engine/Core/ShaderProgram.h"
 #include "Engine/Core/GLHeaders.h"
+#include "Engine/Core/Root.h"
+#include "Engine/Core/FileSystem.h"
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <iostream>
+
+namespace
+{
+	std::filesystem::path ResolveShaderPath(const std::string& path)
+	{
+		const std::filesystem::path requested(path);
+		if (requested.is_absolute())
+			return requested;
+#ifdef AQUANACT_GAME
+		return Root::Current().FileSystemRef().ExecutableDirectory() / requested;
+#else
+		return requested;
+#endif
+	}
+}
 
 ShaderProgram::ShaderProgram()
     : m_programId(-1) {
@@ -26,8 +44,8 @@ void ShaderProgram::load(const std::string& vertexShaderPath, const std::string&
     try
     {
         // open files
-        vShaderFile.open(vertexShaderPath);
-        fShaderFile.open(fragmentShaderPath);
+        vShaderFile.open(ResolveShaderPath(vertexShaderPath));
+        fShaderFile.open(ResolveShaderPath(fragmentShaderPath));
         std::stringstream vShaderStream, fShaderStream;
         // read file's buffer contents into streams
         vShaderStream << vShaderFile.rdbuf();
@@ -101,7 +119,7 @@ void ShaderProgram::load(const std::string& vertexShaderPath, const std::string&
         auto readFile = [](const std::string& path) {
             std::ifstream file;
             file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-            file.open(path);
+			file.open(ResolveShaderPath(path));
             std::stringstream ss;
             ss << file.rdbuf();
             return ss.str();

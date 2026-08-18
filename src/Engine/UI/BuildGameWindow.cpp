@@ -1,10 +1,16 @@
 #include "Engine/UI/BuildGameWindow.h"
 
 #include "Engine/Core/AquanactBuildSystem.h"
+#include "Engine/Core/FileSystem.h"
+#include "Engine/Core/FrontEndManager.h"
+#include "Engine/Core/ProjectManager.h"
+#include "Engine/Core/Root.h"
+#include "Engine/Core/SceneManager.h"
 #include "Engine/UI/EngineGuiWidgets.h"
 
 #include <imgui.h>
 
+#include <cstdio>
 #include <filesystem>
 
 namespace
@@ -24,6 +30,12 @@ void BuildGameWindow::Draw(bool& popupRequested)
 	EngineGuiWidgets::ConsumePopupRequest("Build Game##AquanactBuildGame", popupRequested);
 	EngineGuiWidgets::ModalScope popup("Build Game##AquanactBuildGame");
 	if (!popup) return;
+	if (!m_initializedPath)
+	{
+		const std::filesystem::path defaultOutput = SourceRoot().parent_path() / "Aquanact-package";
+		std::snprintf(m_buildPath, sizeof(m_buildPath), "%s", defaultOutput.string().c_str());
+		m_initializedPath = true;
+	}
 
 	ImGui::TextUnformatted("Build the packaged game to this folder:");
 	ImGui::InputText("Output", m_buildPath, sizeof(m_buildPath));
@@ -41,9 +53,19 @@ void BuildGameWindow::Draw(bool& popupRequested)
 		const std::filesystem::path sourceRoot = SourceRoot();
 		const std::filesystem::path outputRoot = std::filesystem::path(m_buildPath);
 		const std::filesystem::path projectFile = sourceRoot / "assets" / "projects" / "project.aqua";
-		const std::filesystem::path executablePath = std::filesystem::current_path() / "AquanactGame.exe";
-		const bool succeeded = buildSystem.Build(sourceRoot, outputRoot, projectFile, executablePath);
-		m_statusMessage = succeeded ? "Build succeeded." : "Build failed.";
+		const std::filesystem::path executablePath =
+			Root::Current().FileSystemRef().ExecutableDirectory() / "AquanactGame.exe";
+		Root::Current().FrontEnd().Creator().SaveAllRoleGUIs();
+		if (!Root::Current().Projects().SaveProject(projectFile, Root::Current().Scenes()))
+		{
+			m_statusMessage = "Build failed: could not save project.";
+		}
+		else
+		{
+			const AquanactBuildSystem::Result result = buildSystem.Build(
+				sourceRoot, outputRoot, projectFile, executablePath);
+			m_statusMessage = result.message;
+		}
 	}
 
 	EngineGuiWidgets::StatusMessage(m_statusMessage);

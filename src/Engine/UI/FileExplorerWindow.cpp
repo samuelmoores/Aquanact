@@ -20,7 +20,7 @@ void FileExplorerWindow::Draw(FileManager& fileManager, bool& open)
 
 	if (ImGui::Button("Models"))
 	{
-		fileManager.SetRootDirectory("C:/dev/Aquanact/assets/models");
+		fileManager.SetRootDirectory(fileManager.RootDirectory());
 	}
 
 	if (fileManager.CanImportSelection() && ImGui::Button("Import Selected"))

@@ -98,17 +98,18 @@ void EngineCamera::FlyControl(glm::vec2 mouseDiff, glm::vec3 moveInput, float dt
 
 void EngineCamera::UpdateFly(const Input& input)
 {
-	const float dt = input.DeltaTime();
+	const Input::InputFrame& frame = input.Frame();
+	const float dt = frame.deltaTime;
 
-	if (input.LookBecameActive())
+	if (frame.lookBecameActive)
 	{
 		SyncFlyOrientationFromFacing();
 		return;
 	}
 
-	if (input.LookActive() || glm::length(input.MoveInput()) > 0.0f)
+	if (frame.lookActive || glm::length(frame.moveInput) > 0.0f)
 	{
-		FlyControl(input.MouseDelta(), input.MoveInput(), dt);
+		FlyControl(frame.mouseDelta, frame.moveInput, dt);
 	}
 }
 

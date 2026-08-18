@@ -32,6 +32,11 @@ public:
 	std::size_t ControllerCount() const;
 
 private:
+	void EnterMainMenu(FrontEndManager& frontEndManager, Debug& debug);
+	void EnterGameplay(FrontEndManager& frontEndManager, Debug& debug);
+	void EnterPauseMenu(FrontEndManager& frontEndManager, Debug& debug);
+	void LeavePauseMenu(FrontEndManager& frontEndManager, Debug& debug);
+
 	SceneManager* m_levelManager = nullptr;
 	GameState m_state = GameState::MainMenu;
 };

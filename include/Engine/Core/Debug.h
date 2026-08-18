@@ -1,6 +1,7 @@
 #pragma once
 
 #include "glm/glm.hpp"
+#include <fstream>
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -216,6 +217,7 @@ private:
 	glm::vec3 m_controllerSweepNormal{ 0.0f };
 	glm::vec3 m_controllerVelocity{ 0.0f };
 	bool m_controllerGrounded = false;
+	unsigned int m_controllerDiagnosticsFrame = 0;
 	CameraDiagnosticsSnapshot m_cameraDiagnostics;
 	std::vector<std::string> m_cameraDiagnosticsEvents;
 	unsigned int m_cameraDiagnosticsEventSequence = 0;
@@ -237,5 +239,6 @@ private:
 	unsigned int m_entityStateDiagnosticsSelectedEntityId = 0;
 	std::vector<std::string> m_logMessages;
 	std::vector<std::string> m_logOnceKeys;
+	std::ofstream m_runtimeLog;
 };
 

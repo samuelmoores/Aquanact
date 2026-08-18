@@ -156,9 +156,18 @@ void Controller::MoveWithCollisions(Entity& owner, const glm::vec3& desiredMovem
 	const ColliderHandle collider = PhysicsWorld::Instance().Find(owner);
 	glm::vec3 minBounds;
 	glm::vec3 maxBounds;
+	bool verticalSweepHit = false;
+	float verticalSweepTime = 1.0f;
+	glm::vec3 verticalSweepNormal(0.0f);
 	if (collider == InvalidColliderHandle || !owner.WorldAABB(minBounds, maxBounds))
 	{
 		owner.Move(desiredMovement);
+		Root::Current().Debugger().SetControllerPhysicsDiagnostics(
+			owner.Name(), collider != InvalidColliderHandle, false, false, 1.0f,
+			glm::vec3(0.0f), m_velocity, false);
+		Root::Current().Debugger().LogTagged(
+			Debug::Severity::Warning, "Controller",
+			owner.Name() + " has no usable physics collider or world bounds");
 		return;
 	}
 
@@ -186,6 +195,12 @@ void Controller::MoveWithCollisions(Entity& owner, const glm::vec3& desiredMovem
 		{
 			resolvedMovement += remainingMovement;
 			break;
+		}
+		if (remainingMovement.y < 0.0f)
+		{
+			verticalSweepHit = true;
+			verticalSweepTime = collision.time;
+			verticalSweepNormal = collision.normal;
 		}
 
 		const bool walkableSurface = IsWalkableSurface(collision.normal);
@@ -248,6 +263,9 @@ void Controller::MoveWithCollisions(Entity& owner, const glm::vec3& desiredMovem
 
 			if (probe.hit && IsWalkableSurface(probe.normal))
 			{
+				verticalSweepHit = true;
+				verticalSweepTime = probe.time;
+				verticalSweepNormal = probe.normal;
 				owner.Move(probeMovement * glm::clamp(probe.time, 0.0f, 1.0f));
 				m_rawGrounded = true;
 				m_grounded = true;
@@ -258,4 +276,11 @@ void Controller::MoveWithCollisions(Entity& owner, const glm::vec3& desiredMovem
 			}
 		}
 	}
+
+	Root::Current().Debugger().SetControllerPhysicsDiagnostics(
+		owner.Name(), true, true, verticalSweepHit, verticalSweepTime,
+		verticalSweepNormal, m_velocity, m_grounded);
+	Root::Current().Debugger().SetGameplayDiagnostics(
+		owner.Name(), m_diagnosticInput, m_moveSpeed, dt, resolvedMovement,
+		owner.Position(), GroundSurfaceAngle(), m_grounded);
 }

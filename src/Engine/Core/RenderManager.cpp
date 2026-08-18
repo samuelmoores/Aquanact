@@ -236,8 +236,8 @@ void RenderManager::BeginFrame()
 
 void RenderManager::PresentFrame(Window& window)
 {
+	(void)window;
 	m_device.EndFrame();
-	window.PollEvents();
 }
 
 void RenderManager::UpdateCameraPhase(const Input& input, const EngineState& engineState)
@@ -270,7 +270,7 @@ void RenderManager::UpdateCameraPhase(const Input& input, const EngineState& eng
 			m_cameraPlayerProgress = m_gameCamera->ClosestPathDistance(position);
 			m_gameCamera->SetPlayerProgress(m_cameraPlayerProgress);
 		}
-		m_gameCamera->Update(input.DeltaTime());
+		m_gameCamera->Update(input.Frame().deltaTime);
 	}
 	if (engineState.IsEditorMode())
 	{

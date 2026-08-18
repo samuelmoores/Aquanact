@@ -21,6 +21,9 @@
 #include <MYGUI/MyGUI_Colour.h>
 #include <MYGUI/MyGUI_Gui.h>
 #include <MYGUI/MyGUI_ImageBox.h>
+#include <MYGUI/MyGUI_InputManager.h>
+#include <MYGUI/MyGUI_ResourceManager.h>
+#include <MYGUI/MyGUI_SkinManager.h>
 #include <MYGUI/MyGUI_TextBox.h>
 #include <MYGUI/MyGUI_OpenGLDataManager.h>
 #include <MYGUI/MyGUI_OpenGLPlatform.h>
@@ -52,10 +55,11 @@ namespace {
 		const std::filesystem::path candidatePaths[] = {
 			requestedPath,
 			executableRoot / requestedPath,
+			executableRoot / "resources" / requestedPath,
 			executableRoot / "assets" / requestedPath,
-#ifdef AQUANACT_SOURCE_ROOT
+		#if defined(AQUANACT_SOURCE_ROOT) && !defined(AQUANACT_GAME)
 			std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets" / requestedPath,
-#endif
+		#endif
 		};
 
 		for (const std::filesystem::path& candidate : candidatePaths)
@@ -176,6 +180,17 @@ namespace {
 			"', type='" + def.type +
 			"', skin='" + def.skin +
 			"', layer='" + def.layer + "'");
+	}
+
+	void LogSkinLookup(const std::string& widgetName, const std::string& skin)
+	{
+		const bool skinExists = MyGUI::SkinManager::getInstance().isExist(skin);
+		const bool resourceExists = MyGUI::ResourceManager::getInstance().isExist(skin);
+		Root::Current().Debugger().LogTagged(
+			(skinExists || resourceExists) ? "MyGUI" : "MyGUI-WARN",
+			"skin lookup: widget='" + widgetName + "', skin='" + skin +
+			"', skinRegistered=" + (skinExists ? "true" : "false") +
+			", layoutOrResourceRegistered=" + (resourceExists ? "true" : "false"));
 	}
 
 	std::string FormatBindableValue(float value)
@@ -451,6 +466,7 @@ MyGUI::Widget* GameGUI::CreatePanelWidget(const GameGUIWidgetDef& def, MyGUI::Wi
 {
 	// Panels are containers, so they are mostly about layout and pick behavior.
 	const std::string skin = def.useSkin ? (def.skin.empty() ? "PanelSkin" : def.skin) : "PanelEmpty";
+	LogSkinLookup(def.name, skin);
 	MyGUI::Widget* panel = CreateGuiWidget<MyGUI::Widget>(m_gui, parent, skin, def.x, def.y, def.width, def.height, def.layer, def.name);
 	FinalizeAndLogWidget(panel, def, parent == nullptr, false, true);
 	return panel;
@@ -478,6 +494,7 @@ MyGUI::Button* GameGUI::CreateButtonWidget(const GameGUIWidgetDef& def, MyGUI::W
 	// Buttons use a nested TextBox for caption rendering so the visual skin can
 	// stay separate from the editable text content.
 	const std::string skin = ResolveButtonSkin(def);
+	LogSkinLookup(def.name, skin);
 	const int buttonWidth = std::max(1, def.width);
 	const int buttonHeight = std::max(1, def.height);
 	MyGUI::Button* button = CreateGuiWidget<MyGUI::Button>(m_gui, parent, skin, def.x, def.y, buttonWidth, buttonHeight, def.layer, def.name);
@@ -505,14 +522,18 @@ MyGUI::Button* GameGUI::CreateButtonWidget(const GameGUIWidgetDef& def, MyGUI::W
 		m_buttonFocusSounds[button] = soundName;
 	}
 	HookButtonClick(button, def);
-	// Button widgets are interactive, so they keep mouse focus and pick behavior.
-	FinalizeAndLogWidget(button, def, parent == nullptr, true, true);
+	// Buttons must be the actual mouse-pick target. In MyGUI, inheritsPick=true
+	// makes a widget return only a picked child; the nested label deliberately
+	// disables picking, so using it here causes the button to report no hit at
+	// all. Containers keep inherited picking, but interactive buttons do not.
+	FinalizeAndLogWidget(button, def, parent == nullptr, true, false);
 	return button;
 }
 
 MyGUI::TextBox* GameGUI::CreateTextWidget(const GameGUIWidgetDef& def, MyGUI::Widget* parent)
 {
 	const std::string skin = def.skin.empty() ? "TextBox" : def.skin;
+	LogSkinLookup(def.name, skin);
 	MyGUI::TextBox* text = CreateGuiWidget<MyGUI::TextBox>(m_gui, parent, skin, def.x, def.y, def.width, def.height, def.layer, def.name);
 
 	if (!text)
@@ -532,6 +553,7 @@ MyGUI::TextBox* GameGUI::CreateTextWidget(const GameGUIWidgetDef& def, MyGUI::Wi
 MyGUI::ImageBox* GameGUI::CreateImageWidget(const GameGUIWidgetDef& def, MyGUI::Widget* parent)
 {
 	const std::string skin = def.skin.empty() ? "ImageBox" : def.skin;
+	LogSkinLookup(def.name, skin);
 	MyGUI::ImageBox* image = CreateGuiWidget<MyGUI::ImageBox>(m_gui, parent, skin, def.x, def.y, def.width, def.height, def.layer, def.name);
 
 	if (!image)
@@ -550,6 +572,7 @@ MyGUI::ImageBox* GameGUI::CreateImageWidget(const GameGUIWidgetDef& def, MyGUI::
 MyGUI::ProgressBar* GameGUI::CreateProgressBarWidget(const GameGUIWidgetDef& def, MyGUI::Widget* parent)
 {
 	const std::string skin = def.skin.empty() ? "ProgressBar" : def.skin;
+	LogSkinLookup(def.name, skin);
 	MyGUI::ProgressBar* progress = CreateGuiWidget<MyGUI::ProgressBar>(m_gui, parent, skin, def.x, def.y, std::max(1, def.width), std::max(1, def.height), def.layer, def.name);
 
 	if (!progress)
@@ -577,6 +600,9 @@ void* GameGUIImageLoader::loadImage(int& _width, int& _height, MyGUI::PixelForma
 		StbImage image;
 		const std::filesystem::path resolvedPath = ResolveGameGUIImagePath(_filename);
 		image.loadFromFile(resolvedPath.string());
+		Root::Current().Debugger().LogTagged(
+			"MyGUI", "image loaded: requested='" + _filename + "', resolved='" + resolvedPath.string() +
+			"', size=" + std::to_string(image.getWidth()) + "x" + std::to_string(image.getHeight()));
 
 		_width = image.getWidth();
 		_height = image.getHeight();
@@ -648,16 +674,61 @@ void GameGUI::startUp(Window& window)
 		// without scanning nested build-tree copies under vcpkg.
 		const std::filesystem::path resourceRoot = Root::Current().FileSystemRef().ExecutableDirectory();
 		MyGUI::OpenGLDataManager& dataManager = MyGUI::OpenGLDataManager::getInstance();
+		const auto logDirectory = [&resourceRoot](const std::filesystem::path& path)
+		{
+			std::error_code error;
+			const bool exists = std::filesystem::exists(path, error);
+			const bool directory = exists && std::filesystem::is_directory(path, error);
+			std::size_t fileCount = 0;
+			if (directory)
+			{
+				for (const auto& entry : std::filesystem::recursive_directory_iterator(path, error))
+				{
+					if (!error && entry.is_regular_file()) ++fileCount;
+				}
+			}
+			Root::Current().Debugger().LogTagged(
+				"MyGUI", "resource directory: '" + path.string() + "', exists=" +
+				(exists ? "true" : "false") + ", files=" + std::to_string(fileCount));
+		};
+		logDirectory(resourceRoot);
+		logDirectory(resourceRoot / "resources");
+		logDirectory(resourceRoot / "assets");
+		// Packaged games keep MyGUI media under resources/. The editor build
+		// continues to receive media directly in its build output directory from
+		// the CMake copy target.
+#ifdef AQUANACT_GAME
+		dataManager.addResourceLocation((resourceRoot / "resources").string(), false);
+		Root::Current().Debugger().LogTagged("MyGUI", "registered resource location: '" + (resourceRoot / "resources").string() + "'");
+#else
 		dataManager.addResourceLocation(resourceRoot.string(), false);
-		dataManager.addResourceLocation((resourceRoot / "assets").string(), true);
-#ifdef AQUANACT_SOURCE_ROOT
-		dataManager.addResourceLocation((std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets").string(), true);
+		Root::Current().Debugger().LogTagged("MyGUI", "registered resource location: '" + resourceRoot.string() + "'");
 #endif
+		dataManager.addResourceLocation((resourceRoot / "assets").string(), true);
+		Root::Current().Debugger().LogTagged("MyGUI", "registered resource location: '" + (resourceRoot / "assets").string() + "'");
+	#if defined(AQUANACT_SOURCE_ROOT) && !defined(AQUANACT_GAME)
+		dataManager.addResourceLocation((std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets").string(), true);
+		Root::Current().Debugger().LogTagged("MyGUI", "registered resource location: '" + (std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets").string() + "'");
+	#endif
 
 		// Gui has to exist only after the platform and resources are available. That
 		// ordering fixed the runtime exceptions we saw during the first integration pass.
 		m_gui = new MyGUI::Gui();
 		m_gui->initialise();
+		const char* requiredResources[] = {
+			"MyGUI_Core.xml", "MyGUI_CommonSkins.xml", "MyGUI_BlueWhiteSkins.xml",
+			"MyGUI_BlueWhiteTemplates.xml", "MyGUI_BlueWhiteImages.xml", "MyGUI_Layers.xml",
+			"MyGUI_Fonts.xml"
+		};
+		for (const char* resource : requiredResources)
+		{
+			Root::Current().Debugger().LogTagged(
+				dataManager.isDataExist(resource) ? "MyGUI" : "MyGUI-WARN",
+				std::string("resource lookup: '") + resource + "', exists=" +
+				(dataManager.isDataExist(resource) ? "true" : "false") +
+				", path='" + dataManager.getDataPath(resource) + "'");
+		}
+		Root::Current().Debugger().LogTagged("MyGUI", "SkinManager default skin='" + MyGUI::SkinManager::getInstance().getDefaultSkin() + "'");
 		MyGUI::PointerManager::getInstance().setVisible(false);
 		m_initialized = true;
 	}
@@ -953,7 +1024,6 @@ void GameGUI::FocusFirstControllerButton()
 	ClearControllerFocus();
 	m_focusedControllerButton = 0;
 	PositionMenuPointer(m_controllerButtons[0]);
-	m_controllerButtons[0]->_setMouseFocus(true);
 }
 
 void GameGUI::ClearControllerFocus()
@@ -961,10 +1031,38 @@ void GameGUI::ClearControllerFocus()
 	if (m_focusedControllerButton >= 0 && m_focusedControllerButton < static_cast<int>(m_controllerButtons.size()))
 	{
 		MyGUI::Button* button = m_controllerButtons[static_cast<std::size_t>(m_focusedControllerButton)];
-		button->_setMouseFocus(false);
 		ApplyTextHighlight(button, false);
 	}
 	m_focusedControllerButton = -1;
+}
+
+void GameGUI::RelinquishControllerFocusToMouse()
+{
+	MyGUI::Button* controllerButton = nullptr;
+	if (m_focusedControllerButton >= 0 && m_focusedControllerButton < static_cast<int>(m_controllerButtons.size()))
+	{
+		controllerButton = m_controllerButtons[static_cast<std::size_t>(m_focusedControllerButton)];
+	}
+
+	// Mouse movement has already been injected into MyGUI by Input. Drop only
+	// the controller-selection bookkeeping; MyGUI remains the owner of real
+	// mouse hover focus.
+	m_focusedControllerButton = -1;
+	MyGUI::Button* hoveredButton = dynamic_cast<MyGUI::Button*>(
+		MyGUI::InputManager::getInstance().getMouseFocusWidget());
+	if (controllerButton && controllerButton != hoveredButton)
+	{
+		ApplyTextHighlight(controllerButton, false);
+	}
+	if (hoveredButton)
+	{
+		PositionMenuPointer(hoveredButton);
+	}
+	else
+	{
+		if (m_menuPointer) m_menuPointer->setVisible(false);
+		if (m_menuBox) m_menuBox->setVisible(false);
+	}
 }
 
 bool GameGUI::HasControllerFocus() const
@@ -987,10 +1085,8 @@ void GameGUI::NavigateControllerButtons(int direction)
 	const int count = static_cast<int>(m_controllerButtons.size());
 	const int previous = m_focusedControllerButton;
 	m_focusedControllerButton = (previous + direction + count) % count;
-	m_controllerButtons[static_cast<std::size_t>(previous)]->_setMouseFocus(false);
 	ApplyTextHighlight(m_controllerButtons[static_cast<std::size_t>(previous)], false);
 	PositionMenuPointer(m_controllerButtons[static_cast<std::size_t>(m_focusedControllerButton)]);
-	m_controllerButtons[static_cast<std::size_t>(m_focusedControllerButton)]->_setMouseFocus(true);
 }
 
 void GameGUI::ActivateFocusedControllerButton()

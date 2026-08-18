@@ -22,6 +22,7 @@
 #include "Engine/UI/CameraPathCreator.h"
 #include "Engine/Core/Mesh.h"
 #include "Engine/Core/Scene.h"
+#include "Engine/Core/FileSystem.h"
 #include "Engine/Core/Entity.h"
 #include "Engine/Core/EntityStateMachine.h"
 #include "Engine/Core/PhysicsWorld.h"
@@ -32,6 +33,7 @@
 #include <cmath>
 #include <iomanip>
 #include <limits>
+#include <filesystem>
 #include <sstream>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -267,6 +269,25 @@ namespace {
 
 void Debug::startUp()
 {
+	// Packaged games do not expose editor diagnostics windows, so retain a
+	// persistent log beside the executable for runtime investigation.
+	try
+	{
+		const std::filesystem::path logDirectory =
+			Root::Current().FileSystemRef().ExecutableDirectory() / "logs";
+		std::filesystem::create_directories(logDirectory);
+		m_runtimeLog.open(logDirectory / "aquanact-runtime.txt", std::ios::out | std::ios::trunc);
+	}
+	catch (...)
+	{
+		// Logging must never prevent the engine from starting.
+	}
+
+	LogTagged("Runtime", Root::Current().State().IsGameMode()
+		? "Started packaged/game runtime" : "Started editor runtime");
+	LogBuildInfo();
+	VerifyDependencies();
+
 	if (!Root::Current().State().IsEditorMode())
 	{
 		return;
@@ -276,8 +297,6 @@ void Debug::startUp()
 	// early build/dependency diagnostics before the rest of the app starts running.
 	RebuildAxis();
 	RebuildGrid();
-	LogBuildInfo();
-	VerifyDependencies();
 }
 
 void Debug::shutDown()
@@ -304,6 +323,11 @@ void Debug::shutDown()
 	m_cameraCollisionSphere = nullptr;
 	m_logMessages.clear();
 	m_logOnceKeys.clear();
+	if (m_runtimeLog.is_open())
+	{
+		m_runtimeLog.flush();
+		m_runtimeLog.close();
+	}
 }
 
 void Debug::ClearEntityBoundingBoxes()
@@ -619,9 +643,10 @@ void Debug::drawGameModeInput(const Input& input)
 		ImGui::Begin("Game Input", &open);
 	ImGui::Text("FPS: %.1f", m_lastFps);
 	ImGui::Text("Frame: %.3f ms", Root::Current().Profiler().FrameMs());
-	ImGui::Text("Window focused: %s", input.WindowFocused() ? "yes" : "no");
-	ImGui::Text("Look active: %s", input.LookActive() ? "yes" : "no");
-	ImGui::Text("Look became active: %s", input.LookBecameActive() ? "yes" : "no");
+	const Input::InputFrame& inputFrame = input.Frame();
+	ImGui::Text("Window focused: %s", inputFrame.windowFocused ? "yes" : "no");
+	ImGui::Text("Look active: %s", inputFrame.lookActive ? "yes" : "no");
+	ImGui::Text("Look became active: %s", inputFrame.lookBecameActive ? "yes" : "no");
 	ImGui::Text("Engine mode: %s", Root::Current().State().IsGameMode() ? "Game" : "Editor");
 	ImGui::Text("Gameplay flow: %s",
 		Root::Current().Gameplay().State() == GameplayManager::GameState::MainMenu ? "MainMenu" :
@@ -637,12 +662,12 @@ void Debug::drawGameModeInput(const Input& input)
 	ImGui::Text("Active Scene: %s", activeLevel ? activeLevel->Name().c_str() : "<none>");
 	ImGui::Text("Active Scene objects: %zu", activeLevel ? activeLevel->Objects().size() : 0);
 	ImGui::Text("Controller components: %zu", Root::Current().Gameplay().ControllerCount());
-	const glm::vec3 move = input.MoveInput();
-	const glm::vec2 mouse = input.MouseDelta();
+	const glm::vec3 move = inputFrame.moveInput;
+	const glm::vec2 mouse = inputFrame.mouseDelta;
 	ImGui::Separator();
 	ImGui::Text("Move input: %.2f, %.2f", move.x, move.z);
 	ImGui::Text("Mouse delta: %.2f, %.2f", mouse.x, mouse.y);
-		ImGui::Text("Delta time: %.4f", input.DeltaTime());
+			ImGui::Text("Delta time: %.4f", inputFrame.deltaTime);
 		ImGui::Checkbox("Camera Collision Debug", &m_showCameraCollisionDebug);
 	ImGui::Separator();
 	ImGui::Separator();
@@ -727,8 +752,8 @@ void Debug::drawGameModeInput(const Input& input)
 			ImGui::Begin("Motion Diagnostics");
 			const PathedCamera& camera = Root::Current().Render().GetPathedCamera();
 			ImGui::Separator();
-			ImGui::Text("Render dt: %.5f s (%.3f ms)", input.DeltaTime(), input.DeltaTime() * 1000.0f);
-			ImGui::Text("Input move: %.3f, %.3f, %.3f", input.MoveInput().x, input.MoveInput().y, input.MoveInput().z);
+		ImGui::Text("Render dt: %.5f s (%.3f ms)", m_gameplayDt, m_gameplayDt * 1000.0f);
+		ImGui::Text("Input move: %.3f, %.3f, %.3f", m_gameplayMoveInput.x, m_gameplayMoveInput.y, m_gameplayMoveInput.z);
 			ImGui::Text("Applied movement: %.5f, %.5f, %.5f", m_gameplayDelta.x, m_gameplayDelta.y, m_gameplayDelta.z);
 			ImGui::Text("Player position: %.5f, %.5f, %.5f", m_gameplayPosition.x, m_gameplayPosition.y, m_gameplayPosition.z);
 			ImGui::Text("Camera position: %.5f, %.5f, %.5f", camera.GetPosition().x, camera.GetPosition().y, camera.GetPosition().z);
@@ -1166,6 +1191,24 @@ void Debug::SetControllerPhysicsDiagnostics(const std::string& objectName, bool 
 	bool boundsValid, bool verticalSweepHit, float verticalSweepTime,
 	const glm::vec3& sweepNormal, const glm::vec3& velocity, bool grounded)
 {
+	++m_controllerDiagnosticsFrame;
+	if ((m_controllerDiagnosticsFrame % 30u) == 0u ||
+		objectName != m_controllerPhysicsObject ||
+		colliderValid != m_controllerColliderValid ||
+		boundsValid != m_controllerBoundsValid ||
+		grounded != m_controllerGrounded)
+	{
+		LogTagged("Controller", objectName +
+			" collider=" + (colliderValid ? "valid" : "missing") +
+			" bounds=" + (boundsValid ? "valid" : "invalid") +
+			" downwardHit=" + (verticalSweepHit ? "true" : "false") +
+			" sweepTime=" + std::to_string(verticalSweepTime) +
+			" normal=(" + std::to_string(sweepNormal.x) + "," +
+			std::to_string(sweepNormal.y) + "," + std::to_string(sweepNormal.z) + ")" +
+			" velocity=(" + std::to_string(velocity.x) + "," +
+			std::to_string(velocity.y) + "," + std::to_string(velocity.z) + ")" +
+			" grounded=" + (grounded ? "true" : "false"));
+	}
 	m_controllerPhysicsObject = objectName;
 	m_controllerColliderValid = colliderValid;
 	m_controllerBoundsValid = boundsValid;
@@ -1250,6 +1293,13 @@ void Debug::SetCameraDiagnostics(const CameraDiagnosticsSnapshot& diagnostics)
 
 void Debug::SetAnimationDiagnostics(const std::string& currentState, const std::string& desiredState, const std::string& lastTransitionDebug, const std::string& lastTransitionFrom, const std::string& lastTransitionTo, const std::string& lastTransitionLeftOperandText, const std::string& lastTransitionComparatorText, const std::string& lastTransitionRightOperandText, float lastTransitionLeftValue, float lastTransitionRightValue, bool lastTransitionPassed, const std::string& lastResolvedTargetState, int lastResolvedTargetClipIndex, bool lastResolvedTargetFound, const std::string& stateListText)
 {
+	const bool transitionFired = lastTransitionDebug.rfind("Transition fired:", 0) == 0;
+	if (!currentState.empty() && (currentState != m_animationCurrentState || transitionFired))
+	{
+		LogTagged("EntityState", "state=" + currentState +
+			" desired=" + desiredState +
+			" transition=" + lastTransitionDebug);
+	}
 	m_animationCurrentState = currentState;
 	m_animationDesiredState = desiredState;
 	m_animationLastTransitionDebug = lastTransitionDebug;
@@ -1324,11 +1374,17 @@ std::string Debug::SeverityPrefix(Severity severity) const
 
 void Debug::LogMessage(Severity severity, const std::string& message)
 {
+	const std::string formatted = SeverityPrefix(severity) + message;
 	// Keep the log buffer bounded so the UI remains responsive even if a subsystem is noisy.
-	m_logMessages.push_back(SeverityPrefix(severity) + message);
+	m_logMessages.push_back(formatted);
 	if (m_logMessages.size() > 180)
 	{
 		m_logMessages.erase(m_logMessages.begin());
+	}
+	if (m_runtimeLog.is_open())
+	{
+		m_runtimeLog << formatted << '\n';
+		m_runtimeLog.flush();
 	}
 }
 
@@ -1443,8 +1499,7 @@ void Debug::VerifyDependencies()
 	const DependencyProbe probes[] =
 	{
 		{ "GLFW", "glfw3.dll" },
-		{ "FreeType", "freetyped.dll" },
-		{ "MyGUI OpenGL", "MyGUI.OpenGLPlatform_d.dll" }
+		{ "FreeType", "freetyped.dll" }
 	};
 
 	for (const DependencyProbe& probe : probes)

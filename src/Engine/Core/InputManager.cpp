@@ -4,7 +4,6 @@
 
 #include "GLFW/glfw3.h"
 
-#include <imgui.h>
 #include <algorithm>
 #include <cmath>
 #include <utility>
@@ -171,9 +170,9 @@ void InputManager::EvaluateActions()
 	m_vectorStates.clear();
 	m_vectorDeltaStates.clear();
 	m_vectorRateStates.clear();
-	const ImGuiIO& io = ImGui::GetIO();
-	const bool uiCapturesKeyboard = io.WantCaptureKeyboard || io.WantTextInput;
-	const bool uiCapturesMouse = io.WantCaptureMouse || ImGui::IsAnyItemActive();
+	const bool uiCapturesKeyboard = m_captureMask.keyboard;
+	const bool uiCapturesMouseButtons = m_captureMask.mouseButtons;
+	const bool uiCapturesMouseMotion = m_captureMask.mouseMotion;
 	for (auto& [action, state] : m_states)
 	{
 		state.previousValue = state.value;
@@ -203,7 +202,7 @@ void InputManager::EvaluateActions()
 			}
 			else if (binding.type == InputBindingType::MouseButton)
 			{
-				if (uiCapturesMouse)
+				if (uiCapturesMouseButtons)
 				{
 					continue;
 				}
@@ -214,14 +213,18 @@ void InputManager::EvaluateActions()
 			}
 			else if (binding.type == InputBindingType::MouseDelta)
 			{
-				if (uiCapturesMouse)
+				if (uiCapturesMouseMotion)
 				{
 					continue;
 				}
-				deltaValue += m_input->MouseDelta() * binding.vector * binding.scale;
+				deltaValue += m_input->Frame().mouseDelta * binding.vector * binding.scale;
 			}
 			else if (binding.type == InputBindingType::ControllerDigital)
 			{
+				if (m_captureMask.controller)
+				{
+					continue;
+				}
 				if (m_input->ControllerButtonDown(binding.code, binding.joystick))
 				{
 					rateValue += binding.vector * binding.scale;
@@ -229,6 +232,10 @@ void InputManager::EvaluateActions()
 			}
 			else if (binding.type == InputBindingType::ControllerStick)
 			{
+				if (m_captureMask.controller)
+				{
+					continue;
+				}
 				const int xAxis = binding.stick == InputStick::Left ? GLFW_GAMEPAD_AXIS_LEFT_X : GLFW_GAMEPAD_AXIS_RIGHT_X;
 				const int yAxis = binding.stick == InputStick::Left ? GLFW_GAMEPAD_AXIS_LEFT_Y : GLFW_GAMEPAD_AXIS_RIGHT_Y;
 				glm::vec2 stick(

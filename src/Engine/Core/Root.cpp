@@ -13,6 +13,7 @@
 #include "Engine/Core/GameplayManager.h"
 #include "Engine/Core/Input.h"
 #include "Engine/Core/InputManager.h"
+#include "Engine/Core/UIInputRouter.h"
 #include "Engine/Core/FrameProfiler.h"
 #include "Engine/Core/Audio.h"
 #include "Engine/Core/GLHeaders.h"
@@ -34,16 +35,10 @@ namespace
 			return executableProject;
 		}
 
-		const std::filesystem::path packagedProject = std::filesystem::current_path() / "project.aqua";
-		if (std::filesystem::exists(packagedProject))
-		{
-			return packagedProject;
-		}
-
 #ifdef AQUANACT_SOURCE_ROOT
 		return std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets" / "projects" / "project.aqua";
 #else
-		return packagedProject;
+		return executableProject;
 #endif
 	}
 }
@@ -175,7 +170,25 @@ void Root::run()
 		// input
 		{
 			FrameProfiler::Scope scope(*m_profiler, "Input");
+			// Deliver GLFW callbacks before building this frame's input snapshot.
+			// This keeps UI hover/click routing and gameplay actions on the same
+			// event batch instead of making input one frame behind rendering.
+			m_window->PollEvents();
+			const UIInputRoute inputRoute = UIInputRouter::Resolve(
+				m_engineState.IsGameMode(),
+				m_gameplayManager->State(),
+				m_frontEndManager->FrontEndModeValue());
+			m_input->TransitionToContext(inputRoute.context);
+			// Input uses the same frame-level ownership decision for gameplay look.
+			// This keeps low-level input independent from ImGui's global state.
+			m_input->SetMouseCapturedByUI(inputRoute.captureMask.mouseButtons);
 			m_input->Update();
+
+			// MyGUI receives mouse events only when the frame router selects it.
+			// Menus and the GameGUI preview are MyGUI-owned; an ImGui-owned mouse
+			// interaction takes precedence over that route.
+			m_input->DispatchPendingMouseEvents(inputRoute.dispatchMouseToMyGUI);
+			m_inputManager->SetCaptureMask(inputRoute.captureMask);
 			m_inputManager->Update();
 		}
 
@@ -190,7 +203,7 @@ void Root::run()
 			// are we playing?
 			if (m_gameplayManager->State() == GameplayManager::GameState::Playing)
 			{
-				m_gameplayManager->Update(m_input->DeltaTime(), *m_frontEndManager, *m_debug, m_engineState);
+				m_gameplayManager->Update(m_input->Frame().deltaTime, *m_frontEndManager, *m_debug, m_engineState);
 			}
 		}
 

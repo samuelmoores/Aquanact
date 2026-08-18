@@ -79,11 +79,10 @@ private:
 	int m_activeAssetIndex = -1;
 	bool m_showEditorWindow = false;
 	bool m_showDiagnosticsWindow = true;
+	bool m_showInputDiagnostics = false;
 	UIMode m_mode = UIMode::MainMenu;
-	bool m_previousControllerConnected = false;
 	bool m_previousDpadUp = false;
 	bool m_previousDpadDown = false;
 	bool m_previousControllerAccept = false;
-	std::uint64_t m_lastMouseActivitySerial = 0;
 	GameGUIMenuNavigationMode m_menuNavigationMode = GameGUIMenuNavigationMode::Pointer;
 };

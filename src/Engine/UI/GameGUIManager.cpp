@@ -18,6 +18,7 @@
 #include <filesystem>
 #include <fstream>
 #include <imgui.h>
+#include <MYGUI/MyGUI_InputManager.h>
 #include <sstream>
 
 namespace {
@@ -359,6 +360,7 @@ void GameGUIManager::UpdateControllerNavigation()
 	}
 
 	const Input& input = Root::Current().InputRef();
+	const Input::InputFrame& frame = input.Frame();
 	const bool connected = input.ControllerConnected();
 	const bool dpadUp = input.ControllerButtonDown(GLFW_GAMEPAD_BUTTON_DPAD_UP);
 	const bool dpadDown = input.ControllerButtonDown(GLFW_GAMEPAD_BUTTON_DPAD_DOWN);
@@ -366,23 +368,21 @@ void GameGUIManager::UpdateControllerNavigation()
 	const bool dpadUpPressed = dpadUp && !m_previousDpadUp;
 	const bool dpadDownPressed = dpadDown && !m_previousDpadDown;
 	const bool acceptPressed = accept && !m_previousControllerAccept;
-	const bool mouseActivity = input.MouseActivitySerial() != m_lastMouseActivitySerial;
-	if (!connected && m_previousControllerConnected)
+	const bool deviceChanged = frame.deviceChangedThisFrame;
+	if (deviceChanged && frame.activeDevice == Input::ActiveInputDevice::MouseKeyboard)
 	{
-		m_runtime->ClearControllerFocus();
-	}
-	if (mouseActivity)
-	{
-		m_runtime->ClearControllerFocus();
-		m_lastMouseActivitySerial = input.MouseActivitySerial();
+		m_runtime->RelinquishControllerFocusToMouse();
 	}
 
-	if (connected && !mouseActivity && !m_previousControllerConnected)
+	if (deviceChanged && frame.activeDevice == Input::ActiveInputDevice::Gamepad)
 	{
 		m_runtime->FocusFirstControllerButton();
 	}
 
-	if (connected && (dpadUpPressed || dpadDownPressed || acceptPressed))
+	// The input event that switches ownership to the gamepad should not also
+	// activate the first menu item. Navigation begins on the following frame.
+	if (!deviceChanged && frame.activeDevice == Input::ActiveInputDevice::Gamepad &&
+		connected && (dpadUpPressed || dpadDownPressed || acceptPressed))
 	{
 		if (!m_runtime->HasControllerFocus())
 		{
@@ -402,7 +402,6 @@ void GameGUIManager::UpdateControllerNavigation()
 		}
 	}
 
-	m_previousControllerConnected = connected;
 	m_previousDpadUp = dpadUp;
 	m_previousDpadDown = dpadDown;
 	m_previousControllerAccept = accept;
@@ -639,6 +638,46 @@ void GameGUIManager::DrawDiagnosticsWindow()
 	ImGui::Text("Last button asset: %s", m_lastButtonAssetName.empty() ? "<none>" : m_lastButtonAssetName.c_str());
 	ImGui::Text("Last button widget: %s", m_lastButtonWidgetName.empty() ? "<none>" : m_lastButtonWidgetName.c_str());
 	ImGui::Text("Last button action: %s", m_lastButtonActionName.empty() ? "<none>" : m_lastButtonActionName.c_str());
+	ImGui::Separator();
+	ImGui::Checkbox("Input", &m_showInputDiagnostics);
+	if (m_showInputDiagnostics)
+	{
+		const Input& input = Root::Current().InputRef();
+		const Input::InputFrame& frame = input.Frame();
+		const char* context = "Unknown";
+		switch (frame.context)
+		{
+		case Input::InputContext::Editor: context = "Editor"; break;
+		case Input::InputContext::GameGUIPreview: context = "GameGUIPreview"; break;
+		case Input::InputContext::MainMenu: context = "MainMenu"; break;
+		case Input::InputContext::Gameplay: context = "Gameplay"; break;
+		case Input::InputContext::Paused: context = "Paused"; break;
+		}
+		const char* device = frame.activeDevice == Input::ActiveInputDevice::Gamepad
+			? "Gamepad" : "MouseKeyboard";
+		const char* cursorMode = input.CursorMode() == GLFW_CURSOR_DISABLED ? "Disabled"
+			: input.CursorMode() == GLFW_CURSOR_HIDDEN ? "Hidden" : "Normal";
+		const ImGuiIO& imgui = ImGui::GetIO();
+		const glm::ivec2 windowMouse = input.LastWindowMousePosition();
+		const glm::ivec2 routedMouse = input.LastRoutedMousePosition();
+		MyGUI::Widget* mouseFocus = MyGUI::InputManager::getInstance().getMouseFocusWidget();
+		ImGui::Text("Context: %s", context);
+		ImGui::Text("Active device: %s", device);
+		ImGui::Text("Device changed: %s", frame.deviceChangedThisFrame ? "yes" : "no");
+		ImGui::Text("Window focused: %s", frame.windowFocused ? "yes" : "no");
+		ImGui::Text("UI mouse capture: %s", input.MouseCapturedByUI() ? "yes" : "no");
+		ImGui::Text("Routed to MyGUI: %s", input.LastMouseRoutedToMyGUI() ? "yes" : "no");
+		ImGui::Text("ImGui mouse capture: %s", imgui.WantCaptureMouse ? "yes" : "no");
+		ImGui::Text("ImGui active item: %s", ImGui::IsAnyItemActive() ? "yes" : "no");
+		ImGui::Text("Cursor mode: %s", cursorMode);
+		ImGui::Text("MyGUI initialized: %s", m_runtime && m_runtime->IsInitialized() ? "yes" : "no");
+		ImGui::Text("Window mouse: %d, %d", windowMouse.x, windowMouse.y);
+		ImGui::Text("MyGUI mouse: %d, %d", routedMouse.x, routedMouse.y);
+		ImGui::Text("Injected moves: %zu", input.LastInjectedMouseMoves());
+		ImGui::Text("Injected presses: %zu", input.LastInjectedMousePresses());
+		ImGui::Text("Injected releases: %zu", input.LastInjectedMouseReleases());
+		ImGui::Text("MyGUI mouse focus: %s", mouseFocus ? mouseFocus->getName().c_str() : "<none>");
+	}
 	ImGui::Separator();
 	ImGui::TextUnformatted("Action log:");
 	if (m_actionLog.empty())
@@ -1000,7 +1039,6 @@ void GameGUIManager::ApplyActiveAsset()
 		return;
 	}
 	m_runtime->LoadUIAsset(m_assets[static_cast<std::size_t>(m_activeAssetIndex)]);
-	m_previousControllerConnected = false;
 }
 
 void GameGUIManager::ApplyMode()

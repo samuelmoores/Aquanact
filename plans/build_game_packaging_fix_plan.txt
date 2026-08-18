@@ -1,0 +1,266 @@
+Aquanact Build Game Packaging Fix Plan
+=======================================
+
+Goal
+----
+
+Make the editor's Build Game workflow produce a complete, reproducible,
+self-contained package, report actionable failures, and avoid freezing or
+corrupting the source tree.
+
+Scope
+-----
+
+This plan covers the editor Build Game window, AquanactBuildSystem, the
+standalone AquanactBuildTool, and packaged-game resource resolution. It does
+not change the CMake compilation process itself; the packaging step should
+consume an already-built game executable.
+
+
+Step 1: Define the package contract
+------------------------------------
+
+Document and enforce the expected package layout:
+
+    game.exe
+    project.aqua
+    assets/
+    shaders/
+    MyGUI media files at the location expected by the runtime
+    required runtime DLLs
+    build.manifest
+
+Decide which build configuration is supported initially (for example,
+x64-Debug or x64-Release). Do not mix DLLs from different configurations.
+
+Relevant files:
+
+- include/Engine/Core/AquanactBuildSystem.h
+- src/Engine/Core/AquanactBuildSystem.cpp
+- src/Engine/Core/BuildToolMain.cpp
+- src/Engine/UI/BuildGameWindow.cpp
+
+
+Step 2: Centralize build inputs and path resolution
+---------------------------------------------------
+
+Add a small build-input/configuration structure containing:
+
+- source root
+- output root
+- project file
+- executable path
+- dependency/DLL directories
+- build configuration
+
+Use the same resolver for the editor and AquanactBuildTool. The editor must
+not derive the executable from current_path(). It should resolve the actual
+AquanactGame.exe next to the editor executable or from the configured CMake
+build output, with an explicit error if it cannot be found.
+
+Prefer executable-directory and configured paths over the process working
+directory. Keep the command-line arguments as overrides for the standalone
+tool.
+
+Relevant files:
+
+- src/Engine/UI/BuildGameWindow.cpp
+- src/Engine/Core/BuildToolMain.cpp
+- src/Engine/Core/AquanactBuildSystem.cpp
+
+
+Step 3: Save the project before packaging
+------------------------------------------
+
+Before invoking the build system from the editor:
+
+1. Save pending role/UI edits.
+2. Save the active project and scene.
+3. Abort packaging if saving fails.
+4. Only then copy project and assets into the package.
+
+Reuse the existing project-manager save path rather than duplicating project
+serialization logic. Avoid hard-coded C:/dev/Aquanact paths while doing this;
+derive the project path from the same source-root/project configuration used by
+the build system.
+
+Relevant files:
+
+- src/Engine/UI/BuildGameWindow.cpp
+- src/Engine/UI/EngineMenuBar.cpp
+- include/Engine/Core/ProjectManager.h
+- src/Engine/Core/ProjectManager.cpp
+
+
+Step 4: Validate required inputs before copying
+-----------------------------------------------
+
+Add explicit validation before creating or modifying the output package.
+Required inputs should include:
+
+- source root
+- project file
+- game executable
+- shaders directory
+- assets directory
+- selected dependency directories/files
+
+Return structured failure information identifying the missing path and the
+operation that failed. Missing optional dependency directories may be allowed,
+but only if the selected runtime configuration does not require them.
+
+The UI should display the first useful error, and the command-line tool should
+write it to stderr and return a nonzero exit code.
+
+
+Step 5: Protect the source tree and normalize output paths
+-----------------------------------------------------------
+
+Normalize absolute paths before building. Reject output paths that:
+
+- equal the source root
+- are inside the source root
+- are the executable directory or another input directory
+- are empty or otherwise invalid
+
+Also reject an output path that is the same as any input path after
+normalization. Use filesystem error codes where practical so path-validation
+failures can be reported without exceptions being discarded.
+
+Relevant files:
+
+- src/Engine/Core/AquanactBuildSystem.cpp
+- src/Engine/UI/BuildGameWindow.cpp
+
+
+Step 6: Build into a temporary staging directory
+-------------------------------------------------
+
+Do not copy directly into the final output directory. Instead:
+
+1. Create a uniquely named staging directory beside the requested output.
+2. Copy all package contents into staging.
+3. Validate that the staged package contains game.exe, project.aqua, assets,
+   shaders, and the required DLLs.
+4. Write the manifest only after validation succeeds.
+5. Replace the final output directory with the completed staging directory.
+
+On failure, remove only the staging directory and leave the previous package
+untouched. If atomic directory replacement is not practical on Windows, use a
+clearly defined backup/rename sequence and restore the previous package when a
+replacement step fails.
+
+This also fixes stale-file accumulation from previous builds.
+
+
+Step 7: Select dependencies deterministically
+----------------------------------------------
+
+Replace the unconditional debug-plus-release DLL copying with one selected
+dependency set based on the executable/configuration. Copy only the DLLs
+required by the game, or at minimum copy from one configuration directory in a
+deterministic order.
+
+Detect duplicate DLL names before copying and fail with a clear message rather
+than silently allowing a later directory to overwrite an earlier one. Avoid
+copying unrelated DLLs from the executable directory unless they are declared
+runtime dependencies.
+
+Update the standalone tool's defaults and arguments so the selected
+configuration is explicit rather than hard-coded to x64-debug paths.
+
+
+Step 8: Make packaged resource lookup self-contained
+-----------------------------------------------------
+
+Audit every runtime asset/resource resolver used by AQUANACT_GAME. Packaged
+runtime lookup should prefer the executable directory and its assets/shaders
+directories. The compiled-in AQUANACT_SOURCE_ROOT fallback should be editor
+only, or at least disabled for a packaged game after required package paths
+have been checked.
+
+Pay particular attention to:
+
+- project loading in src/Engine/Core/Root.cpp
+- GUI resource registration in src/Engine/UI/GameGUI.cpp
+- audio and texture path resolution
+- shader and model loading
+
+Run the packaged game from a clean directory with the source tree unavailable
+to prove that the package does not accidentally depend on the development
+checkout.
+
+
+Step 9: Improve status, logging, and UI behavior
+------------------------------------------------
+
+Replace catch-all silent failure with an error result containing:
+
+- operation
+- source path
+- destination path
+- filesystem error/message
+
+Show this message in the Build Game window and log it through the engine
+debugger. Include the selected output, executable, and configuration in the
+manifest.
+
+Move the copy operation off the render/UI thread if builds can be large. The
+window should show a building state, prevent duplicate requests, and display
+success or failure when the worker completes. If asynchronous work is deferred,
+at least show a clear busy state and measure whether synchronous copying is
+acceptable for the current asset set.
+
+
+Step 10: Add automated tests for the build system
+-------------------------------------------------
+
+Create filesystem-based tests using temporary directories. Cover:
+
+- successful package creation
+- missing executable
+- missing project file
+- missing required asset/shader directory
+- invalid output path
+- output equal to or inside source root
+- stale-file removal
+- DLL configuration selection
+- duplicate DLL detection
+- copy failure and preservation of the previous package
+- manifest contents
+
+Keep these tests against AquanactBuildSystem so they do not require opening
+the editor window. Add one editor-level smoke test or manual checklist for
+project save-before-build and executable discovery.
+
+
+Step 11: Verify with a clean packaged-game run
+----------------------------------------------
+
+After implementation:
+
+1. Build the selected AquanactGame configuration.
+2. Run Build Game from the editor into a new empty directory.
+3. Inspect the package layout and manifest.
+4. Temporarily rename or move the source checkout so it cannot be found.
+5. Launch package/game.exe from a different working directory.
+6. Confirm project, shaders, models, GUI, audio, and DLL loading.
+7. Repeat through AquanactBuildTool with explicit arguments.
+8. Confirm a failed build leaves the previous final package usable.
+
+
+Recommended implementation order
+---------------------------------
+
+1. Centralize path/configuration resolution.
+2. Add required-input and output-path validation.
+3. Save the project before packaging.
+4. Implement staging and stale-file protection.
+5. Fix deterministic DLL selection.
+6. Remove packaged-runtime dependence on AQUANACT_SOURCE_ROOT.
+7. Add diagnostics and UI busy state.
+8. Add automated tests and perform the clean-directory run.
+
+The first four items address the highest-risk correctness problems: packages
+without an executable, packages with unsaved project data, accidental source
+tree writes, and partially updated output directories.

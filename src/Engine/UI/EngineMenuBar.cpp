@@ -173,11 +173,11 @@ void EngineMenuBar::DrawFileMenu(
 
 	if (ImGui::MenuItem("Save Project"))
 	{
-		projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", sceneManager);
+		projectManager.SaveProject(projectManager.CurrentProjectPath(), sceneManager);
 	}
 	if (ImGui::MenuItem("Load Project"))
 	{
-		projectManager.LoadProject("C:/dev/Aquanact/assets/projects/project.aqua", sceneManager);
+		projectManager.LoadProject(projectManager.CurrentProjectPath(), sceneManager);
 	}
 
 	ImGui::Separator();
@@ -297,7 +297,7 @@ void EngineMenuBar::DrawGameMenu(
 	{
 		Root::Current().FrontEnd().Creator().SaveAllRoleGUIs();
 		Root::Current().FrontEnd().RuntimeGUI().ReloadAssetsFromDisk();
-		if (projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", sceneManager))
+		if (projectManager.SaveProject(projectManager.CurrentProjectPath(), sceneManager))
 		{
 			Root::Current().FrontEnd().RestoreRuntimeLayout();
 			Root::Current().State().SetMode(EngineMode::Game);
@@ -316,7 +316,7 @@ void EngineMenuBar::DrawGameMenu(
 	{
 		Root::Current().FrontEnd().Creator().SaveAllRoleGUIs();
 		Root::Current().FrontEnd().RuntimeGUI().ReloadAssetsFromDisk();
-		if (projectManager.SaveProject("C:/dev/Aquanact/assets/projects/project.aqua", sceneManager))
+		if (projectManager.SaveProject(projectManager.CurrentProjectPath(), sceneManager))
 		{
 			Root::Current().FrontEnd().RestoreRuntimeLayout();
 			Root::Current().State().SetMode(EngineMode::Game);

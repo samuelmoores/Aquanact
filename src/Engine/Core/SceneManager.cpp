@@ -14,6 +14,8 @@
 #include "Game/Enemy.h"
 
 #include <fstream>
+#include <algorithm>
+#include <cctype>
 #include <iostream>
 #include <memory>
 #include <filesystem>
@@ -110,6 +112,21 @@ namespace
 		return compact;
 	}
 
+	std::string PortableAnimationPathKey(const std::string& value)
+	{
+		std::string normalized = value;
+		std::replace(normalized.begin(), normalized.end(), '\\', '/');
+		std::transform(normalized.begin(), normalized.end(), normalized.begin(),
+			[](unsigned char character) { return static_cast<char>(std::tolower(character)); });
+		const std::string assetsMarker = "/assets/";
+		const std::size_t assetsPosition = normalized.find(assetsMarker);
+		if (assetsPosition != std::string::npos)
+		{
+			return normalized.substr(assetsPosition + 1);
+		}
+		return normalized;
+	}
+
 	std::string ResolveSavedAnimationSource(Entity& entity, const std::string& savedAnimationSource)
 	{
 		const Mesh* mesh = entity.GetMesh();
@@ -118,11 +135,13 @@ namespace
 			return savedAnimationSource;
 		}
 
-		const std::string compactSavedSource = WithoutPathSeparators(savedAnimationSource);
+		const std::string portableSavedSource = PortableAnimationPathKey(savedAnimationSource);
 		for (int animationIndex = 0; animationIndex < mesh->NumAnimations(); ++animationIndex)
 		{
 			const std::string& animationSource = mesh->GetAnimationSource(animationIndex);
-			if (animationSource == savedAnimationSource || WithoutPathSeparators(animationSource) == compactSavedSource)
+			if (animationSource == savedAnimationSource ||
+				PortableAnimationPathKey(animationSource) == portableSavedSource ||
+				WithoutPathSeparators(animationSource) == WithoutPathSeparators(savedAnimationSource))
 			{
 				return animationSource;
 			}

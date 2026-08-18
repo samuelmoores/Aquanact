@@ -326,7 +326,9 @@ namespace ProjectStateSerializer {
 					for (const auto& state : animator->States())
 					{
 						contents += ";" + ProjectStateFormat::EscapeField(state.name);
-						contents += ";" + ProjectStateFormat::EscapeField(state.animationName);
+						const std::filesystem::path portableAnimationPath =
+							ProjectStateFormat::MakePortableSourcePath(projectPath, state.animationName);
+						contents += ";" + ProjectStateFormat::EscapeField(portableAnimationPath.string());
 						contents += ";" + std::to_string(state.blocksMovement ? 1 : 0);
 						contents += ";" + std::to_string(state.blocksInput ? 1 : 0);
 					}

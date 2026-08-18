@@ -8,7 +8,8 @@ public:
 	void Draw(bool& popupRequested);
 
 private:
-	char m_buildPath[512] = "C:\\dev\\Aquanact\\out\\package";
+	char m_buildPath[512] = {};
+	bool m_initializedPath = false;
 	bool m_requestedBuild = false;
 	std::string m_statusMessage;
 };

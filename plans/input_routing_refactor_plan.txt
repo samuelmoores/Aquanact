@@ -1,0 +1,454 @@
+Aquanact Mouse and Controller Input Routing Refactor Plan
+=========================================================
+
+Goal
+----
+
+Replace the current overlapping mouse/controller ownership logic with one
+predictable input pipeline. Mouse hover and clicks, controller menu navigation,
+ImGui capture, MyGUI capture, gameplay camera look, cursor visibility, and
+gameplay actions should each have a single owner at every point in a frame.
+
+
+Current Problems
+----------------
+
+- Input and GameGUIManager independently decide whether the mouse or controller
+  is active, so cursor visibility and menu focus can disagree.
+- Controller navigation uses MyGUI's private _setMouseFocus() function, mixing
+  controller selection with real mouse hover state.
+- Mouse movement and mouse clicks use different activity rules.
+- ImGui and MyGUI do not share one event-routing decision, allowing input to be
+  swallowed or delivered to both systems.
+- GLFW events are polled at the end of rendering, making input state one event
+  batch behind and making focus transitions order-dependent.
+- glfwSetInputMode() is called repeatedly even when the cursor mode is already
+  correct.
+- GameGUI editor preview does not receive the same MyGUI mouse path as game mode.
+
+
+Design Contract
+---------------
+
+The refactored pipeline should follow this order once per frame:
+
+    poll platform events
+        -> build an immutable input snapshot
+        -> determine active input device
+        -> determine current input context
+        -> route UI input
+        -> evaluate gameplay actions
+        -> update gameplay
+        -> render
+
+Use these concepts as the shared vocabulary:
+
+    enum class ActiveInputDevice
+    {
+        MouseKeyboard,
+        Gamepad
+    };
+
+    enum class InputContext
+    {
+        Editor,
+        GameGUIPreview,
+        MainMenu,
+        Gameplay,
+        Paused
+    };
+
+    enum class MouseTarget
+    {
+        None,
+        ImGui,
+        MyGUI,
+        GameplayLook
+    };
+
+Only one class should own each of these decisions. UI implementations should
+consume the decisions rather than infer them independently.
+
+
+Step 1: Add characterization diagnostics and tests
+---------------------------------------------------
+
+Before changing behavior, capture the current input state in one diagnostic
+record per frame. Include:
+
+- current InputContext
+- active input device
+- native GLFW cursor mode
+- mouse movement and button activity
+- controller connection and meaningful activity
+- selected controller button index
+- MyGUI mouse-focus widget
+- ImGui mouse/keyboard capture flags
+- final MouseTarget
+
+Add focused tests where practical for activity edge detection and context-to-
+cursor-mode decisions. Keep diagnostics behind the existing debug UI or logging
+controls so release behavior is unaffected.
+
+Relevant files:
+
+- include/Engine/Core/Input.h
+- src/Engine/Core/Input.cpp
+- include/Engine/Core/Debug.h
+- src/Engine/Core/Debug.cpp
+
+
+Step 2: Introduce a platform input snapshot
+--------------------------------------------
+
+Create an InputFrame structure that represents one frame of raw platform input.
+It should contain current and edge state for:
+
+- mouse position in window and framebuffer coordinates
+- mouse movement delta
+- mouse button pressed, released, and held state
+- keyboard pressed, released, and held state
+- controller connection state
+- controller button pressed, released, and held state
+- controller axes after deadzone processing
+- window focus
+
+GLFW callbacks should only record raw events or update a pending-event buffer.
+They must not reference Root, GameplayManager, ImGui, MyGUI, or GameGUI.
+
+Input::Update() should publish one immutable snapshot after platform events have
+been polled. Existing query methods may temporarily delegate to the snapshot so
+the refactor can proceed incrementally.
+
+Relevant files:
+
+- include/Engine/Core/Input.h
+- src/Engine/Core/Input.cpp
+- include/Engine/Core/Window.h
+- src/Engine/Core/Window.cpp
+
+
+Step 3: Move event polling to the beginning of the frame
+--------------------------------------------------------
+
+Move Window::PollEvents() out of RenderManager::PresentFrame(). Poll once near
+the beginning of Root::run(), immediately before Input::Update().
+
+The intended frame order is:
+
+    Window::PollEvents()
+    Input::Update()
+    InputManager::Update()
+    gameplay update
+    rendering
+    buffer presentation
+
+Remove every other regular per-frame poll so events are not processed twice.
+Keep any one-time splash-screen polling explicitly separate and documented.
+
+Verify that window close, resize, focus, ImGui callbacks, and MyGUI input still
+work after the move.
+
+Relevant files:
+
+- src/Engine/Core/Root.cpp
+- src/Engine/Core/RenderManager.cpp
+- src/Engine/UI/EngineGUI.cpp
+- src/Engine/Core/Window.cpp
+
+
+Step 4: Create one active-device arbiter
+----------------------------------------
+
+Add an InputDeviceArbiter, either as a small class or a clearly isolated part of
+Input. It is the only owner of ActiveInputDevice.
+
+Rules:
+
+- meaningful mouse movement selects MouseKeyboard
+- any mouse-button press selects MouseKeyboard
+- keyboard activity may select MouseKeyboard when menu behavior needs it
+- a new controller-button press selects Gamepad
+- meaningful controller-axis movement outside a stable deadzone selects Gamepad
+- connection alone does not select Gamepad
+- held inputs do not repeatedly steal ownership
+- synthetic cursor movement caused by cursor-mode changes is ignored
+
+Expose ActiveDevice() and DeviceChangedThisFrame(). Remove m_controllerActive,
+mouse activity serial comparisons, and duplicate connection-based ownership from
+other systems after consumers have migrated.
+
+Relevant files:
+
+- include/Engine/Core/Input.h
+- src/Engine/Core/Input.cpp
+- include/Engine/UI/GameGUIManager.h
+- src/Engine/UI/GameGUIManager.cpp
+
+
+Step 5: Centralize the input context
+------------------------------------
+
+Compute one InputContext from engine and gameplay state. Do not make Input query
+Root or GameplayManager directly after this step. Root or a small coordinator
+should set the context explicitly at mode boundaries.
+
+Map at least these states:
+
+- editor UI -> Editor
+- GameGUI creator preview -> GameGUIPreview
+- main menu -> MainMenu
+- active level -> Gameplay
+- pause menu -> Paused
+
+Set the context when entering or leaving editor play, loading a level, opening
+the pause menu, returning to the main menu, and returning to the editor.
+
+Relevant files:
+
+- include/Engine/Core/Input.h
+- src/Engine/Core/Input.cpp
+- src/Engine/Core/Root.cpp
+- src/Engine/Core/GameplayManager.cpp
+- src/Engine/UI/EngineMenuBar.cpp
+- src/Engine/UI/GameGUI.cpp
+
+
+Step 6: Extract native cursor policy
+------------------------------------
+
+Create a CursorController or an isolated cursor-policy function. It should be
+the only code that calls glfwSetInputMode(..., GLFW_CURSOR, ...).
+
+Suggested policy:
+
+    Editor or GameGUIPreview:
+        normal cursor unless editor camera look is active
+
+    MainMenu or Paused with MouseKeyboard:
+        normal cursor
+
+    MainMenu or Paused with Gamepad:
+        hidden cursor
+
+    Gameplay with captured focus:
+        disabled cursor
+
+    Gameplay without captured focus, or unfocused window:
+        normal cursor
+
+Read the current native mode before setting it and do nothing when it is already
+correct. Record intentional cursor warps/mode transitions so resulting callbacks
+cannot be mistaken for physical mouse activity.
+
+Relevant files:
+
+- include/Engine/Core/Input.h
+- src/Engine/Core/Input.cpp
+- include/Engine/Core/Window.h
+- src/Engine/Core/Window.cpp
+
+
+Step 7: Add a single UI input router
+------------------------------------
+
+Create a UIInputRouter that decides the MouseTarget for each frame/event batch.
+It should understand both ImGui and MyGUI instead of letting each system make an
+independent capture decision.
+
+Routing rules should include:
+
+- editor ImGui windows receive mouse input before editor camera controls
+- visible diagnostic ImGui windows receive input before MyGUI underneath them
+- runtime MyGUI menus receive mouse movement and clicks before gameplay controls
+- gameplay camera look receives mouse input only when no UI owns it
+- GameGUIPreview routes mouse input to MyGUI while remaining in editor mode
+
+Convert window coordinates to framebuffer/MyGUI coordinates in one helper.
+Remove direct MyGUI injection and ImGui capture decisions from Input callbacks.
+
+Relevant files:
+
+- include/Engine/Core/Input.h
+- src/Engine/Core/Input.cpp
+- include/Engine/Core/FrontEndManager.h
+- src/Engine/Core/FrontEndManager.cpp
+- include/Engine/UI/GameGUI.h
+- src/Engine/UI/GameGUI.cpp
+
+
+Step 8: Separate controller selection from MyGUI mouse focus
+------------------------------------------------------------
+
+Remove every use of MyGUI::_setMouseFocus() for controller navigation.
+
+GameGUI should maintain independent state:
+
+- MyGUI owns real mouse hover and click focus
+- GameGUINavigation owns an optional controller-selected button index
+- button presentation combines mouse-hover and controller-selected states
+- controller activation invokes the same semantic button action as a mouse click
+  without pretending to be a mouse click
+
+Introduce explicit methods such as:
+
+    SetControllerSelection(int index)
+    ClearControllerSelection()
+    SetMouseHoveredButton(MyGUI::Button* button)
+    RefreshButtonVisualState(MyGUI::Button* button)
+
+Focus sounds should fire on a genuine change in either hover or controller
+selection, with deduplication when both point to the same button.
+
+Relevant files:
+
+- include/Engine/UI/GameGUI.h
+- src/Engine/UI/GameGUI.cpp
+- include/Engine/UI/GameGUIManager.h
+- src/Engine/UI/GameGUIManager.cpp
+
+
+Step 9: Make GameGUI consume the shared active device
+------------------------------------------------------
+
+Replace GameGUIManager's mouse activity serial and controller-connection
+heuristics with Input::ActiveDevice() and DeviceChangedThisFrame().
+
+Behavior:
+
+- switching to Gamepad selects the first button only when no valid controller
+  selection exists
+- switching to MouseKeyboard clears controller selection but leaves MyGUI mouse
+  hover untouched
+- connecting an idle controller does not change selection or hide the cursor
+- disconnecting the selected controller clears controller selection
+- UI asset reloads reset selection edge state deterministically
+
+Reset previous D-pad and accept state when loading a new menu so held buttons do
+not activate a new screen accidentally.
+
+Relevant files:
+
+- src/Engine/UI/GameGUIManager.cpp
+- include/Engine/UI/GameGUIManager.h
+- src/Engine/UI/GameGUI.cpp
+- include/Engine/UI/GameGUI.h
+
+
+Step 10: Route gameplay actions through an explicit capture mask
+----------------------------------------------------------------
+
+Replace InputManager's direct ImGui queries with an InputCaptureMask supplied by
+the UI router. At minimum it should expose:
+
+    captureKeyboard
+    captureMouseButtons
+    captureMouseMotion
+    captureControllerNavigation
+
+This prevents MyGUI menu clicks from leaking into gameplay bindings and prevents
+diagnostic ImGui windows from activating MyGUI controls behind them.
+
+Keep action mapping independent from which UI library requested capture.
+
+Relevant files:
+
+- include/Engine/Core/InputManager.h
+- src/Engine/Core/InputManager.cpp
+- include/Engine/Core/FrontEndManager.h
+- src/Engine/Core/FrontEndManager.cpp
+
+
+Step 11: Normalize mode transitions
+-----------------------------------
+
+Create explicit transition methods for:
+
+- EnterEditor
+- EnterMainMenu
+- EnterGameplay
+- EnterPauseMenu
+- LeavePauseMenu
+- EnterGameGUIPreview
+
+Each transition should set the input context, cursor capture state, active UI,
+controller selection policy, and camera-look state in one place. Remove scattered
+calls to CaptureCursorForLevel(), ReleaseCursorFocus(), cursor hiding, and menu
+focus initialization once the transition methods own those responsibilities.
+
+Relevant files:
+
+- src/Engine/Core/GameplayManager.cpp
+- src/Engine/Core/Root.cpp
+- src/Engine/UI/EngineMenuBar.cpp
+- src/Engine/UI/GameGUI.cpp
+- src/Engine/Core/Input.cpp
+
+
+Step 12: Remove compatibility state and private focus calls
+-----------------------------------------------------------
+
+After every consumer uses the new pipeline, remove:
+
+- m_controllerActive
+- m_controllerCursorHidden if no longer required
+- mouse activity serial ownership logic
+- GameGUIManager's duplicate active-device inference
+- controller uses of _setMouseFocus()
+- direct Root and GameplayManager queries from low-level Input
+- direct MyGUI injection from GLFW callbacks
+- direct ImGui capture checks from InputManager
+
+Keep temporary adapters only until all targets compile and the verification
+matrix passes.
+
+
+Step 13: Verification matrix
+----------------------------
+
+Run all cases in both editor play and the packaged executable:
+
+1. Start with no controller connected; mouse hover and click work.
+2. Start with an idle controller connected; mouse remains active.
+3. Press the D-pad; controller selection appears and cursor hides.
+4. Move the mouse; controller selection clears and hover works immediately.
+5. Click without first moving after controller use; mouse takes ownership.
+6. Move controller sticks with small drift; ownership does not change.
+7. Navigate and activate every MainMenu button with controller.
+8. Hover and click every MainMenu button with mouse.
+9. Open pause menu from gameplay and switch devices repeatedly.
+10. Resume gameplay and confirm cursor capture and camera look.
+11. Alt-tab from menu and gameplay; cursor restores safely.
+12. Return from editor play to editor; editor cursor and camera controls recover.
+13. Use the GameGUI creator preview with mouse.
+14. Open an ImGui diagnostic over a MyGUI button; only the top UI receives input.
+15. Test standard and DPI-scaled displays.
+16. Test controller connect and disconnect while each context is active.
+17. Hold D-pad or accept while changing menus; no accidental activation occurs.
+
+Build and test at least:
+
+- AquanactEngine debug
+- AquanactGame debug
+- packaged game launched from an arbitrary working directory
+- release configuration before distribution
+
+
+Recommended Implementation Order
+--------------------------------
+
+Implement in small, buildable milestones:
+
+1. Diagnostics and characterization tests.
+2. InputFrame and beginning-of-frame event polling.
+3. ActiveInputDevice arbitration.
+4. CursorController.
+5. Independent controller selection visuals.
+6. Shared UIInputRouter and capture mask.
+7. Explicit context transitions.
+8. Compatibility-state removal.
+9. Full verification matrix.
+
+Do not combine all changes into one patch. At each milestone, keep mouse,
+controller, editor play, and packaged-game behavior runnable so regressions can
+be isolated to one ownership boundary.

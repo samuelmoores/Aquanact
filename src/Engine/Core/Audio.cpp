@@ -1,7 +1,10 @@
 #include "Engine/Core/Audio.h"
+#include "Engine/Core/Root.h"
+#include "Engine/Core/FileSystem.h"
 #include <miniaudio.h>
 
 #include <algorithm>
+#include <filesystem>
 #include <iostream>
 #include <memory>
 #include <unordered_map>
@@ -50,6 +53,18 @@ Audio::State* Audio::m_state = nullptr;
 
 namespace
 {
+	std::string ResolveAudioPath(const std::string& path)
+	{
+		const std::filesystem::path requested(path);
+		if (requested.is_absolute())
+			return requested.string();
+#ifdef AQUANACT_GAME
+		return (Root::Current().FileSystemRef().ExecutableDirectory() / requested).string();
+#else
+		return path;
+#endif
+	}
+
 	float ToGain(float volume)
 	{
 		return std::clamp(volume / 100.0f, 0.0f, 1.0f);
@@ -133,8 +148,9 @@ void Audio::LoadSound(const std::string& name, const std::string& path) {
 	}
 
 	auto sound = std::make_unique<ma_sound>();
+	const std::string resolvedPath = ResolveAudioPath(path);
 	const ma_result result = ma_sound_init_from_file(
-		&m_state->engine, path.c_str(), 0, nullptr, nullptr, sound.get());
+		&m_state->engine, resolvedPath.c_str(), 0, nullptr, nullptr, sound.get());
 	if (result != MA_SUCCESS)
 	{
 		std::cerr << "Audio: failed to load sound '" << name << "' from " << path
@@ -143,7 +159,7 @@ void Audio::LoadSound(const std::string& name, const std::string& path) {
 	}
 
 	m_state->sounds.emplace(name, std::move(sound));
-	m_state->soundPaths[name] = path;
+	m_state->soundPaths[name] = resolvedPath;
 }
 
 bool Audio::IsSoundLoaded(const std::string& name)
@@ -224,7 +240,7 @@ void Audio::PlayUISound(const std::string& name, float volume)
 	{
 		selected->sound = std::make_unique<ma_sound>();
 		const ma_result result = ma_sound_init_from_file(
-			&m_state->engine, pathIt->second.c_str(), 0, nullptr, nullptr, selected->sound.get());
+			&m_state->engine, ResolveAudioPath(pathIt->second).c_str(), 0, nullptr, nullptr, selected->sound.get());
 		if (result != MA_SUCCESS)
 		{
 			std::cerr << "Audio: failed to initialize UI sound '" << name
@@ -264,8 +280,9 @@ void Audio::PlayMusic(const std::string& path, bool loop, float volume) {
 	}
 
 	auto sound = std::make_unique<ma_sound>();
+	const std::string resolvedPath = ResolveAudioPath(path);
 	const ma_result result = ma_sound_init_from_file(
-		&m_state->engine, path.c_str(), 0, nullptr, nullptr, sound.get());
+		&m_state->engine, resolvedPath.c_str(), 0, nullptr, nullptr, sound.get());
 	if (result != MA_SUCCESS)
 	{
 		std::cerr << "Audio: failed to open music from " << path

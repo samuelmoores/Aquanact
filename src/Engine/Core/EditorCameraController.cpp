@@ -10,7 +10,7 @@ EditorCameraController::EditorCameraController(EngineCamera& camera)
 
 void EditorCameraController::Update(const Input& input)
 {
-	if (m_camera && input.LookActive())
+	if (m_camera && input.Frame().lookActive)
 	{
 		m_camera->UpdateFly(input);
 	}

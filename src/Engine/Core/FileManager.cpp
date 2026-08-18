@@ -17,7 +17,12 @@ void FileManager::startUp()
 		return;
 	}
 
-	m_rootDirectory = m_fileSystem ? m_fileSystem->Path("C:/dev/Aquanact/assets/models") : std::filesystem::path("C:/dev/Aquanact/assets/models");
+	#ifdef AQUANACT_SOURCE_ROOT
+	const std::filesystem::path defaultModels = std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets" / "models";
+	#else
+	const std::filesystem::path defaultModels = Root::Current().FileSystemRef().ExecutableDirectory() / "assets" / "models";
+	#endif
+	m_rootDirectory = defaultModels;
 	m_currentDirectory = m_rootDirectory;
 	m_selectedPath.clear();
 	Refresh();

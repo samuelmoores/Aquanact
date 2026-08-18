@@ -12,6 +12,8 @@ endif()
 
 project ("AquanactEngine")
 
+enable_testing()
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -101,6 +103,7 @@ set(SOURCES
     "include/Engine/Core/Window.h" "src/Engine/Core/Window.cpp"
     "include/Engine/Core/Input.h" "src/Engine/Core/Input.cpp"
     "include/Engine/Core/InputManager.h" "src/Engine/Core/InputManager.cpp"
+	"include/Engine/Core/UIInputRouter.h" "src/Engine/Core/UIInputRouter.cpp"
     "include/Engine/Core/GameplayManager.h" "src/Engine/Core/GameplayManager.cpp"
     "include/Engine/Core/SimulationManager.h" "src/Engine/Core/SimulationManager.cpp"
     "include/Engine/Core/Root.h" "src/Engine/Core/Root.cpp"
@@ -235,6 +238,22 @@ target_link_libraries(AquanactGame PRIVATE
     freetype
 )
 
+add_executable(AquanactUIInputRouterTests
+    "tests/UIInputRouterTests.cpp"
+    "include/Engine/Core/UIInputRouter.h" "src/Engine/Core/UIInputRouter.cpp"
+)
+target_compile_features(AquanactUIInputRouterTests PRIVATE cxx_std_20)
+target_include_directories(AquanactUIInputRouterTests PRIVATE "./include" ${MYGUI_INCLUDE_DIR})
+target_link_libraries(AquanactUIInputRouterTests PRIVATE imgui::imgui)
+if (MSVC)
+    target_link_options(AquanactUIInputRouterTests PRIVATE
+        "/LIBPATH:C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/lib/x64"
+        "/LIBPATH:C:/Program Files (x86)/Windows Kits/10/Lib/10.0.26100.0/um/x64"
+        "/LIBPATH:C:/Program Files (x86)/Windows Kits/10/Lib/10.0.26100.0/ucrt/x64"
+    )
+endif()
+add_test(NAME AquanactUIInputRouterTests COMMAND AquanactUIInputRouterTests)
+
 target_include_directories(AquanactEngine PUBLIC "./include")
 target_include_directories(AquanactEngine PRIVATE "${CMAKE_SOURCE_DIR}/external/imguizmo/src")
 target_include_directories(AquanactGame PUBLIC "./include")
@@ -264,10 +283,12 @@ add_custom_target(copymodels
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 add_custom_target(copymygui
-        # MyGUI's skins, layouts, fonts, and XML descriptors must be present next to
-        # the executable, otherwise startup succeeds but widget/resource loading fails.
+        # Keep media beside the editor executable and under resources/ for the
+        # packaged-game layout. Both targets share this copy step.
         COMMAND ${CMAKE_COMMAND} -E rm -rf ${CMAKE_BINARY_DIR}/MyGUI_Media
         COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/external/mygui-upstream/Media/MyGUI_Media ${CMAKE_BINARY_DIR}
+        COMMAND ${CMAKE_COMMAND} -E rm -rf ${CMAKE_BINARY_DIR}/resources
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/external/mygui-upstream/Media/MyGUI_Media ${CMAKE_BINARY_DIR}/resources
         COMMENT "syncing MyGUI media to ${CMAKE_BINARY_DIR}"
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )

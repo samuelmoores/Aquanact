@@ -40,20 +40,44 @@ struct InputActionState
 	float previousValue = 0.0f;
 };
 
+struct InputCaptureMask
+{
+	bool keyboard = false;
+	bool mouseButtons = false;
+	bool mouseMotion = false;
+	bool controller = false;
+};
+
 class InputManager
 {
 public:
+	// -------------------------------------------------------------------------
+	// Lifecycle and frame processing
+	// -------------------------------------------------------------------------
 	void startUp(Input& input);
 	void shutDown();
 	void Update();
 
+	// -------------------------------------------------------------------------
+	// UI/gameplay capture policy
+	// -------------------------------------------------------------------------
+	void SetCaptureMask(InputCaptureMask mask) { m_captureMask = mask; }
+
+	// -------------------------------------------------------------------------
+	// Binding configuration
+	// -------------------------------------------------------------------------
 	void ResetToDefaults();
 	void Bind(const std::string& action, InputBinding binding);
 	void SetBindings(const std::string& action, std::vector<InputBinding> bindings);
 	void ClearBindings(const std::string& action);
+	const std::unordered_map<std::string, std::vector<InputBinding>>& Bindings() const { return m_bindings; }
 
+	// -------------------------------------------------------------------------
+	// Action value queries
+	// -------------------------------------------------------------------------
 	float Value(const std::string& action) const;
 	glm::vec2 VectorValue(const std::string& action) const;
+
 	// Delta values (for example mouse motion) are frame-local quantities and
 	// must not be multiplied by dt. Rate values (sticks/keys/buttons) are held
 	// inputs that callers normally integrate over time.
@@ -62,17 +86,35 @@ public:
 	bool IsDown(const std::string& action) const;
 	bool WasPressed(const std::string& action) const;
 	bool WasReleased(const std::string& action) const;
+
+	// -------------------------------------------------------------------------
+	// Binding state queries
+	// -------------------------------------------------------------------------
 	bool IsBindingConnected(const InputBinding& binding) const;
 	bool IsBindingDown(const InputBinding& binding) const;
-	const std::unordered_map<std::string, std::vector<InputBinding>>& Bindings() const { return m_bindings; }
 
 private:
+	// -------------------------------------------------------------------------
+	// Per-frame action evaluation
+	// -------------------------------------------------------------------------
 	void EvaluateActions();
 
+	// -------------------------------------------------------------------------
+	// Input source and binding configuration
+	// -------------------------------------------------------------------------
 	Input* m_input = nullptr;
 	std::unordered_map<std::string, std::vector<InputBinding>> m_bindings;
+
+	// -------------------------------------------------------------------------
+	// Cached scalar and vector action state
+	// -------------------------------------------------------------------------
 	std::unordered_map<std::string, InputActionState> m_states;
 	std::unordered_map<std::string, glm::vec2> m_vectorStates;
 	std::unordered_map<std::string, glm::vec2> m_vectorDeltaStates;
 	std::unordered_map<std::string, glm::vec2> m_vectorRateStates;
+
+	// -------------------------------------------------------------------------
+	// Current UI/gameplay capture policy
+	// -------------------------------------------------------------------------
+	InputCaptureMask m_captureMask;
 };

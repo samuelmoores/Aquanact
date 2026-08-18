@@ -31,6 +31,7 @@ public:
 	void BeginFrame();
 	void Draw();
 	void EndFrame();
+	bool IsInitialized() const { return m_initialized; }
 
 	// UI loading and reset
 	void LoadUIAsset(const GameGUIAsset& asset);
@@ -39,6 +40,7 @@ public:
 	// Controller navigation
 	void FocusFirstControllerButton();
 	void ClearControllerFocus();
+	void RelinquishControllerFocusToMouse();
 	bool HasControllerFocus() const;
 	void NavigateControllerButtons(int direction);
 	void ActivateFocusedControllerButton();

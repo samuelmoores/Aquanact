@@ -1,0 +1,162 @@
+Aquanact Input System
+=====================
+
+This document describes the responsibilities and frame order of Input,
+InputManager, and UIInputRouter. The system has two layers:
+
+  Input        Reads GLFW/window state, collects native mouse events, owns the
+               current input context, and publishes one frame snapshot.
+
+  InputManager Converts the snapshot into named actions using configurable
+               keyboard, mouse, and controller bindings.
+
+  UIInputRouter Decides which UI/gameplay owner receives input for the frame.
+
+
+1. Per-frame order
+------------------
+
+Root::run() processes input in this order:
+
+  1. Window::PollEvents() runs GLFW callbacks.
+  2. UIInputRouter::Resolve() selects the InputContext and capture policy.
+  3. Input::TransitionToContext() applies context-specific cursor/look state.
+  4. Input::SetMouseCapturedByUI() stores the gameplay mouse-capture decision.
+  5. Input::Update() evaluates raw movement/look/device state and publishes
+     Input::InputFrame.
+  6. Input::DispatchPendingMouseEvents() sends queued mouse events to MyGUI
+     when the route allows it, then re-injects the current cursor position.
+  7. InputManager::SetCaptureMask() applies the route's gameplay exclusions.
+  8. InputManager::Update() evaluates all named actions.
+  9. Gameplay and UI consume the resulting frame/action values.
+
+Callbacks only collect mouse events. They do not decide whether an event belongs
+to ImGui, MyGUI, or gameplay. That decision is made once per frame by the
+router.
+
+
+2. Input contexts
+-----------------
+
+InputContext::Editor
+  Editor camera and editor tools own input. The cursor remains available.
+
+InputContext::GameGUIPreview
+  The GameGUI creator preview is active. MyGUI receives routed mouse input and
+  editor/preview code can inspect the UI without entering gameplay look mode.
+
+InputContext::MainMenu
+  The runtime main menu owns keyboard, mouse, and controller input. The cursor
+  is visible and gameplay actions are captured.
+
+InputContext::Gameplay
+  The active level owns gameplay input. Entering a level explicitly focuses the
+  window and captures the cursor for camera look.
+
+InputContext::Paused
+  The runtime pause menu owns input in the same way as the main menu.
+
+Use TransitionToContext() for normal transitions. SetContext() is a direct
+state assignment and should only be used when the caller intentionally does not
+need transition side effects.
+
+
+3. Mouse routing
+----------------
+
+GLFW cursor/button callbacks convert window coordinates to framebuffer
+coordinates and append PendingMouseEvent records. DispatchPendingMouseEvents()
+later sends those records to MyGUI through InputManager::injectMouseMove,
+injectMousePress, and injectMouseRelease.
+
+The current cursor position is also injected once every routed UI frame. This is
+important when a menu has just opened and GLFW has not generated a new cursor
+callback yet.
+
+Runtime MainMenu and Paused contexts always route mouse input to MyGUI. This
+prevents an ImGui diagnostics window from suppressing MyGUI hover/click input.
+In gameplay and GameGUI preview, ImGui mouse capture can suppress MyGUI routing.
+
+MyGUI performs the actual widget hit test. Interactive buttons must have
+NeedMouseFocus enabled and must be the final pick target. Container panels may
+use InheritsPick so their children can be selected, but a button with
+InheritsPick enabled can return no hit when its child label is not pickable.
+
+
+4. Controller and mouse ownership
+----------------------------------
+
+Input tracks ActiveInputDevice as either MouseKeyboard or Gamepad. Device
+activity is used to switch menu ownership and controller focus. Gameplay look
+still follows the active gameplay context and does not depend on menu focus.
+
+InputManager does not read GLFW directly for actions. It queries Input for raw
+state and evaluates each configured InputBinding. Bindings may represent:
+
+  Key, MouseButton, MouseDelta, ControllerDigital, or ControllerStick.
+
+MouseDelta and other vector delta values are frame-local and must not be
+multiplied by delta time. Held/rate values such as keys, buttons, and sticks are
+normally integrated or scaled by the consumer.
+
+
+5. Capture policy
+-----------------
+
+InputCaptureMask controls which sources are withheld from gameplay action
+evaluation:
+
+  keyboard       Keyboard actions are blocked.
+  mouseButtons   Mouse button actions are blocked.
+  mouseMotion    Mouse motion actions are blocked.
+  controller     Controller actions are blocked.
+
+UI capture and MyGUI routing are related but separate. A menu can capture
+gameplay mouse buttons while still receiving those same physical mouse events
+through MyGUI.
+
+
+6. Diagnostics
+-------------
+
+The GameGUI diagnostics window has an Input section. The most useful fields for
+mouse menu debugging are:
+
+  Context                 Current InputContext.
+  Routed to MyGUI         Whether this frame dispatched mouse input to MyGUI.
+  MyGUI initialized       Whether the runtime GameGUI exists and is initialized.
+  Window mouse            GLFW/window-space cursor coordinates.
+  MyGUI mouse             Framebuffer-space coordinates injected into MyGUI.
+  Injected moves/presses  Number of mouse events sent to MyGUI this frame.
+  MyGUI mouse focus       Widget selected by MyGUI's hit test.
+
+Interpretation:
+
+  Routed=no
+    The frame router is not assigning mouse ownership to MyGUI.
+
+  Routed=yes, Injected moves=0
+    The event dispatch path is not running or the window is unavailable.
+
+  Routed=yes, moves>0, focus=<none>
+    Check the MyGUI coordinates against the visible widget layout, layer pick
+    settings, widget visibility, and NeedMouseFocus/InheritsPick configuration.
+
+  Focus is a label/container instead of a button
+    The child or parent is intercepting the hit. Make the button the intended
+    pick target and disable picking on decorative labels.
+
+
+7. Common integration rules
+----------------------------
+
+  * Do not call GLFW PollEvents from individual gameplay/UI systems.
+  * Do not inject MyGUI mouse events from GLFW callbacks.
+  * Do not independently switch between mouse and controller ownership in
+    multiple consumers; use UIInputRouter and Input's active-device state.
+  * Read Input::Frame() for the coherent per-frame snapshot.
+  * Read InputManager action queries for gameplay/UI bindings.
+  * Keep coordinate conversion consistent with MyGUI's configured framebuffer
+    view size.
+  * When adding a new UI mode, update UIInputRouter, cursor behavior, capture
+    policy, and diagnostics together.

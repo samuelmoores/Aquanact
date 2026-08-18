@@ -13,7 +13,7 @@ void SimulationManager::run(Window& window, Input& input, GameplayManager& gamep
 		input.Update();
 		if (engineState.IsGameMode())
 		{
-			gameplayManager.Update(input.DeltaTime(), Root::Current().FrontEnd(), Root::Current().Debugger(), engineState);
+		gameplayManager.Update(input.Frame().deltaTime, Root::Current().FrontEnd(), Root::Current().Debugger(), engineState);
 		}
 
 		renderManager.Loop(Root::Current().FrontEnd(), Root::Current().Files(), Root::Current().Scenes(), Root::Current().Projects(), Root::Current().Debugger(), input, window, engineState);
