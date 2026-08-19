@@ -19,6 +19,7 @@ namespace
 			switch (binding.code)
 			{
 			case GLFW_KEY_SPACE: return "Key: Space"; case GLFW_KEY_ENTER: return "Key: Enter";
+			case GLFW_KEY_ESCAPE: return "Key: Escape";
 			case GLFW_KEY_LEFT: return "Key: Left"; case GLFW_KEY_RIGHT: return "Key: Right";
 			case GLFW_KEY_UP: return "Key: Up"; case GLFW_KEY_DOWN: return "Key: Down";
 			default: return "Key: " + std::to_string(binding.code);
@@ -41,6 +42,10 @@ namespace
 			case GLFW_GAMEPAD_BUTTON_A: return "A"; case GLFW_GAMEPAD_BUTTON_B: return "B";
 			case GLFW_GAMEPAD_BUTTON_X: return "X"; case GLFW_GAMEPAD_BUTTON_Y: return "Y";
 			case GLFW_GAMEPAD_BUTTON_LEFT_BUMPER: return "Left Bumper"; case GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER: return "Right Bumper";
+			case GLFW_GAMEPAD_BUTTON_BACK: return "Back"; case GLFW_GAMEPAD_BUTTON_START: return "Start";
+			case GLFW_GAMEPAD_BUTTON_GUIDE: return "Guide";
+			case GLFW_GAMEPAD_BUTTON_LEFT_THUMB: return "Left Stick Click";
+			case GLFW_GAMEPAD_BUTTON_RIGHT_THUMB: return "Right Stick Click";
 			case GLFW_GAMEPAD_BUTTON_DPAD_UP: return "D-pad Up"; case GLFW_GAMEPAD_BUTTON_DPAD_DOWN: return "D-pad Down";
 			case GLFW_GAMEPAD_BUTTON_DPAD_LEFT: return "D-pad Left"; case GLFW_GAMEPAD_BUTTON_DPAD_RIGHT: return "D-pad Right";
 			default: return "Controller digital: " + std::to_string(binding.code);
@@ -378,6 +383,7 @@ void InputMapWindow::Draw()
 					const InputBinding desktopOptions[] = {
 						{ InputBindingType::Key, GLFW_KEY_SPACE, GLFW_JOYSTICK_1, 1.0f, glm::vec2(1.0f, 0.0f) },
 						{ InputBindingType::Key, GLFW_KEY_ENTER, GLFW_JOYSTICK_1, 1.0f, glm::vec2(1.0f, 0.0f) },
+						{ InputBindingType::Key, GLFW_KEY_ESCAPE, GLFW_JOYSTICK_1, 1.0f, glm::vec2(1.0f, 0.0f) },
 						{ InputBindingType::Key, GLFW_KEY_E, GLFW_JOYSTICK_1, 1.0f, glm::vec2(1.0f, 0.0f) },
 						{ InputBindingType::Key, GLFW_KEY_F, GLFW_JOYSTICK_1, 1.0f, glm::vec2(1.0f, 0.0f) },
 						{ InputBindingType::Key, GLFW_KEY_Q, GLFW_JOYSTICK_1, 1.0f, glm::vec2(1.0f, 0.0f) },
@@ -414,6 +420,8 @@ void InputMapWindow::Draw()
 					const int buttonOptions[] = {
 						GLFW_GAMEPAD_BUTTON_A, GLFW_GAMEPAD_BUTTON_B, GLFW_GAMEPAD_BUTTON_X, GLFW_GAMEPAD_BUTTON_Y,
 						GLFW_GAMEPAD_BUTTON_LEFT_BUMPER, GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER,
+						GLFW_GAMEPAD_BUTTON_BACK, GLFW_GAMEPAD_BUTTON_START, GLFW_GAMEPAD_BUTTON_GUIDE,
+						GLFW_GAMEPAD_BUTTON_LEFT_THUMB, GLFW_GAMEPAD_BUTTON_RIGHT_THUMB,
 						GLFW_GAMEPAD_BUTTON_DPAD_UP, GLFW_GAMEPAD_BUTTON_DPAD_DOWN,
 						GLFW_GAMEPAD_BUTTON_DPAD_LEFT, GLFW_GAMEPAD_BUTTON_DPAD_RIGHT
 					};

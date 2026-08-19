@@ -6,6 +6,13 @@ class FrontEndManager;
 class Debug;
 class EngineState;
 
+enum class GameplayCommand
+{
+	Pause,
+	Resume,
+	TogglePause,
+};
+
 class GameplayManager {
 public:
 	enum class GameState
@@ -25,6 +32,7 @@ public:
 	void SyncRuntimeUI(FrontEndManager& frontEndManager) const;
 
 	void Update(float dt, FrontEndManager& frontEndManager, Debug& debug, EngineState& engineState);
+	void ExecuteCommand(GameplayCommand command, FrontEndManager& frontEndManager, Debug& debug);
 	void SetPaused(bool paused, FrontEndManager& frontEndManager, Debug& debug);
 	void TogglePaused(FrontEndManager& frontEndManager, Debug& debug);
 	bool IsPaused() const;

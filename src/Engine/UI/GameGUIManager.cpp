@@ -64,6 +64,10 @@ namespace {
 		{
 		case GameGUIActionType::NewGame:
 			return "New Game";
+		case GameGUIActionType::Pause:
+			return "Pause";
+		case GameGUIActionType::Resume:
+			return "Resume";
 		default:
 			return "None";
 		}
@@ -108,6 +112,14 @@ namespace {
 		if (value == "NewGame")
 		{
 			return GameGUIActionType::NewGame;
+		}
+		if (value == "Pause")
+		{
+			return GameGUIActionType::Pause;
+		}
+		if (value == "Resume")
+		{
+			return GameGUIActionType::Resume;
 		}
 		return GameGUIActionType::None;
 	}
@@ -740,6 +752,11 @@ void GameGUIManager::SetShowDiagnosticsWindow(bool show)
 
 void GameGUIManager::DrawReturnButton()
 {
+	if (!m_showRuntimeDebugWindow)
+	{
+		return;
+	}
+
 	const bool inGameMode = Root::Current().State().IsGameMode();
 	const bool editorLaunchedGameSession = Root::Current().EditorLaunchedGameSession();
 	if (!inGameMode || !editorLaunchedGameSession)
@@ -780,7 +797,7 @@ void GameGUIManager::DrawReturnButton()
 		Root::Current().EditorLaunchedGameSession() = false;
 		Root::Current().State().SetMode(EngineMode::Editor);
 		Root::Current().Render().SetEditorMode();
-		LogAction("Return to editor requested");
+	LogAction("Return to editor requested");
 	}
 	ImGui::Separator();
 	ImGui::TextDisabled("Diagnostics");
@@ -815,6 +832,16 @@ void GameGUIManager::DrawReturnButton()
 	Root::Current().FrontEnd().RuntimeGUI().SetShowDiagnosticsWindow(showGameGUIDiagnostics);
 	Root::Current().Profiler().SetEnabled(profilerEnabled);
 	ImGui::End();
+}
+
+bool GameGUIManager::ShowRuntimeDebugWindow() const
+{
+	return m_showRuntimeDebugWindow;
+}
+
+void GameGUIManager::SetShowRuntimeDebugWindow(bool show)
+{
+	m_showRuntimeDebugWindow = show;
 }
 
 bool GameGUIManager::ShowEditorWindow() const

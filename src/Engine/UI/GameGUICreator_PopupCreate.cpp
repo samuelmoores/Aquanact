@@ -113,14 +113,19 @@ void GameGUICreator::DrawCreateActionField()
 	// Button creation is the only popup path that currently needs action binding.
 	// If more widget types gain launch behavior, this block should become shared.
 	GameGUIActionType action = m_newWidgetAction;
-	const char* bindingLabel = action == GameGUIActionType::NewGame ? "New Game" : "None";
+	const char* bindingLabel = GameGUICreatorHelpers::ActionLabel(action);
 	if (ImGui::BeginCombo("Action", bindingLabel))
 	{
-		const GameGUIActionType options[] = { GameGUIActionType::None, GameGUIActionType::NewGame };
+		const GameGUIActionType options[] = {
+			GameGUIActionType::None,
+			GameGUIActionType::NewGame,
+			GameGUIActionType::Pause,
+			GameGUIActionType::Resume,
+		};
 		for (GameGUIActionType option : options)
 		{
 			const bool selected = option == action;
-			if (ImGui::Selectable(option == GameGUIActionType::NewGame ? "New Game" : "None", selected))
+			if (ImGui::Selectable(GameGUICreatorHelpers::ActionLabel(option), selected))
 			{
 				action = option;
 			}

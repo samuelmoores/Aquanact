@@ -190,12 +190,30 @@ void Root::run()
 			m_input->DispatchPendingMouseEvents(inputRoute.dispatchMouseToMyGUI);
 			m_inputManager->SetCaptureMask(inputRoute.captureMask);
 			m_inputManager->Update();
+
+			const bool debugWindowsToggleDown = m_input->KeyDown(GLFW_KEY_F1);
+			if (debugWindowsToggleDown && !m_previousDebugWindowsToggle)
+			{
+				const bool showRuntimeDebugWindow = !m_frontEndManager->RuntimeGUI().ShowRuntimeDebugWindow();
+				m_frontEndManager->RuntimeGUI().SetShowRuntimeDebugWindow(showRuntimeDebugWindow);
+			}
+			m_previousDebugWindowsToggle = debugWindowsToggleDown;
 		}
 
 		// gameplay
 		if (m_engineState.IsGameMode())
 		{
 			FrameProfiler::Scope scope(*m_profiler, "Gameplay");
+
+			// The Pause input is a toggle. Evaluate it before the gameplay update so
+			// the transition takes effect for this frame in either Playing or Paused.
+			if (m_inputManager->WasPressed("Pause"))
+			{
+				m_gameplayManager->ExecuteCommand(
+					GameplayCommand::TogglePause,
+					*m_frontEndManager,
+					*m_debug);
+			}
 
 			// main menu, HUD or pause menu
 			m_gameplayManager->SyncRuntimeUI(*m_frontEndManager);

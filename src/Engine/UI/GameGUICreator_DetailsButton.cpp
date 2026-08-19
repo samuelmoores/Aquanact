@@ -95,6 +95,37 @@ void GameGUICreator::DrawButtonWidgetDetails(GameGUIAsset& asset, GameGUIWidgetD
 		ImGui::EndCombo();
 	}
 
+	GameGUIActionType action = widget.action;
+	if (ImGui::BeginCombo("Action", GameGUICreatorHelpers::ActionLabel(action)))
+	{
+		const GameGUIActionType options[] = {
+			GameGUIActionType::None,
+			GameGUIActionType::NewGame,
+			GameGUIActionType::Pause,
+			GameGUIActionType::Resume,
+		};
+		for (GameGUIActionType option : options)
+		{
+			const bool selected = option == action;
+			if (ImGui::Selectable(GameGUICreatorHelpers::ActionLabel(option), selected))
+			{
+				action = option;
+				widget.action = action;
+				if (action != GameGUIActionType::NewGame)
+				{
+					widget.launchLevel.clear();
+				}
+				SyncRuntimePreview();
+				SaveSelectedRoleGUI();
+			}
+			if (selected)
+			{
+				ImGui::SetItemDefaultFocus();
+			}
+		}
+		ImGui::EndCombo();
+	}
+
 	if (!controlledByPanel)
 	{
 		// Standalone buttons keep an editable size. Panel-owned buttons are sized

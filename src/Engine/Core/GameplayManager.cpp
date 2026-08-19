@@ -300,6 +300,22 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 
 }
 
+void GameplayManager::ExecuteCommand(GameplayCommand command, FrontEndManager& frontEndManager, Debug& debug)
+{
+	switch (command)
+	{
+	case GameplayCommand::Pause:
+		SetPaused(true, frontEndManager, debug);
+		break;
+	case GameplayCommand::Resume:
+		SetPaused(false, frontEndManager, debug);
+		break;
+	case GameplayCommand::TogglePause:
+		TogglePaused(frontEndManager, debug);
+		break;
+	}
+}
+
 void GameplayManager::SetPaused(bool paused, FrontEndManager& frontEndManager, Debug& debug)
 {
 	if (paused)

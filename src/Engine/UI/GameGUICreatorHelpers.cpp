@@ -92,6 +92,10 @@ namespace GameGUICreatorHelpers {
 		{
 		case GameGUIActionType::NewGame:
 			return "New Game";
+		case GameGUIActionType::Pause:
+			return "Pause";
+		case GameGUIActionType::Resume:
+			return "Resume";
 		default:
 			return "None";
 		}
@@ -103,6 +107,10 @@ namespace GameGUICreatorHelpers {
 		{
 		case GameGUIActionType::NewGame:
 			return "NewGame";
+		case GameGUIActionType::Pause:
+			return "Pause";
+		case GameGUIActionType::Resume:
+			return "Resume";
 		default:
 			return "None";
 		}
@@ -133,7 +141,19 @@ namespace GameGUICreatorHelpers {
 
 	GameGUIActionType StringToAction(const std::string& value)
 	{
-		return value == "NewGame" ? GameGUIActionType::NewGame : GameGUIActionType::None;
+		if (value == "NewGame")
+		{
+			return GameGUIActionType::NewGame;
+		}
+		if (value == "Pause")
+		{
+			return GameGUIActionType::Pause;
+		}
+		if (value == "Resume")
+		{
+			return GameGUIActionType::Resume;
+		}
+		return GameGUIActionType::None;
 	}
 
 	bool WouldCreateParentCycle(const GameGUIAsset& asset, const std::string& childName, const std::string& parentName)

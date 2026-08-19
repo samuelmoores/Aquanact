@@ -43,6 +43,8 @@ public:
 	bool ShowDiagnosticsWindow() const;
 	void SetShowDiagnosticsWindow(bool show);
 	void DrawReturnButton();
+	bool ShowRuntimeDebugWindow() const;
+	void SetShowRuntimeDebugWindow(bool show);
 	bool ShowEditorWindow() const;
 	void SetShowEditorWindow(bool showEditorWindow);
 	void SetUIMode(UIMode mode);
@@ -79,6 +81,7 @@ private:
 	int m_activeAssetIndex = -1;
 	bool m_showEditorWindow = false;
 	bool m_showDiagnosticsWindow = true;
+	bool m_showRuntimeDebugWindow = false;
 	bool m_showInputDiagnostics = false;
 	UIMode m_mode = UIMode::MainMenu;
 	bool m_previousDpadUp = false;

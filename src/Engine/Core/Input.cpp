@@ -526,7 +526,17 @@ void Input::ReleaseCursorFocus()
 	m_gameplayFocusActive = false;
 	m_lookActive = false;
 	m_ignoreMouseDeltaOnce = false;
-	UnhideMouseCursor();
+	// Releasing gameplay look must not briefly expose the cursor when a
+	// controller owns input, especially during a Playing <-> Paused transition.
+	// Mouse/keyboard ownership still gets the normal visible cursor.
+	if (m_activeDevice == ActiveInputDevice::Gamepad)
+	{
+		HideMouseCursor();
+	}
+	else
+	{
+		UnhideMouseCursor();
+	}
 }
 
 void Input::UpdateCursorMode(bool gameMode)
@@ -540,32 +550,15 @@ void Input::UpdateCursorMode(bool gameMode)
 		return;
 	}
 
-	const bool menuActive = m_context == InputContext::MainMenu ||
-		m_context == InputContext::Paused;
+	const bool mainMenuActive = m_context == InputContext::MainMenu;
+	const bool paused = m_context == InputContext::Paused;
 
-	// Device switching is a menu-only behavior. Levels keep their cursor hidden
-	// independently of which input device is active.
-	if (!menuActive)
-	{
-		m_previousGamepadStateValid = false;
-		if (!m_gameplayFocusActive)
-		{
-			UnhideMouseCursor();
-			return;
-		}
-		// Gameplay needs captured input, not merely an invisible cursor. Disabled
-		// mode supplies continuous virtual cursor movement beyond window edges.
-		CaptureMouseCursor();
-		return;
-	}
-
-	// Only physical mouse movement gives control back to the mouse. Mouse-button
-	// activity and cursor-mode callbacks do not release controller ownership.
+	// Physical mouse activity and controller activity both participate in device
+	// ownership. This applies during gameplay as well as menus, so a controller
+	// press cannot leave the cursor visible after a previous mouse interaction.
 	const bool mouseInUse = m_mouseMoveSerial != m_lastMouseMoveSerial;
 	const bool mouseActivity = m_mouseButtonActivityThisFrame;
 
-	// A controller becomes active on a new button press or meaningful axis
-	// movement. Held inputs do not reclaim control after the mouse takes over.
 	bool controllerActivityDetected = false;
 	if (ControllerConnected())
 	{
@@ -618,10 +611,27 @@ void Input::UpdateCursorMode(bool gameMode)
 	if (m_activeDevice == ActiveInputDevice::Gamepad)
 	{
 		HideMouseCursor();
+		return;
+	}
+
+	// The main menu remains mouse-accessible. During a level, the mouse is
+	// visible only while paused; active gameplay keeps it captured, and gameplay
+	// without focus keeps it hidden until the next explicit interaction.
+	if (mainMenuActive || paused)
+	{
+		UnhideMouseCursor();
+		return;
+	}
+
+	if (!m_gameplayFocusActive)
+	{
+		HideMouseCursor();
 	}
 	else
 	{
-		UnhideMouseCursor();
+		// Gameplay needs captured input, not merely an invisible cursor. Disabled
+		// mode supplies continuous virtual cursor movement beyond window edges.
+		CaptureMouseCursor();
 	}
 }
 

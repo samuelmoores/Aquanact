@@ -8,6 +8,8 @@ enum class GameGUIActionType
 {
 	None,
 	NewGame,
+	Pause,
+	Resume,
 };
 
 enum class GameGUIMenuNavigationMode

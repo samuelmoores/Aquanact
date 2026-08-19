@@ -83,6 +83,7 @@ private:
 	EngineState m_engineState;
 	bool m_gameModeDebug = true;
 	bool m_editorLaunchedGameSession = false;
+	bool m_previousDebugWindowsToggle = false;
 	bool m_started = false;
 
 	static Root* s_current;

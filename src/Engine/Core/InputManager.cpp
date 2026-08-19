@@ -175,6 +175,10 @@ void InputManager::EvaluateActions()
 	const bool uiCapturesMouseMotion = m_captureMask.mouseMotion;
 	for (auto& [action, state] : m_states)
 	{
+		// Pause commands must remain available while a runtime UI or diagnostic
+		// ImGui window owns ordinary keyboard/controller input. The gameplay loop
+		// still decides which contexts are allowed to consume these commands.
+		const bool isGlobalCommandAction = action == "Pause" || action == "TogglePause";
 		state.previousValue = state.value;
 		state.value = 0.0f;
 		glm::vec2 vectorValue(0.0f);
@@ -191,7 +195,7 @@ void InputManager::EvaluateActions()
 		{
 			if (binding.type == InputBindingType::Key)
 			{
-				if (uiCapturesKeyboard)
+				if (uiCapturesKeyboard && !isGlobalCommandAction)
 				{
 					continue;
 				}
@@ -221,7 +225,7 @@ void InputManager::EvaluateActions()
 			}
 			else if (binding.type == InputBindingType::ControllerDigital)
 			{
-				if (m_captureMask.controller)
+				if (m_captureMask.controller && !isGlobalCommandAction)
 				{
 					continue;
 				}
@@ -232,7 +236,7 @@ void InputManager::EvaluateActions()
 			}
 			else if (binding.type == InputBindingType::ControllerStick)
 			{
-				if (m_captureMask.controller)
+				if (m_captureMask.controller && !isGlobalCommandAction)
 				{
 					continue;
 				}

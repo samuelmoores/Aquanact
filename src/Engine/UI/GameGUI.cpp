@@ -1378,6 +1378,22 @@ void GameGUI::OnWidgetClicked(MyGUI::Widget* sender)
 		Root::Current().FrontEnd().RuntimeGUI().RecordClick("New Game started");
 		break;
 	}
+	case GameGUIActionType::Pause:
+		Root::Current().Gameplay().ExecuteCommand(
+			GameplayCommand::Pause,
+			Root::Current().FrontEnd(),
+			Root::Current().Debugger());
+		Root::Current().FrontEnd().RuntimeGUI().RecordClick("Pause action requested");
+		Root::Current().Debugger().LogMessage("GameGUI Pause action requested");
+		break;
+	case GameGUIActionType::Resume:
+		Root::Current().Gameplay().ExecuteCommand(
+			GameplayCommand::Resume,
+			Root::Current().FrontEnd(),
+			Root::Current().Debugger());
+		Root::Current().FrontEnd().RuntimeGUI().RecordClick("Resume action requested");
+		Root::Current().Debugger().LogMessage("GameGUI Resume action requested");
+		break;
 	case GameGUIActionType::None:
 	default:
 		break;
