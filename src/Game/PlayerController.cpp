@@ -7,6 +7,7 @@
 #include "Engine/Core/Input.h"
 #include "Engine/Core/InputManager.h"
 #include "Engine/Core/RenderManager.h"
+#include "Engine/Core/MathUtils.h"
 
 #include <algorithm>
 
@@ -55,15 +56,7 @@ namespace
 
 		const float targetYaw = std::atan2(direction.x, direction.z);
 		const float currentYaw = owner.Rotation().y;
-		float yawDelta = targetYaw - currentYaw;
-		while (yawDelta > glm::pi<float>())
-		{
-			yawDelta -= glm::two_pi<float>();
-		}
-		while (yawDelta < -glm::pi<float>())
-		{
-			yawDelta += glm::two_pi<float>();
-		}
+		const float yawDelta = MathUtils::ShortestAngleDelta(currentYaw, targetYaw);
 		const float maxStep = std::max(0.0f, turnSpeed) * dt;
 		const float nextYaw = currentYaw + std::clamp(yawDelta, -maxStep, maxStep);
 		owner.SetRotation(glm::vec3(owner.Rotation().x, nextYaw, owner.Rotation().z));
@@ -71,30 +64,11 @@ namespace
 
 }
 
-float PlayerController::WrapAngle(float angle)
-{
-	while (angle > glm::pi<float>())
-	{
-		angle -= glm::two_pi<float>();
-	}
-	while (angle < -glm::pi<float>())
-	{
-		angle += glm::two_pi<float>();
-	}
-	return angle;
-}
-
-float PlayerController::ShortestAngleDelta(float from, float to)
-{
-	return WrapAngle(to - from);
-}
-
 float PlayerController::GravityScale() const
 {
 	// Increase gravity during both halves of the jump so the full arc completes
 	// faster. The stronger downward scale still makes the descent decisive.
-	//return m_velocity.y > 0.0f ? 1.875f : 5.0f;
-	return 3.0f;
+	return m_velocity.y > 0.0f ? 1.875f : 5.0f;
 }
 
 void PlayerController::TryJump(const InputManager& input)

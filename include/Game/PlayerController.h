@@ -50,9 +50,6 @@ private:
 	float GravityScale() const override;
 	float MaxWalkableSlopeAngle() const override { return m_maxSlopeAngle; }
 
-	// Shared helpers for movement and facing math.
-	static float WrapAngle(float angle);
-	static float ShortestAngleDelta(float from, float to);
 	void TryJump(const InputManager& input);
 	void Move(Entity& owner, const glm::vec2& move2D, float dt);
 
