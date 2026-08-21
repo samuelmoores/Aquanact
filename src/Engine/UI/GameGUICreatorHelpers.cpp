@@ -96,6 +96,8 @@ namespace GameGUICreatorHelpers {
 			return "Pause";
 		case GameGUIActionType::Resume:
 			return "Resume";
+		case GameGUIActionType::SubPanel:
+			return "Sub Panel";
 		default:
 			return "None";
 		}
@@ -111,6 +113,8 @@ namespace GameGUICreatorHelpers {
 			return "Pause";
 		case GameGUIActionType::Resume:
 			return "Resume";
+		case GameGUIActionType::SubPanel:
+			return "SubPanel";
 		default:
 			return "None";
 		}
@@ -152,6 +156,10 @@ namespace GameGUICreatorHelpers {
 		if (value == "Resume")
 		{
 			return GameGUIActionType::Resume;
+		}
+		if (value == "SubPanel")
+		{
+			return GameGUIActionType::SubPanel;
 		}
 		return GameGUIActionType::None;
 	}
@@ -627,7 +635,7 @@ namespace GameGUICreatorHelpers {
 			}
 		}
 
-		const std::string pointerSkin = readField("pointerSkin", 0);
+		const std::string pointerSkin = readField("\"pointerSkin\":", 0);
 		if (pointerSkin == "NavigationArrowRight1" ||
 			pointerSkin == "NavigationArrowRight2" ||
 			pointerSkin == "NavigationArrowRight3" ||
@@ -636,16 +644,19 @@ namespace GameGUICreatorHelpers {
 			asset.pointerSkin = pointerSkin;
 		}
 
-		asset.boxPadding = ReadIntField(readField("boxPadding", 0), asset.boxPadding);
-		asset.boxOffsetX = ReadIntField(readField("boxOffsetX", 0), asset.boxOffsetX);
-		asset.boxOffsetY = ReadIntField(readField("boxOffsetY", 0), asset.boxOffsetY);
-		asset.pointerWidth = ReadIntField(readField("pointerWidth", 0), asset.pointerWidth);
-		asset.pointerHeight = ReadIntField(readField("pointerHeight", 0), asset.pointerHeight);
-		asset.pointerGap = ReadIntField(readField("pointerGap", 0), asset.pointerGap);
+		asset.boxPadding = ReadIntField(readField("\"boxPadding\":", 0), asset.boxPadding);
+		asset.boxOffsetX = ReadIntField(readField("\"boxOffsetX\":", 0), asset.boxOffsetX);
+		asset.boxOffsetY = ReadIntField(readField("\"boxOffsetY\":", 0), asset.boxOffsetY);
+		asset.pointerWidth = ReadIntField(readField("\"pointerWidth\":", 0), asset.pointerWidth);
+		asset.pointerHeight = ReadIntField(readField("\"pointerHeight\":", 0), asset.pointerHeight);
+		asset.pointerGap = ReadIntField(readField("\"pointerGap\":", 0), asset.pointerGap);
 
-		try { asset.highlightR = std::stof(readField("highlightR", 0)); } catch (...) {}
-		try { asset.highlightG = std::stof(readField("highlightG", 0)); } catch (...) {}
-		try { asset.highlightB = std::stof(readField("highlightB", 0)); } catch (...) {}
+		asset.highlightR = ReadFloatField(readField("\"highlightR\":", 0), asset.highlightR);
+		asset.highlightG = ReadFloatField(readField("\"highlightG\":", 0), asset.highlightG);
+		asset.highlightB = ReadFloatField(readField("\"highlightB\":", 0), asset.highlightB);
+		asset.selectedR = ReadFloatField(readField("\"selectedR\":", 0), asset.selectedR);
+		asset.selectedG = ReadFloatField(readField("\"selectedG\":", 0), asset.selectedG);
+		asset.selectedB = ReadFloatField(readField("\"selectedB\":", 0), asset.selectedB);
 
 		// Each widget block is parsed independently so partially edited files still load.
 		std::size_t widgetPos = contents.find("\"type\": \"");
@@ -696,6 +707,7 @@ namespace GameGUICreatorHelpers {
 			widget.focusSound = readField("\"focusSound\":", widgetPos);
 			widget.action = StringToAction(readField("\"action\":", widgetPos));
 			widget.launchLevel = readField("\"launchLevel\":", widgetPos);
+			widget.targetPanel = readField("\"targetPanel\":", widgetPos);
 			widget.bindEntity = readField("\"bindEntity\":", widgetPos);
 			widget.bindComponent = readField("\"bindComponent\":", widgetPos);
 			widget.bindMember = readField("\"bindMember\":", widgetPos);

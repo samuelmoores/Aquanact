@@ -8,6 +8,7 @@
 #include "Engine/Core/SceneManager.h"
 
 #include <imgui.h>
+#include <algorithm>
 
 namespace {
 	Entity* FindEntity(Scene* scene, const std::string& name)
@@ -72,8 +73,22 @@ void GameGUICreator::OpenCreateWidgetPopup(NewWidgetType type)
 	m_showCreateWidgetPopup = true;
 	m_newWidgetAction = GameGUIActionType::None;
 	m_newWidgetLaunchLevel.clear();
+	m_newWidgetTargetPanel.clear();
 	m_newWidgetName[0] = '\0';
 	m_newWidgetTexture[0] = '\0';
+	if (type == NewWidgetType::Panel)
+	{
+		m_newWidgetParentPanel.clear();
+		m_newPanelVisible = std::none_of(CurrentGameGUI().widgets.begin(), CurrentGameGUI().widgets.end(), [](const GameGUIWidgetDef& widget)
+		{
+			return widget.type == "Panel";
+		});
+	}
+	else
+	{
+		RefreshActiveEditingPanel();
+		m_newWidgetParentPanel = m_activeEditingPanel;
+	}
 }
 
 void GameGUICreator::DrawCreateWidgetPopupHeader(const char* title)
@@ -121,6 +136,7 @@ void GameGUICreator::DrawCreateActionField()
 			GameGUIActionType::NewGame,
 			GameGUIActionType::Pause,
 			GameGUIActionType::Resume,
+			GameGUIActionType::SubPanel,
 		};
 		for (GameGUIActionType option : options)
 		{
@@ -137,6 +153,88 @@ void GameGUICreator::DrawCreateActionField()
 		ImGui::EndCombo();
 	}
 	m_newWidgetAction = action;
+	if (m_newWidgetAction != GameGUIActionType::NewGame)
+	{
+		m_newWidgetLaunchLevel.clear();
+	}
+	if (m_newWidgetAction != GameGUIActionType::SubPanel)
+	{
+		m_newWidgetTargetPanel.clear();
+	}
+}
+
+void GameGUICreator::DrawCreateParentPanelField()
+{
+	GameGUIAsset& asset = CurrentGameGUI();
+	const char* parentLabel = m_newWidgetParentPanel.empty() ? "<No Panel>" : m_newWidgetParentPanel.c_str();
+	if (!ImGui::BeginCombo("Parent Panel", parentLabel))
+	{
+		return;
+	}
+	if (ImGui::Selectable("<No Panel>", m_newWidgetParentPanel.empty()))
+	{
+		m_newWidgetParentPanel.clear();
+		m_newWidgetTargetPanel.clear();
+	}
+	for (const GameGUIWidgetDef& panel : asset.widgets)
+	{
+		if (panel.type != "Panel")
+		{
+			continue;
+		}
+		const bool selected = m_newWidgetParentPanel == panel.name;
+		if (ImGui::Selectable(panel.name.c_str(), selected))
+		{
+			m_newWidgetParentPanel = panel.name;
+			m_activeEditingPanel = panel.name;
+			if (m_newWidgetTargetPanel == panel.name)
+			{
+				m_newWidgetTargetPanel.clear();
+			}
+		}
+		if (selected)
+		{
+			ImGui::SetItemDefaultFocus();
+		}
+	}
+	ImGui::EndCombo();
+}
+
+void GameGUICreator::DrawCreateTargetPanelField()
+{
+	if (m_newWidgetAction != GameGUIActionType::SubPanel)
+	{
+		return;
+	}
+	if (m_newWidgetParentPanel.empty())
+	{
+		m_newWidgetTargetPanel.clear();
+		ImGui::TextDisabled("Choose a parent panel before selecting a target.");
+		return;
+	}
+
+	GameGUIAsset& asset = CurrentGameGUI();
+	const char* targetLabel = m_newWidgetTargetPanel.empty() ? "<Select Panel>" : m_newWidgetTargetPanel.c_str();
+	if (ImGui::BeginCombo("Target Panel", targetLabel))
+	{
+		for (const GameGUIWidgetDef& panel : asset.widgets)
+		{
+			if (panel.type != "Panel" || panel.name == m_newWidgetParentPanel)
+			{
+				continue;
+			}
+			const bool selected = m_newWidgetTargetPanel == panel.name;
+			if (ImGui::Selectable(panel.name.c_str(), selected))
+			{
+				m_newWidgetTargetPanel = panel.name;
+			}
+			if (selected)
+			{
+				ImGui::SetItemDefaultFocus();
+			}
+		}
+		ImGui::EndCombo();
+	}
 }
 
 void GameGUICreator::DrawCreateLaunchLevelField()
@@ -180,15 +278,25 @@ void GameGUICreator::DrawCreateButtonPopup()
 	DrawCreateWidgetPopupHeader("Create a button widget:");
 	ImGui::Separator();
 	ImGui::TextUnformatted("Binding");
+	DrawCreateParentPanelField();
 	DrawCreateActionField();
 	DrawCreateLaunchLevelField();
+	DrawCreateTargetPanelField();
 
+	const bool invalidSubPanel = m_newWidgetAction == GameGUIActionType::SubPanel &&
+		(m_newWidgetParentPanel.empty() || m_newWidgetTargetPanel.empty() || m_newWidgetParentPanel == m_newWidgetTargetPanel);
+	ImGui::BeginDisabled(invalidSubPanel);
 	if (ImGui::Button("Create"))
 	{
 		AddButtonWidget();
 		SyncRuntimePreview();
 		Root::Current().Debugger().LogMessage("Create Button requested");
 		ImGui::CloseCurrentPopup();
+	}
+	ImGui::EndDisabled();
+	if (invalidSubPanel)
+	{
+		ImGui::TextDisabled("Sub Panel requires different source and target panels.");
 	}
 
 	DrawCreateWidgetPopupFooter();
@@ -197,6 +305,7 @@ void GameGUICreator::DrawCreateButtonPopup()
 void GameGUICreator::DrawCreatePanelPopup()
 {
 	DrawCreateWidgetPopupHeader("Create a panel widget:");
+	ImGui::Checkbox("Visible on load", &m_newPanelVisible);
 
 	if (ImGui::Button("Create"))
 	{
@@ -212,6 +321,7 @@ void GameGUICreator::DrawCreatePanelPopup()
 void GameGUICreator::DrawCreateImagePopup()
 {
 	DrawCreateWidgetPopupHeader("Create an image widget:");
+	DrawCreateParentPanelField();
 	DrawCreateWidgetTextureField();
 
 	if (ImGui::Button("Create"))
@@ -228,6 +338,7 @@ void GameGUICreator::DrawCreateImagePopup()
 void GameGUICreator::DrawCreateProgressBarPopup()
 {
 	DrawCreateWidgetPopupHeader("Create a progress bar widget:");
+	DrawCreateParentPanelField();
 	DrawCreateWidgetTextureField();
 
 	if (ImGui::Button("Create"))
@@ -244,6 +355,7 @@ void GameGUICreator::DrawCreateProgressBarPopup()
 void GameGUICreator::DrawCreateTextPopup()
 {
 	DrawCreateWidgetPopupHeader("Create a text widget:");
+	DrawCreateParentPanelField();
 
 	if (ImGui::Button("Create"))
 	{

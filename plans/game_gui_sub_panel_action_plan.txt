@@ -1,0 +1,165 @@
+GameGUICreator Sub Panel Action - Implementation Order
+======================================================
+
+Goal
+----
+Add a Sub Panel button action that hides the button's owning panel and shows a
+selected target panel in the same GameGUI asset. Make multi-panel authoring,
+previewing, saving, renaming, deleting, mouse input, and controller navigation
+behave predictably.
+
+Implementation principles
+-------------------------
+1. A GameGUI asset remains the unit for a UI role such as MainMenu or PauseMenu.
+2. Top-level Panel widgets act as pages within that asset.
+3. All content belonging to a page is parented to its Panel.
+4. Sub Panel transitions affect only the source and target panels; unrelated
+   visible panels remain untouched.
+5. Panel names are references in this version, matching the existing parentName
+   and runtime-widget lookup design. Names must therefore be unique.
+6. Existing JSON remains compatible. Missing targetPanel fields load as empty.
+
+Phase 1 - Data model and action conversion
+------------------------------------------
+1. Add GameGUIActionType::SubPanel.
+2. Add GameGUIWidgetDef::targetPanel.
+3. Add Sub Panel labels and string conversion in GameGUICreatorHelpers.
+4. Use the shared action helpers in runtime diagnostics to avoid duplicated
+   conversion tables drifting apart.
+
+Exit condition:
+- SubPanel round-trips between the enum and the string "SubPanel".
+
+Phase 2 - Persistence and compatibility
+---------------------------------------
+1. Write targetPanel for every widget in GameGUICreator_Persistence.cpp.
+2. Read targetPanel in the shared creator asset loader.
+3. Read targetPanel in the runtime manager loader, or route the runtime manager
+   through the shared loader if that refactor is safe within this change.
+4. Keep empty/missing targetPanel values valid for older assets.
+
+Exit condition:
+- A button saved with action SubPanel and a target panel reloads identically in
+  both the creator preview and packaged/runtime asset path.
+
+Phase 3 - Creator state and reusable panel selectors
+----------------------------------------------------
+1. Rename m_newButtonParentPanel to m_newWidgetParentPanel and apply it to all
+   newly created widget types, not only buttons.
+2. Track an editor-only active panel name. Selecting a panel or one of its
+   children in the Widget List isolates that panel for layout work without
+   adding separate panel-selection controls to the window.
+3. Add reusable helpers to enumerate panels, find an owning panel, validate
+   unique names, and draw parent/target selectors consistently.
+
+Exit condition:
+- New buttons, images, text, and progress bars can be created under the active
+  panel, so hiding a panel hides its complete page.
+
+Phase 4 - Panel authoring workflow
+----------------------------------
+1. Selecting a panel in the tree makes it the active editing panel without a
+   separate Active Panel dropdown.
+3. Extend Create Panel with Visible on load; default the first panel to visible
+   and later panels to hidden.
+4. Add Visible on load to panel details.
+5. Annotate panel and Sub Panel rows in the widget tree so the flow is readable.
+6. Keep the existing Add Button action on panel details and make it inherit that
+   panel automatically.
+
+Exit condition:
+- A user can create Main, Options, and Credits panels, edit each hidden panel,
+  and deliberately select which panels appear when the asset first loads.
+
+Phase 5 - Conditional Sub Panel action editor
+---------------------------------------------
+1. Add Sub Panel to the action combo in button creation and button details.
+2. When selected, show a Target Panel dropdown containing panels from the same
+   asset, excluding the source panel.
+3. Require Sub Panel buttons to belong to a panel and have a valid target.
+4. Apply action-field cleanup rules:
+   - NewGame keeps launchLevel and clears targetPanel.
+   - SubPanel keeps targetPanel and clears launchLevel.
+   - All other actions clear both values.
+5. Disable creation or show a clear warning while the binding is invalid.
+
+Exit condition:
+- The target dropdown appears only for Sub Panel and never saves a knowingly
+  invalid new binding.
+
+Phase 6 - Rename, delete, and validation integrity
+--------------------------------------------------
+1. Enforce non-empty, unique widget names when creating or renaming.
+2. Renaming a panel updates child parentName references and all targetPanel
+   references pointing to it.
+3. Deleting a panel clears incoming targetPanel references and handles its child
+   widgets deliberately (retain-and-detach for compatibility, or cascade only
+   behind an explicit confirmation).
+4. Surface broken targets in button details and the widget tree.
+5. Add a pre-save validation log for duplicates, missing parents, missing target
+   panels, and self-targets. A <-> B cycles remain valid for Back navigation.
+
+Exit condition:
+- Ordinary panel maintenance cannot silently leave stale Sub Panel links.
+
+Phase 7 - Runtime transition behavior
+-------------------------------------
+1. Resolve the clicked button definition and its nearest owning Panel.
+2. Resolve targetPanel through the loaded asset and runtime widget registry.
+3. Validate both endpoints before changing visibility.
+4. Hide the source panel and show the target panel.
+5. Clear stale pointer/box highlighting.
+6. Rebuild controller navigation using effective visibility, including ancestor
+   visibility, and focus the first target-panel button.
+7. Log invalid transitions and leave current visibility unchanged.
+
+Exit condition:
+- Mouse and controller input transition between panels without focusing hidden
+  buttons or disturbing unrelated visible panels.
+
+Phase 8 - Verification
+----------------------
+1. Add focused tests for action conversion and pure panel-transition resolution
+   where feasible without constructing the full MyGUI runtime.
+2. Build AquanactEngine and AquanactGame.
+3. Manually verify Main -> Options -> Main and a three-panel chain in the
+   creator preview.
+4. Verify hidden panels can be edited by selecting them in the Widget List.
+5. Save, reload, and package an asset containing SubPanel fields.
+6. Verify missing target, self-target, rename, deletion, and controller focus.
+
+Definition of done
+------------------
+- Sub Panel is available beside New Game, Pause, and Resume.
+- Selecting Sub Panel reveals a target-panel dropdown.
+- Complete panel pages can be authored and edited independently.
+- Clicking a valid transition hides the source and shows the target.
+- Controller focus contains only effectively visible buttons.
+- References survive save/load and panel rename; invalid references fail safely.
+- Existing GUI assets load without migration.
+
+Implementation status - 2026-08-20
+----------------------------------
+Completed in the initial implementation pass:
+- Phases 1 and 2: enum, targetPanel data, shared conversions, creator/runtime
+  loading, and saving.
+- Phases 3 through 5: tree-driven active-panel authoring, selected-panel preview
+  isolation, complete-page parenting, initial visibility, and conditional Sub
+  Panel target selection.
+- Phase 6 core integrity: unique generated names, guarded renames, panel rename
+  propagation, deleted-target cleanup, and pre-save warning logs.
+- Phase 7: validated runtime source/target resolution, source hide/target show,
+  inherited-visibility controller filtering, and target-panel focus.
+- Phase 8 automated coverage: valid forward/back transitions plus missing,
+  self-target, and standalone-button rejection.
+
+Verification completed:
+- AquanactEngine x64-debug builds successfully.
+- AquanactGame x64-debug builds successfully.
+- AquanactUIInputRouterTests passes.
+- AquanactGameGUIAssetTests passes.
+
+Remaining hands-on verification:
+- Exercise panel creation, layout isolation, save/reload, and pointer/controller
+  transitions interactively in GameGUICreator.
+- Run a packaged-game smoke test with an authored multi-panel asset.

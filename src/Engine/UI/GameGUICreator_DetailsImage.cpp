@@ -9,17 +9,19 @@
 
 void GameGUICreator::DrawImageWidgetDetails(GameGUIAsset& asset, GameGUIWidgetDef& widget)
 {
-	(void)asset;
-
 	// Image widgets are intentionally simple: name plus one live texture picker.
 	char nameBuffer[256] = {};
 	std::snprintf(nameBuffer, sizeof(nameBuffer), "%s", widget.name.c_str());
 	if (ImGui::InputText("Name", nameBuffer, sizeof(nameBuffer)))
 	{
-		widget.name = nameBuffer;
-		SyncRuntimePreview();
-		SaveSelectedRoleGUI();
+		if (IsWidgetNameAvailable(asset, nameBuffer, &widget))
+		{
+			widget.name = nameBuffer;
+			SyncRuntimePreview();
+			SaveSelectedRoleGUI();
+		}
 	}
+	DrawWidgetParentPanelField(asset, widget);
 
 	if (GameGUICreatorHelpers::DrawTextureCombo("Texture", widget.texture, true, "<No Texture>"))
 	{
@@ -65,9 +67,4 @@ void GameGUICreator::DrawImageWidgetDetails(GameGUIAsset& asset, GameGUIWidgetDe
 		SaveSelectedRoleGUI();
 	}
 
-	if (ImGui::Button("Delete"))
-	{
-		DeleteSelectedWidget();
-		SyncRuntimePreview();
-	}
 }

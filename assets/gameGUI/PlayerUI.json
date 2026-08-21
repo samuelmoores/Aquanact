@@ -1,5 +1,23 @@
 {
   "name": "PlayerUI",
+  "navigationMode": "TextHighlight",
+  "boxSkin": "PanelSkin",
+  "pointerSkin": "NavigationArrowRight1",
+  "boxPadding": 8,
+  "boxOffsetX": 0,
+  "boxOffsetY": 0,
+  "pointerWidth": 40,
+  "pointerHeight": 40,
+  "pointerGap": 24,
+  "highlightR": 1,
+  "highlightG": 1,
+  "highlightB": 1,
+  "selectedR": 1,
+  "selectedG": 1,
+  "selectedB": 1,
+  "selectedR": 1,
+  "selectedG": 1,
+  "selectedB": 1,
   "widgets": [
   ]
 }

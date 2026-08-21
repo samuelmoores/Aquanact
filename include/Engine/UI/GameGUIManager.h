@@ -87,5 +87,6 @@ private:
 	bool m_previousDpadUp = false;
 	bool m_previousDpadDown = false;
 	bool m_previousControllerAccept = false;
+	bool m_previousControllerBack = false;
 	GameGUIMenuNavigationMode m_menuNavigationMode = GameGUIMenuNavigationMode::Pointer;
 };

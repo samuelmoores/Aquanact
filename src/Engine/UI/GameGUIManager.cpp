@@ -8,6 +8,8 @@
 #include "Engine/Core/ProjectManager.h"
 #include "Engine/Core/RenderManager.h"
 #include "Engine/Core/Input.h"
+#include "Engine/Core/InputManager.h"
+#include "Engine/Core/GameplayManager.h"
 #include "Engine/Core/SceneManager.h"
 #include "Engine/Core/FrameProfiler.h"
 #include "Engine/Core/Audio.h"
@@ -58,21 +60,6 @@ namespace {
 		}
 	}
 
-	const char* ActionLabel(GameGUIActionType action)
-	{
-		switch (action)
-		{
-		case GameGUIActionType::NewGame:
-			return "New Game";
-		case GameGUIActionType::Pause:
-			return "Pause";
-		case GameGUIActionType::Resume:
-			return "Resume";
-		default:
-			return "None";
-		}
-	}
-
 	int ReadIntField(const std::string& value, int fallback = 0)
 	{
 		if (value.empty())
@@ -105,23 +92,6 @@ namespace {
 		{
 			return fallback;
 		}
-	}
-
-	GameGUIActionType StringToAction(const std::string& value)
-	{
-		if (value == "NewGame")
-		{
-			return GameGUIActionType::NewGame;
-		}
-		if (value == "Pause")
-		{
-			return GameGUIActionType::Pause;
-		}
-		if (value == "Resume")
-		{
-			return GameGUIActionType::Resume;
-		}
-		return GameGUIActionType::None;
 	}
 
 	std::filesystem::path AssetDirectory()
@@ -265,8 +235,9 @@ namespace {
 			widget.highlightColor = readField("\"highlightColor\":", widgetPos);
 			widget.clickedColor = readField("\"clickedColor\":", widgetPos);
 			widget.focusSound = readField("\"focusSound\":", widgetPos);
-			widget.action = StringToAction(readField("\"action\":", widgetPos));
+			widget.action = GameGUICreatorHelpers::StringToAction(readField("\"action\":", widgetPos));
 			widget.launchLevel = readField("\"launchLevel\":", widgetPos);
+			widget.targetPanel = readField("\"targetPanel\":", widgetPos);
 			widget.bindEntity = readField("\"bindEntity\":", widgetPos);
 			widget.bindComponent = readField("\"bindComponent\":", widgetPos);
 			widget.bindMember = readField("\"bindMember\":", widgetPos);
@@ -377,9 +348,11 @@ void GameGUIManager::UpdateControllerNavigation()
 	const bool dpadUp = input.ControllerButtonDown(GLFW_GAMEPAD_BUTTON_DPAD_UP);
 	const bool dpadDown = input.ControllerButtonDown(GLFW_GAMEPAD_BUTTON_DPAD_DOWN);
 	const bool accept = input.ControllerButtonDown(GLFW_GAMEPAD_BUTTON_A);
+	const bool back = input.ControllerButtonDown(GLFW_GAMEPAD_BUTTON_B);
 	const bool dpadUpPressed = dpadUp && !m_previousDpadUp;
 	const bool dpadDownPressed = dpadDown && !m_previousDpadDown;
 	const bool acceptPressed = accept && !m_previousControllerAccept;
+	const bool backPressed = back && !m_previousControllerBack;
 	const bool deviceChanged = frame.deviceChangedThisFrame;
 	if (deviceChanged && frame.activeDevice == Input::ActiveInputDevice::MouseKeyboard)
 	{
@@ -389,6 +362,21 @@ void GameGUIManager::UpdateControllerNavigation()
 	if (deviceChanged && frame.activeDevice == Input::ActiveInputDevice::Gamepad)
 	{
 		m_runtime->FocusFirstControllerButton();
+	}
+	if (frame.activeDevice == Input::ActiveInputDevice::Gamepad && connected && backPressed)
+	{
+		const bool returnedFromSubPanel = m_runtime->NavigateBackFromSubPanel();
+		if (!returnedFromSubPanel && m_mode == UIMode::PauseMenu &&
+			Root::Current().Gameplay().State() == GameplayManager::GameState::Paused)
+		{
+			Root::Current().InputActions().SuppressControllerInputUntilRelease();
+			Root::Current().Gameplay().ExecuteCommand(
+				GameplayCommand::Resume,
+				Root::Current().FrontEnd(),
+				Root::Current().Debugger());
+			Root::Current().FrontEnd().RuntimeGUI().RecordClick("Resume action requested via controller B");
+			Root::Current().Debugger().LogMessage("GameGUI Resume action requested via controller B");
+		}
 	}
 
 	// The input event that switches ownership to the gamepad should not also
@@ -417,6 +405,7 @@ void GameGUIManager::UpdateControllerNavigation()
 	m_previousDpadUp = dpadUp;
 	m_previousDpadDown = dpadDown;
 	m_previousControllerAccept = accept;
+	m_previousControllerBack = back;
 }
 
 void GameGUIManager::EndFrame()
@@ -729,7 +718,7 @@ void GameGUIManager::DrawDiagnosticsWindow()
 				"%s / %s -> %s",
 				asset.name.c_str(),
 				widget.name.c_str(),
-				ActionLabel(widget.action));
+				GameGUICreatorHelpers::ActionLabel(widget.action));
 		}
 	}
 	if (!foundButton)
@@ -933,7 +922,7 @@ void GameGUIManager::RecordButtonClick(const std::string& assetName, const std::
 	++m_buttonClickCount;
 	m_lastButtonAssetName = assetName;
 	m_lastButtonWidgetName = widgetName;
-	m_lastButtonActionName = ActionLabel(action);
+	m_lastButtonActionName = GameGUICreatorHelpers::ActionLabel(action);
 	LogAction(
 		std::string("Button click: ") +
 		assetName + " / " + widgetName + " -> " + m_lastButtonActionName);
@@ -1066,6 +1055,11 @@ void GameGUIManager::ApplyActiveAsset()
 		return;
 	}
 	m_runtime->LoadUIAsset(m_assets[static_cast<std::size_t>(m_activeAssetIndex)]);
+	const Input& input = Root::Current().InputRef();
+	if (input.ControllerConnected() && input.ActiveDevice() == Input::ActiveInputDevice::Gamepad)
+	{
+		m_runtime->FocusFirstControllerButton();
+	}
 }
 
 void GameGUIManager::ApplyMode()

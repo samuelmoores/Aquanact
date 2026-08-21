@@ -10,6 +10,7 @@ enum class GameGUIActionType
 	NewGame,
 	Pause,
 	Resume,
+	SubPanel,
 };
 
 enum class GameGUIMenuNavigationMode
@@ -79,6 +80,7 @@ struct GameGUIWidgetDef
 	std::string focusSound;
 	GameGUIActionType action = GameGUIActionType::None;
 	std::string launchLevel;
+	std::string targetPanel;
 
 	// Runtime binding
 	// These fields connect a widget to a live entity/component/member at runtime.

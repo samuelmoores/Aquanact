@@ -32,6 +32,7 @@ void Input::startUp(Window& window)
 	m_lookActive = false;
 	m_lookBecameActive = false;
 	m_gameplayFocusActive = false;
+	m_revealCursorThisFrame = false;
 	m_mouseCapturedByUI = false;
 	m_windowFocused = false;
 	m_lastRoutedMousePosition = glm::ivec2(0);
@@ -60,9 +61,25 @@ void Input::startUp(Window& window)
 	// router may change ownership on the first processed frame after startup.
 	m_previousGamepadState = {};
 	m_previousGamepadStateValid = false;
-	m_activeDevice = ActiveInputDevice::MouseKeyboard;
+	if (ControllerConnected())
+	{
+		GLFWgamepadstate gamepadState{};
+		if (glfwGetGamepadState(GLFW_JOYSTICK_1, &gamepadState) == GLFW_TRUE)
+		{
+			m_previousGamepadState = gamepadState;
+			m_previousGamepadStateValid = true;
+		}
+	}
+	// A connected gamepad owns the initial menu cursor. Mouse activity can
+	// transfer ownership back to mouse/keyboard in UpdateCursorMode().
+	m_activeDevice = ControllerConnected()
+		? ActiveInputDevice::Gamepad
+		: ActiveInputDevice::MouseKeyboard;
 	m_deviceChangedThisFrame = false;
-	m_cursorMode = glfwGetInputMode(m_window->GLFW(), GLFW_CURSOR);
+	// Startup begins in the editor context, so the native cursor must remain
+	// available. If a controller is already being used, the first menu-context
+	// update will hide it through UpdateCursorMode.
+	UnhideMouseCursor();
 
 	// Install the user pointer before installing callbacks so callbacks always
 	// resolve to a fully initialized Input instance. The previous callbacks are
@@ -236,6 +253,13 @@ void Input::ReleaseCursorForUI()
 	ReleaseCursorFocus();
 }
 
+void Input::RevealCursorForFrame()
+{
+	m_revealCursorThisFrame = true;
+	SetActiveDevice(ActiveInputDevice::MouseKeyboard);
+	UnhideMouseCursor();
+}
+
 void Input::DispatchPendingMouseEvents(bool dispatchToMyGUI)
 {
 	m_lastMouseRoutedToMyGUI = dispatchToMyGUI;
@@ -302,7 +326,10 @@ void Input::DispatchPendingMouseEvents(bool dispatchToMyGUI)
 // -----------------------------------------------------------------------------
 bool Input::ControllerConnected(int joystick) const
 {
-	return glfwJoystickIsGamepad(joystick) == GLFW_TRUE;
+	// Presence is intentionally separate from input activity. A mapped GLFW
+	// gamepad owns the initial menu cursor; mouse activity can relinquish it.
+	return glfwJoystickPresent(joystick) == GLFW_TRUE &&
+		glfwJoystickIsGamepad(joystick) == GLFW_TRUE;
 }
 
 bool Input::KeyDown(int key) const
@@ -527,9 +554,11 @@ void Input::ReleaseCursorFocus()
 	m_lookActive = false;
 	m_ignoreMouseDeltaOnce = false;
 	// Releasing gameplay look must not briefly expose the cursor when a
-	// controller owns input, especially during a Playing <-> Paused transition.
-	// Mouse/keyboard ownership still gets the normal visible cursor.
-	if (m_activeDevice == ActiveInputDevice::Gamepad)
+	// connected controller owns input, especially during a Playing <-> Paused
+	// transition. Stale gamepad ownership after a disconnect must never hide it.
+	const bool controllerInUse = ControllerConnected() &&
+		m_activeDevice == ActiveInputDevice::Gamepad;
+	if (controllerInUse)
 	{
 		HideMouseCursor();
 	}
@@ -549,6 +578,10 @@ void Input::UpdateCursorMode(bool gameMode)
 		UnhideMouseCursor();
 		return;
 	}
+	if (m_revealCursorThisFrame)
+	{
+		m_revealCursorThisFrame = false;
+	}
 
 	const bool mainMenuActive = m_context == InputContext::MainMenu;
 	const bool paused = m_context == InputContext::Paused;
@@ -559,8 +592,9 @@ void Input::UpdateCursorMode(bool gameMode)
 	const bool mouseInUse = m_mouseMoveSerial != m_lastMouseMoveSerial;
 	const bool mouseActivity = m_mouseButtonActivityThisFrame;
 
+	const bool controllerConnected = ControllerConnected();
 	bool controllerActivityDetected = false;
-	if (ControllerConnected())
+	if (controllerConnected)
 	{
 		GLFWgamepadstate gamepadState{};
 		if (glfwGetGamepadState(GLFW_JOYSTICK_1, &gamepadState) == GLFW_TRUE)
@@ -602,24 +636,37 @@ void Input::UpdateCursorMode(bool gameMode)
 	if (controllerActivityDetected)
 	{
 		SetActiveDevice(ActiveInputDevice::Gamepad);
+		// The first real controller event immediately transfers cursor ownership
+		// to the gamepad. Mouse movement below can reclaim it on the same frame.
+		HideMouseCursor();
 	}
 	if (mouseInUse || mouseActivity)
 	{
 		SetActiveDevice(ActiveInputDevice::MouseKeyboard);
 	}
 
-	if (m_activeDevice == ActiveInputDevice::Gamepad)
+	const bool controllerInUse = controllerConnected &&
+		m_activeDevice == ActiveInputDevice::Gamepad;
+
+	// Menus always expose the mouse unless a connected controller currently
+	// owns input. Any physical mouse movement or click above transfers ownership
+	// back to mouse/keyboard and restores the cursor in this same update.
+	if (mainMenuActive || paused)
 	{
-		HideMouseCursor();
+		if (controllerInUse)
+		{
+			HideMouseCursor();
+		}
+		else
+		{
+			UnhideMouseCursor();
+		}
 		return;
 	}
 
-	// The main menu remains mouse-accessible. During a level, the mouse is
-	// visible only while paused; active gameplay keeps it captured, and gameplay
-	// without focus keeps it hidden until the next explicit interaction.
-	if (mainMenuActive || paused)
+	if (controllerInUse)
 	{
-		UnhideMouseCursor();
+		HideMouseCursor();
 		return;
 	}
 

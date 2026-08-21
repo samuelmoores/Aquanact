@@ -11,6 +11,42 @@
 #include <algorithm>
 #include <fstream>
 #include <sstream>
+#include <unordered_set>
+
+namespace
+{
+	void LogAssetReferenceWarnings(const GameGUIAsset& asset)
+	{
+		std::unordered_set<std::string> names;
+		for (const GameGUIWidgetDef& widget : asset.widgets)
+		{
+			if (widget.name.empty() || !names.insert(widget.name).second)
+			{
+				Root::Current().Debugger().LogMessage("GameGUI save warning: empty or duplicate widget name in " + asset.name + ": " + widget.name);
+			}
+		}
+
+		for (const GameGUIWidgetDef& widget : asset.widgets)
+		{
+			if (!widget.parentName.empty() && names.find(widget.parentName) == names.end())
+			{
+				Root::Current().Debugger().LogMessage("GameGUI save warning: missing parent '" + widget.parentName + "' for widget " + widget.name);
+			}
+			if (widget.action != GameGUIActionType::SubPanel)
+			{
+				continue;
+			}
+			const auto target = std::find_if(asset.widgets.begin(), asset.widgets.end(), [&widget](const GameGUIWidgetDef& candidate)
+			{
+				return candidate.type == "Panel" && candidate.name == widget.targetPanel;
+			});
+			if (widget.targetPanel.empty() || target == asset.widgets.end() || widget.targetPanel == widget.parentName)
+			{
+				Root::Current().Debugger().LogMessage("GameGUI save warning: invalid SubPanel target for widget " + widget.name);
+			}
+		}
+	}
+}
 
 void GameGUICreator::SaveAllRoleGUIs()
 {
@@ -24,6 +60,7 @@ void GameGUICreator::SaveAllRoleGUIs()
 void GameGUICreator::SaveSelectedRoleGUI()
 {
 	GameGUIAsset& asset = CurrentGameGUI();
+	LogAssetReferenceWarnings(asset);
 	for (GameGUIWidgetDef& widget : asset.widgets)
 	{
 		if (widget.type != "Button" || widget.text.empty() || widget.name == widget.text) continue;
@@ -112,6 +149,7 @@ void GameGUICreator::SaveSelectedRoleGUI()
 		json << "      \"focusSound\": \"" << widget.focusSound << "\",\n";
 		json << "      \"action\": \"" << GameGUICreatorHelpers::ActionToString(widget.action) << "\",\n";
 		json << "      \"launchLevel\": \"" << widget.launchLevel << "\",\n";
+		json << "      \"targetPanel\": \"" << widget.targetPanel << "\",\n";
 		json << "      \"bindEntity\": \"" << widget.bindEntity << "\",\n";
 		json << "      \"bindComponent\": \"" << widget.bindComponent << "\",\n";
 		json << "      \"bindMember\": \"" << widget.bindMember << "\",\n";
@@ -185,19 +223,25 @@ void GameGUICreator::LoadSelectedRoleGUI()
 	for (int i = 0; i < 4; ++i) if (asset.pointerSkin == pointerSkins[i]) { m_pointerSkinIndex = i; break; }
 	LoadNavigationSettingsFromAsset();
 	m_selectedWidgetIndex = asset.widgets.empty() ? -1 : 0;
+	RefreshActiveEditingPanel();
 }
 
 void GameGUICreator::SyncRuntimePreview()
 {
 	auto& runtimeGUI = Root::Current().FrontEnd().RuntimeGUI();
+	RefreshActiveEditingPanel();
 	GameGUIAsset previewAsset = CurrentGameGUI();
-	runtimeGUI.LoadPreviewAsset(previewAsset);
-	if (IsMainMenuSelected())
+	if (!m_activeEditingPanel.empty())
 	{
-		// Give the creator preview an explicit highlighted button so the menu
-		// pointer is visible without requiring controller input.
-		runtimeGUI.FocusFirstControllerButton();
+		for (GameGUIWidgetDef& widget : previewAsset.widgets)
+		{
+			if (widget.type == "Panel")
+			{
+				widget.visible = widget.name == m_activeEditingPanel;
+			}
+		}
 	}
+	runtimeGUI.LoadPreviewAsset(previewAsset);
 }
 
 void GameGUICreator::PreviewSelectedGUI()

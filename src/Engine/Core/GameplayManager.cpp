@@ -44,6 +44,16 @@ void GameplayManager::startUp(SceneManager& SceneManager, FrontEndManager& front
 {
 	m_levelManager = &SceneManager;
 	m_state = GameState::MainMenu;
+	// Publish the Main Menu input context at the same startup boundary as the
+	// gameplay state. This prevents the next input update from briefly treating
+	// the menu as Gameplay and hiding the mouse before the menu is rendered.
+	Root::Current().InputRef().TransitionToContext(Input::InputContext::MainMenu);
+	// Establish the native cursor state at the gameplay boundary as soon as the
+	// session enters Main Menu. ReleaseCursorForUI hides it only when a connected
+	// controller already owns input; otherwise it makes the mouse cursor visible.
+
+	Root::Current().InputRef().ReleaseCursorForUI();
+
 	if (m_levelManager)
 	{
 		// If the runtime UI is already initialized, set it to a known boot

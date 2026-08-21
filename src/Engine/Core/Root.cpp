@@ -196,6 +196,7 @@ void Root::run()
 			{
 				const bool showRuntimeDebugWindow = !m_frontEndManager->RuntimeGUI().ShowRuntimeDebugWindow();
 				m_frontEndManager->RuntimeGUI().SetShowRuntimeDebugWindow(showRuntimeDebugWindow);
+				m_input->RevealCursorForFrame();
 			}
 			m_previousDebugWindowsToggle = debugWindowsToggleDown;
 		}

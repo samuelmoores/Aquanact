@@ -4,6 +4,7 @@
 
 #include <string>
 #include <functional>
+#include <utility>
 #include <unordered_map>
 #include <vector>
 #include <MYGUI/MyGUI_OpenGLImageLoader.h>
@@ -44,6 +45,7 @@ public:
 	bool HasControllerFocus() const;
 	void NavigateControllerButtons(int direction);
 	void ActivateFocusedControllerButton();
+	bool NavigateBackFromSubPanel();
 
 	// Visual configuration
 	void SetMenuNavigationMode(MenuNavigationMode mode);
@@ -83,6 +85,8 @@ private:
 	void PositionMenuPointer(MyGUI::Widget* button);
 	void ApplyTextHighlight(MyGUI::Button* button, bool highlighted);
 	void BindProgressBarFromDef(const GameGUIWidgetDef& def, MyGUI::ProgressBar* progress);
+	void RefreshVisibleControllerButtons();
+	void FocusFirstControllerButtonInPanel(const std::string& panelName);
 
 	// Core runtime
 	Window* m_window = nullptr;
@@ -98,7 +102,9 @@ private:
 	MyGUI::Button* m_testButton = nullptr;
 	MyGUI::Widget* m_menuPointer = nullptr;
 	MyGUI::Widget* m_menuBox = nullptr;
+	std::vector<MyGUI::Button*> m_allControllerButtons;
 	std::vector<MyGUI::Button*> m_controllerButtons;
+	std::vector<std::pair<std::string, std::string>> m_subPanelHistory;
 	int m_focusedControllerButton = -1;
 	MyGUI::Button* m_lastFocusSoundButton = nullptr;
 

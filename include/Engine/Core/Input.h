@@ -58,6 +58,7 @@ public:
 	InputContext Context() const { return m_context; }
 	void CaptureCursorForLevel();
 	void ReleaseCursorForUI();
+	void RevealCursorForFrame();
 	void SetMouseCapturedByUI(bool captured) { m_mouseCapturedByUI = captured; }
 	void DispatchPendingMouseEvents(bool dispatchToMyGUI);
 
@@ -154,6 +155,7 @@ private:
 	bool m_ignoreMouseDeltaOnce = false;
 	glm::vec2 m_lastCursorPos = glm::vec2(0.0f);
 	bool m_gameplayFocusActive = false;
+	bool m_revealCursorThisFrame = false;
 
 	// -------------------------------------------------------------------------
 	// Mouse activity and callback tracking

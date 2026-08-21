@@ -56,9 +56,12 @@ void GameGUICreator::DrawButtonWidgetDetails(GameGUIAsset& asset, GameGUIWidgetD
 	std::snprintf(buttonText, sizeof(buttonText), "%s", widget.text.c_str());
 	if (ImGui::InputText("Button text", buttonText, sizeof(buttonText)))
 	{
-		RenameButtonWidget(asset, widget, buttonText);
-		SyncRuntimePreview();
-		SaveSelectedRoleGUI();
+		if (IsWidgetNameAvailable(asset, buttonText, &widget))
+		{
+			RenameButtonWidget(asset, widget, buttonText);
+			SyncRuntimePreview();
+			SaveSelectedRoleGUI();
+		}
 	}
 
 	if (ImGui::Checkbox("Use button skin", &widget.useSkin))
@@ -103,6 +106,7 @@ void GameGUICreator::DrawButtonWidgetDetails(GameGUIAsset& asset, GameGUIWidgetD
 			GameGUIActionType::NewGame,
 			GameGUIActionType::Pause,
 			GameGUIActionType::Resume,
+			GameGUIActionType::SubPanel,
 		};
 		for (GameGUIActionType option : options)
 		{
@@ -114,6 +118,10 @@ void GameGUICreator::DrawButtonWidgetDetails(GameGUIAsset& asset, GameGUIWidgetD
 				if (action != GameGUIActionType::NewGame)
 				{
 					widget.launchLevel.clear();
+				}
+				if (action != GameGUIActionType::SubPanel)
+				{
+					widget.targetPanel.clear();
 				}
 				SyncRuntimePreview();
 				SaveSelectedRoleGUI();
@@ -160,38 +168,51 @@ void GameGUICreator::DrawButtonWidgetDetails(GameGUIAsset& asset, GameGUIWidgetD
 	}
 
 	// Parent panel selection keeps the hierarchy editable after a rename.
-	const char* parentLabel = widget.parentName.empty() ? "<No Panel>" : widget.parentName.c_str();
-	if (ImGui::BeginCombo("Parent panel", parentLabel))
+	DrawWidgetParentPanelField(asset, widget);
+
+	if (widget.action == GameGUIActionType::SubPanel)
 	{
-		if (ImGui::Selectable("<No Panel>", widget.parentName.empty()))
+		const std::string sourcePanel = OwningPanelName(asset, widget);
+		if (sourcePanel.empty())
 		{
-			widget.parentName.clear();
-			SyncRuntimePreview();
-			SaveSelectedRoleGUI();
+			widget.targetPanel.clear();
+			ImGui::TextDisabled("Sub Panel buttons must belong to a panel.");
 		}
-
-		for (GameGUIWidgetDef& candidate : asset.widgets)
+		else
 		{
-			if (candidate.type != "Panel")
+			const bool targetExists = std::any_of(asset.widgets.begin(), asset.widgets.end(), [&widget](const GameGUIWidgetDef& candidate)
 			{
-				continue;
+				return candidate.type == "Panel" && candidate.name == widget.targetPanel;
+			});
+			const bool targetValid = targetExists && widget.targetPanel != sourcePanel;
+			const char* targetLabel = widget.targetPanel.empty() ? "<Select Panel>" : widget.targetPanel.c_str();
+			if (ImGui::BeginCombo("Target panel", targetLabel))
+			{
+				for (const GameGUIWidgetDef& candidate : asset.widgets)
+				{
+					if (candidate.type != "Panel" || candidate.name == sourcePanel)
+					{
+						continue;
+					}
+					const bool selected = widget.targetPanel == candidate.name;
+					if (ImGui::Selectable(candidate.name.c_str(), selected))
+					{
+						widget.targetPanel = candidate.name;
+						SyncRuntimePreview();
+						SaveSelectedRoleGUI();
+					}
+					if (selected)
+					{
+						ImGui::SetItemDefaultFocus();
+					}
+				}
+				ImGui::EndCombo();
 			}
-
-			const bool selected = widget.parentName == candidate.name;
-			if (ImGui::Selectable(candidate.name.c_str(), selected))
+			if (!widget.targetPanel.empty() && !targetValid)
 			{
-				widget.parentName = candidate.name;
-				ApplyPanelButtonLayout(candidate);
-				SyncRuntimePreview();
-				SaveSelectedRoleGUI();
+				ImGui::TextDisabled("Target panel is missing or matches the source; choose a replacement.");
 			}
 		}
-		ImGui::EndCombo();
 	}
 
-	if (ImGui::Button("Delete"))
-	{
-		DeleteSelectedWidget();
-		SyncRuntimePreview();
-	}
 }

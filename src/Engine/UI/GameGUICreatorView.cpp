@@ -18,9 +18,10 @@
 void GameGUICreatorView::DrawWidgetList(GameGUICreator& creator)
 {
 	ImGui::Begin("Widget List", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+	GameGUIAsset& asset = creator.CurrentGameGUI();
+	creator.RefreshActiveEditingPanel();
 	if (!creator.CurrentGameGUI().widgets.empty())
 	{
-		GameGUIAsset& asset = creator.CurrentGameGUI();
 		const auto hasChildren = [&asset](const GameGUIWidgetDef& widget)
 		{
 			return std::any_of(asset.widgets.begin(), asset.widgets.end(), [&widget](const GameGUIWidgetDef& child)
@@ -52,11 +53,26 @@ void GameGUICreatorView::DrawWidgetList(GameGUICreator& creator)
 					flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
 				}
 
-				const std::string label = widget.name + " (" + widget.type + ")##WidgetTree" + std::to_string(i);
+				std::string annotation;
+				if (widget.type == "Panel")
+				{
+					annotation = widget.visible ? " [visible on load]" : " [hidden on load]";
+				}
+				else if (widget.type == "Button" && widget.action == GameGUIActionType::SubPanel)
+				{
+					annotation = " -> " + (widget.targetPanel.empty() ? std::string("<missing panel>") : widget.targetPanel);
+				}
+				const std::string label = widget.name + " (" + widget.type + ")" + annotation + "##WidgetTree" + std::to_string(i);
 				const bool open = ImGui::TreeNodeEx(label.c_str(), flags);
 				if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
 				{
 					creator.m_selectedWidgetIndex = static_cast<int>(i);
+					const std::string panelName = creator.OwningPanelName(asset, widget);
+					if (!panelName.empty() && panelName != creator.m_activeEditingPanel)
+					{
+						creator.m_activeEditingPanel = panelName;
+						creator.SyncRuntimePreview();
+					}
 				}
 
 				if (widgetHasChildren && open)
@@ -117,6 +133,12 @@ void GameGUICreatorView::DrawWidgetDetails(GameGUICreator& creator)
 		creator.DrawTextWidgetDetails(asset, widget);
 	}
 
+	ImGui::Separator();
+	if (ImGui::Button("Delete Widget"))
+	{
+		creator.DeleteSelectedWidget();
+	}
+
 	ImGui::End();
 }
 
@@ -138,8 +160,7 @@ void GameGUICreatorView::Draw(GameGUICreator& creator, const Camera&)
 					const bool selected = creator.GUIIndex(creator.m_selectedGUI) == i;
 					if (ImGui::MenuItem(creator.GUIName(static_cast<GameGUICreator::GUIRole>(i)), nullptr, selected))
 					{
-						creator.m_selectedGUI = static_cast<GameGUICreator::GUIRole>(i);
-						creator.m_selectedWidgetIndex = creator.m_assets[i].widgets.empty() ? -1 : 0;
+						creator.SelectGUIAsset(creator.m_assets[i].name);
 						creator.SyncRuntimePreview();
 					}
 				}
@@ -192,7 +213,6 @@ void GameGUICreatorView::Draw(GameGUICreator& creator, const Camera&)
 				if (ImGui::MenuItem("Create Button"))
 				{
 					creator.OpenCreateWidgetPopup(GameGUICreator::NewWidgetType::Button);
-					creator.m_newButtonParentPanel.clear();
 				}
 				if (ImGui::MenuItem("Create Image"))
 				{

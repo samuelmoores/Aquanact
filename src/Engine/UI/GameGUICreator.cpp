@@ -27,7 +27,7 @@
 namespace {
 	const char* GUIName(std::size_t index)
 	{
-		static constexpr const char* names[] = { "Main Menu", "HUD" };
+		static constexpr const char* names[] = { "Main Menu", "HUD", "Pause Menu", "Player UI" };
 		return index < std::size(names) ? names[index] : "Unknown";
 	}
 
@@ -182,6 +182,7 @@ bool GameGUICreator::SelectGUIAsset(const std::string& assetName)
 		m_selectedGUI = static_cast<GUIRole>(i);
 		m_selectedWidgetIndex = m_assets[i].widgets.empty() ? -1 : 0;
 		LoadNavigationSettingsFromAsset();
+		RefreshActiveEditingPanel();
 		return true;
 	}
 

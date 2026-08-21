@@ -4,6 +4,8 @@
 #include "Engine/Core/FrontEndManager.h"
 #include "Engine/UI/GameGUIManager.h"
 #include "Engine/Core/EventManager.h"
+#include "Engine/Core/Input.h"
+#include "Engine/Core/InputManager.h"
 #include "Engine/Core/Root.h"
 #include "Engine/Core/GameplayManager.h"
 #include "Engine/Core/ProjectManager.h"
@@ -11,6 +13,7 @@
 #include "Engine/Core/StbImage.h"
 #include "Engine/Core/GLHeaders.h"
 #include "Engine/UI/GameGUIAsset.h"
+#include "Engine/UI/GameGUIAssetUtils.h"
 #include "Engine/UI/GameGUICreatorHelpers.h"
 #include "Engine/Core/FileSystem.h"
 #include "Engine/Core/Scene.h"
@@ -240,7 +243,7 @@ void GameGUI::SetButtonFocusState(MyGUI::Button* button, const GameGUIWidgetDef&
 	button->eventMouseLostFocus += MyGUI::newDelegate(this, &GameGUI::OnButtonMouseLostFocus);
 	if (def.visible)
 	{
-		m_controllerButtons.push_back(button);
+		m_allControllerButtons.push_back(button);
 	}
 }
 
@@ -893,7 +896,7 @@ void GameGUI::LoadUIAsset(const GameGUIAsset& asset)
 		}
 	}
 
-	std::stable_sort(m_controllerButtons.begin(), m_controllerButtons.end(), [this](const MyGUI::Button* left, const MyGUI::Button* right)
+	std::stable_sort(m_allControllerButtons.begin(), m_allControllerButtons.end(), [this](const MyGUI::Button* left, const MyGUI::Button* right)
 	{
 		const GameGUIWidgetDef* leftDef = FindWidgetDef(m_loadedAsset, left->getName());
 		const GameGUIWidgetDef* rightDef = FindWidgetDef(m_loadedAsset, right->getName());
@@ -912,6 +915,7 @@ void GameGUI::LoadUIAsset(const GameGUIAsset& asset)
 		}
 		return left->getName() < right->getName();
 	});
+	RefreshVisibleControllerButtons();
 
 	// Keep the navigation pointer separate from the asset so it does not affect
 	// layout editing or become an interactive widget in the menu.
@@ -952,6 +956,8 @@ void GameGUI::ClearUI()
 		m_menuPointer = nullptr;
 		m_menuBox = nullptr;
 		m_runtimeWidgets.clear();
+		m_subPanelHistory.clear();
+		m_allControllerButtons.clear();
 		m_controllerButtons.clear();
 		m_runtimeWidgetLookup.clear();
 		m_buttonDefaultTextColours.clear();
@@ -983,6 +989,8 @@ void GameGUI::ClearUI()
 	m_buttonLabels.clear();
 	m_buttonFocusSounds.clear();
 	m_runtimeWidgets.clear();
+	m_subPanelHistory.clear();
+	m_allControllerButtons.clear();
 	m_controllerButtons.clear();
 	m_runtimeWidgetLookup.clear();
 	m_focusedControllerButton = -1;
@@ -1016,6 +1024,7 @@ MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::
 
 void GameGUI::FocusFirstControllerButton()
 {
+	RefreshVisibleControllerButtons();
 	if (m_controllerButtons.empty())
 	{
 		return;
@@ -1024,6 +1033,69 @@ void GameGUI::FocusFirstControllerButton()
 	ClearControllerFocus();
 	m_focusedControllerButton = 0;
 	PositionMenuPointer(m_controllerButtons[0]);
+}
+
+void GameGUI::RefreshVisibleControllerButtons()
+{
+	ClearControllerFocus();
+	m_controllerButtons.clear();
+	for (MyGUI::Button* button : m_allControllerButtons)
+	{
+		if (button && button->getInheritedVisible())
+		{
+			m_controllerButtons.push_back(button);
+		}
+	}
+	if (m_menuPointer)
+	{
+		m_menuPointer->setVisible(false);
+	}
+	if (m_menuBox)
+	{
+		m_menuBox->setVisible(false);
+	}
+}
+
+void GameGUI::FocusFirstControllerButtonInPanel(const std::string& panelName)
+{
+	for (std::size_t i = 0; i < m_controllerButtons.size(); ++i)
+	{
+		const GameGUIWidgetDef* buttonDef = FindWidgetDef(m_loadedAsset, m_controllerButtons[i]->getName());
+		const GameGUIWidgetDef* panelDef = buttonDef ? GameGUIAssetUtils::FindOwningPanel(m_loadedAsset, *buttonDef) : nullptr;
+		if (panelDef && panelDef->name == panelName)
+		{
+			m_focusedControllerButton = static_cast<int>(i);
+			PositionMenuPointer(m_controllerButtons[i]);
+			return;
+		}
+	}
+}
+
+bool GameGUI::NavigateBackFromSubPanel()
+{
+	if (m_subPanelHistory.empty())
+	{
+		return false;
+	}
+
+	const auto [currentPanel, previousPanel] = m_subPanelHistory.back();
+	m_subPanelHistory.pop_back();
+	MyGUI::Widget* currentWidget = RuntimeWidget(currentPanel);
+	MyGUI::Widget* previousWidget = RuntimeWidget(previousPanel);
+	if (!currentWidget || !previousWidget)
+	{
+		return false;
+	}
+
+	currentWidget->setVisible(false);
+	previousWidget->setVisible(true);
+	RefreshVisibleControllerButtons();
+	const Input& input = Root::Current().InputRef();
+	if (input.ControllerConnected() && input.ActiveDevice() == Input::ActiveInputDevice::Gamepad)
+	{
+		FocusFirstControllerButtonInPanel(previousPanel);
+	}
+	return true;
 }
 
 void GameGUI::ClearControllerFocus()
@@ -1387,6 +1459,7 @@ void GameGUI::OnWidgetClicked(MyGUI::Widget* sender)
 		Root::Current().Debugger().LogMessage("GameGUI Pause action requested");
 		break;
 	case GameGUIActionType::Resume:
+		Root::Current().InputActions().SuppressControllerInputUntilRelease();
 		Root::Current().Gameplay().ExecuteCommand(
 			GameplayCommand::Resume,
 			Root::Current().FrontEnd(),
@@ -1394,6 +1467,34 @@ void GameGUI::OnWidgetClicked(MyGUI::Widget* sender)
 		Root::Current().FrontEnd().RuntimeGUI().RecordClick("Resume action requested");
 		Root::Current().Debugger().LogMessage("GameGUI Resume action requested");
 		break;
+	case GameGUIActionType::SubPanel:
+	{
+		const GameGUIPanelTransition transition = GameGUIAssetUtils::ResolveSubPanelTransition(m_loadedAsset, name);
+		MyGUI::Widget* sourcePanel = transition.sourcePanel ? RuntimeWidget(transition.sourcePanel->name) : nullptr;
+		MyGUI::Widget* targetPanel = transition.targetPanel ? RuntimeWidget(transition.targetPanel->name) : nullptr;
+		if (!transition || !sourcePanel || !targetPanel)
+		{
+			const std::string reason = transition.error.empty() ? "runtime Panel widget is missing" : transition.error;
+			const std::string message = "GameGUI SubPanel action ignored for button " + name + ": " + reason;
+			Root::Current().FrontEnd().RuntimeGUI().RecordClick(message);
+			Root::Current().Debugger().LogMessage(message);
+			break;
+		}
+
+		sourcePanel->setVisible(false);
+		targetPanel->setVisible(true);
+		m_subPanelHistory.emplace_back(transition.targetPanel->name, transition.sourcePanel->name);
+		RefreshVisibleControllerButtons();
+		const Input& input = Root::Current().InputRef();
+		if (input.ControllerConnected() && input.ActiveDevice() == Input::ActiveInputDevice::Gamepad)
+		{
+			FocusFirstControllerButtonInPanel(transition.targetPanel->name);
+		}
+		const std::string message = "Sub Panel opened: " + transition.sourcePanel->name + " -> " + transition.targetPanel->name;
+		Root::Current().FrontEnd().RuntimeGUI().RecordClick(message);
+		Root::Current().Debugger().LogMessage("GameGUI " + message);
+		break;
+	}
 	case GameGUIActionType::None:
 	default:
 		break;

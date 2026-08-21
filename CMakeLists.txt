@@ -51,6 +51,7 @@ set(SOURCES
     "include/Engine/Core/Line.h" "src/Engine/Core/Line.cpp"
     "include/Engine/Core/Debug.h" "src/Engine/Core/Debug.cpp"
     "include/Engine/UI/GameGUIAsset.h"
+    "include/Engine/UI/GameGUIAssetUtils.h" "src/Engine/UI/GameGUIAssetUtils.cpp"
     "include/Engine/UI/EngineGUI.h" "src/Engine/UI/EngineGUI.cpp"
     "include/Engine/UI/EngineMenuBar.h" "src/Engine/UI/EngineMenuBar.cpp"
     "include/Engine/UI/SceneWindow.h" "src/Engine/UI/SceneWindow.cpp"
@@ -253,6 +254,22 @@ if (MSVC)
     )
 endif()
 add_test(NAME AquanactUIInputRouterTests COMMAND AquanactUIInputRouterTests)
+
+add_executable(AquanactGameGUIAssetTests
+    "tests/GameGUIAssetTests.cpp"
+    "include/Engine/UI/GameGUIAsset.h"
+    "include/Engine/UI/GameGUIAssetUtils.h" "src/Engine/UI/GameGUIAssetUtils.cpp"
+)
+target_compile_features(AquanactGameGUIAssetTests PRIVATE cxx_std_20)
+target_include_directories(AquanactGameGUIAssetTests PRIVATE "./include")
+if (MSVC)
+    target_link_options(AquanactGameGUIAssetTests PRIVATE
+        "/LIBPATH:C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/lib/x64"
+        "/LIBPATH:C:/Program Files (x86)/Windows Kits/10/Lib/10.0.26100.0/um/x64"
+        "/LIBPATH:C:/Program Files (x86)/Windows Kits/10/Lib/10.0.26100.0/ucrt/x64"
+    )
+endif()
+add_test(NAME AquanactGameGUIAssetTests COMMAND AquanactGameGUIAssetTests)
 
 target_include_directories(AquanactEngine PUBLIC "./include")
 target_include_directories(AquanactEngine PRIVATE "${CMAKE_SOURCE_DIR}/external/imguizmo/src")

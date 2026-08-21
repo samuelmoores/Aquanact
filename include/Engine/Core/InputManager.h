@@ -62,6 +62,7 @@ public:
 	// UI/gameplay capture policy
 	// -------------------------------------------------------------------------
 	void SetCaptureMask(InputCaptureMask mask) { m_captureMask = mask; }
+	void SuppressControllerInputUntilRelease() { m_suppressControllerInputUntilRelease = true; }
 
 	// -------------------------------------------------------------------------
 	// Binding configuration
@@ -117,4 +118,5 @@ private:
 	// Current UI/gameplay capture policy
 	// -------------------------------------------------------------------------
 	InputCaptureMask m_captureMask;
+	bool m_suppressControllerInputUntilRelease = false;
 };

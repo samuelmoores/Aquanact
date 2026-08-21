@@ -32,7 +32,7 @@ public:
 	friend class GameGUICreatorView;
 
 private:
-	enum class GUIRole { MainMenu=0, HUD=1, Count=2 };
+	enum class GUIRole { MainMenu=0, HUD=1, PauseMenu=2, PlayerUI=3, Count=4 };
 
 	// Asset access and persistence helpers.
 	std::filesystem::path GUIPathFor(const GameGUIAsset& asset) const;
@@ -59,6 +59,11 @@ private:
 	void CenterWidget(GameGUIWidgetDef& widget);
 	void ApplyPanelButtonLayout(GameGUIWidgetDef& panel);
 	void DeleteSelectedWidget();
+	void DrawWidgetParentPanelField(GameGUIAsset& asset, GameGUIWidgetDef& widget);
+	bool IsWidgetNameAvailable(const GameGUIAsset& asset, const std::string& name, const GameGUIWidgetDef* ignoredWidget = nullptr) const;
+	std::string MakeUniqueWidgetName(const GameGUIAsset& asset, const std::string& preferredName) const;
+	std::string OwningPanelName(const GameGUIAsset& asset, const GameGUIWidgetDef& widget) const;
+	void RefreshActiveEditingPanel();
 	// Popup and detail rendering helpers.
 	void DrawCreateWidgetPopup();
 	void DrawCreateWidgetPopupHeader(const char* title);
@@ -67,6 +72,8 @@ private:
 	void DrawCreateWidgetTextureField();
 	void DrawCreateActionField();
 	void DrawCreateLaunchLevelField();
+	void DrawCreateParentPanelField();
+	void DrawCreateTargetPanelField();
 	void OpenCreateWidgetPopup(NewWidgetType type);
 	void DrawCreateButtonPopup();
 	void DrawCreatePanelPopup();
@@ -105,17 +112,18 @@ private:
 
 	// Widget creation defaults and edit buffers.
 	NewWidgetType m_newWidgetType = NewWidgetType::Button;
-	bool m_lockWidgetSize = false;
 	char m_newWidgetName[64] = { 0 };
 	char m_newWidgetTexture[256] = { 0 };
 	GameGUIActionType m_newWidgetAction = GameGUIActionType::None;
 	std::string m_newWidgetLaunchLevel;
-	std::string m_newButtonParentPanel;
+	std::string m_newWidgetTargetPanel;
+	std::string m_newWidgetParentPanel;
+	std::string m_activeEditingPanel;
+	bool m_newPanelVisible = true;
 	std::string m_bindingWidgetName;
 	std::string m_dimensionRequestWidgetName;
 	int m_dimensionRequestWidth = 32;
 	int m_dimensionRequestHeight = 21;
-	float m_lockedWidgetSizeRatio = 1.0f;
 
 	// Navigation and style values.
 	int m_pointerWidth = 40;

@@ -167,6 +167,33 @@ bool InputManager::IsBindingDown(const InputBinding& binding) const
 
 void InputManager::EvaluateActions()
 {
+	if (m_suppressControllerInputUntilRelease)
+	{
+		bool controllerButtonHeld = m_input &&
+			m_input->ControllerButtonDown(GLFW_GAMEPAD_BUTTON_A);
+		for (const auto& [action, bindings] : m_bindings)
+		{
+			(void)action;
+			for (const InputBinding& binding : bindings)
+			{
+				if (binding.type == InputBindingType::ControllerDigital && m_input &&
+					m_input->ControllerButtonDown(binding.code, binding.joystick))
+				{
+					controllerButtonHeld = true;
+					break;
+				}
+			}
+			if (controllerButtonHeld)
+			{
+				break;
+			}
+		}
+		if (!controllerButtonHeld)
+		{
+			m_suppressControllerInputUntilRelease = false;
+		}
+	}
+
 	m_vectorStates.clear();
 	m_vectorDeltaStates.clear();
 	m_vectorRateStates.clear();
@@ -225,7 +252,8 @@ void InputManager::EvaluateActions()
 			}
 			else if (binding.type == InputBindingType::ControllerDigital)
 			{
-				if (m_captureMask.controller && !isGlobalCommandAction)
+				if (m_suppressControllerInputUntilRelease ||
+					(m_captureMask.controller && !isGlobalCommandAction))
 				{
 					continue;
 				}
@@ -236,7 +264,8 @@ void InputManager::EvaluateActions()
 			}
 			else if (binding.type == InputBindingType::ControllerStick)
 			{
-				if (m_captureMask.controller && !isGlobalCommandAction)
+				if (m_suppressControllerInputUntilRelease ||
+					(m_captureMask.controller && !isGlobalCommandAction))
 				{
 					continue;
 				}

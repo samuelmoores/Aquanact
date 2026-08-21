@@ -10,16 +10,18 @@
 
 void GameGUICreatorView::DrawProgressBarWidgetDetails(GameGUICreator& creator, GameGUIAsset& asset, GameGUIWidgetDef& widget)
 {
-	(void)asset;
-
 	char nameBuffer[256] = {};
 	std::snprintf(nameBuffer, sizeof(nameBuffer), "%s", widget.name.c_str());
 	if (ImGui::InputText("Name", nameBuffer, sizeof(nameBuffer)))
 	{
-		widget.name = nameBuffer;
-		creator.SyncRuntimePreview();
-		creator.SaveSelectedRoleGUI();
+		if (creator.IsWidgetNameAvailable(asset, nameBuffer, &widget))
+		{
+			widget.name = nameBuffer;
+			creator.SyncRuntimePreview();
+			creator.SaveSelectedRoleGUI();
+		}
 	}
+	creator.DrawWidgetParentPanelField(asset, widget);
 
 	if (GameGUICreatorHelpers::DrawTextureCombo("Fill texture", widget.texture, false, "<No Texture>"))
 	{
@@ -75,10 +77,4 @@ void GameGUICreatorView::DrawProgressBarWidgetDetails(GameGUICreator& creator, G
 		}
 	}
 
-	ImGui::Separator();
-	if (ImGui::Button("Delete Progress Bar"))
-	{
-		creator.DeleteSelectedWidget();
-		return;
-	}
 }
