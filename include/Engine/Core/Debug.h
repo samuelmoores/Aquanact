@@ -136,6 +136,8 @@ public:
 	void SetShowCameraCollisionDebug(bool show);
 	bool ShowTriggerSpheres() const;
 	void SetShowTriggerSpheres(bool show);
+	bool ShowPointLightDebugSpheres() const;
+	void SetShowPointLightDebugSpheres(bool show);
 	void DrawCameraCollisionDebug(const Camera& camera);
 	void DrawPhysicsBoundingVolumes(const Camera& camera);
 	void SetPhysicsDiagnostics(const glm::vec3& cameraPosition, const glm::vec3& desiredPosition, const glm::vec3& resolvedPosition, float colliderRadius, int collisionCount, const glm::vec3& collisionNormal, float penetration, const std::string& collisionObject);
@@ -180,6 +182,7 @@ private:
 	bool m_showAnimationDiagnosticsWindow = true;
 	bool m_showCameraCollisionDebug = false;
 	bool m_showTriggerSpheres = false;
+	bool m_showPointLightDebugSpheres = false;
 	bool m_showPhysicsDiagnosticsWindow = true;
 	bool m_showMotionDiagnostics = false;
 	bool m_showCameraDiagnostics = false;

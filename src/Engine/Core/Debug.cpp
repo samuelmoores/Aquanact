@@ -488,43 +488,46 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 		m_grid->draw(view, !gui.ShowAxis());
 	}
 
-	const std::vector<PointLight>& pointLights = Root::Current().Render().Lights().PointLights();
-	bool rebuildLightSpheres = m_pointLightDebugSpheres.size() != pointLights.size();
-	if (!rebuildLightSpheres)
+	if (m_showPointLightDebugSpheres)
 	{
-		for (std::size_t i = 0; i < pointLights.size(); ++i)
+		const std::vector<PointLight>& pointLights = Root::Current().Render().Lights().PointLights();
+		bool rebuildLightSpheres = m_pointLightDebugSpheres.size() != pointLights.size();
+		if (!rebuildLightSpheres)
 		{
-			const glm::vec3 color = glm::clamp(pointLights[i].color, glm::vec3(0.0f), glm::vec3(1.0f));
-			if (m_pointLightDebugColors[i] != color)
+			for (std::size_t i = 0; i < pointLights.size(); ++i)
 			{
-				rebuildLightSpheres = true;
-				break;
+				const glm::vec3 color = glm::clamp(pointLights[i].color, glm::vec3(0.0f), glm::vec3(1.0f));
+				if (m_pointLightDebugColors[i] != color)
+				{
+					rebuildLightSpheres = true;
+					break;
+				}
 			}
 		}
-	}
 
-	if (rebuildLightSpheres)
-	{
-		RebuildPointLightDebugSpheres();
-	}
-
-	for (std::size_t i = 0; i < pointLights.size() && i < m_pointLightDebugSpheres.size(); ++i)
-	{
-		Line* sphere = m_pointLightDebugSpheres[i];
-		if (!sphere)
+		if (rebuildLightSpheres)
 		{
-			continue;
+			RebuildPointLightDebugSpheres();
 		}
 
-		const PointLight& pointLight = pointLights[i];
-		const float markerRadius = std::clamp(pointLight.radius * 0.03f, 15.0f, 80.0f);
-		const glm::mat4 model =
-			glm::translate(glm::mat4(1.0f), pointLight.position) *
-			glm::scale(glm::mat4(1.0f), glm::vec3(markerRadius));
+		for (std::size_t i = 0; i < pointLights.size() && i < m_pointLightDebugSpheres.size(); ++i)
+		{
+			Line* sphere = m_pointLightDebugSpheres[i];
+			if (!sphere)
+			{
+				continue;
+			}
 
-		sphere->UpdateProjection(projection);
-		glLineWidth(2.0f);
-		sphere->draw(view, model);
+			const PointLight& pointLight = pointLights[i];
+			const float markerRadius = std::clamp(pointLight.radius * 0.03f, 15.0f, 80.0f);
+			const glm::mat4 model =
+				glm::translate(glm::mat4(1.0f), pointLight.position) *
+				glm::scale(glm::mat4(1.0f), glm::vec3(markerRadius));
+
+			sphere->UpdateProjection(projection);
+			glLineWidth(2.0f);
+			sphere->draw(view, model);
+		}
 	}
 
 	const Scene* activeLevel = Root::Current().Scenes().ActiveLevel();
@@ -1349,6 +1352,8 @@ bool Debug::ShowPathedCameraDiagnostics() const { return m_showPathedCameraDiagn
 void Debug::SetShowPathedCameraDiagnostics(bool show) { m_showPathedCameraDiagnostics = show; }
 bool Debug::ShowTriggerSpheres() const { return m_showTriggerSpheres; }
 void Debug::SetShowTriggerSpheres(bool show) { m_showTriggerSpheres = show; }
+bool Debug::ShowPointLightDebugSpheres() const { return m_showPointLightDebugSpheres; }
+void Debug::SetShowPointLightDebugSpheres(bool show) { m_showPointLightDebugSpheres = show; }
 bool Debug::ShowEntityStateDiagnosticsWindow() const { return m_showEntityStateDiagnosticsWindow; }
 void Debug::SetShowEntityStateDiagnosticsWindow(bool show) { m_showEntityStateDiagnosticsWindow = show; }
 bool Debug::ShowAnimationDiagnosticsWindow() const { return m_showAnimationDiagnosticsWindow; }

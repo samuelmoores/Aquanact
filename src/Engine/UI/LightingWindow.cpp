@@ -1,6 +1,8 @@
 #include "Engine/UI/LightingWindow.h"
 
+#include "Engine/Core/Debug.h"
 #include "Engine/Core/LightingManager.h"
+#include "Engine/Core/Root.h"
 #include "Engine/UI/EngineGuiWidgets.h"
 
 #include <imgui.h>
@@ -43,6 +45,11 @@ void LightingWindow::Draw(LightingManager& lightingManager, bool& open)
 	}
 
 	ImGui::SeparatorText("Point Lights");
+	bool showDebugSpheres = Root::Current().Debugger().ShowPointLightDebugSpheres();
+	if (ImGui::Checkbox("Show Debug Spheres", &showDebugSpheres))
+	{
+		Root::Current().Debugger().SetShowPointLightDebugSpheres(showDebugSpheres);
+	}
 	std::vector<PointLight>& pointLights = lightingManager.PointLights();
 	for (int i = 0; i < static_cast<int>(pointLights.size()); ++i)
 	{

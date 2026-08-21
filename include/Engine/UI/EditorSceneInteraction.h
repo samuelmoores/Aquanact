@@ -7,6 +7,7 @@
 #include <imgui.h>
 
 class Entity;
+struct PointLight;
 
 class EditorSceneInteraction
 {
@@ -20,5 +21,7 @@ private:
 	static Entity* FindSelectedEntity(const EngineGuiFrameContext& context);
 	static bool PickEntity(const EngineGuiFrameContext& context,
 		const glm::vec3& rayOrigin, const glm::vec3& rayDirection,
-		unsigned int& entityId);
+		unsigned int& entityId, float& distance);
+	static bool PickPointLight(const glm::vec3& rayOrigin, const glm::vec3& rayDirection,
+		int& pointLightIndex, float& distance);
 };

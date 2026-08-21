@@ -203,6 +203,14 @@ void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManage
 	}
 	if (!selectedEntityStillExists)
 		m_selection.entityId = 0;
+	if (m_selection.entityId != 0)
+		m_selection.pointLightIndex = -1;
+	const std::size_t pointLightCount = Root::Current().Render().Lights().PointLights().size();
+	if (m_selection.pointLightIndex < 0 ||
+		m_selection.pointLightIndex >= static_cast<int>(pointLightCount))
+	{
+		m_selection.pointLightIndex = -1;
+	}
 
 	const EngineMenuBarResult viewResult =
 		m_menuBar.Draw(context, m_showAxis, m_showGrid, m_windowState, m_popupRequests);

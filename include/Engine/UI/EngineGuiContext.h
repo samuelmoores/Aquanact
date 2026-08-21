@@ -11,6 +11,9 @@ struct EngineGuiSelection
 	// Entity IDs remain stable when the scene vector is reordered or an earlier
 	// object is removed. Zero is reserved for no selection.
 	unsigned int entityId = 0;
+	// Point lights are stored in a fixed-capacity vector and are currently only
+	// appended, so their index is sufficient for editor selection. -1 is none.
+	int pointLightIndex = -1;
 };
 
 // Visibility owned by EngineGUI and shared with the menu and window dispatch.

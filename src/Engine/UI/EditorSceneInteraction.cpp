@@ -1,7 +1,11 @@
 #include "Engine/UI/EditorSceneInteraction.h"
 
+#include "Engine/Core/Debug.h"
 #include "Engine/Core/Entity.h"
+#include "Engine/Core/LightingManager.h"
 #include "Engine/Core/Mesh.h"
+#include "Engine/Core/RenderManager.h"
+#include "Engine/Core/Root.h"
 #include "Engine/Core/Scene.h"
 #include "Engine/Core/SceneManager.h"
 
@@ -11,7 +15,9 @@
 #endif
 
 #include <glm/gtc/matrix_inverse.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 
@@ -78,8 +84,11 @@ bool EditorSceneInteraction::PickEntity(
 	const EngineGuiFrameContext& context,
 	const glm::vec3& rayOrigin,
 	const glm::vec3& rayDirection,
-	unsigned int& entityId)
+	unsigned int& entityId,
+	float& distance)
 {
+	entityId = 0;
+	distance = std::numeric_limits<float>::max();
 	if (!context.sceneManager)
 		return false;
 	const Scene* activeScene = context.sceneManager->ActiveLevel();
@@ -123,7 +132,45 @@ bool EditorSceneInteraction::PickEntity(
 	}
 
 	entityId = closestEntity ? closestEntity->Id() : 0;
-	return true;
+	distance = closestDistance;
+	return closestEntity != nullptr;
+}
+
+bool EditorSceneInteraction::PickPointLight(
+	const glm::vec3& rayOrigin,
+	const glm::vec3& rayDirection,
+	int& pointLightIndex,
+	float& distance)
+{
+	pointLightIndex = -1;
+	distance = std::numeric_limits<float>::max();
+	if (!Root::Current().Debugger().ShowPointLightDebugSpheres())
+		return false;
+
+	const std::vector<PointLight>& pointLights = Root::Current().Render().Lights().PointLights();
+	for (std::size_t i = 0; i < pointLights.size(); ++i)
+	{
+		const PointLight& pointLight = pointLights[i];
+		const float markerRadius = std::clamp(pointLight.radius * 0.03f, 15.0f, 80.0f);
+		const glm::vec3 originToCenter = rayOrigin - pointLight.position;
+		const float halfB = glm::dot(originToCenter, rayDirection);
+		const float c = glm::dot(originToCenter, originToCenter) - markerRadius * markerRadius;
+		const float discriminant = halfB * halfB - c;
+		if (discriminant < 0.0f)
+			continue;
+
+		const float root = std::sqrt(discriminant);
+		float hitDistance = -halfB - root;
+		if (hitDistance < 0.0f)
+			hitDistance = -halfB + root;
+		if (hitDistance < 0.0f || hitDistance >= distance)
+			continue;
+
+		distance = hitDistance;
+		pointLightIndex = static_cast<int>(i);
+	}
+
+	return pointLightIndex >= 0;
 }
 
 void EditorSceneInteraction::Draw(const EngineGuiFrameContext& context) const
@@ -133,19 +180,31 @@ void EditorSceneInteraction::Draw(const EngineGuiFrameContext& context) const
 
 	const ImGuiIO& io = ImGui::GetIO();
 	Entity* selectedEntity = FindSelectedEntity(context);
+	PointLight* selectedPointLight = nullptr;
+	std::vector<PointLight>& pointLights = Root::Current().Render().Lights().PointLights();
+	if (context.selection->pointLightIndex >= 0 &&
+		context.selection->pointLightIndex < static_cast<int>(pointLights.size()))
+	{
+		selectedPointLight = &pointLights[static_cast<std::size_t>(context.selection->pointLightIndex)];
+	}
 	const bool editorWindowCapturesMouse = IsEditorWindowCapturingMouse();
 	bool gizmoOwnsMouse = false;
 
 #ifdef AQUANACT_EDITOR
-	if (selectedEntity)
+	if (selectedEntity || selectedPointLight)
 	{
 		ImGuizmo::SetDrawlist(ImGui::GetBackgroundDrawList());
 		ImGuizmo::SetRect(0.0f, 0.0f, io.DisplaySize.x, io.DisplaySize.y);
 
-		glm::mat4 gizmoMatrix = selectedEntity->BuildModelMatrix();
-		// Keep the gizmo at the visible mesh center while preserving the entity's
-		// orientation and scale for the axis display.
-		gizmoMatrix[3] = glm::vec4(selectedEntity->WorldCenterPosition(), 1.0f);
+		glm::mat4 gizmoMatrix = selectedEntity
+			? selectedEntity->BuildModelMatrix()
+			: glm::translate(glm::mat4(1.0f), selectedPointLight->position);
+		if (selectedEntity)
+		{
+			// Keep the gizmo at the visible mesh center while preserving the entity's
+			// orientation and scale for the axis display.
+			gizmoMatrix[3] = glm::vec4(selectedEntity->WorldCenterPosition(), 1.0f);
+		}
 
 		const bool wasUsingGizmo = ImGuizmo::IsUsing();
 		ImGuizmo::Enable(!editorWindowCapturesMouse || wasUsingGizmo);
@@ -160,8 +219,15 @@ void EditorSceneInteraction::Draw(const EngineGuiFrameContext& context) const
 
 		if (manipulated)
 		{
-			const glm::vec3 delta = glm::vec3(gizmoMatrix[3]) - selectedEntity->WorldCenterPosition();
-			selectedEntity->Translate(delta);
+			if (selectedEntity)
+			{
+				const glm::vec3 delta = glm::vec3(gizmoMatrix[3]) - selectedEntity->WorldCenterPosition();
+				selectedEntity->Translate(delta);
+			}
+			else
+			{
+				selectedPointLight->position = glm::vec3(gizmoMatrix[3]);
+			}
 		}
 
 		// The no-argument IsOver() reports the previous frame's hotspot in the
@@ -183,6 +249,21 @@ void EditorSceneInteraction::Draw(const EngineGuiFrameContext& context) const
 		return;
 
 	unsigned int pickedEntityId = 0;
-	if (PickEntity(context, rayOrigin, rayDirection, pickedEntityId))
+	float entityDistance = std::numeric_limits<float>::max();
+	PickEntity(context, rayOrigin, rayDirection, pickedEntityId, entityDistance);
+
+	int pickedPointLightIndex = -1;
+	float pointLightDistance = std::numeric_limits<float>::max();
+	PickPointLight(rayOrigin, rayDirection, pickedPointLightIndex, pointLightDistance);
+
+	if (pickedPointLightIndex >= 0 && pointLightDistance < entityDistance)
+	{
+		context.selection->entityId = 0;
+		context.selection->pointLightIndex = pickedPointLightIndex;
+	}
+	else
+	{
 		context.selection->entityId = pickedEntityId;
+		context.selection->pointLightIndex = -1;
+	}
 }
