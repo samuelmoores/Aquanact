@@ -83,6 +83,9 @@ public:
 	void startUp(Entity& owner) override;
 	void FirstFrame(Entity& owner) override;
 	void Update(Entity& owner, float dt) override;
+	// Advances only the selected animation clip for editor visualization. State
+	// transitions remain a gameplay concern and are not evaluated in this path.
+	void UpdateEditorPreview(float dt);
 
 	// State editing.
 	void SetInitialState(const std::string& stateName);
@@ -147,7 +150,7 @@ private:
 	void EvaluateTransitions(Entity& owner);
 	bool EvaluateTransitionConditions(const Transition& transition, const Entity& owner, float& leftValue, float& rightValue, bool& operandsResolved);
 	bool FireTransition(const Transition& transition);
-	void StartInitialState();
+	void StartInitialState(bool playSoundEvents = true);
 	void ActivateState(const std::string& stateName);
 	void PlaySoundEventsAtStateStart();
 	void PlaySoundEvent(const SoundEvent& event);

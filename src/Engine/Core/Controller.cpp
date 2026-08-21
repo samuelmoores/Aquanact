@@ -17,7 +17,6 @@ namespace
 	constexpr float terminalFallSpeed = -55.0f * worldUnitsPerMeter;
 	// Keep grounded state through brief contact misses caused by collider seams
 	// or uneven ground while the controller is still moving across the surface.
-	constexpr float groundedLossThreshold = 0.1f;
 	constexpr float walkableGroundNormalY = 0.25f;
 	constexpr float groundProbeDistance = 20.0f;
 
@@ -86,8 +85,6 @@ bool Controller::IsWalkableSurface(const glm::vec3& normal) const
 void Controller::startUp(Entity&)
 {
 	m_velocity = glm::vec3(0.0f);
-	m_groundedLossTimer = 0.0f;
-	m_rawGrounded = false;
 	m_grounded = false;
 }
 
@@ -99,23 +96,16 @@ void Controller::Update(Entity& owner, float dt)
 		return;
 	}
 
-	// Grounding is a result of this frame's collision solve. Clear the previous
-	// contact before applying gravity so walking off an edge can produce a fall.
-	m_rawGrounded = false;
+	// Preserve the previous contact only while resolving the next movement step.
+	// A jump explicitly clears m_grounded before this function, so this does not
+	// suppress the launch impulse.
+	// Grounded is a yes/no result of this frame's collision solve.
 	m_grounded = false;
 
-	if (m_rawGrounded)
-	{
-		m_velocity.y = 0.0f;
-	}
-	else
-	{
-		m_velocity.y = std::max(
-			m_velocity.y + gravity * GravityScale() * dt,
-			terminalFallSpeed);
-	}
+	m_velocity.y = std::max(
+		m_velocity.y + gravity * GravityScale() * dt,
+		terminalFallSpeed);
 
-	m_grounded = m_rawGrounded;
 	m_pendingMovement = glm::vec3(0.0f, m_velocity.y * dt, 0.0f);
 }
 
@@ -210,9 +200,7 @@ void Controller::MoveWithCollisions(Entity& owner, const glm::vec3& desiredMovem
 
 		if (collidedWithGround)
 		{
-			m_rawGrounded = true;
 			m_grounded = true;
-			m_groundedLossTimer = 0.0f;
 			m_velocity.y = 0.0f;
 		}
 
@@ -251,7 +239,7 @@ void Controller::MoveWithCollisions(Entity& owner, const glm::vec3& desiredMovem
 
 	// Keep the controller attached to nearby walkable surfaces when moving
 	// downhill or across small gaps in collision geometry.
-	if (m_velocity.y <= 0.0f && !m_rawGrounded)
+	if (m_velocity.y <= 0.0f && !m_grounded)
 	{
 		glm::vec3 probeMin;
 		glm::vec3 probeMax;
@@ -267,10 +255,8 @@ void Controller::MoveWithCollisions(Entity& owner, const glm::vec3& desiredMovem
 				verticalSweepTime = probe.time;
 				verticalSweepNormal = probe.normal;
 				owner.Move(probeMovement * glm::clamp(probe.time, 0.0f, 1.0f));
-				m_rawGrounded = true;
 				m_grounded = true;
 				m_groundNormal = probe.normal;
-				m_groundedLossTimer = 0.0f;
 				m_velocity.y = 0.0f;
 				PhysicsWorld::Instance().Update(owner);
 			}

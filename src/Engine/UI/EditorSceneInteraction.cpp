@@ -57,12 +57,16 @@ bool EditorSceneInteraction::BuildWorldRay(
 
 bool EditorSceneInteraction::IsEditorWindowCapturingMouse()
 {
-	// Capture this click only when it actually lands on an editor window. An
-	// unrelated input widget may remain active until the user clicks the scene to
-	// dismiss it; treating IsAnyItemActive() as mouse ownership discarded that
-	// first scene click. Hovered items are already covered by their host window.
-	// Avoid io.WantCaptureMouse here because ImGuizmo sets it for the next frame.
-	return ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow);
+	// UI controls must consume the click before the scene picker gets a chance to
+	// clear the current entity selection. The state-machine button is submitted
+	// in the Entity window, then scene interaction runs later in the same frame;
+	// checking only the current hovered window is fragile when another window or
+	// popup has become the active ImGui target.
+	const ImGuiIO& io = ImGui::GetIO();
+	return io.WantCaptureMouse
+		|| ImGui::IsAnyItemActive()
+		|| ImGui::IsAnyItemHovered()
+		|| ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow);
 }
 
 Entity* EditorSceneInteraction::FindSelectedEntity(const EngineGuiFrameContext& context)

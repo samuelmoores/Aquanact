@@ -119,9 +119,7 @@ void PlayerController::TryJump(const InputManager& input)
 	// Step 3: leave the grounded state before applying vertical launch velocity.
 	// MoveWithPhysics() clears vertical velocity while grounded, so this order is
 	// required for the jump impulse to survive the movement step.
-	m_rawGrounded = false;
 	m_grounded = false;
-	m_groundedLossTimer = 0.0f;
 	m_velocity.y = m_jumpSpeed;
 
 }
@@ -167,11 +165,12 @@ void PlayerController::Update(Entity& owner, float dt)
 	const glm::vec2 move2D = input.VectorValue("Move");
 	m_wantsToMove = glm::length(move2D) > 0.0001f;
 
-	if (m_entityState->CurrentStateBlocksMovement())
+	if (m_entityState && m_entityState->CurrentStateBlocksMovement())
 	{
-		// Keep the movement bindable synchronized while movement is blocked. If
-		// this is skipped, IsMoving can remain true from the previous Run frame and
-		// incorrectly select Punch -> Run when the attack animation completes.
+		// Blocking locomotion must not block gravity, ground probing, or landing.
+		// Otherwise Jump/Landing/Punch can freeze the controller's last grounded
+		// value and leave the animation state machine stuck in an airborne state.
+		Controller::Update(owner, dt);
 		Move(owner, glm::vec2(0.0f), dt);
 		return;
 	}

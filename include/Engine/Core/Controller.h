@@ -21,6 +21,7 @@ public:
 	const glm::vec3& MovementDirection() const { return m_movementDirection; }
 	bool IsMoving() const { return m_isMoving; }
 	bool IsGrounded() const { return m_grounded; }
+	bool IsRising() const { return !m_grounded && m_velocity.y > 0.0f; }
 	float GroundSurfaceAngle() const;
 
 	// Bindable names used by entity state transitions and editor condition pickers.
@@ -28,6 +29,7 @@ public:
 	#define CONTROLLER_BINDABLES(VALUE, FUNCTION) \
 		FUNCTION(IsMoving) \
 		FUNCTION(IsGrounded) \
+		FUNCTION(IsRising) \
 		VALUE(m_moveSpeed)
 	AQUA_DECLARE_BINDABLES(CONTROLLER_BINDABLES)
 	#undef CONTROLLER_BINDABLES
@@ -54,8 +56,6 @@ protected:
 	glm::vec3 m_movementDirection{ 0.0f };
 	glm::vec3 m_pendingMovement{ 0.0f };
 	glm::vec3 m_velocity{ 0.0f };
-	float m_groundedLossTimer = 0.0f;
-	bool m_rawGrounded = false;
 	bool m_grounded = false;
 	bool m_isMoving = false;
 	glm::vec3 m_groundNormal{ 0.0f, 1.0f, 0.0f };

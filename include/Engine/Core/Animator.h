@@ -26,6 +26,10 @@ public:
 
 	// Playback
 	void Play(int clipIndex, float blendSeconds = 0.33f);
+	// Selects a clip immediately and rewinds it to its first pose. This is used
+	// at scene/play-session boundaries where playback must not inherit runtime
+	// state from the previous session.
+	void Restart(int clipIndex);
 	void Update(float dt);
 
 	// Returns the full clip length in seconds.
@@ -63,11 +67,14 @@ private:
 	std::vector<AnimEvent> m_events;
 
 	// Active playback state
-	int m_currentClip = 0;
+	// No clip is active until the state machine applies its saved initial state.
+	// Defaulting to zero made the first imported file visible in the editor; for
+	// Griff that file is the falling animation.
+	int m_currentClip = -1;
 	float m_currentTime = 0.0f;
 
 	// Blend target state
-	int m_nextClip = 0;
+	int m_nextClip = -1;
 	float m_nextTime = 0.0f;
 	float m_blendFactor = 1.0f;
 	float m_blendSpeed = 3.0f;

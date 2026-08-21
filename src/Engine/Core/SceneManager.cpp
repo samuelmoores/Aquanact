@@ -118,11 +118,11 @@ namespace
 		std::replace(normalized.begin(), normalized.end(), '\\', '/');
 		std::transform(normalized.begin(), normalized.end(), normalized.begin(),
 			[](unsigned char character) { return static_cast<char>(std::tolower(character)); });
-		const std::string assetsMarker = "/assets/";
+		const std::string assetsMarker = "assets/";
 		const std::size_t assetsPosition = normalized.find(assetsMarker);
 		if (assetsPosition != std::string::npos)
 		{
-			return normalized.substr(assetsPosition + 1);
+			return normalized.substr(assetsPosition + assetsMarker.size());
 		}
 		return normalized;
 	}

@@ -4,14 +4,39 @@
 #include "Engine/Core/Animation.h"
 #include "Engine/Core/Controller.h"
 #include "Engine/Core/Audio.h"
+#include "Engine/Core/Debug.h"
 #include "Engine/Core/Root.h"
 #include "Engine/Core/FileSystem.h"
 
 #include <algorithm>
 #include <cassert>
+#include <cctype>
 #include <filesystem>
 #include <random>
 #include <sstream>
+
+namespace
+{
+	std::string NormalizeAnimationPath(std::string value)
+	{
+		std::replace(value.begin(), value.end(), '\\', '/');
+		std::transform(value.begin(), value.end(), value.begin(),
+			[](unsigned char character) { return static_cast<char>(std::tolower(character)); });
+		return value;
+	}
+
+	std::string PortableAnimationPath(std::string value)
+	{
+		value = NormalizeAnimationPath(std::move(value));
+		const std::size_t assetsMarker = value.find("assets/");
+		// Saved graph paths are relative to the assets directory (for example,
+		// models/animations/griff_idle.fbx), while imported mesh sources may be
+		// absolute paths. Compare both forms using the path below assets/.
+		return assetsMarker == std::string::npos
+			? value
+			: value.substr(assetsMarker + std::string("assets/").size());
+	}
+}
 
 // -----------------------------------------------------------------------------
 // Construction and lifecycle.
@@ -42,6 +67,14 @@ void EntityStateMachine::FirstFrame(Entity&)
 	}
 
 	StartInitialState();
+}
+
+void EntityStateMachine::UpdateEditorPreview(float dt)
+{
+	if (m_animator && dt > 0.0f)
+	{
+		m_animator->Update(dt);
+	}
 }
 
 void EntityStateMachine::Update(Entity& entity, float dt)
@@ -82,7 +115,7 @@ void EntityStateMachine::Update(Entity& entity, float dt)
 	const State* currentState = FindCurrentState();
 
 	// play sound events after animation update
-	if (!currentState->soundEvents.empty())
+	if (currentState && !currentState->soundEvents.empty())
 	{
 		// get the animation clip index and the current tick
 		const int currentClip = m_animator->CurrentClipIndex();
@@ -439,6 +472,9 @@ void EntityStateMachine::SetInitialState(const std::string& stateName)
 	if (const State* state = FindState(stateName))
 	{
 		m_initialState = state->name;
+		// Apply the saved/editor-selected state immediately. Scene FirstFrame will
+		// restart it again at the play boundary, guaranteeing a clean session.
+		StartInitialState(false);
 	}
 }
 
@@ -886,7 +922,7 @@ std::string EntityStateMachine::OperandToString(const Operand& operand)
 // Internal state management.
 // -----------------------------------------------------------------------------
 
-void EntityStateMachine::StartInitialState()
+void EntityStateMachine::StartInitialState(bool playSoundEvents)
 {
 	const State* initialState = FindState(m_initialState);
 	if (!initialState)
@@ -895,16 +931,29 @@ void EntityStateMachine::StartInitialState()
 	}
 
 	const int clipIndex = ResolveAnimationClipIndex(*initialState);
+	if (clipIndex < 0 || !m_animator)
+	{
+		Root::Current().Debugger().LogTagged(
+			Debug::Severity::Warning,
+			"Animation",
+			"Initial state '" + initialState->name + "' could not resolve animation clip '"
+			+ initialState->animationName + "'.");
+		return;
+	}
+
 	m_currentState = initialState->name;
 	m_desiredState = initialState->name;
 	m_transitionCooldown = 0.0f;
 	m_currentStateElapsed = 0.0f;
 	m_currentStateLockedUntilComplete = false;
 
-	if (clipIndex >= 0 && m_animator)
+	if (m_animator)
 	{
-		m_animator->Play(clipIndex, 0.0f);
-		PlaySoundEventsAtStateStart();
+		m_animator->Restart(clipIndex);
+		if (playSoundEvents)
+		{
+			PlaySoundEventsAtStateStart();
+		}
 	}
 }
 
@@ -934,6 +983,19 @@ int EntityStateMachine::ResolveAnimationClipIndex(const State& state) const
 	for (std::size_t i = 0; i < m_animationNames.size(); ++i)
 	{
 		if (m_animationNames[i] == state.animationName)
+		{
+			return static_cast<int>(i);
+		}
+	}
+
+	// Project files may contain an absolute path, a source-root path, or a
+	// portable assets path depending on where they were authored. Match the
+	// normalized portable path as well so the initial state still resolves after
+	// moving the project or changing path separators.
+	const std::string savedPortablePath = PortableAnimationPath(state.animationName);
+	for (std::size_t i = 0; i < m_animationNames.size(); ++i)
+	{
+		if (PortableAnimationPath(m_animationNames[i]) == savedPortablePath)
 		{
 			return static_cast<int>(i);
 		}

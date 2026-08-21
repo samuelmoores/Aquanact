@@ -222,6 +222,7 @@ std::size_t GameplayManager::ControllerCount() const
 	}
 
 	std::size_t count = 0;
+	bool animationDiagnosticsPublished = false;
 	for (const auto& object : activeLevel->Objects())
 	{
 		if (object && object->GetController())
@@ -256,6 +257,7 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 		engineState.IsGameMode() ? "Game" : "Editor");
 
 
+	bool animationDiagnosticsPublished = false;
 	for (const auto& object : activeLevel->Objects())
 	{
 		if (object)
@@ -278,6 +280,8 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 			}
 			if (EntityStateMachine* animator = object->GetEntityState())
 			{
+				if (animationDiagnosticsPublished || animator->States().empty() || animator->CurrentState().empty())
+					continue;
 				std::string stateListText;
 				for (const auto& state : animator->States())
 				{
@@ -304,6 +308,7 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 					animator->LastResolvedTargetClipIndex(),
 					animator->LastResolvedTargetFound(),
 					stateListText);
+				animationDiagnosticsPublished = true;
 			}
 		}
 	}

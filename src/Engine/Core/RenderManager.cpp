@@ -7,6 +7,7 @@
 #include "Engine/Core/PathedCamera.h"
 #include "Engine/Core/Window.h"
 #include "Engine/Core/Entity.h"
+#include "Engine/Core/EntityStateMachine.h"
 #include "Engine/Core/Input.h"
 #include "Engine/Core/Scene.h"
 #include "Engine/Core/SceneManager.h"
@@ -18,6 +19,7 @@
 #include <iomanip>
 #include <iostream>
 #include <algorithm>
+#include <filesystem>
 #include <memory>
 #include <vector>
 
@@ -485,6 +487,54 @@ void RenderManager::Loop(FrontEndManager& frontEndManager, FileManager& fileMana
 	ResetFrameState();
 	const auto buildStart = std::chrono::high_resolution_clock::now();
 	BeginFrame();
+
+	// Editor scenes do not run gameplay components, but their selected initial
+	// animation still needs to advance. Previewing only the animator keeps Griff
+	// in Idle without applying gravity, input, or state transitions in the editor.
+	if (engineState.IsEditorMode() && !ShouldPreviewMainMenu(frontEndManager, engineState))
+	{
+		bool animationDiagnosticsPublished = false;
+		if (Scene* activeLevel = SceneManager.ActiveLevel())
+		{
+			for (const std::unique_ptr<Entity>& object : activeLevel->Objects())
+			{
+				if (object)
+				{
+					if (EntityStateMachine* stateMachine = object->GetEntityState())
+					{
+						if (animationDiagnosticsPublished || stateMachine->States().empty() || stateMachine->CurrentState().empty())
+							continue;
+						stateMachine->UpdateEditorPreview(input.Frame().deltaTime);
+						std::string stateListText;
+						for (const auto& state : stateMachine->States())
+						{
+							const std::string animationLabel = state.animationName.empty()
+								? "<none>"
+								: std::filesystem::path(state.animationName).filename().string();
+							stateListText += state.name + " -> animation " + animationLabel + "\n";
+						}
+						Root::Current().Debugger().SetAnimationDiagnostics(
+							stateMachine->CurrentState(),
+							stateMachine->DesiredState(),
+							stateMachine->LastTransitionDebug(),
+							stateMachine->LastTransitionFrom(),
+							stateMachine->LastTransitionTo(),
+							stateMachine->LastTransitionLeftOperandText(),
+							stateMachine->LastTransitionComparatorText(),
+							stateMachine->LastTransitionRightOperandText(),
+							stateMachine->LastTransitionLeftValue(),
+							stateMachine->LastTransitionRightValue(),
+							stateMachine->LastTransitionPassed(),
+							stateMachine->LastResolvedTargetState(),
+							stateMachine->LastResolvedTargetClipIndex(),
+							stateMachine->LastResolvedTargetFound(),
+							stateListText);
+						animationDiagnosticsPublished = true;
+					}
+				}
+			}
+		}
+	}
 
 	{
 		FrameProfiler::Scope scope(Root::Current().Profiler(), "RenderCommands");

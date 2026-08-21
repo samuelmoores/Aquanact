@@ -43,6 +43,11 @@ void Animator::AddClip(Animation* clip)
 void Animator::Play(int clipIndex, float blendSeconds)
 {
 	if (clipIndex < 0 || clipIndex >= static_cast<int>(m_clips.size())) return;
+	if (m_currentClip < 0)
+	{
+		Restart(clipIndex);
+		return;
+	}
 	if (clipIndex == m_currentClip && m_blendFactor >= 1.0f) return;
 
 	// If a transition is interrupted by returning to the clip that was being
@@ -62,6 +67,26 @@ void Animator::Play(int clipIndex, float blendSeconds)
 	m_blendSpeed = blendSeconds > 0.0f ? (1.0f / blendSeconds) : 9999.0f;
 	m_nextTime = 0.0f;
 	m_prevTicks = 0.0f;
+}
+
+void Animator::Restart(int clipIndex)
+{
+	if (clipIndex < 0 || clipIndex >= static_cast<int>(m_clips.size()))
+	{
+		return;
+	}
+
+	m_currentClip = clipIndex;
+	m_nextClip = clipIndex;
+	m_currentTime = 0.0f;
+	m_nextTime = 0.0f;
+	m_blendFactor = 1.0f;
+	m_blendSpeed = 3.0f;
+	m_prevTicks = 0.0f;
+
+	// Apply the first pose now so editor rendering and the first rendered game
+	// frame cannot display whichever animation happened to be imported first.
+	Traverse(0.0f, m_rootNode, aiMatrix4x4(), m_clips[clipIndex].get());
 }
 
 void Animator::AddEvent(int clipIndex, float tickTime, std::function<void()> callback)
@@ -87,7 +112,7 @@ void Animator::FireEvents(int clipIndex, float prevTicks, float currTicks, float
 
 void Animator::Update(float dt)
 {
-	if (m_clips.empty()) return;
+	if (m_clips.empty() || m_currentClip < 0) return;
 	m_currentTime += dt;
 
 	if (m_blendFactor < 1.0f)

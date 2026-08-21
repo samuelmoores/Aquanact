@@ -33,6 +33,7 @@ public:
 		FUNCTION(IsMoving) \
 		FUNCTION(WantsToMove) \
 		FUNCTION(IsGrounded) \
+		FUNCTION(IsRising) \
 		VALUE(m_moveSpeed) \
 		VALUE(m_turnSpeed) \
 		VALUE(m_maxSlopeAngle) 
