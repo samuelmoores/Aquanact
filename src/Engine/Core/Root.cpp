@@ -170,15 +170,19 @@ void Root::run()
 		// input
 		{
 			FrameProfiler::Scope scope(*m_profiler, "Input");
+
 			// Deliver GLFW callbacks before building this frame's input snapshot.
 			// This keeps UI hover/click routing and gameplay actions on the same
 			// event batch instead of making input one frame behind rendering.
 			m_window->PollEvents();
+
 			const UIInputRoute inputRoute = UIInputRouter::Resolve(
 				m_engineState.IsGameMode(),
 				m_gameplayManager->State(),
 				m_frontEndManager->FrontEndModeValue());
+
 			m_input->TransitionToContext(inputRoute.context);
+
 			// Input uses the same frame-level ownership decision for gameplay look.
 			// This keeps low-level input independent from ImGui's global state.
 			m_input->SetMouseCapturedByUI(inputRoute.captureMask.mouseButtons);
