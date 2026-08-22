@@ -445,9 +445,14 @@ namespace ProjectStateSerializer {
 			try
 			{
 				const std::vector<std::string> fields = ProjectStateFormat::SplitFields(line);
-				if ((fields.size() >= 7 && fields[0] == "gamecamera") || (fields.size() >= 2 && fields[0] == "camerapath") || (fields.size() >= 4 && fields[0] == "camerapathsettings") || (fields.size() == 3 && fields[0] == "editorview") || (fields.size() >= 3 && fields[0] == "debugwindows") || ((fields.size() >= 8 && fields.size() <= 11) && fields[0] == "sunlight") || ((fields.size() >= 12 && fields.size() <= 15) && fields[0] == "pointlight") || (fields.size() == 2 && fields[0] == "imguilayout"))
+				if ((fields.size() == 3 && fields[0] == "enginecamera") || (fields.size() >= 7 && fields[0] == "gamecamera") || (fields.size() >= 2 && fields[0] == "camerapath") || (fields.size() >= 4 && fields[0] == "camerapathsettings") || (fields.size() == 3 && fields[0] == "editorview") || (fields.size() >= 3 && fields[0] == "debugwindows") || ((fields.size() >= 8 && fields.size() <= 11) && fields[0] == "sunlight") || ((fields.size() >= 12 && fields.size() <= 15) && fields[0] == "pointlight") || (fields.size() == 2 && fields[0] == "imguilayout"))
 				{
-					if (fields.size() >= 7 && fields[0] == "gamecamera")
+					if (fields.size() == 3 && fields[0] == "enginecamera")
+					{
+						renderState.engineCameraMoveSpeed = std::stof(fields[1]);
+						renderState.engineCameraLookSensitivity = std::stof(fields[2]);
+					}
+					else if (fields.size() >= 7 && fields[0] == "gamecamera")
 					{
 						renderState.gameCameraPosition = glm::vec3(std::stof(fields[1]), std::stof(fields[2]), std::stof(fields[3]));
 						renderState.gameCameraFacing = glm::vec3(std::stof(fields[4]), std::stof(fields[5]), std::stof(fields[6]));
@@ -503,13 +508,6 @@ namespace ProjectStateSerializer {
 						renderState.pathedCameraFollowSharpness = std::stof(fields[1]);
 						renderState.pathedCameraSamplesPerSegment = std::stoi(fields[2]);
 						renderState.showCameraPath = fields[3] == "1" || fields[3] == "true" || fields[3] == "True";
-						if (fields.size() >= 6)
-						{
-							renderState.pathedCameraMinimumDistance = std::stof(fields[4]);
-							renderState.pathedCameraPreferredLagDistance = std::stof(fields[5]);
-						}
-						if (fields.size() >= 7)
-							renderState.pathedCameraMaximumDistance = std::stof(fields[6]);
 					}
 					else if (fields.size() == 3 && fields[0] == "editorview")
 					{
@@ -877,6 +875,9 @@ namespace ProjectStateSerializer {
 
 	void AppendRenderState(std::string& contents, const FrontEndManager& frontEndManager, const RenderManager& renderManager)
 	{
+		const auto& engineCamera = renderManager.GetEngineCamera();
+		contents += "enginecamera;" + std::to_string(engineCamera.MoveSpeed()) + ";" + std::to_string(engineCamera.LookSensitivity()) + "\n";
+
 		const glm::vec3 gameCameraPosition = renderManager.GetPathedCamera().GetPosition();
 		const glm::vec3 gameCameraFacing = renderManager.GetPathedCamera().GetFacing();
 		const PathedCamera& gameCamera = renderManager.GetPathedCamera();
@@ -893,7 +894,7 @@ namespace ProjectStateSerializer {
 			contents += ";" + std::to_string(point.position.x) + ";" + std::to_string(point.position.y) + ";" + std::to_string(point.position.z);
 		}
 		contents += "\n";
-		contents += "camerapathsettings;" + std::to_string(renderManager.GetPathedCamera().FollowSharpness()) + ";" + std::to_string(renderManager.GetPathedCamera().PathSamplesPerSegment()) + ";" + (frontEndManager.EditorGUI().ShowCameraPath() ? "1" : "0") + ";" + std::to_string(renderManager.GetPathedCamera().MinimumFollowDistance()) + ";" + std::to_string(renderManager.GetPathedCamera().PreferredLagDistance()) + ";" + std::to_string(renderManager.GetPathedCamera().MaximumFollowDistance()) + "\n";
+		contents += "camerapathsettings;" + std::to_string(renderManager.GetPathedCamera().FollowSharpness()) + ";" + std::to_string(renderManager.GetPathedCamera().PathSamplesPerSegment()) + ";" + (frontEndManager.EditorGUI().ShowCameraPath() ? "1" : "0") + "\n";
 
 		contents += "editorview;";
 		contents += frontEndManager.EditorGUI().ShowAxis() ? "1" : "0";

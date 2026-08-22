@@ -47,6 +47,9 @@ void EngineGUI::startUp(Window& window)
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGuiIO& io = ImGui::GetIO();
+	// ProjectManager owns ImGui layout persistence. Disable the process-local
+	// imgui.ini so opening one project cannot leak its layout into another.
+	io.IniFilename = nullptr;
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 	// Input owns the native GLFW cursor visibility. Prevent the ImGui backend
 	// from restoring or reshaping the Windows cursor during NewFrame().
@@ -237,9 +240,8 @@ void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManage
 	{
 		m_sceneWindow.Draw(context, m_windowState.showSceneWindow, m_windowState.showEntityWindow);
 	}
-	static bool showLevelColliderWindow = true;
-	if (showLevelColliderWindow)
-		m_sceneWindow.DrawLevelColliderWindow(context, showLevelColliderWindow);
+	if (m_windowState.showLevelColliderWindow)
+		m_sceneWindow.DrawLevelColliderWindow(context, m_windowState.showLevelColliderWindow);
 
 	// EntityWindow owns the complete entity inspector.
 	if (m_windowState.showEntityWindow)

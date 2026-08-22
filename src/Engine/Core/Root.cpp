@@ -182,6 +182,9 @@ void Root::run()
 				m_frontEndManager->FrontEndModeValue());
 
 			m_input->TransitionToContext(inputRoute.context);
+			m_input->SetRuntimeOverlayOpen(
+				m_engineState.IsGameMode() &&
+				m_frontEndManager->RuntimeGUI().ShowRuntimeDebugWindow());
 
 			// Input uses the same frame-level ownership decision for gameplay look.
 			// This keeps low-level input independent from ImGui's global state.
@@ -196,11 +199,18 @@ void Root::run()
 			m_inputManager->Update();
 
 			const bool debugWindowsToggleDown = m_input->KeyDown(GLFW_KEY_F1);
-			if (debugWindowsToggleDown && !m_previousDebugWindowsToggle)
+			if (m_engineState.IsGameMode() && debugWindowsToggleDown && !m_previousDebugWindowsToggle)
 			{
 				const bool showRuntimeDebugWindow = !m_frontEndManager->RuntimeGUI().ShowRuntimeDebugWindow();
 				m_frontEndManager->RuntimeGUI().SetShowRuntimeDebugWindow(showRuntimeDebugWindow);
-				m_input->RevealCursorForFrame();
+				if (showRuntimeDebugWindow)
+				{
+					m_input->RevealCursorForFrame();
+				}
+				else if (m_gameplayManager->State() == GameplayManager::GameState::Playing)
+				{
+					m_input->CaptureCursorForLevel();
+				}
 			}
 			m_previousDebugWindowsToggle = debugWindowsToggleDown;
 		}

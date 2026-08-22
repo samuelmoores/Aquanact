@@ -11,7 +11,6 @@
 #include "Engine/Core/Root.h"
 #include "Engine/Core/RenderManager.h"
 #include <imgui.h>
-#include <cstring>
 
 FrontEndManager::~FrontEndManager()
 {
@@ -175,9 +174,10 @@ void FrontEndManager::OpenGameGUICreator()
 
 void FrontEndManager::CaptureRuntimeLayout()
 {
-	if (const char* imguiIniData = ImGui::SaveIniSettingsToMemory())
+	size_t imguiIniSize = 0;
+	if (const char* imguiIniData = ImGui::SaveIniSettingsToMemory(&imguiIniSize))
 	{
-		m_runtimeImguiLayout.assign(imguiIniData, std::strlen(imguiIniData));
+		m_runtimeImguiLayout.assign(imguiIniData, imguiIniSize);
 	}
 }
 

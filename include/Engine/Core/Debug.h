@@ -149,6 +149,8 @@ public:
 		const glm::vec3& sweepNormal, const glm::vec3& velocity, bool grounded);
 	bool ShowPhysicsDiagnosticsWindow() const;
 	void SetShowPhysicsDiagnosticsWindow(bool show);
+	bool ShowLevelColliderDebugShapes() const;
+	void SetShowLevelColliderDebugShapes(bool show);
 	void SetSelectedLevelCollider(class LevelCollider* collider) { m_selectedLevelCollider = collider; }
 	void SetSelectedLevelColliderFace(int axis, float direction) { m_selectedLevelColliderFaceAxis = axis; m_selectedLevelColliderFaceDirection = direction; }
 	void SetLevelColliderFaceEditMode(bool enabled) { m_levelColliderFaceEditMode = enabled; }
@@ -187,15 +189,15 @@ private:
 	double m_startupToFirstDrawMs = -1.0;
 	bool m_showLogWindow = false;
 	bool m_showStatsWindow = false;
-	bool m_showGameInputWindow = true;
-	bool m_showGameplayDiagnosticsWindow = true;
-	bool m_showLevelColliderDebugShapes = true;
+	bool m_showGameInputWindow = false;
+	bool m_showGameplayDiagnosticsWindow = false;
+	bool m_showLevelColliderDebugShapes = false;
 	bool m_showEntityStateDiagnosticsWindow = false;
-	bool m_showAnimationDiagnosticsWindow = true;
+	bool m_showAnimationDiagnosticsWindow = false;
 	bool m_showCameraCollisionDebug = false;
 	bool m_showTriggerSpheres = false;
 	bool m_showPointLightDebugSpheres = false;
-	bool m_showPhysicsDiagnosticsWindow = true;
+	bool m_showPhysicsDiagnosticsWindow = false;
 	bool m_showMotionDiagnostics = false;
 	bool m_showCameraDiagnostics = false;
 	bool m_showPathedCameraDiagnostics = false;

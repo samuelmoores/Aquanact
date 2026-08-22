@@ -33,6 +33,7 @@ void Input::startUp(Window& window)
 	m_lookBecameActive = false;
 	m_gameplayFocusActive = false;
 	m_revealCursorThisFrame = false;
+	m_runtimeOverlayOpen = false;
 	m_mouseCapturedByUI = false;
 	m_windowFocused = false;
 	m_lastRoutedMousePosition = glm::ivec2(0);
@@ -574,6 +575,14 @@ void Input::UpdateCursorMode(bool gameMode)
 	if (!gameMode || !m_windowFocused)
 	{
 		m_previousGamepadStateValid = false;
+		SetActiveDevice(ActiveInputDevice::MouseKeyboard);
+		UnhideMouseCursor();
+		return;
+	}
+	if (m_runtimeOverlayOpen)
+	{
+		m_lookActive = false;
+		m_ignoreMouseDeltaOnce = true;
 		SetActiveDevice(ActiveInputDevice::MouseKeyboard);
 		UnhideMouseCursor();
 		return;

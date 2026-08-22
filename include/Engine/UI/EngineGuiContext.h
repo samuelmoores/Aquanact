@@ -23,7 +23,7 @@ struct EngineGuiSelection
 struct EngineGuiWindowState
 {
 	bool showSceneWindow = true;
-	bool showLevelColliderWindow = true;
+	bool showLevelColliderWindow = false;
 	bool showEntityWindow = false;
 	bool showLightingWindow = false;
 	bool showFileExplorer = false;

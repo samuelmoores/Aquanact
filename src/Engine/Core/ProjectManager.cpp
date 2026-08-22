@@ -12,7 +12,6 @@
 #include "Engine/Core/InputManager.h"
 #include <fstream>
 #include <imgui.h>
-#include <cstring>
 #include <sstream>
 #include <vector>
 
@@ -31,10 +30,11 @@ namespace {
 
 	void AppendImguiLayoutState(std::string& contents)
 	{
-		if (const char* imguiIniData = ImGui::SaveIniSettingsToMemory())
+		size_t imguiIniSize = 0;
+		if (const char* imguiIniData = ImGui::SaveIniSettingsToMemory(&imguiIniSize))
 		{
 			contents += "imguilayout;";
-			contents += ProjectStateSerializer::HexEncode(imguiIniData, std::strlen(imguiIniData));
+			contents += ProjectStateSerializer::HexEncode(imguiIniData, imguiIniSize);
 			contents += "\n";
 		}
 	}

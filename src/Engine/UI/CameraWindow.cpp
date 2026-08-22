@@ -33,21 +33,6 @@ void CameraWindow::Draw(CameraPathCreator& cameraPath, bool& open, bool& showCam
 	{
 		pathedCamera.SetFollowSharpness(followSharpness);
 	}
-	float minimumDistance = pathedCamera.MinimumFollowDistance();
-	if (EngineGuiWidgets::LabeledFloat("Minimum Distance", minimumDistance, 5.0f, 0.0f, 100000.0f))
-	{
-		pathedCamera.SetMinimumFollowDistance(minimumDistance);
-	}
-	float maximumDistance = pathedCamera.MaximumFollowDistance();
-	if (EngineGuiWidgets::LabeledFloat("Maximum Distance", maximumDistance, 5.0f, 0.0f, 100000.0f))
-	{
-		pathedCamera.SetMaximumFollowDistance(maximumDistance);
-	}
-	float lagDistance = pathedCamera.PreferredLagDistance();
-	if (EngineGuiWidgets::LabeledFloat("Preferred Lag", lagDistance, 5.0f, 0.0f, 100000.0f))
-	{
-		pathedCamera.SetPreferredLagDistance(lagDistance);
-	}
 	int curveSamples = pathedCamera.PathSamplesPerSegment();
 	if (ImGui::SliderInt("Curve Samples", &curveSamples, 4, 256))
 	{

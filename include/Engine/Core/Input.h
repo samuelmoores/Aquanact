@@ -59,6 +59,7 @@ public:
 	void CaptureCursorForLevel();
 	void ReleaseCursorForUI();
 	void RevealCursorForFrame();
+	void SetRuntimeOverlayOpen(bool open) { m_runtimeOverlayOpen = open; }
 	void SetMouseCapturedByUI(bool captured) { m_mouseCapturedByUI = captured; }
 	void DispatchPendingMouseEvents(bool dispatchToMyGUI);
 
@@ -156,6 +157,7 @@ private:
 	glm::vec2 m_lastCursorPos = glm::vec2(0.0f);
 	bool m_gameplayFocusActive = false;
 	bool m_revealCursorThisFrame = false;
+	bool m_runtimeOverlayOpen = false;
 
 	// -------------------------------------------------------------------------
 	// Mouse activity and callback tracking

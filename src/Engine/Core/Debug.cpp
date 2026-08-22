@@ -873,7 +873,6 @@ void Debug::drawGameModeInput(const Input& input)
 		ImGui::Text("Ground surface angle: %.2f degrees", m_gameplayGroundSurfaceAngle);
 		ImGui::Text("Is grounded: %s", m_gameplayGrounded ? "true" : "false");
 		ImGui::Text("Position: %.3f, %.3f, %.3f", m_gameplayPosition.x, m_gameplayPosition.y, m_gameplayPosition.z);
-		ImGui::Checkbox("Level + Player Collision Shapes", &m_showLevelColliderDebugShapes);
 		if (m_showMotionDiagnostics)
 		{
 			ImGui::Begin("Motion Diagnostics");
@@ -968,17 +967,9 @@ void Debug::drawGameModeInput(const Input& input)
 		ImGui::Text("Path points: %zu", path.points.size());
 		ImGui::Text("Target: %s", camera.Target() ? "assigned" : "none");
 		ImGui::Text("Player progress: %.3f", camera.PlayerProgress());
-		ImGui::Text("Chosen camera progress: %.3f", camera.DesiredFollowProgress());
 		ImGui::Text("Follow sharpness: %.3f", camera.FollowSharpness());
-		ImGui::Text("Minimum distance: %.3f", camera.MinimumFollowDistance());
-		ImGui::Text("Maximum distance: %.3f", camera.MaximumFollowDistance());
-		ImGui::Text("Preferred lag distance: %.3f", camera.PreferredLagDistance());
-		ImGui::Text("Desired target distance: %.3f", camera.DesiredTargetDistance());
-		ImGui::Text("Actual target distance: %.3f", camera.ActualTargetDistance());
 		ImGui::Text("Curve samples/segment: %d", camera.PathSamplesPerSegment());
 		ImGui::Text("Position: %.3f, %.3f, %.3f", camera.GetPosition().x, camera.GetPosition().y, camera.GetPosition().z);
-		const glm::vec3& desiredPosition = camera.DesiredFollowPosition();
-		ImGui::Text("Desired position: %.3f, %.3f, %.3f", desiredPosition.x, desiredPosition.y, desiredPosition.z);
 		ImGui::Text("Facing: %.3f, %.3f, %.3f", camera.GetFacing().x, camera.GetFacing().y, camera.GetFacing().z);
 		ImGui::End();
 		m_showPathedCameraDiagnostics = open;
@@ -1314,6 +1305,8 @@ bool Debug::ShowCameraCollisionDebug() const { return m_showCameraCollisionDebug
 void Debug::SetShowCameraCollisionDebug(bool show) { m_showCameraCollisionDebug = show; }
 bool Debug::ShowPhysicsDiagnosticsWindow() const { return m_showPhysicsDiagnosticsWindow; }
 void Debug::SetShowPhysicsDiagnosticsWindow(bool show) { m_showPhysicsDiagnosticsWindow = show; }
+bool Debug::ShowLevelColliderDebugShapes() const { return m_showLevelColliderDebugShapes; }
+void Debug::SetShowLevelColliderDebugShapes(bool show) { m_showLevelColliderDebugShapes = show; }
 
 void Debug::SetPhysicsDiagnostics(const glm::vec3& cameraPosition, const glm::vec3& desiredPosition, const glm::vec3& resolvedPosition, float colliderRadius, int collisionCount, const glm::vec3& collisionNormal, float penetration, const std::string& collisionObject)
 {

@@ -64,8 +64,6 @@ EngineMenuBarResult EngineMenuBar::DrawViewMenu(
 	ImGui::TextDisabled("Engine");
 	ImGui::Separator();
 	EngineGuiWidgets::ToggleMenuItem("Axis", showAxis);
-	EngineGuiWidgets::ToggleMenuItem("Camera Window", windowState.showCameraWindow);
-	EngineGuiWidgets::ToggleMenuItem("Audio Window", windowState.showAudioWindow);
 
 	if (ImGui::BeginMenu("EngineCamera"))
 	{
@@ -97,21 +95,21 @@ EngineMenuBarResult EngineMenuBar::DrawViewMenu(
 	}
 
 	ImGui::Separator();
-	bool showFileExplorer = windowState.showFileExplorer;
-	if (EngineGuiWidgets::ToggleMenuItem("File Explorer", showFileExplorer))
-	{
-		result.showFileExplorer = showFileExplorer;
-	}
-	bool showSceneWindow = windowState.showSceneWindow;
-	if (EngineGuiWidgets::ToggleMenuItem("Scene Window", showSceneWindow))
-	{
-		result.showSceneWindow = showSceneWindow;
-	}
+	ImGui::TextDisabled("Windows");
+	ImGui::Separator();
+	EngineGuiWidgets::ToggleMenuItem("Audio Window", windowState.showAudioWindow);
+	EngineGuiWidgets::ToggleMenuItem("Camera Window", windowState.showCameraWindow);
 	bool showEntityWindow = windowState.showEntityWindow;
 	if (EngineGuiWidgets::ToggleMenuItem("Entity Window", showEntityWindow))
 	{
 		result.showEntityWindow = showEntityWindow;
 	}
+	bool showFileExplorer = windowState.showFileExplorer;
+	if (EngineGuiWidgets::ToggleMenuItem("File Explorer", showFileExplorer))
+	{
+		result.showFileExplorer = showFileExplorer;
+	}
+	EngineGuiWidgets::ToggleMenuItem("Level Colliders Window", windowState.showLevelColliderWindow);
 	bool showLightingWindow = windowState.showLightingWindow;
 	if (EngineGuiWidgets::ToggleMenuItem("Lighting Window", showLightingWindow))
 	{
@@ -123,6 +121,11 @@ EngineMenuBarResult EngineMenuBar::DrawViewMenu(
 	if (EngineGuiWidgets::ToggleMenuItem("Log Window", showLogWindow))
 	{
 		Root::Current().Debugger().SetShowLogWindow(showLogWindow);
+	}
+	bool showSceneWindow = windowState.showSceneWindow;
+	if (EngineGuiWidgets::ToggleMenuItem("Scene Window", showSceneWindow))
+	{
+		result.showSceneWindow = showSceneWindow;
 	}
 	if (EngineGuiWidgets::ToggleMenuItem("Stats Window", showStatsWindow))
 	{

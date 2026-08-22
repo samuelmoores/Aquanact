@@ -183,13 +183,12 @@ void RenderManager::shutDown()
 
 void RenderManager::ApplyProjectState(const ProjectStateData::RenderStateData& renderState)
 {
+	m_engineCamera->SetMoveSpeed(renderState.engineCameraMoveSpeed);
+	m_engineCamera->SetLookSensitivity(renderState.engineCameraLookSensitivity);
 	m_gameCamera->SetPose(renderState.gameCameraPosition, renderState.gameCameraFacing);
 	m_gameCamera->SetPath(renderState.cameraPath);
 	m_engineCameraPathInitialized = false;
 	m_gameCamera->SetFollowSharpness(renderState.pathedCameraFollowSharpness);
-	m_gameCamera->SetMinimumFollowDistance(renderState.pathedCameraMinimumDistance);
-	m_gameCamera->SetMaximumFollowDistance(renderState.pathedCameraMaximumDistance);
-	m_gameCamera->SetPreferredLagDistance(renderState.pathedCameraPreferredLagDistance);
 	m_gameCamera->SetPathSamplesPerSegment(renderState.pathedCameraSamplesPerSegment);
 	Root::Current().FrontEnd().EditorGUI().CameraPath().Data() = renderState.cameraPath;
 	Root::Current().FrontEnd().EditorGUI().SetShowCameraPath(renderState.showCameraPath);

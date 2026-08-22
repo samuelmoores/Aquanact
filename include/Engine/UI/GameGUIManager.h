@@ -80,8 +80,8 @@ private:
 	std::size_t m_buttonClickCount = 0;
 	int m_activeAssetIndex = -1;
 	bool m_showEditorWindow = false;
-	bool m_showDiagnosticsWindow = true;
-	bool m_showRuntimeDebugWindow = false;
+	bool m_showDiagnosticsWindow = false;
+	bool m_showRuntimeDebugWindow = true;
 	bool m_showInputDiagnostics = false;
 	UIMode m_mode = UIMode::MainMenu;
 	bool m_previousDpadUp = false;

@@ -109,11 +109,10 @@ namespace ProjectStateData {
 	};
 
 	struct RenderStateData {
+		float engineCameraMoveSpeed = 300.0f;
+		float engineCameraLookSensitivity = 0.08f;
 		CameraPathData cameraPath;
 		float pathedCameraFollowSharpness = 8.0f;
-		float pathedCameraMinimumDistance = 250.0f;
-		float pathedCameraMaximumDistance = 1000.0f;
-		float pathedCameraPreferredLagDistance = 450.0f;
 		int pathedCameraSamplesPerSegment = 32;
 		bool showCameraPath = false;
 		glm::vec3 gameCameraPosition{ 0.0f };
@@ -135,13 +134,13 @@ namespace ProjectStateData {
 		bool showLightingWindow = false;
 		bool showInputMapWindow = false;
 		bool showCameraWindow = false;
-		bool showGameInputWindow = true;
-		bool showGameplayDiagnosticsWindow = true;
-		bool showAnimationDiagnosticsWindow = true;
-		bool showGameGUIDiagnosticsWindow = true;
+		bool showGameInputWindow = false;
+		bool showGameplayDiagnosticsWindow = false;
+		bool showAnimationDiagnosticsWindow = false;
+		bool showGameGUIDiagnosticsWindow = false;
 		bool profilerEnabled = false;
 		bool showCameraCollisionDebug = false;
-		bool showPhysicsDiagnosticsWindow = true;
+		bool showPhysicsDiagnosticsWindow = false;
 		struct DirectionalLightData {
 			glm::vec3 direction{ 0.0f, -1.0f, 0.0f };
 			glm::vec3 color{ 1.0f };
