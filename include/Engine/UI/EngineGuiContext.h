@@ -5,6 +5,7 @@ class FileManager;
 class ProjectManager;
 class SceneManager;
 class Window;
+class CameraPathCreator;
 
 struct EngineGuiSelection
 {
@@ -14,12 +15,15 @@ struct EngineGuiSelection
 	// Point lights are stored in a fixed-capacity vector and are currently only
 	// appended, so their index is sufficient for editor selection. -1 is none.
 	int pointLightIndex = -1;
+	// Index into the active scene's independent level-collider collection.
+	int levelColliderIndex = -1;
 };
 
 // Visibility owned by EngineGUI and shared with the menu and window dispatch.
 struct EngineGuiWindowState
 {
 	bool showSceneWindow = true;
+	bool showLevelColliderWindow = true;
 	bool showEntityWindow = false;
 	bool showLightingWindow = false;
 	bool showFileExplorer = false;
@@ -46,4 +50,10 @@ struct EngineGuiFrameContext
 	SceneManager* sceneManager = nullptr;
 	ProjectManager* projectManager = nullptr;
 	EngineGuiSelection* selection = nullptr;
+	bool* gizmoTranslate = nullptr;
+	bool* gizmoRotate = nullptr;
+	bool* gizmoScale = nullptr;
+	bool* boxFaceDragMode = nullptr;
+	CameraPathCreator* cameraPath = nullptr;
+	bool* showCameraPath = nullptr;
 };

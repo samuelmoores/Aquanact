@@ -1,0 +1,25 @@
+LevelCollider implementation plan
+
+1. Add an independent LevelCollider data model with shape, world transform,
+   collision filters, trigger state, and editor/debug metadata.
+2. Make Scene/Level own LevelCollider instances and serialize them separately
+   from entities and environment models.
+3. Register static LevelColliders with PhysicsWorld and remove them cleanly on
+   scene shutdown or reload.
+4. Extend PhysicsWorld queries to identify LevelCollider hits independently
+   from Entity hits.
+5. Implement shape-specific collision and sweep support, starting with boxes
+   and spheres, then capsules, convex meshes, and static triangle meshes.
+6. Add editor hierarchy selection, inspector editing, and a 3D transform gizmo
+   for LevelColliders.
+7. Add collider wireframes, AABBs, contact normals, and global/per-collider
+   debug visibility controls.
+8. Add snapping, duplication, grouping, validation, and collision preview
+   tools for environment-collision polish.
+9. Add unit tests for transforms, serialization, filtering, shape tests, and
+   scene reload/lifecycle behavior before replacing existing entity collision.
+
+Initial implementation scope:
+- Complete step 1 (data model).
+- Begin step 2 (Scene ownership and lifecycle storage).
+- Do not change entity collision or runtime physics behavior yet.

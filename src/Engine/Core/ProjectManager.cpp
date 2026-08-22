@@ -113,6 +113,21 @@ namespace {
 				object->SetDefaultRotation(object->Rotation());
 				Scene->AddObject(std::move(object));
 			}
+			for (const auto& pendingCollider : pendingLevel.levelColliders)
+			{
+				auto collider = std::make_unique<LevelCollider>(pendingCollider.name);
+				collider->SetShape(static_cast<LevelColliderShape>(std::clamp(pendingCollider.shape, 0, 1)));
+				collider->SetPosition(pendingCollider.position);
+				collider->SetRotation(pendingCollider.rotation);
+				collider->SetScale(pendingCollider.scale);
+				collider->SetRadius(pendingCollider.radius);
+				collider->SetHeight(pendingCollider.height);
+				collider->SetLayer(pendingCollider.layer);
+				collider->SetMask(pendingCollider.mask);
+				collider->SetTrigger(pendingCollider.trigger);
+				collider->SetDebugVisible(pendingCollider.debugVisible);
+				Scene->AddLevelCollider(std::move(collider));
+			}
 		}
 	}
 

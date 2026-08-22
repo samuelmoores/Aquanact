@@ -92,11 +92,28 @@ namespace ProjectStateData {
 			int physicsColliderShape = 0;
 		};
 		std::vector<PendingObject> objects;
+		struct PendingLevelCollider {
+			std::string name;
+			int shape = 0;
+			glm::vec3 position{ 0.0f };
+			glm::vec3 rotation{ 0.0f };
+			glm::vec3 scale{ 1.0f };
+			float radius = 50.0f;
+			float height = 100.0f;
+			unsigned int layer = 1u;
+			unsigned int mask = 0xFFFFFFFFu;
+			bool trigger = false;
+			bool debugVisible = true;
+		};
+		std::vector<PendingLevelCollider> levelColliders;
 	};
 
 	struct RenderStateData {
 		CameraPathData cameraPath;
 		float pathedCameraFollowSharpness = 8.0f;
+		float pathedCameraMinimumDistance = 250.0f;
+		float pathedCameraMaximumDistance = 1000.0f;
+		float pathedCameraPreferredLagDistance = 450.0f;
 		int pathedCameraSamplesPerSegment = 32;
 		bool showCameraPath = false;
 		glm::vec3 gameCameraPosition{ 0.0f };

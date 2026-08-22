@@ -5,10 +5,13 @@
 #include <cstddef>
 #include <glm/glm.hpp>
 
+class LevelCollider;
+
 struct PhysicsCollider
 {
 	// The world does not own the entity; this is used to identify collision results.
 	Entity* owner = nullptr;
+	LevelCollider* levelOwner = nullptr;
 
 	PhysicsColliderShape shape = PhysicsColliderShape::Box;
 
@@ -16,7 +19,9 @@ struct PhysicsCollider
 	glm::vec3 maxBounds{ 0.0f };
 	// Capsule dimensions remain stable when the visual entity rotates.
 	float capsuleRadius = 0.0f;
+	glm::vec3 capsuleRadii{ 0.0f };
 	float capsuleHalfLength = 0.0f;
+	glm::vec3 capsuleAxis{ 0.0f, 1.0f, 0.0f };
 
 	bool isStatic = true;
 	bool enabled = true;

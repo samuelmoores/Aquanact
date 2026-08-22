@@ -74,3 +74,10 @@ void CameraPathCreator::SelectPoint(int index)
 
 	m_selectedPoint = index;
 }
+
+void CameraPathCreator::TranslateAll(const glm::vec3& delta)
+{
+	if (!std::isfinite(delta.x) || !std::isfinite(delta.y) || !std::isfinite(delta.z)) return;
+	for (CameraPathPoint& point : m_data.points)
+		point.position += delta;
+}

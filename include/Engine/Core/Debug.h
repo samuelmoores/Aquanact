@@ -149,6 +149,9 @@ public:
 		const glm::vec3& sweepNormal, const glm::vec3& velocity, bool grounded);
 	bool ShowPhysicsDiagnosticsWindow() const;
 	void SetShowPhysicsDiagnosticsWindow(bool show);
+	void SetSelectedLevelCollider(class LevelCollider* collider) { m_selectedLevelCollider = collider; }
+	void SetSelectedLevelColliderFace(int axis, float direction) { m_selectedLevelColliderFaceAxis = axis; m_selectedLevelColliderFaceDirection = direction; }
+	void SetLevelColliderFaceEditMode(bool enabled) { m_levelColliderFaceEditMode = enabled; }
 
 private:
 	// Rebuilds the axis/grid helpers when the grid configuration changes.
@@ -167,6 +170,14 @@ private:
 	std::vector<class Line*> m_cameraPathSegments;
 	std::vector<class Line*> m_entityBoundingBoxes;
 	std::vector<class Entity*> m_entityBoundingBoxObjects;
+	std::vector<class Line*> m_levelColliderBounds;
+	std::vector<class Line*> m_levelColliderFaceGizmos;
+	std::vector<class Line*> m_levelColliderFaceHighlights;
+	std::vector<class LevelCollider*> m_levelColliderObjects;
+	class LevelCollider* m_selectedLevelCollider = nullptr;
+	int m_selectedLevelColliderFaceAxis = -1;
+	float m_selectedLevelColliderFaceDirection = 1.0f;
+	bool m_levelColliderFaceEditMode = false;
 	class Line* m_cameraCollisionSphere = nullptr;
 	std::vector<glm::vec3> m_pointLightDebugColors;
 	float m_axisLength = 1200.0f;
@@ -178,6 +189,7 @@ private:
 	bool m_showStatsWindow = false;
 	bool m_showGameInputWindow = true;
 	bool m_showGameplayDiagnosticsWindow = true;
+	bool m_showLevelColliderDebugShapes = true;
 	bool m_showEntityStateDiagnosticsWindow = false;
 	bool m_showAnimationDiagnosticsWindow = true;
 	bool m_showCameraCollisionDebug = false;

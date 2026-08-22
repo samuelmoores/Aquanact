@@ -72,6 +72,25 @@ Entity* Scene::AddObject(std::unique_ptr<Entity> entity)
 	return rawEntity;
 }
 
+LevelCollider* Scene::AddLevelCollider(std::unique_ptr<LevelCollider> collider)
+{
+	if (!collider)
+		return nullptr;
+	LevelCollider* result = collider.get();
+	m_levelColliders.push_back(std::move(collider));
+	return result;
+}
+
+bool Scene::RemoveLevelCollider(LevelCollider* collider)
+{
+	const auto iterator = std::find_if(m_levelColliders.begin(), m_levelColliders.end(),
+		[collider](const std::unique_ptr<LevelCollider>& candidate) { return candidate.get() == collider; });
+	if (iterator == m_levelColliders.end())
+		return false;
+	m_levelColliders.erase(iterator);
+	return true;
+}
+
 bool Scene::RemoveObject(Entity* entity)
 {
 	if (!entity)

@@ -33,6 +33,21 @@ void CameraWindow::Draw(CameraPathCreator& cameraPath, bool& open, bool& showCam
 	{
 		pathedCamera.SetFollowSharpness(followSharpness);
 	}
+	float minimumDistance = pathedCamera.MinimumFollowDistance();
+	if (EngineGuiWidgets::LabeledFloat("Minimum Distance", minimumDistance, 5.0f, 0.0f, 100000.0f))
+	{
+		pathedCamera.SetMinimumFollowDistance(minimumDistance);
+	}
+	float maximumDistance = pathedCamera.MaximumFollowDistance();
+	if (EngineGuiWidgets::LabeledFloat("Maximum Distance", maximumDistance, 5.0f, 0.0f, 100000.0f))
+	{
+		pathedCamera.SetMaximumFollowDistance(maximumDistance);
+	}
+	float lagDistance = pathedCamera.PreferredLagDistance();
+	if (EngineGuiWidgets::LabeledFloat("Preferred Lag", lagDistance, 5.0f, 0.0f, 100000.0f))
+	{
+		pathedCamera.SetPreferredLagDistance(lagDistance);
+	}
 	int curveSamples = pathedCamera.PathSamplesPerSegment();
 	if (ImGui::SliderInt("Curve Samples", &curveSamples, 4, 256))
 	{
@@ -48,6 +63,13 @@ void CameraWindow::Draw(CameraPathCreator& cameraPath, bool& open, bool& showCam
 	if (ImGui::Button("Remove Point") && selectedPoint >= 0)
 	{
 		cameraPath.RemovePoint(static_cast<std::size_t>(selectedPoint));
+	}
+	ImGui::Separator();
+	EngineGuiWidgets::Vector3Editor("Curve Offset", m_curveTranslation, 0.1f);
+	if (ImGui::Button("Move Entire Curve"))
+	{
+		cameraPath.TranslateAll(m_curveTranslation);
+		m_curveTranslation = glm::vec3(0.0f);
 	}
 
 	for (std::size_t index = 0; index < path.points.size(); ++index)

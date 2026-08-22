@@ -6,6 +6,7 @@
 #include <vector>
 
 class Scene;
+class LevelCollider;
 
 class PhysicsWorld final
 {
@@ -71,6 +72,9 @@ public:
 	// Add only accepts entities with a mesh and a valid world AABB.
 	// The returned handle is InvalidColliderHandle when registration fails.
 	ColliderHandle Add(Entity& entity);
+	ColliderHandle Add(LevelCollider& collider);
+	void Update(LevelCollider& collider);
+	void Remove(LevelCollider& collider);
 
 	void Remove(ColliderHandle handle);
 	// Refreshes an entity's cached collider state when it has moved or changed

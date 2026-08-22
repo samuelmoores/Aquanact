@@ -208,6 +208,22 @@ namespace ProjectStateFormat {
 				contents += std::to_string(colliderShape) + ";";
 				contents += object->BlocksCameraView() ? "1\n" : "0\n";
 			}
+			for (const auto& collider : Scene->LevelColliders())
+			{
+				if (!collider) continue;
+				const glm::vec3 position = collider->Position();
+				const glm::vec3 rotation = collider->Rotation();
+				const glm::vec3 scale = collider->Scale();
+				contents += "levelcollider;" + EscapeField(collider->Name()) + ";"
+					+ std::to_string(static_cast<int>(collider->Shape())) + ";"
+					+ std::to_string(position.x) + ";" + std::to_string(position.y) + ";" + std::to_string(position.z) + ";"
+					+ std::to_string(rotation.x) + ";" + std::to_string(rotation.y) + ";" + std::to_string(rotation.z) + ";"
+					+ std::to_string(scale.x) + ";" + std::to_string(scale.y) + ";" + std::to_string(scale.z) + ";"
+					+ std::to_string(collider->Radius()) + ";" + std::to_string(collider->Height()) + ";"
+					+ std::to_string(collider->Layer()) + ";" + std::to_string(collider->Mask()) + ";"
+					+ (collider->IsTrigger() ? "1;" : "0;")
+					+ (collider->DebugVisible() ? "1\n" : "0\n");
+			}
 		}
 	}
 }

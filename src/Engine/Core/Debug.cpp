@@ -48,7 +48,27 @@
 #endif
 
 namespace {
+	std::vector<LineVertex3D> MakeBoxFaceVertices(const glm::vec3& minimum, const glm::vec3& maximum, int axis, float direction, const glm::vec3& color)
+	{
+		const float coordinate = direction > 0.0f ? maximum[axis] : minimum[axis];
+		glm::vec3 a, b, c, d;
+		if (axis == 0) { a = { coordinate, minimum.y, minimum.z }; b = { coordinate, maximum.y, minimum.z }; c = { coordinate, maximum.y, maximum.z }; d = { coordinate, minimum.y, maximum.z }; }
+		else if (axis == 1) { a = { minimum.x, coordinate, minimum.z }; b = { maximum.x, coordinate, minimum.z }; c = { maximum.x, coordinate, maximum.z }; d = { minimum.x, coordinate, maximum.z }; }
+		else { a = { minimum.x, minimum.y, coordinate }; b = { maximum.x, minimum.y, coordinate }; c = { maximum.x, maximum.y, coordinate }; d = { minimum.x, maximum.y, coordinate }; }
+		const auto makeVertex = [&color](const glm::vec3& p) { return LineVertex3D{ p.x, p.y, p.z, color.r, color.g, color.b }; };
+		return { makeVertex(a), makeVertex(b), makeVertex(b), makeVertex(c), makeVertex(c), makeVertex(d), makeVertex(d), makeVertex(a) };
+	}
 	const auto g_programStartTime = std::chrono::high_resolution_clock::now();
+	std::vector<LineVertex3D> MakeFaceArrowVertices(const glm::vec3& center, const glm::vec3& normal, float length, const glm::vec3& color)
+	{
+		const glm::vec3 tip = center + normal * length;
+		glm::vec3 tangent = glm::cross(normal, glm::vec3(0, 1, 0));
+		if (glm::dot(tangent, tangent) < 0.001f) tangent = glm::cross(normal, glm::vec3(1, 0, 0));
+		tangent = glm::normalize(tangent) * (length * 0.16f);
+		const glm::vec3 side = glm::normalize(glm::cross(normal, tangent)) * (length * 0.16f);
+		auto v = [&color](const glm::vec3& p) { return LineVertex3D{p.x,p.y,p.z,color.r,color.g,color.b}; };
+		return {v(center),v(tip), v(tip),v(tip-tangent), v(tip),v(tip+tangent), v(tip),v(tip-side), v(tip),v(tip+side)};
+	}
 
 	std::string FormatBindableValueForDebug(float value)
 	{
@@ -319,6 +339,13 @@ void Debug::shutDown()
 	for (auto& entry : m_triggerSpheres) delete entry.second;
 	m_triggerSpheres.clear();
 	ClearEntityBoundingBoxes();
+	for (Line* volume : m_levelColliderBounds) delete volume;
+	m_levelColliderBounds.clear();
+	for (Line* gizmo : m_levelColliderFaceGizmos) delete gizmo;
+	m_levelColliderFaceGizmos.clear();
+	for (Line* highlight : m_levelColliderFaceHighlights) delete highlight;
+	m_levelColliderFaceHighlights.clear();
+	m_levelColliderObjects.clear();
 	delete m_cameraCollisionSphere;
 	m_cameraCollisionSphere = nullptr;
 	m_logMessages.clear();
@@ -530,7 +557,105 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 		}
 	}
 
+	// Level-collider debug geometry follows the same overlay path as point-light
+	// markers, so it remains visible independently of the physics diagnostics UI.
 	const Scene* activeLevel = Root::Current().Scenes().ActiveLevel();
+	std::vector<LevelCollider*> levelColliders;
+	if (activeLevel)
+	{
+		for (const auto& collider : activeLevel->LevelColliders())
+			if (collider) levelColliders.push_back(collider.get());
+	}
+	if (levelColliders != m_levelColliderObjects)
+	{
+		for (Line* volume : m_levelColliderBounds) delete volume;
+		for (Line* gizmo : m_levelColliderFaceGizmos) delete gizmo;
+		for (Line* highlight : m_levelColliderFaceHighlights) delete highlight;
+		m_levelColliderBounds.clear();
+		m_levelColliderFaceGizmos.clear();
+		m_levelColliderFaceHighlights.clear();
+		m_levelColliderObjects = levelColliders;
+		for (LevelCollider* collider : m_levelColliderObjects)
+		{
+			m_levelColliderBounds.push_back(new Line(glm::vec3(0.0f), glm::vec3(0.0f)));
+			m_levelColliderFaceGizmos.push_back(new Line(glm::vec3(0.0f), glm::vec3(0.0f)));
+			m_levelColliderFaceHighlights.push_back(new Line(glm::vec3(0.0f), glm::vec3(0.0f)));
+		}
+	}
+	for (std::size_t i = 0; i < m_levelColliderObjects.size(); ++i)
+	{
+		LevelCollider* collider = m_levelColliderObjects[i];
+		if (!collider || !collider->DebugVisible()) continue;
+		Line* volume = m_levelColliderBounds[i];
+		glm::vec3 halfExtents = glm::abs(collider->Scale()) * 50.0f;
+		if (collider->Shape() == LevelColliderShape::Plane) halfExtents.y = 0.5f;
+		const glm::vec3 debugColor = collider == m_selectedLevelCollider
+			? glm::vec3(0.2f, 0.9f, 1.0f)
+			: glm::vec3(0.04f, 0.25f, 0.32f);
+		const bool sphereShape = collider->Shape() == LevelColliderShape::Sphere;
+		if (sphereShape)
+		{
+			volume->SetVertices(MakeWireSphereVertices(debugColor));
+		}
+		else if (collider->Shape() == LevelColliderShape::Capsule)
+		{
+			const float radius = collider->Radius();
+			const float halfHeight = std::max(radius, collider->Height() * 0.5f);
+			const glm::vec3 base(0.0f, -std::max(0.0f, halfHeight - radius), 0.0f);
+			const glm::vec3 tip(0.0f, std::max(0.0f, halfHeight - radius), 0.0f);
+			volume->SetVertices(MakeWireCapsuleVertices(base, tip, radius, debugColor));
+		}
+		else
+		{
+			// Keep box geometry in local space so the authored collider rotation is
+			// visible instead of collapsing back to an axis-aligned world box.
+			const float localHalfY = collider->Shape() == LevelColliderShape::Plane ? 0.0f : 50.0f;
+			volume->SetBounds(glm::vec3(-50.0f, -localHalfY, -50.0f), glm::vec3(50.0f, localHalfY, 50.0f), debugColor);
+		}
+		volume->UpdateProjection(projection);
+		glLineWidth(2.0f);
+		glm::mat4 colliderModel = glm::translate(glm::mat4(1.0f), collider->Position());
+		colliderModel = glm::rotate(colliderModel, collider->Rotation().z, glm::vec3(0.0f, 0.0f, 1.0f));
+		colliderModel = glm::rotate(colliderModel, collider->Rotation().y, glm::vec3(0.0f, 1.0f, 0.0f));
+		colliderModel = glm::rotate(colliderModel, collider->Rotation().x, glm::vec3(1.0f, 0.0f, 0.0f));
+		if (sphereShape)
+		{
+			const glm::vec3 absoluteScale = glm::abs(collider->Scale());
+			const float radius = collider->Radius() * std::max(absoluteScale.x, std::max(absoluteScale.y, absoluteScale.z));
+			colliderModel = glm::scale(colliderModel, glm::vec3(radius));
+		}
+		else
+			colliderModel = glm::scale(colliderModel, collider->Scale());
+		volume->draw(view, colliderModel);
+		if (m_levelColliderFaceEditMode && collider == m_selectedLevelCollider && collider->Shape() == LevelColliderShape::Box)
+		{
+			Line* arrows = m_levelColliderFaceGizmos[i];
+			std::vector<LineVertex3D> vertices;
+			const glm::vec3 axes[3] = {glm::vec3(1,0,0),glm::vec3(0,1,0),glm::vec3(0,0,1)};
+			const float arrowLength = 35.0f;
+			for (int axis=0; axis<3; ++axis) for (float sign : {-1.0f,1.0f})
+			{
+				const glm::vec3 normal = axes[axis] * sign;
+				const glm::vec3 face = collider->Position() + normal * halfExtents[axis];
+				const glm::vec3 color = (axis == m_selectedLevelColliderFaceAxis && sign == m_selectedLevelColliderFaceDirection) ? glm::vec3(1,0.9f,0.1f) : debugColor;
+				const auto arrow = MakeFaceArrowVertices(face, normal, arrowLength, color);
+				vertices.insert(vertices.end(), arrow.begin(), arrow.end());
+			}
+			arrows->SetVertices(std::move(vertices));
+			arrows->UpdateProjection(projection);
+			arrows->draw(view);
+		}
+		if (m_levelColliderFaceEditMode && collider == m_selectedLevelCollider && m_selectedLevelColliderFaceAxis >= 0 && collider->Shape() == LevelColliderShape::Box)
+		{
+			Line* highlight = m_levelColliderFaceHighlights[i];
+			highlight->SetVertices(MakeBoxFaceVertices(collider->Position() - halfExtents, collider->Position() + halfExtents,
+				m_selectedLevelColliderFaceAxis, m_selectedLevelColliderFaceDirection, glm::vec3(1.0f, 0.95f, 0.1f)));
+			highlight->UpdateProjection(projection);
+			glLineWidth(4.0f);
+			highlight->draw(view);
+		}
+	}
+
 	std::vector<Entity*> currentBoundingBoxObjects;
 	if (activeLevel)
 	{
@@ -556,8 +681,6 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 	for (std::size_t i = 0; i < m_entityBoundingBoxObjects.size(); ++i)
 	{
 		Entity* object = m_entityBoundingBoxObjects[i];
-		// Editor volumes are controlled only by the selected entity's toggle. The
-		// global diagnostics toggle is applied separately by the game-view path.
 		if (!object || !object->ShowPhysicsBoundingBox() || !object->GetMesh())
 		{
 			continue;
@@ -750,6 +873,7 @@ void Debug::drawGameModeInput(const Input& input)
 		ImGui::Text("Ground surface angle: %.2f degrees", m_gameplayGroundSurfaceAngle);
 		ImGui::Text("Is grounded: %s", m_gameplayGrounded ? "true" : "false");
 		ImGui::Text("Position: %.3f, %.3f, %.3f", m_gameplayPosition.x, m_gameplayPosition.y, m_gameplayPosition.z);
+		ImGui::Checkbox("Level + Player Collision Shapes", &m_showLevelColliderDebugShapes);
 		if (m_showMotionDiagnostics)
 		{
 			ImGui::Begin("Motion Diagnostics");
@@ -831,27 +955,33 @@ void Debug::drawGameModeInput(const Input& input)
 			ImGui::EndChild();
 			ImGui::End();
 		}
-		if (m_showPathedCameraDiagnostics)
-		{
-			ImGui::Begin("Pathed Camera Diagnostics");
-			const PathedCamera& camera = Root::Current().Render().GetPathedCamera();
-			const CameraPathData& path = camera.Path();
-			ImGui::Separator();
-			ImGui::Text("Path points: %zu", path.points.size());
-			ImGui::Text("Target: %s", camera.Target() ? "assigned" : "none");
-			ImGui::Text("Player progress: %.3f", camera.PlayerProgress());
-			ImGui::Text("Follow sharpness: %.3f", camera.FollowSharpness());
-			ImGui::Text("Curve samples/segment: %d", camera.PathSamplesPerSegment());
-			ImGui::Text("Position: %.3f, %.3f, %.3f", camera.GetPosition().x, camera.GetPosition().y, camera.GetPosition().z);
-			ImGui::Text("Facing: %.3f, %.3f, %.3f", camera.GetFacing().x, camera.GetFacing().y, camera.GetFacing().z);
-			if (!path.points.empty())
-			{
-				ImGui::Text("Normalized progress: %.3f", camera.PlayerProgress());
-			}
-			ImGui::End();
-		}
 		ImGui::End();
 		m_showGameplayDiagnosticsWindow = open;
+	}
+
+	if (m_showPathedCameraDiagnostics)
+	{
+		bool open = m_showPathedCameraDiagnostics;
+		ImGui::Begin("Pathed Camera Diagnostics", &open);
+		const PathedCamera& camera = Root::Current().Render().GetPathedCamera();
+		const CameraPathData& path = camera.Path();
+		ImGui::Text("Path points: %zu", path.points.size());
+		ImGui::Text("Target: %s", camera.Target() ? "assigned" : "none");
+		ImGui::Text("Player progress: %.3f", camera.PlayerProgress());
+		ImGui::Text("Chosen camera progress: %.3f", camera.DesiredFollowProgress());
+		ImGui::Text("Follow sharpness: %.3f", camera.FollowSharpness());
+		ImGui::Text("Minimum distance: %.3f", camera.MinimumFollowDistance());
+		ImGui::Text("Maximum distance: %.3f", camera.MaximumFollowDistance());
+		ImGui::Text("Preferred lag distance: %.3f", camera.PreferredLagDistance());
+		ImGui::Text("Desired target distance: %.3f", camera.DesiredTargetDistance());
+		ImGui::Text("Actual target distance: %.3f", camera.ActualTargetDistance());
+		ImGui::Text("Curve samples/segment: %d", camera.PathSamplesPerSegment());
+		ImGui::Text("Position: %.3f, %.3f, %.3f", camera.GetPosition().x, camera.GetPosition().y, camera.GetPosition().z);
+		const glm::vec3& desiredPosition = camera.DesiredFollowPosition();
+		ImGui::Text("Desired position: %.3f, %.3f, %.3f", desiredPosition.x, desiredPosition.y, desiredPosition.z);
+		ImGui::Text("Facing: %.3f, %.3f, %.3f", camera.GetFacing().x, camera.GetFacing().y, camera.GetFacing().z);
+		ImGui::End();
+		m_showPathedCameraDiagnostics = open;
 	}
 
 	if (m_showEntityStateDiagnosticsWindow)
@@ -1062,7 +1192,7 @@ void Debug::drawGameModeInput(const Input& input)
 
 void Debug::DrawPhysicsBoundingVolumes(const Camera& camera)
 {
-	if (!m_showPhysicsDiagnosticsWindow)
+	if (!m_showLevelColliderDebugShapes)
 	{
 		return;
 	}
@@ -1096,7 +1226,7 @@ void Debug::DrawPhysicsBoundingVolumes(const Camera& camera)
 	for (std::size_t i = 0; i < m_entityBoundingBoxObjects.size(); ++i)
 	{
 		Entity* object = m_entityBoundingBoxObjects[i];
-		if (!object || !object->GetMesh())
+		if (!object || !object->GetMesh() || object->GetController() == nullptr)
 		{
 			continue;
 		}
@@ -1133,6 +1263,51 @@ void Debug::DrawPhysicsBoundingVolumes(const Camera& camera)
 		volume->UpdateProjection(projection);
 		volume->draw(view);
 	}
+
+	std::vector<LevelCollider*> currentLevelColliders;
+	if (activeLevel)
+	{
+		for (const auto& collider : activeLevel->LevelColliders())
+			if (collider && collider->DebugVisible()) currentLevelColliders.push_back(collider.get());
+	}
+	if (currentLevelColliders != m_levelColliderObjects)
+	{
+		for (Line* volume : m_levelColliderBounds) delete volume;
+		for (Line* gizmo : m_levelColliderFaceGizmos) delete gizmo;
+		for (Line* highlight : m_levelColliderFaceHighlights) delete highlight;
+		m_levelColliderBounds.clear();
+		m_levelColliderFaceGizmos.clear();
+		m_levelColliderFaceHighlights.clear();
+		m_levelColliderObjects = currentLevelColliders;
+		for (LevelCollider* collider : m_levelColliderObjects)
+			m_levelColliderBounds.push_back(new Line(glm::vec3(0.0f), glm::vec3(0.0f)));
+	}
+	for (std::size_t i = 0; i < m_levelColliderObjects.size(); ++i)
+	{
+		LevelCollider* collider = m_levelColliderObjects[i];
+		Line* volume = m_levelColliderBounds[i];
+		const glm::vec3 debugColor(0.2f, 0.9f, 1.0f);
+		if (collider->Shape() == LevelColliderShape::Capsule)
+		{
+			const float radius = collider->Radius();
+			const float halfHeight = std::max(radius, collider->Height() * 0.5f);
+			volume->SetVertices(MakeWireCapsuleVertices(
+				glm::vec3(0.0f, -(halfHeight - radius), 0.0f),
+				glm::vec3(0.0f, halfHeight - radius, 0.0f), radius, debugColor));
+		}
+		else
+		{
+			volume->SetBounds(glm::vec3(-50.0f), glm::vec3(50.0f), debugColor);
+		}
+		glm::mat4 model = glm::translate(glm::mat4(1.0f), collider->Position());
+		model = glm::rotate(model, collider->Rotation().z, glm::vec3(0.0f, 0.0f, 1.0f));
+		model = glm::rotate(model, collider->Rotation().y, glm::vec3(0.0f, 1.0f, 0.0f));
+		model = glm::rotate(model, collider->Rotation().x, glm::vec3(1.0f, 0.0f, 0.0f));
+		model = glm::scale(model, collider->Scale());
+		volume->UpdateProjection(projection);
+		volume->draw(view, model);
+	}
+
 }
 
 bool Debug::ShowCameraCollisionDebug() const { return m_showCameraCollisionDebug; }

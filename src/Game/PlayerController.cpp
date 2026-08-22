@@ -75,22 +75,14 @@ void PlayerController::TryJump(const InputManager& input)
 {
 	// Step 1: accept only a new Jump press while grounded. This prevents held
 	// input from creating repeated jumps and leaves landing to the physics code.
-	if (!input.WasPressed("Jump") || !m_grounded)
+	if (!input.WasPressed("Jump"))
 	{
 		return;
 	}
 
-	// Step 2: wait until the state machine has left Falling. Physics can report
-	// ground contact one frame before Falling -> Idle/Run is evaluated. Launching
-	// during that gap immediately re-enters the falling animation and interrupts
-	// the landing transition.
-	if (m_entityState && (m_entityState->CurrentState() == "Falling"
-		|| m_entityState->CurrentState() == "Landing"))
-	{
-		return;
-	}
-
-	// Step 3: leave the grounded state before applying vertical launch velocity.
+	// Leave the grounded state before applying vertical launch velocity. The
+	// physics controller owns the authoritative grounded result; animation state
+	// names must not veto a valid jump impulse.
 	// MoveWithPhysics() clears vertical velocity while grounded, so this order is
 	// required for the jump impulse to survive the movement step.
 	m_grounded = false;

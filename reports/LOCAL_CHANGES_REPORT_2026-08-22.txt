@@ -1,0 +1,148 @@
+Aquanact local changes review
+=============================
+
+Review baseline
+---------------
+Baseline commit: a5542b8 (test level)
+Review date: 2026-08-22
+Working tree: not clean; no changes were committed by this review.
+
+Tracked-file summary
+--------------------
+30 tracked files are modified relative to the baseline, with approximately
+1,194 insertions and 79 deletions. The changes span editor tooling, runtime
+physics, camera behavior, project serialization, diagnostics, and player
+movement.
+
+1. Independent level-collider system
+------------------------------------
+- Added an independent LevelCollider data model and Scene ownership.
+- Added level-collider serialization/materialization in project state.
+- Added PhysicsWorld registration, update, removal, filtering, and collision
+  sweeps for level colliders.
+- Added box, sphere, capsule, and plane-related handling in the current code.
+- Added collider transforms, scale/radius/height properties, trigger/filter
+  fields, and debug visibility state.
+- Entity collision is now opt-in through a controller; ordinary render-only
+  entities no longer automatically participate in physics.
+- Added editor selection, inspector/window support, transform gizmo controls,
+  camera-path point selection, and box-face editing support.
+- Added editor/runtime wireframe drawing, selected-collider highlighting,
+  face arrows, face highlights, and gameplay collision-shape diagnostics.
+- Added LEVEL_COLLIDER_IMPLEMENTATION_PLAN.txt as the implementation roadmap.
+
+Primary files:
+  include/Engine/Core/LevelCollider.h (new, currently untracked)
+  include/Engine/Core/PhysicsCollider.h
+  include/Engine/Core/PhysicsWorld.h
+  src/Engine/Core/PhysicsWorld.cpp
+  include/Engine/Core/Scene.h
+  src/Engine/Core/Scene.cpp
+  src/Engine/Core/ProjectManager.cpp
+  src/Engine/Core/ProjectStateFormat.cpp
+  src/Engine/Core/ProjectStateSerializer.cpp
+  src/Engine/UI/EditorSceneInteraction.cpp
+  src/Engine/UI/SceneWindow.cpp
+  src/Engine/Core/Debug.cpp
+
+2. Pathed camera and camera-path tooling
+----------------------------------------
+- Added camera-path point editing/selection and whole-curve translation.
+- Added smoother fly-camera movement using velocity response/interpolation.
+- Added fly-camera look sensitivity API and state.
+- Added pathed-camera follow sharpness, minimum distance, maximum distance,
+  preferred lag distance, path sampling, and runtime diagnostics.
+- Added path-progress direction tracking and candidate selection intended to
+  keep the camera behind the player while respecting the distance band.
+- Runtime camera mode now synchronizes edited camera points into the pathed
+  camera when entering gameplay.
+- Camera path points and camera follow settings are serialized and restored.
+- Fixed project loading so camerapathsettings records are actually parsed.
+
+Primary files:
+  include/Engine/Core/PathedCamera.h
+  src/Engine/Core/PathedCamera.cpp
+  include/Engine/Core/EngineCamera.h
+  src/Engine/Core/EngineCamera.cpp
+  include/Engine/UI/CameraPathCreator.h
+  src/Engine/UI/CameraPathCreator.cpp
+  include/Engine/UI/CameraWindow.h
+  src/Engine/UI/CameraWindow.cpp
+  src/Engine/Core/RenderManager.cpp
+  src/Engine/Core/ProjectStateSerializer.cpp
+
+3. Diagnostics and editor UI
+----------------------------
+- Added level-collider configuration window and scene integration.
+- Added toggles for translate/rotate/scale gizmos and box-face edit mode.
+- Added independent pathed-camera diagnostics window.
+- Added runtime level/player collision-shape drawing toggle.
+- Added broader selection handling for entities, lights, camera points, and
+  level colliders.
+- Added project-state fields for editor window visibility and collider data.
+
+Primary files:
+  include/Engine/Core/Debug.h
+  src/Engine/Core/Debug.cpp
+  include/Engine/UI/EngineGUI.h
+  include/Engine/UI/EngineGuiContext.h
+  src/Engine/UI/EngineGUI.cpp
+  src/Engine/UI/EngineMenuBar.cpp
+  src/Engine/UI/SceneWindow.cpp
+
+4. Player/controller and physics-related changes
+-------------------------------------------------
+- Updated PlayerController movement/collision integration for the independent
+  level-collider physics path.
+- Removed/adjusted entity collision assumptions so only the player controller
+  receives the default entity collider.
+- Added capsule scaling/radius/height evaluation for level-collider physics.
+- Added plane-floor handling and one-sided upward floor behavior in sweeps.
+
+Primary file:
+  src/Game/PlayerController.cpp
+
+5. Project asset changes
+------------------------
+- assets/projects/project.aqua has local camera-path and camera-path-settings
+  updates, including minimum/maximum distance and preferred lag values.
+- The project file also contains the current serialized scene/editor state.
+
+Untracked files/directories
+---------------------------
+- LEVEL_COLLIDER_IMPLEMENTATION_PLAN.txt — implementation roadmap.
+- include/Engine/Core/LevelCollider.h — new level-collider header.
+- external/imguizmo/ — untracked third-party ImGuizmo source tree (about 40
+  files reported by the local file count).
+- external/mygui-upstream/ — untracked third-party MyGUI source tree (about
+  2,119 files reported by the local file count).
+
+Verification performed
+----------------------
+- Built targets:
+    cmake --build out/build/x64-debug --target AquanactEngine AquanactGame -j 2
+- Result: successful engine and game links.
+- Tests:
+    ctest --test-dir out/build/x64-debug --output-on-failure
+- Result: 2/2 tests passed.
+
+Items to review tomorrow
+------------------------
+- Exercise level-collider selection and face dragging from multiple camera
+  angles, especially while gizmos are enabled/disabled.
+- Verify collider rotation, non-uniform capsule scale, and plane/floor
+  behavior in gameplay.
+- Verify save, close/reopen, and gameplay startup preserve every camera point
+  in the same order and position.
+- Confirm the runtime camera follows the edited path after switching from the
+  editor without an unwanted reset.
+- Decide whether the external ImGuizmo/MyGUI trees should be committed,
+  ignored, or removed from the working tree.
+- Add focused automated tests for level-collider serialization, path reload,
+  transform updates, and collision sweeps.
+
+Notes
+-----
+This report describes the complete working-tree delta relative to the stated
+baseline commit. It does not modify or stage any of those changes.
+

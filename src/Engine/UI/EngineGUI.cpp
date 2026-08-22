@@ -186,7 +186,13 @@ void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManage
 		&fileManager,
 		&SceneManager,
 		&projectManager,
-		&m_selection };
+		&m_selection,
+		&m_gizmoTranslate,
+		&m_gizmoRotate,
+		&m_gizmoScale,
+		&m_boxFaceDragMode,
+		&m_cameraPathCreator,
+		&m_showCameraPath };
 
 	Scene* activeLevel = SceneManager.ActiveLevel();
 	bool selectedEntityStillExists = false;
@@ -231,6 +237,9 @@ void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManage
 	{
 		m_sceneWindow.Draw(context, m_windowState.showSceneWindow, m_windowState.showEntityWindow);
 	}
+	static bool showLevelColliderWindow = true;
+	if (showLevelColliderWindow)
+		m_sceneWindow.DrawLevelColliderWindow(context, showLevelColliderWindow);
 
 	// EntityWindow owns the complete entity inspector.
 	if (m_windowState.showEntityWindow)

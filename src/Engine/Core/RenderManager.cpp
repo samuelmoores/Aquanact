@@ -19,6 +19,21 @@
 #include <iomanip>
 #include <iostream>
 #include <algorithm>
+#include <cmath>
+
+namespace
+{
+	bool CameraPathsEqual(const CameraPathData& left, const CameraPathData& right)
+	{
+		if (left.points.size() != right.points.size()) return false;
+		for (std::size_t i = 0; i < left.points.size(); ++i)
+		{
+			const glm::vec3 delta = left.points[i].position - right.points[i].position;
+			if (glm::dot(delta, delta) > 1e-8f) return false;
+		}
+		return true;
+	}
+}
 #include <filesystem>
 #include <memory>
 #include <vector>
@@ -172,6 +187,9 @@ void RenderManager::ApplyProjectState(const ProjectStateData::RenderStateData& r
 	m_gameCamera->SetPath(renderState.cameraPath);
 	m_engineCameraPathInitialized = false;
 	m_gameCamera->SetFollowSharpness(renderState.pathedCameraFollowSharpness);
+	m_gameCamera->SetMinimumFollowDistance(renderState.pathedCameraMinimumDistance);
+	m_gameCamera->SetMaximumFollowDistance(renderState.pathedCameraMaximumDistance);
+	m_gameCamera->SetPreferredLagDistance(renderState.pathedCameraPreferredLagDistance);
 	m_gameCamera->SetPathSamplesPerSegment(renderState.pathedCameraSamplesPerSegment);
 	Root::Current().FrontEnd().EditorGUI().CameraPath().Data() = renderState.cameraPath;
 	Root::Current().FrontEnd().EditorGUI().SetShowCameraPath(renderState.showCameraPath);
@@ -221,6 +239,12 @@ void RenderManager::ApplyCameraMode(const EngineState& engineState)
 	if (engineState.IsGameMode() ||
 		(engineState.IsEditorMode() && Root::Current().FrontEnd().FrontEndModeValue() == FrontEndMode::GameGUICreator))
 	{
+		// The editor owns the authored path. Synchronize it when entering the
+		// pathed-camera mode so point edits made after project load are used by
+		// gameplay without resetting the camera every frame.
+		const CameraPathData& authoredPath = Root::Current().FrontEnd().EditorGUI().CameraPath().Data();
+		if (!CameraPathsEqual(authoredPath, m_gameCamera->Path()))
+			m_gameCamera->SetPath(authoredPath);
 		m_cameraManager.SetGameMode(*m_gameCamera);
 	}
 	else
@@ -395,6 +419,7 @@ void RenderManager::DrawRuntimeFrame(FrontEndManager& frontEndManager, Debug& de
 	const auto debugStart = std::chrono::high_resolution_clock::now();
 	if (Root::Current().GameModeDebugFlag())
 	{
+		debug.DrawPhysicsBoundingVolumes(ActiveCamera());
 		debug.drawGameModeInput(input);
 	}
 	frontEndManager.DrawRuntimeGUI();

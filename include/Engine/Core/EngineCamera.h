@@ -20,6 +20,8 @@ public:
 	glm::vec3 Right() const;
 	void SetMoveSpeed(float moveSpeed);
 	float MoveSpeed() const;
+	void SetLookSensitivity(float sensitivity);
+	float LookSensitivity() const;
 
 private:
 	void SyncFlyOrientationFromFacing();
@@ -34,11 +36,13 @@ private:
 	glm::vec3 m_front{ 0.0f, 0.0f, 1.0f };
 	glm::vec3 m_up{ 0.0f, 1.0f, 0.0f };
 	glm::vec3 m_right{ 1.0f, 0.0f, 0.0f };
+	glm::vec3 m_flyVelocity{ 0.0f };
 	GLFWwindow* m_window = nullptr;
 	float m_yaw = 0.0f;
 	float m_pitch = 0.0f;
 	float m_mouseSensitivity = 0.08f;
 	float m_moveSpeed = 300.0f;
+	float m_moveResponse = 12.0f;
 };
 
 

@@ -1,24 +1,26 @@
 #include "Engine/Core/PhysicsWorld.h"
 
 #include "Engine/Core/Scene.h"
+#include "Engine/Core/LevelCollider.h"
 
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <glm/gtc/matrix_transform.hpp>
 
 namespace
 {
 	bool IsCameraCollisionCandidate(const PhysicsCollider& collider)
 	{
-		return collider.enabled && collider.owner &&
-			!collider.owner->IgnoreCameraCollision();
+		return collider.enabled &&
+			((collider.owner && !collider.owner->IgnoreCameraCollision()) || collider.levelOwner);
 	}
 
 	bool IsCameraCollisionCandidate(
 		const PhysicsCollider& collider, const Entity* ignoredEntity)
 	{
 		return IsCameraCollisionCandidate(collider) &&
-			collider.owner != ignoredEntity;
+			(collider.levelOwner || collider.owner != ignoredEntity);
 	}
 
 	bool OverlapsSweptBounds(const glm::vec3& sweptMin, const glm::vec3& sweptMax,
@@ -76,6 +78,69 @@ namespace
 		const float tipY = boxMax.y - radius;
 		base = glm::vec3(center.x, glm::min(baseY, tipY), center.z);
 		tip = glm::vec3(center.x, glm::max(baseY, tipY), center.z);
+	}
+
+	Physics::SweepCollision SweepVerticalCapsules(
+		const glm::vec3& movingBase, const glm::vec3& movingTip, float movingRadius,
+		const glm::vec3& movement, const glm::vec3& staticBase,
+		const glm::vec3& staticTip, const glm::vec3& staticRadii)
+	{
+		const glm::vec3 combinedRadii = glm::max(staticRadii + glm::vec3(movingRadius), glm::vec3(0.001f));
+		auto separationAt = [&](float time, glm::vec3* separation)
+		{
+			const glm::vec3 baseWorld = movingBase + movement * time;
+			const glm::vec3 tipWorld = movingTip + movement * time;
+			const glm::vec3 base = baseWorld / combinedRadii;
+			const glm::vec3 tip = tipWorld / combinedRadii;
+			const glm::vec3 normalizedStaticBase = staticBase / combinedRadii;
+			const glm::vec3 normalizedStaticTip = staticTip / combinedRadii;
+			const glm::vec3 u = tip - base;
+			const glm::vec3 v = normalizedStaticTip - normalizedStaticBase;
+			const glm::vec3 w = base - normalizedStaticBase;
+			const float a = glm::dot(u, u), b = glm::dot(u, v), c = glm::dot(v, v);
+			const float d = glm::dot(u, w), e = glm::dot(v, w);
+			const float denominator = a * c - b * b;
+			float s = denominator > 1e-6f ? std::clamp((b * e - c * d) / denominator, 0.0f, 1.0f) : 0.0f;
+			float t = c > 1e-6f ? std::clamp((b * s + e) / c, 0.0f, 1.0f) : 0.0f;
+			if (a > 1e-6f) s = std::clamp((b * t - d) / a, 0.0f, 1.0f);
+			const glm::vec3 normalizedDelta = (base + u * s) - (normalizedStaticBase + v * t);
+			if (separation) *separation = normalizedDelta;
+			return glm::dot(normalizedDelta, normalizedDelta) - 1.0f;
+		};
+
+		auto makeHit = [&](float time)
+		{
+			Physics::SweepCollision hit;
+			glm::vec3 separation;
+			separationAt(time, &separation);
+			if (glm::length(separation) <= 1e-5f)
+				separation = glm::length(movement) > 1e-5f ? -glm::normalize(movement) : glm::vec3(0, 1, 0);
+			hit.hit = true;
+			hit.time = time;
+			hit.normal = glm::normalize(separation / combinedRadii);
+			return hit;
+		};
+
+		if (separationAt(0.0f, nullptr) <= 0.0f)
+		{
+			Physics::SweepCollision hit = makeHit(0.0f);
+			return glm::dot(movement, hit.normal) < 0.0f ? hit : Physics::SweepCollision{};
+		}
+		constexpr int samples = 32;
+		float previous = 0.0f;
+		for (int sample = 1; sample <= samples; ++sample)
+		{
+			const float time = static_cast<float>(sample) / samples;
+			if (separationAt(time, nullptr) > 0.0f) { previous = time; continue; }
+			float low = previous, high = time;
+			for (int iteration = 0; iteration < 12; ++iteration)
+			{
+				const float middle = (low + high) * 0.5f;
+				if (separationAt(middle, nullptr) <= 0.0f) high = middle; else low = middle;
+			}
+			return makeHit(high);
+		}
+		return {};
 	}
 
 	std::vector<Physics::ConvexPlane> BuildConvexPlanes(const PhysicsCollider& collider)
@@ -299,6 +364,106 @@ void PhysicsWorld::RegisterScene(const Scene& scene)
 			Add(*object);
 		}
 	}
+	for (const auto& collider : scene.LevelColliders())
+	{
+		if (collider)
+		{
+			Add(*collider);
+		}
+	}
+}
+
+ColliderHandle PhysicsWorld::Add(LevelCollider& collider)
+{
+	PhysicsCollider record;
+	record.levelOwner = &collider;
+	record.isStatic = true;
+	record.enabled = true;
+	record.shape = collider.Shape() == LevelColliderShape::Capsule
+		? PhysicsColliderShape::Capsule : PhysicsColliderShape::Box;
+
+	const glm::vec3 center = collider.Position();
+	glm::vec3 dimensions = glm::abs(collider.Scale()) * 100.0f;
+	if (collider.Shape() == LevelColliderShape::Plane)
+	{
+		// A plane is represented by a shallow slab extending below its authored
+		// surface. Keeping the top face exactly at Position().y guarantees that
+		// grounded sweeps receive an upward normal instead of selecting the
+		// slab's bottom face when the player is resting on it.
+		dimensions.y = 2.0f;
+	}
+	if (collider.Shape() == LevelColliderShape::Sphere)
+	{
+		const glm::vec3 absoluteScale = glm::abs(collider.Scale());
+		const float radius = collider.Radius() * std::max(absoluteScale.x, std::max(absoluteScale.y, absoluteScale.z));
+		record.minBounds = center - glm::vec3(radius);
+		record.maxBounds = center + glm::vec3(radius);
+	}
+	else if (collider.Shape() == LevelColliderShape::Capsule)
+	{
+		const glm::vec3 absoluteScale = glm::abs(collider.Scale());
+		record.capsuleRadii = glm::max(glm::vec3(collider.Radius()) * absoluteScale, glm::vec3(0.001f));
+		record.capsuleRadius = glm::max(record.capsuleRadii.x, record.capsuleRadii.z);
+		const float authoredHalfSegment = glm::max(0.0f, collider.Height() * 0.5f - collider.Radius());
+		record.capsuleHalfLength = authoredHalfSegment * absoluteScale.y;
+		glm::mat4 rotation(1.0f);
+		rotation = glm::rotate(rotation, collider.Rotation().z, glm::vec3(0.0f, 0.0f, 1.0f));
+		rotation = glm::rotate(rotation, collider.Rotation().y, glm::vec3(0.0f, 1.0f, 0.0f));
+		rotation = glm::rotate(rotation, collider.Rotation().x, glm::vec3(1.0f, 0.0f, 0.0f));
+		record.capsuleAxis = glm::normalize(glm::vec3(rotation * glm::vec4(0.0f, 1.0f, 0.0f, 0.0f)));
+		const glm::mat3 rotation3(rotation);
+		const glm::vec3 rotatedCapExtents =
+			glm::abs(rotation3[0]) * record.capsuleRadii.x +
+			glm::abs(rotation3[1]) * record.capsuleRadii.y +
+			glm::abs(rotation3[2]) * record.capsuleRadii.z;
+		const glm::vec3 capsuleExtents = glm::abs(record.capsuleAxis) * record.capsuleHalfLength + rotatedCapExtents;
+		record.minBounds = center - capsuleExtents;
+		record.maxBounds = center + capsuleExtents;
+	}
+	else
+	{
+		const glm::vec3 halfExtents = dimensions * 0.5f;
+		if (collider.Shape() == LevelColliderShape::Plane)
+		{
+			record.minBounds = center - glm::vec3(halfExtents.x, dimensions.y, halfExtents.z);
+			record.maxBounds = center + glm::vec3(halfExtents.x, 0.0f, halfExtents.z);
+		}
+		else
+		{
+			record.minBounds = center - halfExtents;
+			record.maxBounds = center + halfExtents;
+		}
+	}
+	m_colliders.push_back(record);
+	return m_colliders.size() - 1;
+}
+
+void PhysicsWorld::Update(LevelCollider& collider)
+{
+	for (ColliderHandle handle = 0; handle < m_colliders.size(); ++handle)
+	{
+		if (m_colliders[handle].levelOwner != &collider)
+			continue;
+
+		// Reuse the exact shape/bounds construction used during registration while
+		// preserving the existing handle referenced by scene queries.
+		const ColliderHandle temporaryHandle = Add(collider);
+		m_colliders[handle] = m_colliders[temporaryHandle];
+		m_colliders.pop_back();
+		return;
+	}
+}
+
+void PhysicsWorld::Remove(LevelCollider& collider)
+{
+	for (PhysicsCollider& record : m_colliders)
+	{
+		if (record.levelOwner == &collider)
+		{
+			record.enabled = false;
+			return;
+		}
+	}
 }
 
 ColliderHandle PhysicsWorld::Find(const Entity& entity) const
@@ -369,10 +534,14 @@ Physics::SweepCollision PhysicsWorld::Sweep(
 		}
 
 		const PhysicsCollider& candidate = m_colliders[handle];
-		if (!candidate.enabled || !candidate.owner)
+		if (!candidate.enabled || (!candidate.owner && !candidate.levelOwner))
 		{
 			continue;
 		}
+		// Level planes are one-sided floor surfaces. Do not let a rising player
+		// collide with the underside of the floor slab and cancel the jump.
+		if (candidate.levelOwner && candidate.levelOwner->Shape() == LevelColliderShape::Plane && movement.y > 0.0f)
+			continue;
 
 		// Broadphase rejection avoids invoking shape-specific geometry code for
 		// colliders that cannot intersect the moving shape's swept bounds.
@@ -415,6 +584,15 @@ Physics::SweepCollision PhysicsWorld::Sweep(
 			// the same normalized time interval as the box and capsule sweeps.
 			hit = Physics::GetConvexSweep(planes, movingCenter, movement);
 		}
+		else if (useCapsule && candidate.shape == PhysicsColliderShape::Capsule)
+		{
+			const glm::vec3 candidateCenter = (candidate.minBounds + candidate.maxBounds) * 0.5f;
+			const glm::vec3 candidateBase = candidateCenter - candidate.capsuleAxis * candidate.capsuleHalfLength;
+			const glm::vec3 candidateTip = candidateCenter + candidate.capsuleAxis * candidate.capsuleHalfLength;
+			hit = SweepVerticalCapsules(capsuleBase, capsuleTip, moving.capsuleRadius,
+				movement, candidateBase, candidateTip,
+				candidate.levelOwner ? candidate.capsuleRadii : glm::vec3(candidate.capsuleRadius));
+		}
 		else if (useCapsule)
 		{
 			hit = Physics::GetCapsuleAABBSweep(
@@ -426,6 +604,12 @@ Physics::SweepCollision PhysicsWorld::Sweep(
 			hit = Physics::GetAABBSweep(
 				minBounds, maxBounds, movement,
 				candidate.minBounds, candidate.maxBounds);
+		}
+		if (hit.hit && candidate.levelOwner && candidate.levelOwner->Shape() == LevelColliderShape::Plane)
+		{
+			// A plane only has a walkable top surface; never report its underside as
+			// a collision normal while the controller is descending.
+			hit.normal = glm::vec3(0.0f, 1.0f, 0.0f);
 		}
 
 		// Multiple records may be touched by one movement. Keep the first contact
@@ -521,7 +705,7 @@ Physics::SweepCollision PhysicsWorld::SweepCameraAgainst(
 	}
 
 	const PhysicsCollider& collider = m_colliders[handle];
-	if (!collider.enabled || !collider.owner)
+	if (!collider.enabled || (!collider.owner && !collider.levelOwner))
 	{
 		return {};
 	}
@@ -593,8 +777,10 @@ std::vector<Entity*> PhysicsWorld::QuerySphere(const glm::vec3& center, float ra
 
 ColliderHandle PhysicsWorld::Add(Entity& entity)
 {
-	// Meshless entities have no geometry that can participate in collision.
-	if (!entity.GetMesh())
+	// Ordinary entities are render-only by default. The player controller is the
+	// explicit opt-in for entity collision; environment collision uses the
+	// independent LevelCollider type.
+	if (!entity.GetMesh() || entity.GetController() == nullptr)
 	{
 		return InvalidColliderHandle;
 	}
@@ -620,7 +806,9 @@ ColliderHandle PhysicsWorld::Add(Entity& entity)
 		glm::vec3 capsuleBase;
 		glm::vec3 capsuleTip;
 		BuildVerticalCapsule(minBounds, maxBounds, capsuleBase, capsuleTip, collider.capsuleRadius);
+		collider.capsuleRadii = glm::vec3(collider.capsuleRadius);
 		collider.capsuleHalfLength = glm::length(capsuleTip - capsuleBase) * 0.5f;
+		collider.capsuleAxis = glm::vec3(0.0f, 1.0f, 0.0f);
 	}
 	collider.isStatic = entity.GetController() == nullptr;
 

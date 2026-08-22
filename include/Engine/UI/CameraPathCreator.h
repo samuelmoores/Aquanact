@@ -16,6 +16,7 @@ public:
 
 	int SelectedPoint() const { return m_selectedPoint; }
 	void SelectPoint(int index);
+	void TranslateAll(const glm::vec3& delta);
 
 
 private:

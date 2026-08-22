@@ -445,7 +445,7 @@ namespace ProjectStateSerializer {
 			try
 			{
 				const std::vector<std::string> fields = ProjectStateFormat::SplitFields(line);
-				if ((fields.size() >= 7 && fields[0] == "gamecamera") || (fields.size() >= 2 && fields[0] == "camerapath") || (fields.size() == 3 && fields[0] == "editorview") || (fields.size() >= 3 && fields[0] == "debugwindows") || ((fields.size() >= 8 && fields.size() <= 11) && fields[0] == "sunlight") || ((fields.size() >= 12 && fields.size() <= 15) && fields[0] == "pointlight") || (fields.size() == 2 && fields[0] == "imguilayout"))
+				if ((fields.size() >= 7 && fields[0] == "gamecamera") || (fields.size() >= 2 && fields[0] == "camerapath") || (fields.size() >= 4 && fields[0] == "camerapathsettings") || (fields.size() == 3 && fields[0] == "editorview") || (fields.size() >= 3 && fields[0] == "debugwindows") || ((fields.size() >= 8 && fields.size() <= 11) && fields[0] == "sunlight") || ((fields.size() >= 12 && fields.size() <= 15) && fields[0] == "pointlight") || (fields.size() == 2 && fields[0] == "imguilayout"))
 				{
 					if (fields.size() >= 7 && fields[0] == "gamecamera")
 					{
@@ -503,6 +503,13 @@ namespace ProjectStateSerializer {
 						renderState.pathedCameraFollowSharpness = std::stof(fields[1]);
 						renderState.pathedCameraSamplesPerSegment = std::stoi(fields[2]);
 						renderState.showCameraPath = fields[3] == "1" || fields[3] == "true" || fields[3] == "True";
+						if (fields.size() >= 6)
+						{
+							renderState.pathedCameraMinimumDistance = std::stof(fields[4]);
+							renderState.pathedCameraPreferredLagDistance = std::stof(fields[5]);
+						}
+						if (fields.size() >= 7)
+							renderState.pathedCameraMaximumDistance = std::stof(fields[6]);
 					}
 					else if (fields.size() == 3 && fields[0] == "editorview")
 					{
@@ -637,6 +644,32 @@ namespace ProjectStateSerializer {
 					currentLevel = &pendingLevel;
 					break;
 				}
+			}
+			continue;
+		}
+
+		if (fields.size() >= 18 && fields[0] == "levelcollider")
+		{
+			if (!currentLevel) return false;
+			try
+			{
+				PendingLevel::PendingLevelCollider collider;
+				collider.name = ProjectStateFormat::UnescapeField(fields[1]);
+				collider.shape = std::stoi(fields[2]);
+				collider.position = glm::vec3(std::stof(fields[3]), std::stof(fields[4]), std::stof(fields[5]));
+				collider.rotation = glm::vec3(std::stof(fields[6]), std::stof(fields[7]), std::stof(fields[8]));
+				collider.scale = glm::vec3(std::stof(fields[9]), std::stof(fields[10]), std::stof(fields[11]));
+				collider.radius = std::stof(fields[12]);
+				collider.height = std::stof(fields[13]);
+				collider.layer = static_cast<unsigned int>(std::stoul(fields[14]));
+				collider.mask = static_cast<unsigned int>(std::stoul(fields[15]));
+				collider.trigger = fields[16] == "1" || fields[16] == "true";
+				collider.debugVisible = fields[17] == "1" || fields[17] == "true";
+				currentLevel->levelColliders.push_back(std::move(collider));
+			}
+			catch (...)
+			{
+				return false;
 			}
 			continue;
 		}
@@ -860,7 +893,7 @@ namespace ProjectStateSerializer {
 			contents += ";" + std::to_string(point.position.x) + ";" + std::to_string(point.position.y) + ";" + std::to_string(point.position.z);
 		}
 		contents += "\n";
-		contents += "camerapathsettings;" + std::to_string(renderManager.GetPathedCamera().FollowSharpness()) + ";" + std::to_string(renderManager.GetPathedCamera().PathSamplesPerSegment()) + ";" + (frontEndManager.EditorGUI().ShowCameraPath() ? "1" : "0") + "\n";
+		contents += "camerapathsettings;" + std::to_string(renderManager.GetPathedCamera().FollowSharpness()) + ";" + std::to_string(renderManager.GetPathedCamera().PathSamplesPerSegment()) + ";" + (frontEndManager.EditorGUI().ShowCameraPath() ? "1" : "0") + ";" + std::to_string(renderManager.GetPathedCamera().MinimumFollowDistance()) + ";" + std::to_string(renderManager.GetPathedCamera().PreferredLagDistance()) + ";" + std::to_string(renderManager.GetPathedCamera().MaximumFollowDistance()) + "\n";
 
 		contents += "editorview;";
 		contents += frontEndManager.EditorGUI().ShowAxis() ? "1" : "0";

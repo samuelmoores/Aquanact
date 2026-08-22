@@ -64,6 +64,10 @@ private:
 	int m_bootTextureWidth = 0;
 	int m_bootTextureHeight = 0;
 	EngineGuiSelection m_selection;
+	bool m_gizmoTranslate = true;
+	bool m_gizmoRotate = false;
+	bool m_gizmoScale = false;
+	bool m_boxFaceDragMode = false;
 	EngineMenuBar m_menuBar;
 	SceneWindow m_sceneWindow;
 	EntityWindow m_entityWindow;

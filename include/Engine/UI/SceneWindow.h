@@ -9,6 +9,7 @@ class SceneWindow
 {
 public:
 	void Draw(const EngineGuiFrameContext& context, bool& open, bool& entityWindowOpen) const;
+	void DrawLevelColliderWindow(const EngineGuiFrameContext& context, bool& open) const;
 	void DrawNewLevelPopup(SceneManager& sceneManager, bool& requested);
 
 private:

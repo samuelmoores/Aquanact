@@ -2,6 +2,7 @@
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <algorithm>
 #include <cmath>
 
 #include "Engine/Core/EngineCamera.h"
@@ -25,6 +26,7 @@ void EngineCamera::startUp()
 	m_front = glm::normalize(glm::vec3(0.0f) - m_position);
 	m_up = glm::vec3(0.0f, 1.0f, 0.0f);
 	m_right = glm::normalize(glm::cross(m_front, m_up));
+	m_flyVelocity = glm::vec3(0.0f);
 	m_view_matrix = glm::lookAt(m_position, m_position + m_front, m_up);
 	SyncFlyOrientationFromFacing();
 	m_lastFlyTime = static_cast<float>(glfwGetTime());
@@ -85,13 +87,24 @@ void EngineCamera::FlyControl(glm::vec2 mouseDiff, glm::vec3 moveInput, float dt
 	m_right = glm::normalize(glm::cross(m_front, glm::vec3(0.0f, 1.0f, 0.0f)));
 	m_up = glm::normalize(glm::cross(m_right, m_front));
 
+	glm::vec3 targetVelocity(0.0f);
 	if (glm::length(moveInput) > 0.0001f)
 	{
-		glm::vec3 movement = glm::normalize(moveInput);
-		m_position += m_right * (movement.x * m_moveSpeed * dt);
-		m_position += m_up * (movement.y * m_moveSpeed * dt);
-		m_position += m_front * (movement.z * m_moveSpeed * dt);
+		const glm::vec3 movement = glm::normalize(moveInput);
+		targetVelocity =
+			m_right * (movement.x * m_moveSpeed) +
+			m_up * (movement.y * m_moveSpeed) +
+			m_front * (movement.z * m_moveSpeed);
 	}
+
+	// Exponential response gives the same acceleration and braking feel at
+	// different frame rates while avoiding abrupt keyboard-driven velocity steps.
+	const float safeDt = glm::clamp(dt, 0.0f, 1.0f / 15.0f);
+	const float response = 1.0f - std::exp(-m_moveResponse * safeDt);
+	m_flyVelocity = glm::mix(m_flyVelocity, targetVelocity, response);
+	if (glm::length(m_flyVelocity) < 0.01f && glm::length(targetVelocity) < 0.01f)
+		m_flyVelocity = glm::vec3(0.0f);
+	m_position += m_flyVelocity * safeDt;
 
 	m_view_matrix = glm::lookAt(m_position, m_position + m_front, m_up);
 }
@@ -103,6 +116,7 @@ void EngineCamera::UpdateFly(const Input& input)
 
 	if (frame.lookBecameActive)
 	{
+		m_flyVelocity = glm::vec3(0.0f);
 		SyncFlyOrientationFromFacing();
 		return;
 	}
@@ -123,6 +137,7 @@ void EngineCamera::SetPose(const glm::vec3& position, const glm::vec3& facing)
 	}
 	m_position = position;
 	m_front = glm::normalize(facing);
+	m_flyVelocity = glm::vec3(0.0f);
 	SyncFlyOrientationFromFacing();
 }
 
@@ -159,6 +174,16 @@ void EngineCamera::SetMoveSpeed(float moveSpeed)
 float EngineCamera::MoveSpeed() const
 {
 	return m_moveSpeed;
+}
+
+void EngineCamera::SetLookSensitivity(float sensitivity)
+{
+	m_mouseSensitivity = std::max(0.0f, sensitivity);
+}
+
+float EngineCamera::LookSensitivity() const
+{
+	return m_mouseSensitivity;
 }
 
 

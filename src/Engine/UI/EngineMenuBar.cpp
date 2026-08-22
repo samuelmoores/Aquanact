@@ -75,6 +75,12 @@ EngineMenuBarResult EngineMenuBar::DrawViewMenu(
 		{
 			Root::Current().Render().GetEngineCamera().SetMoveSpeed(moveSpeed);
 		}
+		float lookSensitivity = Root::Current().Render().GetEngineCamera().LookSensitivity();
+		ImGui::SetNextItemWidth(140.0f);
+		if (ImGui::InputFloat("Look Sensitivity", &lookSensitivity, 0.0f, 0.0f, "%.3f"))
+		{
+			Root::Current().Render().GetEngineCamera().SetLookSensitivity(lookSensitivity);
+		}
 		ImGui::EndMenu();
 	}
 
