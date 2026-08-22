@@ -33,10 +33,10 @@ private:
 		bool& showGrid,
 		EngineGuiWindowState& windowState) const;
 	void DrawLightingMenu() const;
-	void DrawAquanactMenu(Window* window, bool& showInputMap) const;
-	void DrawFileMenu(FileManager& fileManager, SceneManager& sceneManager, ProjectManager& projectManager) const;
+	void DrawAquanactMenu(Window* window, bool& showInputMap, bool& buildGameRequested) const;
+	void DrawFileMenu(SceneManager& sceneManager, ProjectManager& projectManager) const;
 	void DrawSceneMenu(SceneManager& sceneManager, bool& newLevelRequested) const;
 	void DrawCodeMenu(bool& addCodeFileRequested, bool& deleteComponentRequested) const;
 	void DrawUiMenu() const;
-	void DrawGameMenu(ProjectManager& projectManager, SceneManager& sceneManager, bool& buildGameRequested) const;
+	void DrawGameMenu(ProjectManager& projectManager, SceneManager& sceneManager) const;
 };

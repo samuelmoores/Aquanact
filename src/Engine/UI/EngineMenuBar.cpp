@@ -4,7 +4,6 @@
 #include "Engine/Core/RenderManager.h"
 #include "Engine/Core/Debug.h"
 #include "Engine/Core/LightingManager.h"
-#include "Engine/Core/FileManager.h"
 #include "Engine/Core/ProjectManager.h"
 #include "Engine/Core/SceneManager.h"
 #include "Engine/Core/Window.h"
@@ -33,15 +32,14 @@ EngineMenuBarResult EngineMenuBar::Draw(
 		return result;
 	}
 
-	FileManager& fileManager = *context.fileManager;
 	SceneManager& sceneManager = *context.sceneManager;
 	ProjectManager& projectManager = *context.projectManager;
 
-	DrawAquanactMenu(context.window, windowState.showInputMapWindow);
-	DrawFileMenu(fileManager, sceneManager, projectManager);
+	DrawAquanactMenu(context.window, windowState.showInputMapWindow, popupRequests.buildGame);
+	DrawFileMenu(sceneManager, projectManager);
 	result = DrawViewMenu(showAxis, showGrid, windowState);
 	DrawLightingMenu();
-	DrawGameMenu(projectManager, sceneManager, popupRequests.buildGame);
+	DrawGameMenu(projectManager, sceneManager);
 	DrawSceneMenu(sceneManager, popupRequests.newScene);
 	DrawCodeMenu(popupRequests.addCodeFile, popupRequests.deleteComponent);
 	DrawUiMenu();
@@ -152,7 +150,7 @@ void EngineMenuBar::DrawLightingMenu() const
 	ImGui::EndMenu();
 }
 
-void EngineMenuBar::DrawAquanactMenu(Window* window, bool& showInputMap) const
+void EngineMenuBar::DrawAquanactMenu(Window* window, bool& showInputMap, bool& buildGameRequested) const
 {
 	if (!ImGui::BeginMenu("Aquanact"))
 	{
@@ -163,6 +161,11 @@ void EngineMenuBar::DrawAquanactMenu(Window* window, bool& showInputMap) const
 	{
 		showInputMap = true;
 	}
+	if (ImGui::MenuItem("Build Game"))
+	{
+		buildGameRequested = true;
+	}
+	ImGui::Separator();
 	if (ImGui::MenuItem("Quit") && window)
 	{
 		glfwSetWindowShouldClose(window->GLFW(), GLFW_TRUE);
@@ -171,7 +174,6 @@ void EngineMenuBar::DrawAquanactMenu(Window* window, bool& showInputMap) const
 }
 
 void EngineMenuBar::DrawFileMenu(
-	FileManager& fileManager,
 	SceneManager& sceneManager,
 	ProjectManager& projectManager) const
 {
@@ -187,12 +189,6 @@ void EngineMenuBar::DrawFileMenu(
 	if (ImGui::MenuItem("Load Project"))
 	{
 		projectManager.LoadProject(projectManager.CurrentProjectPath(), sceneManager);
-	}
-
-	ImGui::Separator();
-	if (ImGui::MenuItem("Import Selected", nullptr, false, fileManager.CanImportSelection()))
-	{
-		fileManager.ImportSelected();
 	}
 	ImGui::EndMenu();
 }
@@ -284,22 +280,11 @@ void EngineMenuBar::DrawUiMenu() const
 
 void EngineMenuBar::DrawGameMenu(
 	ProjectManager& projectManager,
-	SceneManager& sceneManager,
-	bool& buildGameRequested) const
+	SceneManager& sceneManager) const
 {
 	if (!ImGui::BeginMenu("Game"))
 	{
 		return;
-	}
-
-	if (ImGui::BeginMenu("Camera"))
-	{
-		const bool thirdPerson = Root::Current().Render().CameraModeValue() == RenderManager::CameraMode::ThirdPerson;
-		if (ImGui::MenuItem("Third Person", nullptr, thirdPerson))
-		{
-			Root::Current().Render().SetCameraMode(RenderManager::CameraMode::ThirdPerson);
-		}
-		ImGui::EndMenu();
 	}
 
 	if (ImGui::MenuItem("Play Game"))
@@ -340,15 +325,5 @@ void EngineMenuBar::DrawGameMenu(
 		}
 	}
 
-	if (ImGui::MenuItem("Set Game Camera"))
-	{
-		Root::Current().Render().GetPathedCamera().SetPose(
-			Root::Current().Render().GetEngineCamera().GetPosition(),
-			Root::Current().Render().GetEngineCamera().GetFacing());
-	}
-	if (ImGui::MenuItem("Build Game"))
-	{
-		buildGameRequested = true;
-	}
 	ImGui::EndMenu();
 }
