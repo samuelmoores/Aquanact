@@ -125,7 +125,7 @@ EngineMenuBarResult EngineMenuBar::DrawViewMenu(
 	{
 		result.showSceneWindow = showSceneWindow;
 	}
-	if (EngineGuiWidgets::ToggleMenuItem("Stats Window", showStatsWindow))
+	if (EngineGuiWidgets::ToggleMenuItem("Render Stats Window", showStatsWindow))
 	{
 		Root::Current().Debugger().SetShowStatsWindow(showStatsWindow);
 	}

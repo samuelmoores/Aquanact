@@ -19,6 +19,8 @@ struct ImportedModel {
 	std::vector<Vertex3D> vertices;
 	std::vector<uint32_t> faces;
 	std::vector<int> facesSize;
+	std::vector<glm::vec3> subMeshMinBounds;
+	std::vector<glm::vec3> subMeshMaxBounds;
 	Skeleton skeleton;
 	std::vector<SubMeshMaterial> materials;
 	std::vector<aiAnimation*> animations;

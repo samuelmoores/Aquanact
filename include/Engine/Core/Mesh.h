@@ -73,6 +73,8 @@ class Mesh {
 		bool HasSpecularTexture(int index) const;
 		bool HasNormalTexture(int index) const;
 		uint32_t FacesOffset(int index) const;
+		const glm::vec3& SubMeshMinBounds(int index) const;
+		const glm::vec3& SubMeshMaxBounds(int index) const;
 		void SetAmbientColor(int index, glm::vec3 color);
 		bool Skinned();
 		int NumBuffers() const;
@@ -118,6 +120,8 @@ class Mesh {
 		bool m_skinned;
 		std::vector<int> m_facesSize;
 		std::vector<int> m_faceOffsets;
+		std::vector<glm::vec3> m_subMeshMinBounds;
+		std::vector<glm::vec3> m_subMeshMaxBounds;
 		std::vector<aiAnimation*> m_animations;
 		std::vector<std::string> m_animationSources;
 		std::vector<SubMeshMaterial> m_materials;

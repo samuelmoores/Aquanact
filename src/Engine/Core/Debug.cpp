@@ -735,33 +735,63 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 
 	if (m_showStatsWindow)
 	{
-		ImGui::Begin("Debug Stats", &m_showStatsWindow, ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoBringToFrontOnFocus);
-		ImGui::Text("FPS: %.1f", m_lastFps);
-		const Scene* activeLevel = Root::Current().Scenes().ActiveLevel();
-		ImGui::Text("Scene objects: %zu", activeLevel ? activeLevel->Objects().size() : 0);
-		ImGui::Separator();
-		ImGui::Text("Render commands: %zu", Root::Current().Render().LastFrameCommandCount());
-		ImGui::Text("Skipped objects: %zu", Root::Current().Render().LastFrameSkippedObjects());
-		ImGui::Text("Build time: %.4f ms", Root::Current().Render().LastFrameBuildMs());
-		ImGui::Text("Flush time: %.4f ms", Root::Current().Render().LastFrameFlushMs());
-		ImGui::Separator();
-		ImGui::Text("Debug overlay: %.4f ms", Root::Current().Render().LastFrameDebugOverlayMs());
-		ImGui::Text("Editor GUI/MyGUI: %.4f ms", Root::Current().Render().LastFrameEditorGuiMs());
-		ImGui::Text("UI creator: %.4f ms", Root::Current().Render().LastFrameUiCreatorMs());
-		ImGui::Text("Runtime GUI: %.4f ms", Root::Current().Render().LastFrameRuntimeGuiMs());
-		ImGui::Text("Startup to first draw: %.2f s", m_startupToFirstDrawMs);
-		ImGui::Separator();
-		ImGui::Text("Frame allocator capacity: %.2f KB", static_cast<double>(Root::Current().Render().FrameAllocatorCapacityBytes()) / 1024.0);
-		ImGui::Text("Frame allocator used: %.2f KB", static_cast<double>(Root::Current().Render().FrameAllocatorUsedBytes()) / 1024.0);
-		ImGui::Text("Frame allocator peak: %.2f KB", static_cast<double>(Root::Current().Render().FrameAllocatorPeakBytes()) / 1024.0);
-		ImGui::End();
+		DrawRenderStatsWindow();
 	}
+}
+
+void Debug::DrawRenderStatsWindow()
+{
+	RenderManager& render = Root::Current().Render();
+	const auto& graphics = render.LastFrameGraphicsStats();
+	const std::size_t totalDrawCalls = graphics.mainDrawCalls + graphics.shadowDrawCalls;
+	const std::uint64_t totalTriangles = graphics.mainTriangles + graphics.shadowTriangles;
+	const double frameMs = Root::Current().Profiler().FrameMs();
+	ImGui::Begin("Render Stats", &m_showStatsWindow, ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoBringToFrontOnFocus);
+	ImGui::Text("FPS: %.1f", Root::Current().Profiler().SmoothedFps());
+	ImGui::Text("Frame time: %.3f ms", frameMs);
+	if (frameMs > 16.67)
+		ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.2f, 1.0f), "Over 60 FPS budget by %.3f ms", frameMs - 16.67);
+	const Scene* activeLevel = Root::Current().Scenes().ActiveLevel();
+	ImGui::Text("Scene objects: %zu", activeLevel ? activeLevel->Objects().size() : 0);
+	ImGui::Text("Candidate mesh buffers: %zu", render.LastFrameCommandCount());
+	ImGui::Text("Skipped objects: %zu", render.LastFrameSkippedObjects());
+	ImGui::Text("Camera-visible mesh buffers: %zu",
+		render.LastFrameCommandCount() - render.LastFrameFrustumCulledObjects());
+	ImGui::Text("Camera-frustum culled: %zu", render.LastFrameFrustumCulledObjects());
+	ImGui::TextColored(ImVec4(0.3f, 0.9f, 0.45f, 1.0f),
+		"Main draw calls saved: %zu", render.LastFrameDrawCallsSaved());
+	ImGui::Separator();
+	ImGui::Text("Camera draw calls actually issued: %zu", graphics.mainDrawCalls);
+	ImGui::Text("Shadow-map draw calls (camera-independent): %zu", graphics.shadowDrawCalls);
+	ImGui::Text("Total GPU draw calls: %zu", totalDrawCalls);
+	ImGui::Text("Main triangles: %llu", static_cast<unsigned long long>(graphics.mainTriangles));
+	ImGui::Text("Shadow triangles: %llu", static_cast<unsigned long long>(graphics.shadowTriangles));
+	ImGui::Text("Total submitted triangles: %llu", static_cast<unsigned long long>(totalTriangles));
+	if (totalDrawCalls > 2000)
+		ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.2f, 1.0f), "High draw-call count");
+	else if (totalDrawCalls > 1000)
+		ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.2f, 1.0f), "Elevated draw-call count");
+	ImGui::Separator();
+	ImGui::Text("Build time: %.4f ms", render.LastFrameBuildMs());
+	ImGui::Text("Flush time: %.4f ms", render.LastFrameFlushMs());
+	ImGui::Text("Debug overlay: %.4f ms", render.LastFrameDebugOverlayMs());
+	ImGui::Text("Editor GUI/MyGUI: %.4f ms", render.LastFrameEditorGuiMs());
+	ImGui::Text("Runtime GUI: %.4f ms", render.LastFrameRuntimeGuiMs());
+	ImGui::Separator();
+	ImGui::Text("Frame allocator capacity: %.2f KB", static_cast<double>(render.FrameAllocatorCapacityBytes()) / 1024.0);
+	ImGui::Text("Frame allocator used: %.2f KB", static_cast<double>(render.FrameAllocatorUsedBytes()) / 1024.0);
+	ImGui::Text("Frame allocator peak: %.2f KB", static_cast<double>(render.FrameAllocatorPeakBytes()) / 1024.0);
+	ImGui::End();
 }
 
 void Debug::drawGameModeInput(const Input& input)
 {
 	// Game mode uses this panel to show live input and gameplay state without the editor UI.
 	m_lastFps = static_cast<float>(Root::Current().Profiler().SmoothedFps());
+	if (m_showStatsWindow)
+	{
+		DrawRenderStatsWindow();
+	}
 
 	if (m_showGameInputWindow)
 	{

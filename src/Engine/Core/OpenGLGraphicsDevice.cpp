@@ -7,6 +7,7 @@
 #include "Engine/Core/Mesh.h"
 #include "Engine/Core/ShaderProgram.h"
 #include "Engine/Core/GLHeaders.h"
+#include "Engine/Core/Frustum.h"
 
 #include <algorithm>
 #include <cmath>
@@ -23,6 +24,25 @@ namespace {
 	constexpr int PointShadowMapResolution = 512;
 	constexpr int DirectionalShadowTextureUnit = 3;
 	constexpr int FirstPointShadowTextureUnit = 4;
+
+	int FirstBuffer(const RenderCommand& command)
+	{
+		return command.subMeshIndex >= 0 ? command.subMeshIndex : 0;
+	}
+
+	int BufferEnd(const RenderCommand& command)
+	{
+		return command.subMeshIndex >= 0
+			? std::min(command.subMeshIndex + 1, command.mesh->NumBuffers())
+			: command.mesh->NumBuffers();
+	}
+
+	bool SubMeshVisible(const RenderCommand& command, int subMeshIndex, const Frustum& localFrustum)
+	{
+		return localFrustum.IntersectsAabb(
+			command.mesh->SubMeshMinBounds(subMeshIndex),
+			command.mesh->SubMeshMaxBounds(subMeshIndex));
+	}
 
 	glm::mat4 AiToGlm(const aiMatrix4x4& aiMat)
 	{
@@ -52,7 +72,8 @@ namespace {
 		shader->setUniform("finalBones", glmTransforms);
 	}
 
-	void DrawShadowCasters(const RenderCommand* commands, std::size_t commandCount, const ShaderProgram* shader)
+	void DrawShadowCasters(const RenderCommand* commands, std::size_t commandCount, const ShaderProgram* shader,
+		const glm::mat4* lightViewProjection, std::size_t& drawCalls, std::uint64_t& triangles)
 	{
 		for (std::size_t commandIndex = 0; commandIndex < commandCount; ++commandIndex)
 		{
@@ -64,11 +85,23 @@ namespace {
 
 			shader->setUniform("model", command.modelMatrix);
 			UploadSkinning(command, shader);
-			for (int bufferIndex = 0; bufferIndex < command.mesh->NumBuffers(); ++bufferIndex)
+			const Frustum localLightFrustum = lightViewProjection
+				? Frustum::FromViewProjection(*lightViewProjection * command.modelMatrix)
+				: Frustum{};
+			for (int bufferIndex = FirstBuffer(command); bufferIndex < BufferEnd(command); ++bufferIndex)
 			{
+				// Animated bind-pose bounds are not conservative, so only static
+				// submeshes participate in shadow-frustum culling.
+				if (lightViewProjection && !command.isSkinned &&
+					!SubMeshVisible(command, bufferIndex, localLightFrustum))
+				{
+					continue;
+				}
 				command.mesh->Bind(bufferIndex);
 				glDrawElements(GL_TRIANGLES, command.mesh->FacesSize(bufferIndex), GL_UNSIGNED_INT,
 					reinterpret_cast<void*>(static_cast<uintptr_t>(command.mesh->FacesOffset(bufferIndex) * sizeof(uint32_t))));
+				++drawCalls;
+				triangles += static_cast<std::uint64_t>(command.mesh->FacesSize(bufferIndex)) / 3u;
 				command.mesh->UnBind();
 			}
 		}
@@ -261,6 +294,7 @@ OpenGLGraphicsDevice::~OpenGLGraphicsDevice()
 
 void OpenGLGraphicsDevice::BeginFrame()
 {
+	m_frameStats = {};
 	if (m_platform)
 	{
 		// Make the window's context current and update the viewport before any draw calls.
@@ -349,7 +383,8 @@ void OpenGLGraphicsDevice::RenderShadowMaps(const RenderCommand* commands, std::
 			glClear(GL_DEPTH_BUFFER_BIT);
 			m_shadowShader->activate();
 			m_shadowShader->setUniform("lightSpaceMatrix", m_lightSpaceMatrix);
-			DrawShadowCasters(commands, commandCount, m_shadowShader.get());
+			DrawShadowCasters(commands, commandCount, m_shadowShader.get(), &m_lightSpaceMatrix,
+				m_frameStats.shadowDrawCalls, m_frameStats.shadowTriangles);
 			m_shadowMapReady = true;
 			renderedAnyShadowMap = true;
 		}
@@ -395,8 +430,10 @@ void OpenGLGraphicsDevice::RenderShadowMaps(const RenderCommand* commands, std::
 					pointLight.position,
 					pointLight.position + faceDirections[face],
 					faceUpDirections[face]);
-				m_pointShadowShader->setUniform("shadowMatrix", shadowProjection * shadowView);
-				DrawShadowCasters(commands, commandCount, m_pointShadowShader.get());
+				const glm::mat4 shadowMatrix = shadowProjection * shadowView;
+				m_pointShadowShader->setUniform("shadowMatrix", shadowMatrix);
+				DrawShadowCasters(commands, commandCount, m_pointShadowShader.get(), &shadowMatrix,
+					m_frameStats.shadowDrawCalls, m_frameStats.shadowTriangles);
 			}
 			m_pointShadowMapsReady[lightIndex] = true;
 			renderedAnyShadowMap = true;
@@ -416,6 +453,51 @@ void OpenGLGraphicsDevice::RenderShadowMaps(const RenderCommand* commands, std::
 
 void OpenGLGraphicsDevice::Draw(const RenderCommand& command, const Camera& camera, const LightingManager& lightingManager)
 {
+	DrawInternal(command, camera, lightingManager, nullptr, nullptr, nullptr);
+}
+
+void OpenGLGraphicsDevice::DrawCulled(const RenderCommand& command, const Camera& camera,
+	const LightingManager& lightingManager, const Frustum& frustum,
+	std::size_t& visibleSubMeshes, std::size_t& culledSubMeshes)
+{
+	DrawInternal(command, camera, lightingManager, &frustum, &visibleSubMeshes, &culledSubMeshes);
+}
+
+void OpenGLGraphicsDevice::DrawInternal(const RenderCommand& command, const Camera& camera,
+	const LightingManager& lightingManager, const Frustum* frustum,
+	std::size_t* visibleSubMeshes, std::size_t* culledSubMeshes)
+{
+	// Test the complete batch before doing any shader, lighting, or texture work.
+	// This matters for grouped level entities whose aggregate AABB intersects the
+	// frustum even though every individual imported mesh is outside it.
+	if (frustum)
+	{
+		const Frustum localFrustum = Frustum::FromViewProjection(
+			camera.GetProjectionMatrix() * camera.GetViewMatrix() * command.modelMatrix);
+
+		bool anyVisible = false;
+
+		for (int bufferIndex = FirstBuffer(command); bufferIndex < BufferEnd(command); ++bufferIndex)
+		{
+			if (SubMeshVisible(command, bufferIndex, localFrustum))
+			{
+				anyVisible = true;
+				if (visibleSubMeshes) ++(*visibleSubMeshes);
+			}
+			else if (culledSubMeshes)
+			{
+				++(*culledSubMeshes);
+			}
+		}
+		if (!anyVisible)
+		{
+			return;
+		}
+	}
+	const Frustum localFrustum = frustum
+		? Frustum::FromViewProjection(camera.GetProjectionMatrix() * camera.GetViewMatrix() * command.modelMatrix)
+		: Frustum{};
+
 	command.shader->activate();
 
 	command.shader->setUniform("baseTexture", 0);
@@ -431,14 +513,19 @@ void OpenGLGraphicsDevice::Draw(const RenderCommand& command, const Camera& came
 	command.shader->setUniform("lightSpaceMatrix", m_lightSpaceMatrix);
 	command.shader->setUniform("directionalShadowEnabled",
 		lightingManager.ShadowsEnabled() && lightingManager.SunLight().castsShadows && m_shadowMapReady);
+
 	for (int lightIndex = 0; lightIndex < LightingManager::MaxPointLights; ++lightIndex)
 	{
 		const std::string index = std::to_string(lightIndex);
+
 		const bool lightCastsShadows = lightIndex < static_cast<int>(lightingManager.PointLights().size()) &&
 			lightingManager.PointLights()[lightIndex].castsShadows;
+
 		command.shader->setUniform("pointShadowMap" + index, FirstPointShadowTextureUnit + lightIndex);
+
 		command.shader->setUniform("pointShadowReady[" + index + "]",
 			lightingManager.ShadowsEnabled() && lightCastsShadows && m_pointShadowMapsReady[lightIndex]);
+
 		command.shader->setUniform("pointShadowFarPlanes[" + index + "]", m_pointShadowFarPlanes[lightIndex]);
 	}
 
@@ -447,14 +534,19 @@ void OpenGLGraphicsDevice::Draw(const RenderCommand& command, const Camera& came
 	UploadSkinning(command, command.shader);
 	glActiveTexture(GL_TEXTURE0 + DirectionalShadowTextureUnit);
 	glBindTexture(GL_TEXTURE_2D, m_shadowDepthTexture);
+
 	for (int lightIndex = 0; lightIndex < LightingManager::MaxPointLights; ++lightIndex)
 	{
 		glActiveTexture(GL_TEXTURE0 + FirstPointShadowTextureUnit + lightIndex);
 		glBindTexture(GL_TEXTURE_CUBE_MAP, m_pointShadowDepthTextures[lightIndex]);
 	}
 
-	int numBuffs = command.mesh->NumBuffers();
-	for (int j = 0; j < numBuffs; j++) {
+	for (int j = FirstBuffer(command); j < BufferEnd(command); ++j) 
+	{
+		if (frustum && !SubMeshVisible(command, j, localFrustum))
+		{
+			continue;
+		}
 		const SubMeshMaterial& mat = command.mesh->GetMaterial(j);
 		command.shader->setUniform("material", mat.phong);
 		command.shader->setUniform("ambientColor", mat.ambientColor);
@@ -462,11 +554,16 @@ void OpenGLGraphicsDevice::Draw(const RenderCommand& command, const Camera& came
 		command.shader->setUniform("hasSpecularTexture", command.mesh->HasSpecularTexture(j));
 		command.shader->setUniform("hasNormalTexture", command.mesh->HasNormalTexture(j));
 		command.mesh->Bind(j);
+
 		glDrawElements(GL_TRIANGLES, command.mesh->FacesSize(j), GL_UNSIGNED_INT, reinterpret_cast<void*>(static_cast<uintptr_t>(command.mesh->FacesOffset(j) * sizeof(uint32_t))));
+		++m_frameStats.mainDrawCalls;
+		m_frameStats.mainTriangles += static_cast<std::uint64_t>(command.mesh->FacesSize(j)) / 3u;
 		command.mesh->UnBind();
 	}
+
 	glActiveTexture(GL_TEXTURE0 + DirectionalShadowTextureUnit);
 	glBindTexture(GL_TEXTURE_2D, 0);
+
 	for (int lightIndex = 0; lightIndex < LightingManager::MaxPointLights; ++lightIndex)
 	{
 		glActiveTexture(GL_TEXTURE0 + FirstPointShadowTextureUnit + lightIndex);
@@ -517,7 +614,7 @@ void OpenGLGraphicsDevice::DrawSelectionOutline(const RenderCommand& command, co
 	UploadSkinning(command, m_selectionOutlineShader.get());
 	const auto drawSelectedMesh = [&command]()
 	{
-		for (int bufferIndex = 0; bufferIndex < command.mesh->NumBuffers(); ++bufferIndex)
+		for (int bufferIndex = FirstBuffer(command); bufferIndex < BufferEnd(command); ++bufferIndex)
 		{
 			command.mesh->Bind(bufferIndex);
 			glDrawElements(GL_TRIANGLES, command.mesh->FacesSize(bufferIndex), GL_UNSIGNED_INT,

@@ -156,6 +156,7 @@ public:
 	void SetLevelColliderFaceEditMode(bool enabled) { m_levelColliderFaceEditMode = enabled; }
 
 private:
+	void DrawRenderStatsWindow();
 	// Rebuilds the axis/grid helpers when the grid configuration changes.
 	void RebuildGrid();
 	void RebuildAxis();

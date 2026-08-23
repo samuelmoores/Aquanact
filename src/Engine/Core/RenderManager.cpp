@@ -13,6 +13,7 @@
 #include "Engine/Core/SceneManager.h"
 #include "Engine/Core/ProjectStateData.h"
 #include "Engine/Core/FrameProfiler.h"
+#include "Engine/Core/Frustum.h"
 #include "Game/PlayerController.h"
 
 #include <chrono>
@@ -52,6 +53,8 @@ void RenderManager::startUp(Window& window)
 	m_commandCount = 0;
 	m_lastFrameCommandCount = 0;
 	m_lastFrameSkippedObjects = 0;
+	m_lastFrameFrustumCulledObjects = 0;
+	m_lastFrameDrawCallsSaved = 0;
 	m_lastFrameBuildTime = std::chrono::duration<double, std::milli>{ 0.0 };
 	m_lastFrameFlushTime = std::chrono::duration<double, std::milli>{ 0.0 };
 	m_lastFrameDebugOverlayTime = std::chrono::duration<double, std::milli>{ 0.0 };
@@ -332,6 +335,8 @@ void RenderManager::ResetFrameState()
 {
 	m_lastFrameCommandCount = 0;
 	m_lastFrameSkippedObjects = 0;
+	m_lastFrameFrustumCulledObjects = 0;
+	m_lastFrameDrawCallsSaved = 0;
 	m_frameAllocator.Reset();
 	m_commands = nullptr;
 	if (m_commandCapacity > 0)
@@ -371,13 +376,12 @@ void RenderManager::BuildRenderCommands(FrontEndManager& frontEndManager, SceneM
 			continue;
 		}
 
-		Submit(RenderCommand{
-			object->GetMesh(),
-			object->GetShader(),
-			object->BuildModelMatrix(),
-			object->skinned(),
-			object->Id()
-		});
+		glm::vec3 worldBoundsMin(0.0f);
+		glm::vec3 worldBoundsMax(0.0f);
+		const bool hasWorldBounds = object->WorldAABB(worldBoundsMin, worldBoundsMax);
+		Submit(RenderCommand{ object->GetMesh(), object->GetShader(),
+			object->BuildModelMatrix(), object->skinned(), object->Id(),
+			worldBoundsMin, worldBoundsMax, hasWorldBounds, -1 });
 	}
 }
 
@@ -494,11 +498,52 @@ void RenderManager::Submit(const RenderCommand& command)
 void RenderManager::Flush(const Camera& camera, unsigned int /*selectedEntityId*/)
 {
 	const auto flushStart = std::chrono::high_resolution_clock::now();
-	m_lastFrameCommandCount = m_commandCount;
+	m_lastFrameCommandCount = 0;
+
+	for (std::size_t i = 0; i < m_commandCount; ++i)
+	{
+		m_lastFrameCommandCount += static_cast<std::size_t>(
+			std::max(m_commands[i].mesh->NumBuffers(), 0));
+	}
+
 	m_device.RenderShadowMaps(m_commands, m_commandCount, *m_lightingManager);
-	for (std::size_t i = 0; i < m_commandCount; ++i) {
+
+	const Frustum frustum = Frustum::FromViewProjection(
+		camera.GetProjectionMatrix() * camera.GetViewMatrix());
+
+	for (std::size_t i = 0; i < m_commandCount; ++i) 
+	{
 		const RenderCommand& command = m_commands[i];
-		m_device.Draw(command, camera, *m_lightingManager);
+
+		// Commands without trustworthy bounds remain visible. Shadow maps receive
+		// the full list above because off-camera entities can cast visible shadows.
+		if (command.hasWorldBounds &&
+			!frustum.IntersectsAabb(command.worldBoundsMin, command.worldBoundsMax))
+		{
+			const std::size_t subMeshCount = static_cast<std::size_t>(
+				std::max(command.mesh->NumBuffers(), 0));
+
+			m_lastFrameFrustumCulledObjects += subMeshCount;
+			m_lastFrameDrawCallsSaved += subMeshCount;
+
+			continue;
+		}
+
+		if (command.isSkinned)
+		{
+			m_device.Draw(command, camera, *m_lightingManager);
+		}
+		else
+		{
+			std::size_t visibleSubMeshes = 0;
+			std::size_t culledSubMeshes = 0;
+
+			m_device.DrawCulled(command, camera, *m_lightingManager, frustum,
+				visibleSubMeshes, culledSubMeshes);
+
+			m_lastFrameFrustumCulledObjects += culledSubMeshes;
+			m_lastFrameDrawCallsSaved += culledSubMeshes;
+		}
 	}
 
 	m_commandCount = 0;
@@ -598,6 +643,16 @@ std::size_t RenderManager::LastFrameCommandCount() const
 std::size_t RenderManager::LastFrameSkippedObjects() const
 {
 	return m_lastFrameSkippedObjects;
+}
+
+std::size_t RenderManager::LastFrameFrustumCulledObjects() const
+{
+	return m_lastFrameFrustumCulledObjects;
+}
+
+std::size_t RenderManager::LastFrameDrawCallsSaved() const
+{
+	return m_lastFrameDrawCallsSaved;
 }
 
 double RenderManager::LastFrameBuildMs() const

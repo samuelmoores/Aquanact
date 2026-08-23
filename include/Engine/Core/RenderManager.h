@@ -59,6 +59,8 @@ public:
 
 	std::size_t LastFrameCommandCount() const;
 	std::size_t LastFrameSkippedObjects() const;
+	std::size_t LastFrameFrustumCulledObjects() const;
+	std::size_t LastFrameDrawCallsSaved() const;
 	double LastFrameBuildMs() const;
 	double LastFrameFlushMs() const;
 	double LastFrameDebugOverlayMs() const;
@@ -68,6 +70,7 @@ public:
 	std::size_t FrameAllocatorCapacityBytes() const;
 	std::size_t FrameAllocatorUsedBytes() const;
 	std::size_t FrameAllocatorPeakBytes() const;
+	const OpenGLGraphicsDevice::FrameStats& LastFrameGraphicsStats() const { return m_device.Stats(); }
 
 private:
 	void ResetFrameState();
@@ -99,6 +102,8 @@ private:
 	std::size_t m_commandCount = 0;
 	std::size_t m_lastFrameCommandCount = 0;
 	std::size_t m_lastFrameSkippedObjects = 0;
+	std::size_t m_lastFrameFrustumCulledObjects = 0;
+	std::size_t m_lastFrameDrawCallsSaved = 0;
 	std::chrono::duration<double, std::milli> m_lastFrameBuildTime{ 0.0 };
 	std::chrono::duration<double, std::milli> m_lastFrameFlushTime{ 0.0 };
 	std::chrono::duration<double, std::milli> m_lastFrameDebugOverlayTime{ 0.0 };

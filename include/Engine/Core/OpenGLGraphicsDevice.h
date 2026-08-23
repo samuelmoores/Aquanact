@@ -12,9 +12,16 @@
 
 class Window;
 class LightingManager;
+class Frustum;
 
 class OpenGLGraphicsDevice final : public GraphicsDevice {
 public:
+	struct FrameStats {
+		std::size_t mainDrawCalls = 0;
+		std::size_t shadowDrawCalls = 0;
+		std::uint64_t mainTriangles = 0;
+		std::uint64_t shadowTriangles = 0;
+	};
 	OpenGLGraphicsDevice() = default;
 	~OpenGLGraphicsDevice() override;
 	void startUp(Window& window);
@@ -29,13 +36,20 @@ public:
 	void RenderShadowMaps(const RenderCommand* commands, std::size_t commandCount, const LightingManager& lightingManager);
 
 	void Draw(const RenderCommand& command, const Camera& camera, const LightingManager& lightingManager) override;
+	void DrawCulled(const RenderCommand& command, const Camera& camera,
+		const LightingManager& lightingManager, const Frustum& frustum,
+		std::size_t& visibleSubMeshes, std::size_t& culledSubMeshes);
 	void DrawSelected(const RenderCommand& command, const Camera& camera, const LightingManager& lightingManager);
 	void DrawSelectionOutline(const RenderCommand& command, const Camera& camera);
+	const FrameStats& Stats() const { return m_frameStats; }
 
 private:
 	void startUp() override;
 	void InitializeShadowMap();
 	void ReleaseShadowMap();
+	void DrawInternal(const RenderCommand& command, const Camera& camera,
+		const LightingManager& lightingManager, const Frustum* frustum,
+		std::size_t* visibleSubMeshes, std::size_t* culledSubMeshes);
 	std::unique_ptr<OpenGLGraphics> m_platform;
 	std::unique_ptr<class ShaderProgram> m_shadowShader;
 	std::unique_ptr<class ShaderProgram> m_pointShadowShader;
@@ -50,6 +64,7 @@ private:
 	glm::mat4 m_lightSpaceMatrix{ 1.0f };
 	bool m_shadowMapReady = false;
 	bool m_initialized = false;
+	FrameStats m_frameStats;
 };
 
 

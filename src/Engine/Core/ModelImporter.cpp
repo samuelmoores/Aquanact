@@ -63,10 +63,14 @@ ImportedModel ModelImporter::Import(const std::string& path, bool flipUvs) const
 		const aiMesh* mesh = model.scene->mMeshes[i];
 		const int numVertices = static_cast<int>(mesh->mNumVertices);
 		const int numBones = static_cast<int>(mesh->mNumBones);
+		glm::vec3 subMeshMin(FLT_MAX);
+		glm::vec3 subMeshMax(-FLT_MAX);
 
 		for (int v = 0; v < numVertices; ++v)
 		{
 			glm::vec3 position{ mesh->mVertices[v].x, mesh->mVertices[v].y, mesh->mVertices[v].z };
+			subMeshMin = glm::min(subMeshMin, position);
+			subMeshMax = glm::max(subMeshMax, position);
 			glm::vec2 texCoord{ 0.0f };
 			if (mesh->mTextureCoords[0])
 			{
@@ -96,6 +100,8 @@ ImportedModel ModelImporter::Import(const std::string& path, bool flipUvs) const
 		}
 
 		model.facesSize.push_back(static_cast<int>(mesh->mNumFaces * VERTICES_PER_FACE));
+		model.subMeshMinBounds.push_back(subMeshMin);
+		model.subMeshMaxBounds.push_back(subMeshMax);
 
 		model.skinned = model.skinned || mesh->mNumBones != 0;
 		if (model.skinned)

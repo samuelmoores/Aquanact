@@ -86,6 +86,8 @@ void Mesh::AdoptImportedModel(ImportedModel&& importedModel)
 	m_vertices = std::move(importedModel.vertices); // Final imported vertex buffer for GPU upload.
 	m_faces = std::move(importedModel.faces); // Final imported index buffer for GPU upload.
 	m_facesSize = std::move(importedModel.facesSize); // One index-count entry per imported submesh.
+	m_subMeshMinBounds = std::move(importedModel.subMeshMinBounds);
+	m_subMeshMaxBounds = std::move(importedModel.subMeshMaxBounds);
 	m_materials = std::move(importedModel.materials); // Per-submesh material parameters.
 	m_faceOffsets.clear();
 	int runningOffset = 0;
@@ -389,6 +391,16 @@ uint32_t Mesh::FacesOffset(int index) const
 	if (index < 0 || index >= static_cast<int>(m_faceOffsets.size()))
 		return 0;
 	return static_cast<uint32_t>(m_faceOffsets[index]);
+}
+
+const glm::vec3& Mesh::SubMeshMinBounds(int index) const
+{
+	return m_subMeshMinBounds.at(static_cast<std::size_t>(index));
+}
+
+const glm::vec3& Mesh::SubMeshMaxBounds(int index) const
+{
+	return m_subMeshMaxBounds.at(static_cast<std::size_t>(index));
 }
 
 void Mesh::SetAmbientColor(int index, glm::vec3 color)
