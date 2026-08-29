@@ -8,6 +8,7 @@
 #include "Engine/Core/ShaderProgram.h"
 #include "Engine/Core/GLHeaders.h"
 #include "Engine/Core/Frustum.h"
+#include "Engine/Core/OccluderSelector.h"
 
 #include <algorithm>
 #include <chrono>
@@ -171,7 +172,69 @@ void OpenGLGraphicsDevice::startUp()
 	}
 	m_platform->startUp(*m_window);
 	InitializeShadowMap();
+	InitializeOcclusionQueries();
 	m_initialized = true;
+}
+
+void OpenGLGraphicsDevice::InitializeOcclusionQueries()
+{
+	constexpr std::size_t QueryPoolSize = 128;
+	m_occlusionBoundsShader = std::make_unique<ShaderProgram>();
+	m_occlusionBoundsShader->load("shaders/occlusion_bounds.vert", "shaders/occlusion_bounds.frag");
+
+	const float vertices[] = {
+		-0.5f, -0.5f, -0.5f,  0.5f, -0.5f, -0.5f,
+		 0.5f,  0.5f, -0.5f, -0.5f,  0.5f, -0.5f,
+		-0.5f, -0.5f,  0.5f,  0.5f, -0.5f,  0.5f,
+		 0.5f,  0.5f,  0.5f, -0.5f,  0.5f,  0.5f
+	};
+	const std::uint16_t indices[] = {
+		0, 1, 2, 0, 2, 3, 4, 6, 5, 4, 7, 6,
+		0, 4, 5, 0, 5, 1, 3, 2, 6, 3, 6, 7,
+		0, 3, 7, 0, 7, 4, 1, 5, 6, 1, 6, 2
+	};
+
+	glGenVertexArrays(1, &m_occlusionBoundsVao);
+	glGenBuffers(1, &m_occlusionBoundsVbo);
+	glGenBuffers(1, &m_occlusionBoundsEbo);
+	glBindVertexArray(m_occlusionBoundsVao);
+	glBindBuffer(GL_ARRAY_BUFFER, m_occlusionBoundsVbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_occlusionBoundsEbo);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
+	glBindVertexArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	m_occlusionQueryPool.resize(QueryPoolSize);
+	std::vector<std::uint32_t> queryIds(QueryPoolSize);
+	glGenQueries(static_cast<GLsizei>(queryIds.size()), queryIds.data());
+	for (std::size_t index = 0; index < QueryPoolSize; ++index)
+	{
+		m_occlusionQueryPool[index].id = queryIds[index];
+	}
+}
+
+void OpenGLGraphicsDevice::ReleaseOcclusionQueries()
+{
+	std::vector<std::uint32_t> queryIds;
+	queryIds.reserve(m_occlusionQueryPool.size());
+	for (const QuerySlot& slot : m_occlusionQueryPool)
+	{
+		if (slot.id != 0) queryIds.push_back(slot.id);
+	}
+	if (!queryIds.empty())
+		glDeleteQueries(static_cast<GLsizei>(queryIds.size()), queryIds.data());
+	m_occlusionQueryPool.clear();
+
+	if (m_occlusionBoundsEbo != 0) glDeleteBuffers(1, &m_occlusionBoundsEbo);
+	if (m_occlusionBoundsVbo != 0) glDeleteBuffers(1, &m_occlusionBoundsVbo);
+	if (m_occlusionBoundsVao != 0) glDeleteVertexArrays(1, &m_occlusionBoundsVao);
+	m_occlusionBoundsEbo = 0;
+	m_occlusionBoundsVbo = 0;
+	m_occlusionBoundsVao = 0;
+	m_occlusionBoundsShader.reset();
 }
 
 void OpenGLGraphicsDevice::InitializeShadowMap()
@@ -277,6 +340,7 @@ void OpenGLGraphicsDevice::ReleaseShadowMap()
 
 void OpenGLGraphicsDevice::shutDown()
 {
+	ReleaseOcclusionQueries();
 	ReleaseShadowMap();
 	if (m_platform)
 	{
@@ -464,21 +528,251 @@ void OpenGLGraphicsDevice::RenderShadowMaps(const RenderCommand* commands, std::
 		std::chrono::high_resolution_clock::now() - shadowPassStart).count();
 }
 
+void OpenGLGraphicsDevice::RenderOccluderDepth(const RenderCommand* commands,
+	std::size_t commandCount, const std::vector<SelectedOccluder>& occluders,
+	const Camera& camera)
+{
+	if (!commands || occluders.empty() || !m_shadowShader)
+	{
+		return;
+	}
+
+	const auto passStart = std::chrono::high_resolution_clock::now();
+	GLboolean colorMask[4] = { GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE };
+	glGetBooleanv(GL_COLOR_WRITEMASK, colorMask);
+	GLboolean depthMask = GL_TRUE;
+	glGetBooleanv(GL_DEPTH_WRITEMASK, &depthMask);
+	GLint depthFunction = GL_LESS;
+	glGetIntegerv(GL_DEPTH_FUNC, &depthFunction);
+	const GLboolean depthTestEnabled = glIsEnabled(GL_DEPTH_TEST);
+	const GLboolean blendEnabled = glIsEnabled(GL_BLEND);
+	const GLboolean polygonOffsetEnabled = glIsEnabled(GL_POLYGON_OFFSET_FILL);
+	GLfloat polygonOffsetFactor = 0.0f;
+	GLfloat polygonOffsetUnits = 0.0f;
+	glGetFloatv(GL_POLYGON_OFFSET_FACTOR, &polygonOffsetFactor);
+	glGetFloatv(GL_POLYGON_OFFSET_UNITS, &polygonOffsetUnits);
+
+	glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+	glDepthMask(GL_TRUE);
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LESS);
+	glDisable(GL_BLEND);
+	// Push prepass depth slightly away from the camera so the normal GL_LESS
+	// main pass can redraw the same surfaces and populate color normally.
+	glEnable(GL_POLYGON_OFFSET_FILL);
+	glPolygonOffset(1.0f, 1.0f);
+
+	m_shadowShader->activate();
+	// shadow_depth.vert names this camera transform lightSpaceMatrix; using a
+	// nonexistent shadowMatrix leaves the uniform at its default and clips the
+	// entire prepass, making every occlusion query report visible.
+	m_shadowShader->setUniform("lightSpaceMatrix",
+		camera.GetProjectionMatrix() * camera.GetViewMatrix());
+	m_shadowShader->setUniform("skinned", false);
+
+	for (const SelectedOccluder& selected : occluders)
+	{
+		const RenderCommand* command = nullptr;
+		for (std::size_t commandIndex = 0; commandIndex < commandCount; ++commandIndex)
+		{
+			if (commands[commandIndex].entityId == selected.key.entityId)
+			{
+				command = &commands[commandIndex];
+				break;
+			}
+		}
+		if (!command || !command->mesh || command->isSkinned) continue;
+		if (selected.key.subMeshIndex < 0 ||
+			selected.key.subMeshIndex >= command->mesh->NumBuffers()) continue;
+
+		m_shadowShader->setUniform("model", command->modelMatrix);
+		command->mesh->Bind(selected.key.subMeshIndex);
+		glDrawElements(GL_TRIANGLES, command->mesh->FacesSize(selected.key.subMeshIndex),
+			GL_UNSIGNED_INT, reinterpret_cast<void*>(static_cast<uintptr_t>(
+				command->mesh->FacesOffset(selected.key.subMeshIndex) * sizeof(uint32_t))));
+		++m_frameStats.occluderPrepassDrawCalls;
+		m_frameStats.occluderPrepassTriangles += static_cast<std::uint64_t>(
+			command->mesh->FacesSize(selected.key.subMeshIndex)) / 3u;
+		command->mesh->UnBind();
+	}
+
+	glColorMask(colorMask[0], colorMask[1], colorMask[2], colorMask[3]);
+	glDepthMask(depthMask);
+	glDepthFunc(depthFunction);
+	if (depthTestEnabled) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
+	if (blendEnabled) glEnable(GL_BLEND); else glDisable(GL_BLEND);
+	glPolygonOffset(polygonOffsetFactor, polygonOffsetUnits);
+	if (polygonOffsetEnabled) glEnable(GL_POLYGON_OFFSET_FILL); else glDisable(GL_POLYGON_OFFSET_FILL);
+	glUseProgram(0);
+	glBindVertexArray(0);
+	m_frameStats.occluderPrepassMs = std::chrono::duration<double, std::milli>(
+		std::chrono::high_resolution_clock::now() - passStart).count();
+}
+
+void OpenGLGraphicsDevice::PollOcclusionQueries(
+	std::vector<OcclusionQueryResult>& results)
+{
+	const auto pollStart = std::chrono::high_resolution_clock::now();
+	results.clear();
+	for (QuerySlot& slot : m_occlusionQueryPool)
+	{
+		if (!slot.pending) continue;
+		GLint available = GL_FALSE;
+		glGetQueryObjectiv(slot.id, GL_QUERY_RESULT_AVAILABLE, &available);
+		if (available == GL_FALSE) continue;
+
+		GLuint samplesPassed = GL_TRUE;
+		glGetQueryObjectuiv(slot.id, GL_QUERY_RESULT, &samplesPassed);
+		results.push_back({ slot.nodeIndex, slot.generation, samplesPassed != GL_FALSE });
+		++m_frameStats.occlusionQueryResults;
+		if (samplesPassed != GL_FALSE)
+			++m_frameStats.occlusionVisibleResults;
+		else
+			++m_frameStats.occlusionOccludedResults;
+		slot.pending = false;
+		slot.nodeIndex = OcclusionBvh::InvalidIndex;
+	}
+
+	m_frameStats.occlusionQueriesPending = 0;
+	for (const QuerySlot& slot : m_occlusionQueryPool)
+		if (slot.pending) ++m_frameStats.occlusionQueriesPending;
+	m_frameStats.occlusionQueryPollMs = std::chrono::duration<double, std::milli>(
+		std::chrono::high_resolution_clock::now() - pollStart).count();
+}
+
+void OpenGLGraphicsDevice::IssueOcclusionQueries(const OcclusionBvh& bvh,
+	const std::vector<std::uint32_t>& nodeIndices, std::uint64_t generation,
+	const Camera& camera)
+{
+	const auto issueStart = std::chrono::high_resolution_clock::now();
+	if (!m_occlusionBoundsShader || m_occlusionBoundsVao == 0 || nodeIndices.empty())
+		return;
+
+	GLboolean colorMask[4] = { GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE };
+	glGetBooleanv(GL_COLOR_WRITEMASK, colorMask);
+	GLboolean depthMask = GL_TRUE;
+	glGetBooleanv(GL_DEPTH_WRITEMASK, &depthMask);
+	GLint depthFunction = GL_LESS;
+	glGetIntegerv(GL_DEPTH_FUNC, &depthFunction);
+	const GLboolean depthTestEnabled = glIsEnabled(GL_DEPTH_TEST);
+	const GLboolean blendEnabled = glIsEnabled(GL_BLEND);
+	const GLboolean cullEnabled = glIsEnabled(GL_CULL_FACE);
+
+	glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+	glDepthMask(GL_FALSE);
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LESS);
+	glDisable(GL_BLEND);
+	glDisable(GL_CULL_FACE);
+	m_occlusionBoundsShader->activate();
+	m_occlusionBoundsShader->setUniform("viewProjection",
+		camera.GetProjectionMatrix() * camera.GetViewMatrix());
+	glBindVertexArray(m_occlusionBoundsVao);
+
+	const auto& nodes = bvh.Nodes();
+	const Frustum cameraFrustum = Frustum::FromViewProjection(
+		camera.GetProjectionMatrix() * camera.GetViewMatrix());
+	for (const std::uint32_t nodeIndex : nodeIndices)
+	{
+		if (nodeIndex >= nodes.size()) continue;
+		if (!cameraFrustum.IntersectsAabb(
+			nodes[nodeIndex].boundsMin, nodes[nodeIndex].boundsMax)) continue;
+		const glm::vec3 cameraPosition = camera.GetPosition();
+		const glm::vec3 cameraMargin(0.05f);
+		if (glm::all(glm::greaterThanEqual(cameraPosition,
+			nodes[nodeIndex].boundsMin - cameraMargin)) &&
+			glm::all(glm::lessThanEqual(cameraPosition,
+				nodes[nodeIndex].boundsMax + cameraMargin)))
+		{
+			// A proxy surrounding the eye can be clipped completely even though
+			// its contents are visible. Such a node must remain conservative.
+			continue;
+		}
+		bool alreadyPending = false;
+		for (const QuerySlot& slot : m_occlusionQueryPool)
+		{
+			if (slot.pending && slot.generation == generation && slot.nodeIndex == nodeIndex)
+			{
+				alreadyPending = true;
+				break;
+			}
+		}
+		if (alreadyPending) continue;
+
+		QuerySlot* availableSlot = nullptr;
+		for (QuerySlot& slot : m_occlusionQueryPool)
+		{
+			if (!slot.pending)
+			{
+				availableSlot = &slot;
+				break;
+			}
+		}
+		if (!availableSlot) break;
+
+		const OcclusionBvhNode& node = nodes[nodeIndex];
+		const glm::vec3 center = (node.boundsMin + node.boundsMax) * 0.5f;
+		const glm::vec3 size = node.boundsMax - node.boundsMin;
+		const glm::vec3 expansion = glm::max(size * 0.01f, glm::vec3(0.01f));
+		const glm::mat4 model = glm::translate(glm::mat4(1.0f), center) *
+			glm::scale(glm::mat4(1.0f), size + expansion * 2.0f);
+		m_occlusionBoundsShader->setUniform("model", model);
+
+		glBeginQuery(GL_ANY_SAMPLES_PASSED, availableSlot->id);
+		glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_SHORT, nullptr);
+		glEndQuery(GL_ANY_SAMPLES_PASSED);
+		availableSlot->pending = true;
+		availableSlot->nodeIndex = nodeIndex;
+		availableSlot->generation = generation;
+		++m_frameStats.occlusionQueriesIssued;
+	}
+
+	glBindVertexArray(0);
+	glColorMask(colorMask[0], colorMask[1], colorMask[2], colorMask[3]);
+	glDepthMask(depthMask);
+	glDepthFunc(depthFunction);
+	if (depthTestEnabled) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
+	if (blendEnabled) glEnable(GL_BLEND); else glDisable(GL_BLEND);
+	if (cullEnabled) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE);
+	glUseProgram(0);
+
+	m_frameStats.occlusionQueriesPending = 0;
+	for (const QuerySlot& slot : m_occlusionQueryPool)
+		if (slot.pending) ++m_frameStats.occlusionQueriesPending;
+	m_frameStats.occlusionQueryIssueMs = std::chrono::duration<double, std::milli>(
+		std::chrono::high_resolution_clock::now() - issueStart).count();
+}
+
+int OpenGLGraphicsDevice::ViewportWidth() const
+{
+	return m_platform ? m_platform->ViewportWidth() : 0;
+}
+
+int OpenGLGraphicsDevice::ViewportHeight() const
+{
+	return m_platform ? m_platform->ViewportHeight() : 0;
+}
+
 void OpenGLGraphicsDevice::Draw(const RenderCommand& command, const Camera& camera, const LightingManager& lightingManager)
 {
-	DrawInternal(command, camera, lightingManager, nullptr, nullptr, nullptr);
+	DrawInternal(command, camera, lightingManager, nullptr, nullptr, nullptr, nullptr, nullptr);
 }
 
 void OpenGLGraphicsDevice::DrawCulled(const RenderCommand& command, const Camera& camera,
 	const LightingManager& lightingManager, const Frustum& frustum,
-	std::size_t& visibleSubMeshes, std::size_t& culledSubMeshes)
+	std::size_t& visibleSubMeshes, std::size_t& culledSubMeshes,
+	const std::vector<std::uint8_t>* occlusionVisibility,
+	std::size_t* occlusionCulledSubMeshes)
 {
-	DrawInternal(command, camera, lightingManager, &frustum, &visibleSubMeshes, &culledSubMeshes);
+	DrawInternal(command, camera, lightingManager, &frustum, &visibleSubMeshes,
+		&culledSubMeshes, occlusionVisibility, occlusionCulledSubMeshes);
 }
 
 void OpenGLGraphicsDevice::DrawInternal(const RenderCommand& command, const Camera& camera,
 	const LightingManager& lightingManager, const Frustum* frustum,
-	std::size_t* visibleSubMeshes, std::size_t* culledSubMeshes)
+	std::size_t* visibleSubMeshes, std::size_t* culledSubMeshes,
+	const std::vector<std::uint8_t>* occlusionVisibility,
+	std::size_t* occlusionCulledSubMeshes)
 {
 	// Test the complete batch before doing any shader, lighting, or texture work.
 	// This matters for grouped level entities whose aggregate AABB intersects the
@@ -493,6 +787,13 @@ void OpenGLGraphicsDevice::DrawInternal(const RenderCommand& command, const Came
 
 		for (int bufferIndex = FirstBuffer(command); bufferIndex < BufferEnd(command); ++bufferIndex)
 		{
+			if (occlusionVisibility &&
+				(static_cast<std::size_t>(bufferIndex) >= occlusionVisibility->size() ||
+				(*occlusionVisibility)[static_cast<std::size_t>(bufferIndex)] == 0))
+			{
+				if (occlusionCulledSubMeshes) ++(*occlusionCulledSubMeshes);
+				continue;
+			}
 			if (SubMeshVisible(command, bufferIndex, localFrustum))
 			{
 				anyVisible = true;
@@ -561,6 +862,12 @@ void OpenGLGraphicsDevice::DrawInternal(const RenderCommand& command, const Came
 
 	for (int j = FirstBuffer(command); j < BufferEnd(command); ++j) 
 	{
+		if (occlusionVisibility &&
+			(static_cast<std::size_t>(j) >= occlusionVisibility->size() ||
+			(*occlusionVisibility)[static_cast<std::size_t>(j)] == 0))
+		{
+			continue;
+		}
 		if (frustum && !SubMeshVisible(command, j, localFrustum))
 		{
 			continue;

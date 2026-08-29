@@ -801,11 +801,15 @@ void GameGUIManager::DrawReturnButton()
 	bool showGameGUIDiagnostics = Root::Current().FrontEnd().RuntimeGUI().ShowDiagnosticsWindow();
 	bool showLevelColliders = Root::Current().Debugger().ShowLevelColliderDebugShapes();
 	bool showRenderStats = Root::Current().Debugger().ShowStatsWindow();
+	bool showFlushTimings = Root::Current().Debugger().ShowFlushWindow();
+	bool occlusionCullingEnabled = Root::Current().Render().OcclusionCullingEnabled();
 	bool profilerEnabled = Root::Current().Profiler().IsEnabled();
 	ImGui::Checkbox("Animation", &showAnimationDiagnostics);
 	ImGui::Checkbox("Camera", &showCameraDiagnostics);
 	ImGui::Checkbox("Entity State", &showEntityStateDiagnostics);
 	ImGui::Checkbox("Game Input", &showGameInput);
+	ImGui::Checkbox("Flush Timings", &showFlushTimings);
+	ImGui::Checkbox("Occlusion BVH (experimental)", &occlusionCullingEnabled);
 	ImGui::Checkbox("GameGUI", &showGameGUIDiagnostics);
 	ImGui::Checkbox("Gameplay", &showGameplayDiagnostics);
 	ImGui::Checkbox("Level Colliders", &showLevelColliders);
@@ -818,6 +822,8 @@ void GameGUIManager::DrawReturnButton()
 	Root::Current().Debugger().SetShowCameraDiagnostics(showCameraDiagnostics);
 	Root::Current().Debugger().SetShowEntityStateDiagnosticsWindow(showEntityStateDiagnostics);
 	Root::Current().Debugger().SetShowGameInputWindow(showGameInput);
+	Root::Current().Debugger().SetShowFlushWindow(showFlushTimings);
+	Root::Current().Render().SetOcclusionCullingEnabled(occlusionCullingEnabled);
 	Root::Current().FrontEnd().RuntimeGUI().SetShowDiagnosticsWindow(showGameGUIDiagnostics);
 	Root::Current().Debugger().SetShowGameplayDiagnosticsWindow(showGameplayDiagnostics);
 	Root::Current().Debugger().SetShowLevelColliderDebugShapes(showLevelColliders);

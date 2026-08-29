@@ -758,9 +758,12 @@ void Debug::DrawRenderStatsWindow()
 	ImGui::Text("Scene objects: %zu", activeLevel ? activeLevel->Objects().size() : 0);
 	ImGui::Text("Candidate mesh buffers: %zu", render.LastFrameCommandCount());
 	ImGui::Text("Skipped objects: %zu", render.LastFrameSkippedObjects());
+	const std::size_t totalCameraCulled = render.LastFrameFrustumCulledObjects() +
+		render.LastFrameOcclusionCulledObjects();
 	ImGui::Text("Camera-visible mesh buffers: %zu",
-		render.LastFrameCommandCount() - render.LastFrameFrustumCulledObjects());
+		render.LastFrameCommandCount() - (std::min)(render.LastFrameCommandCount(), totalCameraCulled));
 	ImGui::Text("Camera-frustum culled: %zu", render.LastFrameFrustumCulledObjects());
+	ImGui::Text("Camera-occlusion culled: %zu", render.LastFrameOcclusionCulledObjects());
 	ImGui::TextColored(ImVec4(0.3f, 0.9f, 0.45f, 1.0f),
 		"Main draw calls saved: %zu", render.LastFrameDrawCallsSaved());
 	ImGui::Separator();
@@ -814,6 +817,10 @@ void Debug::drawGameModeInput(const Input& input)
 	if (m_showStatsWindow)
 	{
 		DrawRenderStatsWindow();
+	}
+	if (m_showFlushWindow)
+	{
+		DrawFlushWindow();
 	}
 
 	if (m_showGameInputWindow)
@@ -1234,6 +1241,71 @@ void Debug::drawGameModeInput(const Input& input)
 	}
 }
 
+void Debug::DrawFlushWindow()
+{
+	bool open = m_showFlushWindow;
+	ImGui::Begin("Flush Timings", &open,
+		ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoBringToFrontOnFocus);
+
+	RenderManager& render = Root::Current().Render();
+	const double candidateCountMs = render.LastFrameFlushCandidateCountMs();
+	const double shadowMs = render.LastFrameFlushShadowMs();
+	const double occluderPrepassMs = render.LastFrameFlushOccluderPrepassMs();
+	const double frustumSetupMs = render.LastFrameFlushFrustumSetupMs();
+	const double mainPassMs = render.LastFrameFlushMainPassMs();
+	const double cleanupMs = render.LastFrameFlushCleanupMs();
+	const double measuredStagesMs = candidateCountMs + shadowMs + occluderPrepassMs + frustumSetupMs + mainPassMs + cleanupMs;
+	const double totalMs = render.LastFrameFlushMs();
+
+	ImGui::Text("Total flush: %.4f ms", totalMs);
+	ImGui::Separator();
+	ImGui::Text("Candidate counting: %.4f ms", candidateCountMs);
+	ImGui::Text("Shadow maps: %.4f ms", shadowMs);
+	ImGui::Text("Occluder prepass: %.4f ms", occluderPrepassMs);
+	ImGui::Text("Camera frustum setup: %.4f ms", frustumSetupMs);
+	ImGui::Text("Main pass: %.4f ms", mainPassMs);
+	ImGui::Text("Command cleanup: %.4f ms", cleanupMs);
+	ImGui::Text("Unaccounted/timer overhead: %.4f ms", (std::max)(0.0, totalMs - measuredStagesMs));
+	ImGui::Separator();
+	ImGui::Text("Main visibility tests: %.4f ms",
+		Root::Current().Render().LastFrameGraphicsStats().mainVisibilityTestMs);
+	ImGui::Text("Candidate mesh buffers: %zu", render.LastFrameCommandCount());
+	ImGui::Text("Frustum-culled mesh buffers: %zu", render.LastFrameFrustumCulledObjects());
+	ImGui::Text("Occlusion-culled mesh buffers: %zu", render.LastFrameOcclusionCulledObjects());
+	ImGui::Text("Main draw calls issued: %zu", render.LastFrameGraphicsStats().mainDrawCalls);
+	ImGui::Separator();
+	bool occlusionEnabled = render.OcclusionCullingEnabled();
+	if (ImGui::Checkbox("Enable occlusion culling", &occlusionEnabled))
+		render.SetOcclusionCullingEnabled(occlusionEnabled);
+	ImGui::Text("Occlusion BVH: %s", render.OcclusionCullingEnabled() ? "preparing" : "disabled");
+	if (render.OcclusionCullingEnabled())
+	{
+		bool queriesEnabled = render.OcclusionQueriesEnabled();
+		if (ImGui::Checkbox("Issue GPU occlusion queries", &queriesEnabled))
+			render.SetOcclusionQueriesEnabled(queriesEnabled);
+		bool masksEnabled = render.OcclusionMasksEnabled();
+		if (ImGui::Checkbox("Apply occlusion masks", &masksEnabled))
+			render.SetOcclusionMasksEnabled(masksEnabled);
+		ImGui::Separator();
+		const OcclusionCullingSystem::Stats& occlusion = render.OcclusionStats();
+		ImGui::TextDisabled("Performance and query health");
+		ImGui::Text("BVH update: %.4f ms", occlusion.updateMs);
+		ImGui::Text("Last rebuild: %.4f ms", occlusion.rebuildMs);
+		ImGui::Text("Queries issued: %zu", render.LastFrameGraphicsStats().occlusionQueriesIssued);
+		ImGui::Text("Queries pending: %zu", render.LastFrameGraphicsStats().occlusionQueriesPending);
+		ImGui::Text("Results completed: %zu", render.LastFrameGraphicsStats().occlusionQueryResults);
+		ImGui::Text("Occluded results: %zu", render.LastFrameGraphicsStats().occlusionOccludedResults);
+		const OcclusionVisibilityHistory::Stats& visibility =
+			render.OcclusionVisibilityStats();
+		ImGui::Text("Accepted occluded items: %zu", visibility.occludedItems);
+		ImGui::Text("Stale results rejected: %zu", visibility.staleResults);
+		ImGui::Text("Camera state: %s", render.OcclusionCameraMoving() ? "moving" : "settled");
+	}
+
+	ImGui::End();
+	m_showFlushWindow = open;
+}
+
 void Debug::DrawPhysicsBoundingVolumes(const Camera& camera)
 {
 	if (!m_showLevelColliderDebugShapes)
@@ -1551,8 +1623,10 @@ void Debug::SetGameplayContext(const std::string& activeLevelName, std::size_t a
 
 bool Debug::ShowLogWindow() const { return m_showLogWindow; }
 bool Debug::ShowStatsWindow() const { return m_showStatsWindow; }
+bool Debug::ShowFlushWindow() const { return m_showFlushWindow; }
 void Debug::SetShowLogWindow(bool showLogWindow) { m_showLogWindow = showLogWindow; }
 void Debug::SetShowStatsWindow(bool showStatsWindow) { m_showStatsWindow = showStatsWindow; }
+void Debug::SetShowFlushWindow(bool show) { m_showFlushWindow = show; }
 bool Debug::ShowGameInputWindow() const { return m_showGameInputWindow; }
 void Debug::SetShowGameInputWindow(bool show) { m_showGameInputWindow = show; }
 bool Debug::ShowGameplayDiagnosticsWindow() const { return m_showGameplayDiagnosticsWindow; }

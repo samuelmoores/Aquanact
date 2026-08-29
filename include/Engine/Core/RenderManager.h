@@ -12,6 +12,7 @@
 #include "Engine/Core/RenderCommand.h"
 #include "Engine/Core/OpenGLGraphicsDevice.h"
 #include "Engine/Core/LightingManager.h"
+#include "Engine/Core/OcclusionCullingSystem.h"
 #include "Engine/Core/ProjectStateData.h"
 
 class Window;
@@ -60,9 +61,16 @@ public:
 	std::size_t LastFrameCommandCount() const;
 	std::size_t LastFrameSkippedObjects() const;
 	std::size_t LastFrameFrustumCulledObjects() const;
+	std::size_t LastFrameOcclusionCulledObjects() const { return m_lastFrameOcclusionCulledObjects; }
 	std::size_t LastFrameDrawCallsSaved() const;
 	double LastFrameBuildMs() const;
 	double LastFrameFlushMs() const;
+	double LastFrameFlushCandidateCountMs() const;
+	double LastFrameFlushShadowMs() const;
+	double LastFrameFlushOccluderPrepassMs() const;
+	double LastFrameFlushFrustumSetupMs() const;
+	double LastFrameFlushMainPassMs() const;
+	double LastFrameFlushCleanupMs() const;
 	double LastFrameDebugOverlayMs() const;
 	double LastFrameEditorGuiMs() const;
 	double LastFrameUiCreatorMs() const;
@@ -71,6 +79,19 @@ public:
 	std::size_t FrameAllocatorUsedBytes() const;
 	std::size_t FrameAllocatorPeakBytes() const;
 	const OpenGLGraphicsDevice::FrameStats& LastFrameGraphicsStats() const { return m_device.Stats(); }
+	bool OcclusionCullingEnabled() const { return m_occlusionCullingEnabled; }
+	void SetOcclusionCullingEnabled(bool enabled);
+	bool OcclusionQueriesEnabled() const { return m_occlusionQueriesEnabled; }
+	void SetOcclusionQueriesEnabled(bool enabled) { m_occlusionQueriesEnabled = enabled; }
+	bool OcclusionMasksEnabled() const { return m_occlusionMasksEnabled; }
+	void SetOcclusionMasksEnabled(bool enabled) { m_occlusionMasksEnabled = enabled; }
+	const OcclusionCullingSystem::Stats& OcclusionStats() const { return m_occlusionCulling.CurrentStats(); }
+	const OcclusionVisibilityHistory::Stats& OcclusionVisibilityStats() const
+	{
+		return m_occlusionCulling.VisibilityStats();
+	}
+	std::uint64_t OcclusionQueryGeneration() const { return m_occlusionCulling.QueryGeneration(); }
+	bool OcclusionCameraMoving() const { return m_occlusionCulling.CameraMoving(); }
 
 private:
 	void ResetFrameState();
@@ -96,6 +117,10 @@ private:
 	FrameAllocator m_frameAllocator;
 	RenderCommand* m_commands = nullptr;
 	std::unique_ptr<LightingManager> m_lightingManager = nullptr;
+	OcclusionCullingSystem m_occlusionCulling;
+	bool m_occlusionCullingEnabled = false;
+	bool m_occlusionQueriesEnabled = true;
+	bool m_occlusionMasksEnabled = true;
 
 	//debug
 	std::size_t m_commandCapacity = 0;
@@ -103,9 +128,16 @@ private:
 	std::size_t m_lastFrameCommandCount = 0;
 	std::size_t m_lastFrameSkippedObjects = 0;
 	std::size_t m_lastFrameFrustumCulledObjects = 0;
+	std::size_t m_lastFrameOcclusionCulledObjects = 0;
 	std::size_t m_lastFrameDrawCallsSaved = 0;
 	std::chrono::duration<double, std::milli> m_lastFrameBuildTime{ 0.0 };
 	std::chrono::duration<double, std::milli> m_lastFrameFlushTime{ 0.0 };
+	std::chrono::duration<double, std::milli> m_lastFrameFlushCandidateCountTime{ 0.0 };
+	std::chrono::duration<double, std::milli> m_lastFrameFlushShadowTime{ 0.0 };
+	std::chrono::duration<double, std::milli> m_lastFrameFlushOccluderPrepassTime{ 0.0 };
+	std::chrono::duration<double, std::milli> m_lastFrameFlushFrustumSetupTime{ 0.0 };
+	std::chrono::duration<double, std::milli> m_lastFrameFlushMainPassTime{ 0.0 };
+	std::chrono::duration<double, std::milli> m_lastFrameFlushCleanupTime{ 0.0 };
 	std::chrono::duration<double, std::milli> m_lastFrameDebugOverlayTime{ 0.0 };
 	std::chrono::duration<double, std::milli> m_lastFrameEditorGuiTime{ 0.0 };
 	std::chrono::duration<double, std::milli> m_lastFrameUiCreatorTime{ 0.0 };

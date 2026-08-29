@@ -119,6 +119,10 @@ set(SOURCES
     "include/Engine/Core/Audio.h" "src/Engine/Core/Audio.cpp"
     "src/Engine/miniaudio_impl.c"
     "include/Engine/Core/RenderCommand.h"
+	"include/Engine/Core/OcclusionBvh.h" "src/Engine/Core/OcclusionBvh.cpp"
+	"include/Engine/Core/OcclusionCullingSystem.h" "src/Engine/Core/OcclusionCullingSystem.cpp"
+	"include/Engine/Core/OccluderSelector.h" "src/Engine/Core/OccluderSelector.cpp"
+	"include/Engine/Core/OcclusionVisibilityHistory.h" "src/Engine/Core/OcclusionVisibilityHistory.cpp"
     "include/Engine/Core/FrameAllocator.h"
     "include/Engine/Core/FrameProfiler.h" "src/Engine/Core/FrameProfiler.cpp"
     "include/Engine/Core/GLHeaders.h"
@@ -192,6 +196,7 @@ target_link_libraries(AquanactEngine PRIVATE OpenGL::GL)
 target_link_libraries(AquanactGame PRIVATE OpenGL::GL)
 
 find_package(imgui CONFIG REQUIRED)
+find_package(glm CONFIG REQUIRED)
 target_link_libraries(AquanactEngine PRIVATE imgui::imgui)
 target_link_libraries(AquanactGame PRIVATE imgui::imgui)
 
@@ -232,11 +237,13 @@ target_link_libraries(AquanactEngine PRIVATE
     debug ${MYGUI_ENGINE_LIBRARY_DEBUG} optimized ${MYGUI_ENGINE_LIBRARY_RELEASE}
     debug ${MYGUI_OPENGL_LIBRARY_DEBUG} optimized ${MYGUI_OPENGL_LIBRARY_RELEASE}
     freetype
+	glm::glm
 )
 target_link_libraries(AquanactGame PRIVATE
     debug ${MYGUI_ENGINE_LIBRARY_DEBUG} optimized ${MYGUI_ENGINE_LIBRARY_RELEASE}
     debug ${MYGUI_OPENGL_LIBRARY_DEBUG} optimized ${MYGUI_OPENGL_LIBRARY_RELEASE}
     freetype
+	glm::glm
 )
 
 add_executable(AquanactUIInputRouterTests
@@ -270,6 +277,24 @@ if (MSVC)
     )
 endif()
 add_test(NAME AquanactGameGUIAssetTests COMMAND AquanactGameGUIAssetTests)
+
+add_executable(AquanactOcclusionBvhTests
+    "tests/OcclusionBvhTests.cpp"
+    "include/Engine/Core/OcclusionBvh.h" "src/Engine/Core/OcclusionBvh.cpp"
+	"include/Engine/Core/OccluderSelector.h" "src/Engine/Core/OccluderSelector.cpp"
+	"include/Engine/Core/OcclusionVisibilityHistory.h" "src/Engine/Core/OcclusionVisibilityHistory.cpp"
+)
+target_compile_features(AquanactOcclusionBvhTests PRIVATE cxx_std_20)
+target_include_directories(AquanactOcclusionBvhTests PRIVATE "./include")
+target_link_libraries(AquanactOcclusionBvhTests PRIVATE glm::glm)
+if (MSVC)
+    target_link_options(AquanactOcclusionBvhTests PRIVATE
+        "/LIBPATH:C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/lib/x64"
+        "/LIBPATH:C:/Program Files (x86)/Windows Kits/10/Lib/10.0.26100.0/um/x64"
+        "/LIBPATH:C:/Program Files (x86)/Windows Kits/10/Lib/10.0.26100.0/ucrt/x64"
+    )
+endif()
+add_test(NAME AquanactOcclusionBvhTests COMMAND AquanactOcclusionBvhTests)
 
 target_include_directories(AquanactEngine PUBLIC "./include")
 target_include_directories(AquanactEngine PRIVATE "${CMAKE_SOURCE_DIR}/external/imguizmo/src")
