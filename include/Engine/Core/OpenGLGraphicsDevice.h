@@ -19,8 +19,14 @@ public:
 	struct FrameStats {
 		std::size_t mainDrawCalls = 0;
 		std::size_t shadowDrawCalls = 0;
+		std::size_t directionalShadowDrawCalls = 0;
+		std::array<std::size_t, LightingManager::MaxPointLights> pointShadowDrawCalls{};
 		std::uint64_t mainTriangles = 0;
 		std::uint64_t shadowTriangles = 0;
+		std::uint64_t directionalShadowTriangles = 0;
+		std::array<std::uint64_t, LightingManager::MaxPointLights> pointShadowTriangles{};
+		double mainVisibilityTestMs = 0.0;
+		double shadowPassMs = 0.0;
 	};
 	OpenGLGraphicsDevice() = default;
 	~OpenGLGraphicsDevice() override;

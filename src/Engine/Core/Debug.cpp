@@ -749,8 +749,11 @@ void Debug::DrawRenderStatsWindow()
 	ImGui::Begin("Render Stats", &m_showStatsWindow, ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoBringToFrontOnFocus);
 	ImGui::Text("FPS: %.1f", Root::Current().Profiler().SmoothedFps());
 	ImGui::Text("Frame time: %.3f ms", frameMs);
-	if (frameMs > 16.67)
-		ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.2f, 1.0f), "Over 60 FPS budget by %.3f ms", frameMs - 16.67);
+	constexpr double frameBudgetMs = 16.67;
+	if (frameMs > frameBudgetMs)
+		ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.2f, 1.0f), "Over 60 FPS budget by %.3f ms", frameMs - frameBudgetMs);
+	else
+		ImGui::TextColored(ImVec4(0.3f, 0.9f, 0.45f, 1.0f), "Under 60 FPS budget by %.3f ms", frameBudgetMs - frameMs);
 	const Scene* activeLevel = Root::Current().Scenes().ActiveLevel();
 	ImGui::Text("Scene objects: %zu", activeLevel ? activeLevel->Objects().size() : 0);
 	ImGui::Text("Candidate mesh buffers: %zu", render.LastFrameCommandCount());
@@ -767,12 +770,32 @@ void Debug::DrawRenderStatsWindow()
 	ImGui::Text("Main triangles: %llu", static_cast<unsigned long long>(graphics.mainTriangles));
 	ImGui::Text("Shadow triangles: %llu", static_cast<unsigned long long>(graphics.shadowTriangles));
 	ImGui::Text("Total submitted triangles: %llu", static_cast<unsigned long long>(totalTriangles));
-	if (totalDrawCalls > 2000)
-		ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.2f, 1.0f), "High draw-call count");
+	if (graphics.mainDrawCalls > 2000)
+		ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.2f, 1.0f), "High main-pass draw-call count");
+	else if (graphics.shadowDrawCalls > 2000)
+		ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.2f, 1.0f), "High shadow-pass draw-call count");
 	else if (totalDrawCalls > 1000)
 		ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.2f, 1.0f), "Elevated draw-call count");
+	else
+		ImGui::TextColored(ImVec4(0.3f, 0.9f, 0.45f, 1.0f), "Normal draw-call count");
+	ImGui::Separator();
+	ImGui::Text("Directional shadow: %zu draws, %llu triangles",
+		graphics.directionalShadowDrawCalls,
+		static_cast<unsigned long long>(graphics.directionalShadowTriangles));
+	const std::size_t pointLightCount = render.Lights().PointLights().size();
+	for (std::size_t lightIndex = 0;
+		lightIndex < pointLightCount && lightIndex < LightingManager::MaxPointLights;
+		++lightIndex)
+	{
+		ImGui::Text("Point light %zu shadow: %zu draws, %llu triangles",
+			lightIndex,
+			graphics.pointShadowDrawCalls[lightIndex],
+			static_cast<unsigned long long>(graphics.pointShadowTriangles[lightIndex]));
+	}
 	ImGui::Separator();
 	ImGui::Text("Build time: %.4f ms", render.LastFrameBuildMs());
+	ImGui::Text("Main visibility tests: %.4f ms", graphics.mainVisibilityTestMs);
+	ImGui::Text("Shadow pass: %.4f ms", graphics.shadowPassMs);
 	ImGui::Text("Flush time: %.4f ms", render.LastFrameFlushMs());
 	ImGui::Text("Debug overlay: %.4f ms", render.LastFrameDebugOverlayMs());
 	ImGui::Text("Editor GUI/MyGUI: %.4f ms", render.LastFrameEditorGuiMs());

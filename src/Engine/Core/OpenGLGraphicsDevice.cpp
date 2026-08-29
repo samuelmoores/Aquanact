@@ -10,6 +10,7 @@
 #include "Engine/Core/Frustum.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <limits>
 #include <memory>
@@ -341,10 +342,12 @@ void OpenGLGraphicsDevice::ConfigureGuiState()
 
 void OpenGLGraphicsDevice::RenderShadowMaps(const RenderCommand* commands, std::size_t commandCount, const LightingManager& lightingManager)
 {
+	const auto shadowPassStart = std::chrono::high_resolution_clock::now();
 	m_shadowMapReady = false;
 	m_pointShadowMapsReady.fill(false);
 	if (!lightingManager.ShadowsEnabled() || !commands || commandCount == 0)
 	{
+		m_frameStats.shadowPassMs = 0.0;
 		return;
 	}
 
@@ -384,7 +387,7 @@ void OpenGLGraphicsDevice::RenderShadowMaps(const RenderCommand* commands, std::
 			m_shadowShader->activate();
 			m_shadowShader->setUniform("lightSpaceMatrix", m_lightSpaceMatrix);
 			DrawShadowCasters(commands, commandCount, m_shadowShader.get(), &m_lightSpaceMatrix,
-				m_frameStats.shadowDrawCalls, m_frameStats.shadowTriangles);
+				m_frameStats.directionalShadowDrawCalls, m_frameStats.directionalShadowTriangles);
 			m_shadowMapReady = true;
 			renderedAnyShadowMap = true;
 		}
@@ -433,7 +436,8 @@ void OpenGLGraphicsDevice::RenderShadowMaps(const RenderCommand* commands, std::
 				const glm::mat4 shadowMatrix = shadowProjection * shadowView;
 				m_pointShadowShader->setUniform("shadowMatrix", shadowMatrix);
 				DrawShadowCasters(commands, commandCount, m_pointShadowShader.get(), &shadowMatrix,
-					m_frameStats.shadowDrawCalls, m_frameStats.shadowTriangles);
+					m_frameStats.pointShadowDrawCalls[lightIndex],
+					m_frameStats.pointShadowTriangles[lightIndex]);
 			}
 			m_pointShadowMapsReady[lightIndex] = true;
 			renderedAnyShadowMap = true;
@@ -449,6 +453,15 @@ void OpenGLGraphicsDevice::RenderShadowMaps(const RenderCommand* commands, std::
 			m_platform->ConfigureDefaultState();
 		}
 	}
+	m_frameStats.shadowDrawCalls = m_frameStats.directionalShadowDrawCalls;
+	m_frameStats.shadowTriangles = m_frameStats.directionalShadowTriangles;
+	for (int lightIndex = 0; lightIndex < LightingManager::MaxPointLights; ++lightIndex)
+	{
+		m_frameStats.shadowDrawCalls += m_frameStats.pointShadowDrawCalls[lightIndex];
+		m_frameStats.shadowTriangles += m_frameStats.pointShadowTriangles[lightIndex];
+	}
+	m_frameStats.shadowPassMs = std::chrono::duration<double, std::milli>(
+		std::chrono::high_resolution_clock::now() - shadowPassStart).count();
 }
 
 void OpenGLGraphicsDevice::Draw(const RenderCommand& command, const Camera& camera, const LightingManager& lightingManager)
@@ -472,6 +485,7 @@ void OpenGLGraphicsDevice::DrawInternal(const RenderCommand& command, const Came
 	// frustum even though every individual imported mesh is outside it.
 	if (frustum)
 	{
+		const auto visibilityStart = std::chrono::high_resolution_clock::now();
 		const Frustum localFrustum = Frustum::FromViewProjection(
 			camera.GetProjectionMatrix() * camera.GetViewMatrix() * command.modelMatrix);
 
@@ -491,8 +505,12 @@ void OpenGLGraphicsDevice::DrawInternal(const RenderCommand& command, const Came
 		}
 		if (!anyVisible)
 		{
+			m_frameStats.mainVisibilityTestMs += std::chrono::duration<double, std::milli>(
+				std::chrono::high_resolution_clock::now() - visibilityStart).count();
 			return;
 		}
+		m_frameStats.mainVisibilityTestMs += std::chrono::duration<double, std::milli>(
+			std::chrono::high_resolution_clock::now() - visibilityStart).count();
 	}
 	const Frustum localFrustum = frustum
 		? Frustum::FromViewProjection(camera.GetProjectionMatrix() * camera.GetViewMatrix() * command.modelMatrix)
