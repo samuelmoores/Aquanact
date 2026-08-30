@@ -116,10 +116,8 @@ public:
 	void SetGameplayContext(const std::string& activeLevelName, std::size_t activeLevelObjects, std::size_t controllerCount, const std::string& engineMode);
 	bool ShowLogWindow() const;
 	bool ShowStatsWindow() const;
-	bool ShowFlushWindow() const;
 	void SetShowLogWindow(bool showLogWindow);
 	void SetShowStatsWindow(bool showStatsWindow);
-	void SetShowFlushWindow(bool show);
 	bool ShowGameInputWindow() const;
 	void SetShowGameInputWindow(bool show);
 	bool ShowGameplayDiagnosticsWindow() const;
@@ -159,7 +157,6 @@ public:
 
 private:
 	void DrawRenderStatsWindow();
-	void DrawFlushWindow();
 	// Rebuilds the axis/grid helpers when the grid configuration changes.
 	void RebuildGrid();
 	void RebuildAxis();
@@ -193,7 +190,6 @@ private:
 	double m_startupToFirstDrawMs = -1.0;
 	bool m_showLogWindow = false;
 	bool m_showStatsWindow = false;
-	bool m_showFlushWindow = false;
 	bool m_showGameInputWindow = false;
 	bool m_showGameplayDiagnosticsWindow = false;
 	bool m_showLevelColliderDebugShapes = false;
