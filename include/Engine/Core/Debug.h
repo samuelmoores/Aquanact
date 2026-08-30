@@ -170,6 +170,7 @@ private:
 	std::vector<class Line*> m_pointLightDebugSpheres;
 	std::unordered_map<Entity*, class Line*> m_triggerSpheres;
 	std::vector<class Line*> m_cameraPathSpheres;
+	std::vector<class Line*> m_cameraPathTriggerSpheres;
 	std::vector<class Line*> m_cameraPathSegments;
 	std::vector<class Line*> m_entityBoundingBoxes;
 	std::vector<class Entity*> m_entityBoundingBoxObjects;

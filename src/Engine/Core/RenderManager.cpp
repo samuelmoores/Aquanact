@@ -192,7 +192,8 @@ void RenderManager::ApplyProjectState(const ProjectStateData::RenderStateData& r
 	m_gameCamera->SetPath(renderState.cameraPath);
 	m_engineCameraPathInitialized = false;
 	m_gameCamera->SetFollowSharpness(renderState.pathedCameraFollowSharpness);
-	m_gameCamera->SetPathSamplesPerSegment(renderState.pathedCameraSamplesPerSegment);
+	// Curve sampling is intentionally fixed for predictable camera behavior.
+	m_gameCamera->SetPathSamplesPerSegment(16);
 	Root::Current().FrontEnd().EditorGUI().CameraPath().Data() = renderState.cameraPath;
 	Root::Current().FrontEnd().EditorGUI().SetShowCameraPath(renderState.showCameraPath);
 	if (!renderState.cameraPath.points.empty())

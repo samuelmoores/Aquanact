@@ -308,6 +308,7 @@ void EditorSceneInteraction::Draw(const EngineGuiFrameContext& context) const
 	PointLight* selectedPointLight = nullptr;
 	LevelCollider* selectedLevelCollider = nullptr;
 	CameraPathPoint* selectedCameraPathPoint = nullptr;
+	bool selectedCameraPathTrigger = false;
 	std::vector<PointLight>& pointLights = Root::Current().Render().Lights().PointLights();
 	if (context.selection->pointLightIndex >= 0 &&
 		context.selection->pointLightIndex < static_cast<int>(pointLights.size()))
@@ -325,7 +326,10 @@ void EditorSceneInteraction::Draw(const EngineGuiFrameContext& context) const
 		const int selectedPoint = context.cameraPath->SelectedPoint();
 		auto& points = context.cameraPath->Data().points;
 		if (selectedPoint >= 0 && selectedPoint < static_cast<int>(points.size()))
+		{
 			selectedCameraPathPoint = &points[static_cast<std::size_t>(selectedPoint)];
+			selectedCameraPathTrigger = context.cameraPath->TriggerSelected() && selectedCameraPathPoint->island;
+		}
 	}
 	if (selectedCameraPathPoint)
 	{
@@ -351,7 +355,9 @@ void EditorSceneInteraction::Draw(const EngineGuiFrameContext& context) const
 			? glm::translate(glm::mat4(1.0f), selectedPointLight->position)
 			: selectedLevelCollider
 			? glm::translate(glm::mat4(1.0f), selectedLevelCollider->Position())
-			: glm::translate(glm::mat4(1.0f), selectedCameraPathPoint->position);
+			: glm::translate(glm::mat4(1.0f), selectedCameraPathTrigger
+				? selectedCameraPathPoint->triggerPosition
+				: selectedCameraPathPoint->position);
 		if (selectedLevelCollider)
 		{
 			gizmoMatrix = glm::translate(glm::mat4(1.0f), selectedLevelCollider->Position());
@@ -426,7 +432,10 @@ void EditorSceneInteraction::Draw(const EngineGuiFrameContext& context) const
 			}
 			else if (selectedCameraPathPoint)
 			{
-				selectedCameraPathPoint->position = glm::vec3(gizmoMatrix[3]);
+				if (selectedCameraPathTrigger)
+					selectedCameraPathPoint->triggerPosition = glm::vec3(gizmoMatrix[3]);
+				else
+					selectedCameraPathPoint->position = glm::vec3(gizmoMatrix[3]);
 			}
 		}
 

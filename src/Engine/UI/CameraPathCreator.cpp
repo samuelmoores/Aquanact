@@ -7,6 +7,7 @@ void CameraPathCreator::Clear()
 {
 	m_data.points.clear();
 	m_selectedPoint = -1;
+	m_selectedPart = SelectedPart::Camera;
 }
 
 void CameraPathCreator::AddPoint(
@@ -29,6 +30,7 @@ void CameraPathCreator::AddPoint(
 
 	CameraPathPoint point;
 	point.position = position;
+	point.triggerPosition = position;
 	m_data.points.push_back(point);
 	m_selectedPoint = static_cast<int>(m_data.points.size()) - 1;
 }
@@ -73,11 +75,15 @@ void CameraPathCreator::SelectPoint(int index)
 	}
 
 	m_selectedPoint = index;
+	m_selectedPart = SelectedPart::Camera;
 }
 
 void CameraPathCreator::TranslateAll(const glm::vec3& delta)
 {
 	if (!std::isfinite(delta.x) || !std::isfinite(delta.y) || !std::isfinite(delta.z)) return;
 	for (CameraPathPoint& point : m_data.points)
+	{
 		point.position += delta;
+		point.triggerPosition += delta;
+	}
 }

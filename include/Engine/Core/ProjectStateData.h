@@ -113,7 +113,7 @@ namespace ProjectStateData {
 		float engineCameraLookSensitivity = 0.08f;
 		CameraPathData cameraPath;
 		float pathedCameraFollowSharpness = 8.0f;
-		int pathedCameraSamplesPerSegment = 32;
+		int pathedCameraSamplesPerSegment = 16;
 		bool showCameraPath = false;
 		glm::vec3 gameCameraPosition{ 0.0f };
 		glm::vec3 gameCameraFacing{ 0.0f };

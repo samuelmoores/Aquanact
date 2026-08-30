@@ -8,6 +8,9 @@
 // One ordered position on the camera dolly path.
 struct CameraPathPoint {
 	glm::vec3 position{0.0f};
+	bool island = false;
+	float triggerRadius = 90.0f;
+	glm::vec3 triggerPosition{0.0f};
 };
 
 // Points are stored in travel order.  The path is open: the final point does

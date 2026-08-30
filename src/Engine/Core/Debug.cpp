@@ -333,8 +333,10 @@ void Debug::shutDown()
 	m_pointLightDebugSpheres.clear();
 	m_pointLightDebugColors.clear();
 	for (Line* sphere : m_cameraPathSpheres) delete sphere;
+	for (Line* sphere : m_cameraPathTriggerSpheres) delete sphere;
 	for (Line* segment : m_cameraPathSegments) delete segment;
 	m_cameraPathSpheres.clear();
+	m_cameraPathTriggerSpheres.clear();
 	m_cameraPathSegments.clear();
 	for (auto& entry : m_triggerSpheres) delete entry.second;
 	m_triggerSpheres.clear();
@@ -381,21 +383,41 @@ void Debug::DrawCameraPath(const Camera& camera, const CameraPathData& path, int
 {
 	// Rebuild each editor frame so dragging a point immediately moves its sphere
 	// and the connecting segments.
-	if (!path.points.empty() || !m_cameraPathSpheres.empty())
+	if (!path.points.empty() || !m_cameraPathSpheres.empty() || !m_cameraPathTriggerSpheres.empty())
 	{
 		for (Line* sphere : m_cameraPathSpheres) delete sphere;
+		for (Line* sphere : m_cameraPathTriggerSpheres) delete sphere;
 		for (Line* segment : m_cameraPathSegments) delete segment;
 		m_cameraPathSpheres.clear();
+		m_cameraPathTriggerSpheres.clear();
 		m_cameraPathSegments.clear();
 		for (std::size_t i = 0; i < path.points.size(); ++i)
 		{
 			const glm::vec3 color = static_cast<int>(i) == selectedPoint
 				? glm::vec3(1.0f, 0.8f, 0.1f) : glm::vec3(0.2f, 0.7f, 1.0f);
 			m_cameraPathSpheres.push_back(new Line(MakeWireSphereVertices(color)));
+			if (path.points[i].island)
+			{
+				m_cameraPathTriggerSpheres.push_back(new Line(MakeWireSphereVertices(glm::vec3(1.0f, 0.1f, 0.1f))));
+			}
 		}
 		const int curveSamples = Root::Current().Render().GetPathedCamera().PathSamplesPerSegment();
 		for (std::size_t segment = 0; segment + 1 < path.points.size(); ++segment)
 		{
+			// An island point is reached independently by its trigger, so it has
+			// no authored curve segment from the preceding point. Keep a simple
+			// straight guide so the authored relationship remains visible without
+			// allocating many line objects every editor frame.
+			if (path.points[segment + 1].island)
+			{
+				const glm::vec3 start = path.points[segment].position;
+				const glm::vec3 end = path.points[segment + 1].position;
+				const glm::vec3 color(0.95f, 0.65f, 0.2f);
+				m_cameraPathSegments.push_back(new Line({
+					{start.x, start.y, start.z, color.r, color.g, color.b},
+					{end.x, end.y, end.z, color.r, color.g, color.b}}));
+				continue;
+			}
 			const glm::vec3 color(0.2f, 0.7f, 1.0f);
 			for (int sample = 0; sample < curveSamples; ++sample)
 			{
@@ -419,6 +441,17 @@ void Debug::DrawCameraPath(const Camera& camera, const CameraPathData& path, int
 			? pointRadius * 1.25f
 			: pointRadius;
 		m_cameraPathSpheres[i]->draw(view, glm::translate(glm::mat4(1.0f), path.points[i].position) * glm::scale(glm::mat4(1.0f), glm::vec3(radius)));
+	}
+	std::size_t triggerSphereIndex = 0;
+	for (const CameraPathPoint& point : path.points)
+	{
+		if (!point.island || triggerSphereIndex >= m_cameraPathTriggerSpheres.size())
+		{
+			continue;
+		}
+		Line* triggerSphere = m_cameraPathTriggerSpheres[triggerSphereIndex++];
+		triggerSphere->UpdateProjection(projection);
+		triggerSphere->draw(view, glm::translate(glm::mat4(1.0f), point.triggerPosition) * glm::scale(glm::mat4(1.0f), glm::vec3(point.triggerRadius)));
 	}
 	for (std::size_t i = 0; i < m_cameraPathSegments.size(); ++i)
 	{

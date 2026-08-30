@@ -489,7 +489,11 @@ namespace ProjectStateSerializer {
 					else if (fields.size() >= 2 && fields[0] == "camerapath")
 					{
 						const std::size_t count = std::min<std::size_t>(std::stoul(fields[1]), 1000);
-						const std::size_t stride = fields.size() >= 2 + count * 4 ? 4 : 3;
+						const std::size_t stride = fields.size() >= 2 + count * 8
+							? 8
+							: (fields.size() >= 2 + count * 5
+								? 5
+								: (fields.size() >= 2 + count * 4 ? 4 : 3));
 						if (fields.size() >= 2 + count * stride)
 						{
 							renderState.cameraPath.points.clear();
@@ -498,6 +502,35 @@ namespace ProjectStateSerializer {
 								const std::size_t offset = 2 + i * stride;
 								CameraPathPoint point;
 								point.position = glm::vec3(std::stof(fields[offset]), std::stof(fields[offset + 1]), std::stof(fields[offset + 2]));
+								if (stride == 4)
+								{
+									point.island = fields[offset + 3] == "1" || fields[offset + 3] == "true" || fields[offset + 3] == "True";
+								}
+								else if (stride == 5)
+								{
+									point.island = fields[offset + 3] == "1" || fields[offset + 3] == "true" || fields[offset + 3] == "True";
+									point.triggerRadius = std::stof(fields[offset + 4]);
+									if (!std::isfinite(point.triggerRadius) || point.triggerRadius < 0.0f)
+										point.triggerRadius = 90.0f;
+									point.triggerPosition = point.position;
+								}
+								else if (stride == 8)
+								{
+									point.island = fields[offset + 3] == "1" || fields[offset + 3] == "true" || fields[offset + 3] == "True";
+									point.triggerRadius = std::stof(fields[offset + 4]);
+									point.triggerPosition = glm::vec3(
+										std::stof(fields[offset + 5]),
+										std::stof(fields[offset + 6]),
+										std::stof(fields[offset + 7]));
+									if (!std::isfinite(point.triggerRadius) || point.triggerRadius < 0.0f)
+										point.triggerRadius = 90.0f;
+									if (!std::isfinite(point.triggerPosition.x) || !std::isfinite(point.triggerPosition.y) || !std::isfinite(point.triggerPosition.z))
+										point.triggerPosition = point.position;
+								}
+								else
+								{
+									point.triggerPosition = point.position;
+								}
 								if (std::isfinite(point.position.x) && std::isfinite(point.position.y) && std::isfinite(point.position.z))
 									renderState.cameraPath.points.push_back(point);
 							}
@@ -892,9 +925,12 @@ namespace ProjectStateSerializer {
 		for (const CameraPathPoint& point : path.points)
 		{
 			contents += ";" + std::to_string(point.position.x) + ";" + std::to_string(point.position.y) + ";" + std::to_string(point.position.z);
+			contents += ";" + std::to_string(point.island ? 1 : 0);
+			contents += ";" + std::to_string(point.triggerRadius);
+			contents += ";" + std::to_string(point.triggerPosition.x) + ";" + std::to_string(point.triggerPosition.y) + ";" + std::to_string(point.triggerPosition.z);
 		}
 		contents += "\n";
-		contents += "camerapathsettings;" + std::to_string(renderManager.GetPathedCamera().FollowSharpness()) + ";" + std::to_string(renderManager.GetPathedCamera().PathSamplesPerSegment()) + ";" + (frontEndManager.EditorGUI().ShowCameraPath() ? "1" : "0") + "\n";
+		contents += "camerapathsettings;" + std::to_string(renderManager.GetPathedCamera().FollowSharpness()) + ";16;" + (frontEndManager.EditorGUI().ShowCameraPath() ? "1" : "0") + "\n";
 
 		contents += "editorview;";
 		contents += frontEndManager.EditorGUI().ShowAxis() ? "1" : "0";

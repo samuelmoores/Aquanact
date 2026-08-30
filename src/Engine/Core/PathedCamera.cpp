@@ -8,8 +8,8 @@
 #include <glm/ext/matrix_transform.hpp>
 #include <algorithm>
 #include <cmath>
-#include <limits>
 
+// Lifecycle: acquire and release the window resource used for projection.
 void PathedCamera::startUp()
 {
 	m_window = Root::Current().WindowRef().GLFW();
@@ -21,6 +21,7 @@ void PathedCamera::shutDown()
 	m_window = nullptr;
 }
 
+// Camera interface: provide the matrices and orientation consumed by rendering.
 glm::mat4 PathedCamera::GetProjectionMatrix() const
 {
 	int width = 1;
@@ -39,6 +40,7 @@ glm::mat4 PathedCamera::GetViewMatrix() const { return m_viewMatrix; }
 glm::vec3 PathedCamera::GetPosition() const { return m_position; }
 glm::vec3 PathedCamera::GetFacing() const { return m_facing; }
 
+// Pose and path authoring: directly set the camera pose or replace its path.
 void PathedCamera::SetPose(const glm::vec3& position, const glm::vec3& facing)
 {
 	if (!std::isfinite(position.x) || !std::isfinite(position.y) || !std::isfinite(position.z)) return;
@@ -64,6 +66,7 @@ void PathedCamera::SetPath(const CameraPathData& path)
 	}
 }
 
+// Targeting: identify the entity the camera should face while it follows.
 void PathedCamera::SetTarget(Entity* target)
 {
 	if (m_target == target)
@@ -75,6 +78,7 @@ void PathedCamera::SetTarget(Entity* target)
 	RebuildView();
 }
 
+// Path-follow state: control progress and the quality of closest-point queries.
 void PathedCamera::SetPlayerProgress(float progress)
 {
 	if (std::isfinite(progress))
@@ -93,6 +97,7 @@ void PathedCamera::SetPathSamplesPerSegment(int samples)
 	m_pathSamplesPerSegment = std::clamp(samples, 4, 256);
 }
 
+// Runtime follow behavior: advance toward the path position and tune smoothing.
 void PathedCamera::Update(float deltaTime)
 {
 	const float blend = 1.0f - std::exp(-std::max(0.0f, m_followSharpness) * std::max(0.0f, deltaTime));
@@ -117,7 +122,6 @@ void PathedCamera::Update(float deltaTime)
 	m_position = glm::mix(m_position, desiredPosition, blend);
 
 	FaceTarget();
-
 	RebuildView();
 }
 
@@ -129,6 +133,7 @@ void PathedCamera::SetFollowSharpness(float sharpness)
 	}
 }
 
+// Private helpers: update orientation toward the target and rebuild the view matrix.
 void PathedCamera::FaceTarget()
 {
 	if (!m_target || !m_target->GetMesh())
