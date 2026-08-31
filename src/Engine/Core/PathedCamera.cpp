@@ -78,6 +78,18 @@ void PathedCamera::SetTarget(Entity* target)
 	RebuildView();
 }
 
+void PathedCamera::SetOverridePosition(const glm::vec3& position)
+{
+	if (!std::isfinite(position.x) || !std::isfinite(position.y) || !std::isfinite(position.z)) return;
+	m_overridePosition = position;
+	m_hasOverridePosition = true;
+}
+
+void PathedCamera::ClearOverridePosition()
+{
+	m_hasOverridePosition = false;
+}
+
 // Path-follow state: control progress and the quality of closest-point queries.
 void PathedCamera::SetPlayerProgress(float progress)
 {
@@ -118,7 +130,9 @@ void PathedCamera::Update(float deltaTime)
 	const float pathPosition = glm::clamp(m_playerProgress, 0.0f, 1.0f) * static_cast<float>(segmentCount);
 	const std::size_t segment = std::min(static_cast<std::size_t>(pathPosition), segmentCount - 1);
 	const float t = pathPosition - static_cast<float>(segment);
-	const glm::vec3 desiredPosition = EvaluateCameraPathSegment(m_path, segment, t);
+	const glm::vec3 desiredPosition = m_hasOverridePosition
+		? m_overridePosition
+		: EvaluateCameraPathSegment(m_path, segment, t);
 	m_position = glm::mix(m_position, desiredPosition, blend);
 
 	FaceTarget();

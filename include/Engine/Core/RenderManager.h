@@ -54,6 +54,7 @@ public:
 	void Flush(const Camera& camera, unsigned int selectedEntityId = 0);
 	void Loop(FrontEndManager& frontEndManager, FileManager& fileManager, SceneManager& SceneManager, ProjectManager& projectManager, Debug& debug, Input& input, Window& window, EngineState& engineState);
 	void UpdateCameraPhase(const Input& input, const EngineState& engineState);
+	void ToggleCameraPoint(std::size_t pointIndex);
 	// Clear non-owning entity references before a scene destroys its entities.
 	void ClearPathedCameraTarget();
 
@@ -90,6 +91,12 @@ private:
 	float m_cameraPlayerProgress = 0.0f;
 	bool m_hasCameraTargetPosition = false;
 	bool m_engineCameraPathInitialized = false;
+	bool m_cameraOverrideActive = false;
+	bool m_cameraToggleAtIsland = false;
+	std::size_t m_cameraIslandPoint = static_cast<std::size_t>(-1);
+	glm::vec3 m_cameraIslandPosition{0.0f};
+	glm::vec3 m_cameraPreviousPosition{0.0f};
+	std::vector<bool> m_cameraIslandTriggerInside;
 	CameraManager m_cameraManager;
 	CameraMode m_cameraMode = CameraMode::ThirdPerson;
 	OpenGLGraphicsDevice m_device;

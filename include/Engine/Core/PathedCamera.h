@@ -28,6 +28,9 @@ public:
 	// Targeting: identify the entity the camera should face while it follows.
 	void SetTarget(Entity* target);
 	Entity* Target() const { return m_target; }
+	void SetOverridePosition(const glm::vec3& position);
+	void ClearOverridePosition();
+	bool HasOverridePosition() const { return m_hasOverridePosition; }
 
 	// Path-follow state: control progress and the quality of closest-point queries.
 	void SetPlayerProgress(float progress);
@@ -61,6 +64,8 @@ private:
 	// Authored path and the entity used for camera-facing behavior.
 	CameraPathData m_path;
 	Entity* m_target = nullptr;
+	glm::vec3 m_overridePosition{0.0f};
+	bool m_hasOverridePosition = false;
 
 	// Follow controls: normalized player progress, smoothing, and fixed sampling.
 	float m_playerProgress = 0.0f;

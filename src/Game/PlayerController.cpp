@@ -10,6 +10,7 @@
 #include "Engine/Core/MathUtils.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace
 {
@@ -36,9 +37,8 @@ namespace
 		return glm::normalize(right);
 	}
 
-	glm::vec3 BuildWorldMovement(const glm::vec2& move2D)
+	glm::vec3 BuildWorldMovement(const glm::vec2& move2D, const glm::vec3& forward)
 	{
-		const glm::vec3 forward = CameraForwardVector();
 		const glm::vec3 right = CameraRightVector(forward);
 
 		glm::vec3 movement = forward * move2D.y + right * move2D.x;
@@ -62,6 +62,18 @@ namespace
 		owner.SetRotation(glm::vec3(owner.Rotation().x, nextYaw, owner.Rotation().z));
 	}
 
+}
+
+void PlayerController::PreserveCameraDirection(const glm::vec3& direction)
+{
+	glm::vec3 horizontalDirection = direction;
+	horizontalDirection.y = 0.0f;
+	if (std::isfinite(horizontalDirection.x) && std::isfinite(horizontalDirection.z) &&
+		glm::dot(horizontalDirection, horizontalDirection) > 1e-8f)
+	{
+		m_cameraDirectionOverride = glm::normalize(horizontalDirection);
+		m_hasCameraDirectionOverride = true;
+	}
 }
 
 float PlayerController::GravityScale() const
@@ -111,7 +123,10 @@ void PlayerController::FirstFrame(Entity& owner)
 
 void PlayerController::Move(Entity& owner, const glm::vec2& move2D, float dt)
 {
-	const glm::vec3 worldMovement = BuildWorldMovement(move2D);
+	const glm::vec3 cameraForward = m_hasCameraDirectionOverride
+		? m_cameraDirectionOverride
+		: CameraForwardVector();
+	const glm::vec3 worldMovement = BuildWorldMovement(move2D, cameraForward);
 	const bool hasMovement = glm::length(worldMovement) > 0.0001f;
 
 	if (hasMovement)
@@ -130,6 +145,10 @@ void PlayerController::Update(Entity& owner, float dt)
 	const InputManager& input = m_inputActions ? *m_inputActions : Root::Current().InputActions();
 	const glm::vec2 move2D = input.VectorValue("Move");
 	m_wantsToMove = glm::length(move2D) > 0.0001f;
+	if (!m_wantsToMove)
+	{
+		m_hasCameraDirectionOverride = false;
+	}
 
 	if (m_entityState && m_entityState->CurrentStateBlocksMovement())
 	{

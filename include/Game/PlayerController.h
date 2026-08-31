@@ -45,6 +45,7 @@ public:
 	const Input* InputDevice() const { return m_inputDevice; }
 	void SetInputActions(const InputManager& inputActions) { m_inputActions = &inputActions; }
 	const InputManager* InputActions() const { return m_inputActions; }
+	void PreserveCameraDirection(const glm::vec3& direction);
 
 private:
 	float GravityScale() const override;
@@ -61,6 +62,8 @@ private:
 	const InputManager* m_inputActions = nullptr;
 	EntityStateMachine* m_entityState = nullptr;
 	bool m_wantsToMove = false;
+	glm::vec3 m_cameraDirectionOverride{0.0f};
+	bool m_hasCameraDirectionOverride = false;
 
 	// Player-specific tuning.
 	float m_turnSpeed = 8.0f;
