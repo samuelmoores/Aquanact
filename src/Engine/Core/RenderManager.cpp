@@ -337,7 +337,9 @@ void RenderManager::UpdateCameraPhase(const Input& input, const EngineState& eng
 				// reaches the island through its trigger-volume transition.
 				for (std::size_t index = 1; index < path.points.size(); ++index)
 				{
-					if (path.points[index].island)
+					const float islandProgress = static_cast<float>(index) /
+						static_cast<float>(path.points.size() - 1);
+					if (path.points[index].island && m_cameraPlayerProgress < islandProgress)
 					{
 						const float stopProgress = static_cast<float>(index - 1) /
 							static_cast<float>(path.points.size() - 1);
@@ -408,20 +410,45 @@ void RenderManager::ToggleCameraPoint(std::size_t pointIndex)
 	}
 	if (m_cameraToggleAtIsland && m_cameraIslandPoint == pointIndex)
 	{
-		m_cameraIslandPosition = m_cameraPreviousPosition;
-		m_cameraToggleAtIsland = false;
+		// Each trigger is a fixed two-point toggle: its own island point on
+		// entry, then the authored point immediately before it on exit.
+		const std::size_t returnIndex = pointIndex > 0 ? pointIndex - 1 : pointIndex;
+		m_cameraIslandPosition = path.points[returnIndex].position;
+		m_cameraIslandPoint = returnIndex;
+		m_cameraPlayerProgress = path.points.size() > 1
+			? static_cast<float>(returnIndex) / static_cast<float>(path.points.size() - 1)
+			: 0.0f;
+		// The previous point may itself be another island. Keep that island
+		// active so its trigger can switch to its own preceding point directly.
+		m_cameraToggleAtIsland = path.points[returnIndex].island;
+		m_cameraOverrideActive = m_cameraToggleAtIsland;
+		if (!m_cameraOverrideActive)
+		{
+			m_gameCamera->ClearOverridePosition();
+		}
 	}
 	else
 	{
-		m_cameraPreviousPosition = m_cameraOverrideActive
-			? m_cameraIslandPosition
-			: m_gameCamera->GetPosition();
+		// Preserve the position from before entering the island chain. When
+		// moving directly between islands, the current camera position is
+		// another island and must not replace the non-island return position.
+		if (!m_cameraOverrideActive)
+		{
+			m_cameraPreviousPosition = m_gameCamera->GetPosition();
+		}
 		m_cameraIslandPosition = islandPosition;
 		m_cameraIslandPoint = pointIndex;
 		m_cameraToggleAtIsland = true;
+		m_cameraOverrideActive = true;
 	}
-	m_cameraOverrideActive = true;
-	m_gameCamera->SetOverridePosition(m_cameraIslandPosition);
+	if (m_cameraOverrideActive)
+	{
+		m_gameCamera->SetOverridePosition(m_cameraIslandPosition);
+	}
+	else
+	{
+		m_gameCamera->ClearOverridePosition();
+	}
 	glm::vec3 facing = m_gameCamera->GetFacing();
 	if (m_cameraTarget)
 	{
