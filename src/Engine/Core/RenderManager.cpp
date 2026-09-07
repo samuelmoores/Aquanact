@@ -32,9 +32,12 @@ namespace
 		{
 			const glm::vec3 delta = left.points[i].position - right.points[i].position;
 			if (glm::dot(delta, delta) > 1e-8f) return false;
-			if (left.points[i].island != right.points[i].island ||
+			if (left.points[i].lookAtPlayer != right.points[i].lookAtPlayer ||
+				left.points[i].island != right.points[i].island ||
 				std::abs(left.points[i].triggerRadius - right.points[i].triggerRadius) > 1e-5f)
 				return false;
+			const glm::vec3 facingDelta = left.points[i].facing - right.points[i].facing;
+			if (glm::dot(facingDelta, facingDelta) > 1e-8f) return false;
 			const glm::vec3 triggerDelta = left.points[i].triggerPosition - right.points[i].triggerPosition;
 			if (glm::dot(triggerDelta, triggerDelta) > 1e-8f) return false;
 		}
@@ -109,11 +112,26 @@ const EngineCamera& RenderManager::GetEngineCamera() const
 
 PathedCamera& RenderManager::GetPathedCamera()
 {
+	if (Root::HasCurrent())
+	{
+		if (Scene* scene = Root::Current().Scenes().ActiveLevel())
+		{
+			scene->EnsureCameraSystemStarted();
+			return scene->CameraSystem();
+		}
+	}
 	return *m_gameCamera;
 }
 
 const PathedCamera& RenderManager::GetPathedCamera() const
 {
+	if (Root::HasCurrent())
+	{
+		if (const Scene* scene = Root::Current().Scenes().ActiveLevel())
+		{
+			return scene->CameraSystem();
+		}
+	}
 	return *m_gameCamera;
 }
 
@@ -124,7 +142,7 @@ void RenderManager::SetEditorMode()
 
 void RenderManager::SetGameMode()
 {
-	m_cameraManager.SetGameMode(*m_gameCamera);
+	m_cameraManager.SetGameMode(GetPathedCamera());
 }
 
 void RenderManager::SetCameraMode(CameraMode mode)
@@ -143,10 +161,7 @@ void RenderManager::ClearPathedCameraTarget()
 	m_cameraLastTargetPosition = glm::vec3(0.0f);
 	m_cameraPlayerProgress = 0.0f;
 	m_hasCameraTargetPosition = false;
-	if (m_gameCamera)
-	{
-		m_gameCamera->SetTarget(nullptr);
-	}
+	GetPathedCamera().SetTarget(nullptr);
 }
 
 RenderManager::~RenderManager()
@@ -192,19 +207,39 @@ void RenderManager::shutDown()
 
 void RenderManager::ApplyProjectState(const ProjectStateData::RenderStateData& renderState)
 {
+	PathedCamera& gameCamera = GetPathedCamera();
 	m_engineCamera->SetMoveSpeed(renderState.engineCameraMoveSpeed);
 	m_engineCamera->SetLookSensitivity(renderState.engineCameraLookSensitivity);
-	m_gameCamera->SetPose(renderState.gameCameraPosition, renderState.gameCameraFacing);
-	m_gameCamera->SetPath(renderState.cameraPath);
-	m_gameCamera->ClearOverridePosition();
+	gameCamera.SetPose(renderState.gameCameraPosition, renderState.gameCameraFacing);
+	gameCamera.SetPath(renderState.cameraPath);
+	gameCamera.ClearOverridePosition();
 	m_cameraOverrideActive = false;
 	m_cameraToggleAtIsland = false;
 	m_cameraIslandPoint = static_cast<std::size_t>(-1);
 	m_cameraIslandTriggerInside.assign(renderState.cameraPath.points.size(), false);
 	m_engineCameraPathInitialized = false;
-	m_gameCamera->SetFollowSharpness(renderState.pathedCameraFollowSharpness);
+	gameCamera.SetFollowSharpness(renderState.pathedCameraFollowSharpness);
 	// Curve sampling is intentionally fixed for predictable camera behavior.
-	m_gameCamera->SetPathSamplesPerSegment(16);
+	gameCamera.SetPathSamplesPerSegment(16);
+	for (const auto& sceneCamera : renderState.sceneCameras)
+	{
+		if (Scene* scene = Root::Current().Scenes().FindLevel(sceneCamera.sceneName))
+		{
+			scene->EnsureCameraSystemStarted();
+			scene->CameraSystem().SetPose(sceneCamera.position, sceneCamera.facing);
+			scene->CameraSystem().SetPath(sceneCamera.path);
+			scene->CameraSystem().SetFollowSharpness(sceneCamera.followSharpness);
+			scene->CameraSystem().SetPathSamplesPerSegment(sceneCamera.samplesPerSegment);
+		}
+	}
+	if (const Scene* activeScene = Root::Current().Scenes().ActiveLevel())
+	{
+		gameCamera.SetPose(activeScene->CameraSystem().GetPosition(), activeScene->CameraSystem().GetFacing());
+		gameCamera.SetPath(activeScene->CameraSystem().Path());
+		gameCamera.SetFollowSharpness(activeScene->CameraSystem().FollowSharpness());
+		gameCamera.SetPathSamplesPerSegment(activeScene->CameraSystem().PathSamplesPerSegment());
+		Root::Current().FrontEnd().EditorGUI().CameraPath().Data() = activeScene->CameraSystem().Path();
+	}
 	Root::Current().FrontEnd().EditorGUI().CameraPath().Data() = renderState.cameraPath;
 	Root::Current().FrontEnd().EditorGUI().SetShowCameraPath(renderState.showCameraPath);
 	if (!renderState.cameraPath.points.empty())
@@ -257,9 +292,10 @@ void RenderManager::ApplyCameraMode(const EngineState& engineState)
 		// pathed-camera mode so point edits made after project load are used by
 		// gameplay without resetting the camera every frame.
 		const CameraPathData& authoredPath = Root::Current().FrontEnd().EditorGUI().CameraPath().Data();
-		if (!CameraPathsEqual(authoredPath, m_gameCamera->Path()))
-			m_gameCamera->SetPath(authoredPath);
-		m_cameraManager.SetGameMode(*m_gameCamera);
+		PathedCamera& gameCamera = GetPathedCamera();
+		if (!CameraPathsEqual(authoredPath, gameCamera.Path()))
+			gameCamera.SetPath(authoredPath);
+		m_cameraManager.SetGameMode(gameCamera);
 	}
 	else
 	{
@@ -282,6 +318,7 @@ void RenderManager::PresentFrame(Window& window)
 
 void RenderManager::UpdateCameraPhase(const Input& input, const EngineState& engineState)
 {
+	PathedCamera& gameCamera = GetPathedCamera();
 	// Select the active camera before updating gameplay or editor camera state.
 	ApplyCameraMode(engineState);
 	const bool isPlaying = engineState.IsGameMode() &&
@@ -302,11 +339,11 @@ void RenderManager::UpdateCameraPhase(const Input& input, const EngineState& eng
 			}
 		}
 		m_cameraTarget = target;
-		m_gameCamera->SetTarget(target);
+		gameCamera.SetTarget(target);
 		if (target)
 		{
 			const glm::vec3 position = target->WorldCenterPosition();
-			const CameraPathData& path = m_gameCamera->Path();
+			const CameraPathData& path = gameCamera.Path();
 
 			// Island triggers are edge-triggered: remaining inside a trigger does
 			// not repeatedly toggle the camera every frame.
@@ -331,7 +368,7 @@ void RenderManager::UpdateCameraPhase(const Input& input, const EngineState& eng
 			// active; otherwise update progress from the player's path position.
 			if (!m_cameraOverrideActive)
 			{
-				m_cameraPlayerProgress = m_gameCamera->ClosestPathDistance(position);
+				m_cameraPlayerProgress = gameCamera.ClosestPathDistance(position);
 				// Do not let ordinary path-following cross into an island. The
 				// camera stops at the point immediately before the island and only
 				// reaches the island through its trigger-volume transition.
@@ -347,16 +384,16 @@ void RenderManager::UpdateCameraPhase(const Input& input, const EngineState& eng
 						break;
 					}
 				}
-				m_gameCamera->SetPlayerProgress(m_cameraPlayerProgress);
+				gameCamera.SetPlayerProgress(m_cameraPlayerProgress);
 			}
 		}
 		// Reapply the override every frame so ordinary path updates cannot pull
 		// the camera away from an island destination.
 		if (m_cameraOverrideActive)
 		{
-			m_gameCamera->SetOverridePosition(m_cameraIslandPosition);
+			gameCamera.SetOverridePosition(m_cameraIslandPosition);
 		}
-		m_gameCamera->Update(input.Frame().deltaTime);
+		gameCamera.Update(input.Frame().deltaTime);
 	}
 	if (engineState.IsEditorMode())
 	{
@@ -364,7 +401,7 @@ void RenderManager::UpdateCameraPhase(const Input& input, const EngineState& eng
 		// entry, aiming at the player when the active level has one.
 		if (!m_engineCameraPathInitialized)
 		{
-			const CameraPathData& path = m_gameCamera->Path();
+			const CameraPathData& path = gameCamera.Path();
 			if (!path.points.empty())
 			{
 				glm::vec3 facing = m_engineCamera->GetFacing();
@@ -397,18 +434,19 @@ void RenderManager::ResetForNewProject()
 	{
 		return;
 	}
+	PathedCamera& gameCamera = GetPathedCamera();
 
 	const glm::vec3 defaultEditorPosition(200.0f, 300.0f, 450.0f);
 	m_engineCamera->SetMoveSpeed(300.0f);
 	m_engineCamera->SetLookSensitivity(0.08f);
 	m_engineCamera->SetPose(defaultEditorPosition, glm::normalize(-defaultEditorPosition));
 
-	m_gameCamera->SetPose(glm::vec3(0.0f, 0.0f, -10.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-	m_gameCamera->SetPath(CameraPathData{});
-	m_gameCamera->ClearOverridePosition();
-	m_gameCamera->SetPlayerProgress(0.0f);
-	m_gameCamera->SetFollowSharpness(8.0f);
-	m_gameCamera->SetPathSamplesPerSegment(16);
+	gameCamera.SetPose(glm::vec3(0.0f, 0.0f, -10.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	gameCamera.SetPath(CameraPathData{});
+	gameCamera.ClearOverridePosition();
+	gameCamera.SetPlayerProgress(0.0f);
+	gameCamera.SetFollowSharpness(8.0f);
+	gameCamera.SetPathSamplesPerSegment(16);
 
 	m_cameraTarget = nullptr;
 	m_cameraLastTargetPosition = glm::vec3(0.0f);
@@ -428,13 +466,14 @@ void RenderManager::ResetForNewProject()
 
 void RenderManager::ToggleCameraPoint(std::size_t pointIndex)
 {
-	const CameraPathData& path = m_gameCamera->Path();
+	PathedCamera& gameCamera = GetPathedCamera();
+	const CameraPathData& path = gameCamera.Path();
 	if (pointIndex >= path.points.size() || !path.points[pointIndex].island)
 	{
 		return;
 	}
 
-	const glm::vec3 previousCameraFacing = m_gameCamera->GetFacing();
+	const glm::vec3 previousCameraFacing = gameCamera.GetFacing();
 	const glm::vec3 islandPosition = path.points[pointIndex].position;
 	if (m_cameraTarget)
 	{
@@ -459,7 +498,7 @@ void RenderManager::ToggleCameraPoint(std::size_t pointIndex)
 		m_cameraOverrideActive = m_cameraToggleAtIsland;
 		if (!m_cameraOverrideActive)
 		{
-			m_gameCamera->ClearOverridePosition();
+			gameCamera.ClearOverridePosition();
 		}
 	}
 	else
@@ -469,7 +508,7 @@ void RenderManager::ToggleCameraPoint(std::size_t pointIndex)
 		// another island and must not replace the non-island return position.
 		if (!m_cameraOverrideActive)
 		{
-			m_cameraPreviousPosition = m_gameCamera->GetPosition();
+			m_cameraPreviousPosition = gameCamera.GetPosition();
 		}
 		m_cameraIslandPosition = islandPosition;
 		m_cameraIslandPoint = pointIndex;
@@ -478,13 +517,13 @@ void RenderManager::ToggleCameraPoint(std::size_t pointIndex)
 	}
 	if (m_cameraOverrideActive)
 	{
-		m_gameCamera->SetOverridePosition(m_cameraIslandPosition);
+		gameCamera.SetOverridePosition(m_cameraIslandPosition);
 	}
 	else
 	{
-		m_gameCamera->ClearOverridePosition();
+		gameCamera.ClearOverridePosition();
 	}
-	glm::vec3 facing = m_gameCamera->GetFacing();
+	glm::vec3 facing = gameCamera.GetFacing();
 	if (m_cameraTarget)
 	{
 		const glm::vec3 direction = m_cameraTarget->WorldCenterPosition() - m_cameraIslandPosition;
@@ -495,7 +534,7 @@ void RenderManager::ToggleCameraPoint(std::size_t pointIndex)
 	}
 	// Island transitions are teleports, not path travel. The camera begins at
 	// the selected position and the normal target-facing behavior takes over.
-	m_gameCamera->SetPose(m_cameraIslandPosition, facing);
+	gameCamera.SetPose(m_cameraIslandPosition, facing);
 }
 
 void RenderManager::ResetFrameState()

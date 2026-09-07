@@ -109,6 +109,14 @@ namespace ProjectStateData {
 	};
 
 	struct RenderStateData {
+		struct SceneCameraData {
+			std::string sceneName;
+			glm::vec3 position{ 0.0f };
+			glm::vec3 facing{ 0.0f, 0.0f, 1.0f };
+			CameraPathData path;
+			float followSharpness = 8.0f;
+			int samplesPerSegment = 16;
+		};
 		float engineCameraMoveSpeed = 300.0f;
 		float engineCameraLookSensitivity = 0.08f;
 		CameraPathData cameraPath;
@@ -124,6 +132,7 @@ namespace ProjectStateData {
 		float gameCameraPitch = 15.0f;
 		float gameCameraColliderRadius = 25.0f;
 		bool gameCameraHasTarget = false;
+		std::vector<SceneCameraData> sceneCameras;
 		bool editorShowAxis = true;
 		bool editorShowGrid = true;
 		bool debugShowLogWindow = false;

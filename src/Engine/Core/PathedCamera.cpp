@@ -62,6 +62,10 @@ void PathedCamera::SetPath(const CameraPathData& path)
 	if (!m_path.points.empty())
 	{
 		m_position = m_path.points.front().position;
+		if (!m_path.points.front().lookAtPlayer)
+		{
+			ApplyAuthoredFacing(m_path.points.front().facing);
+		}
 		RebuildView();
 	}
 }
@@ -121,7 +125,10 @@ void PathedCamera::Update(float deltaTime)
 	if (m_path.points.size() == 1 || m_playerProgress <= 0.0f)
 	{
 		m_position = glm::mix(m_position, m_path.points.front().position, blend);
-		FaceTarget();
+		if (m_path.points.front().lookAtPlayer)
+			FaceTarget();
+		else
+			ApplyAuthoredFacing(m_path.points.front().facing);
 		RebuildView();
 		return;
 	}
@@ -135,7 +142,11 @@ void PathedCamera::Update(float deltaTime)
 		: EvaluateCameraPathSegment(m_path, segment, t);
 	m_position = glm::mix(m_position, desiredPosition, blend);
 
-	FaceTarget();
+	const CameraPathPoint& orientationPoint = t >= 0.5f ? m_path.points[segment + 1] : m_path.points[segment];
+	if (orientationPoint.lookAtPlayer)
+		FaceTarget();
+	else
+		ApplyAuthoredFacing(orientationPoint.facing);
 	RebuildView();
 }
 
@@ -164,6 +175,19 @@ void PathedCamera::FaceTarget()
 			? glm::vec3(0.0f, 0.0f, 1.0f)
 			: glm::vec3(0.0f, 1.0f, 0.0f);
 	}
+}
+
+void PathedCamera::ApplyAuthoredFacing(const glm::vec3& facing)
+{
+	if (!std::isfinite(facing.x) || !std::isfinite(facing.y) || !std::isfinite(facing.z) ||
+		glm::dot(facing, facing) <= 1e-8f)
+	{
+		return;
+	}
+	m_facing = glm::normalize(facing);
+	m_up = std::abs(glm::dot(m_facing, glm::vec3(0.0f, 1.0f, 0.0f))) > 0.999f
+		? glm::vec3(0.0f, 0.0f, 1.0f)
+		: glm::vec3(0.0f, 1.0f, 0.0f);
 }
 
 void PathedCamera::RebuildView()

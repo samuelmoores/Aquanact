@@ -8,6 +8,8 @@
 #include <utility>
 #include <vector>
 
+class PathedCamera;
+
 class Scene
 {
 public:
@@ -32,12 +34,20 @@ public:
 	const std::vector<std::unique_ptr<Entity>>& Objects() const { return m_entities; }
 	const std::vector<std::unique_ptr<LevelCollider>>& LevelColliders() const { return m_levelColliders; }
 
+	// Every level/cutscene owns an independent gameplay camera and authored path.
+	// The render manager only selects the camera belonging to the active scene.
+	PathedCamera& CameraSystem();
+	const PathedCamera& CameraSystem() const;
+	void EnsureCameraSystemStarted();
+
 private:
 	std::string m_name;
 	std::string m_musicPath;
 	float m_musicVolume = 50.0f;
 	std::vector<std::unique_ptr<Entity>> m_entities;
 	std::vector<std::unique_ptr<LevelCollider>> m_levelColliders;
+	std::unique_ptr<PathedCamera> m_cameraSystem;
+	bool m_cameraSystemStarted = false;
 	bool m_firstFramePending = false;
 };
 

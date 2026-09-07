@@ -113,6 +113,15 @@ void CameraWindow::Draw(CameraPathCreator& cameraPath, bool& open, bool& showCam
 		CameraPathPoint& point = path.points[static_cast<std::size_t>(editedPoint)];
 		ImGui::Separator();
 		EngineGuiWidgets::Vector3Editor("Position", point.position, 0.1f);
+		ImGui::Checkbox("Look At Player", &point.lookAtPlayer);
+		if (!point.lookAtPlayer)
+		{
+			EngineGuiWidgets::Vector3Editor("Facing", point.facing, 0.01f);
+			if (ImGui::Button("Capture Editor Camera Rotation"))
+			{
+				point.facing = Root::Current().Render().GetEngineCamera().GetFacing();
+			}
+		}
 		ImGui::Checkbox("Island", &point.island);
 		if (point.island)
 		{

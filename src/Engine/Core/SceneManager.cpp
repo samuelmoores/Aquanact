@@ -8,6 +8,7 @@
 #include "Engine/Core/ProjectStateData.h"
 #include "Engine/Core/PhysicsWorld.h"
 #include "Engine/Core/Root.h"
+#include "Engine/Core/FrontEndManager.h"
 #include "Engine/Core/RenderManager.h"
 #include "Engine/Core/PathedCamera.h"
 #include "Engine/Core/TriggerSphere.h"
@@ -317,14 +318,27 @@ bool SceneManager::SetActiveLevel(const std::string& name)
 		return false;
 	}
 
-	if (m_activeLevel != level)
+	Scene* previousLevel = m_activeLevel;
+	if (previousLevel != level)
 	{
 		// The current PhysicsWorld represents one active scene at a time. Its
 		// colliders will be repopulated when the new scene is registered.
 		PhysicsWorld::Instance().Clear();
 	}
+	if (previousLevel && previousLevel != level && Root::HasCurrent())
+	{
+		previousLevel->CameraSystem().SetPath(
+			Root::Current().FrontEnd().EditorGUI().CameraPath().Data());
+	}
 
 	m_activeLevel = level;
+	m_activeLevel->EnsureCameraSystemStarted();
+	if (Root::HasCurrent())
+	{
+		// The path editor is a view onto the active scene's camera points.
+		Root::Current().FrontEnd().EditorGUI().CameraPath().Data() =
+			m_activeLevel->CameraSystem().Path();
+	}
 	return true;
 }
 

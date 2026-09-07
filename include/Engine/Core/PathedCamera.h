@@ -24,6 +24,7 @@ public:
 	void SetPose(const glm::vec3& position, const glm::vec3& facing);
 	void SetPath(const CameraPathData& path);
 	const CameraPathData& Path() const { return m_path; }
+	CameraPathData& MutablePath() { return m_path; }
 
 	// Targeting: identify the entity the camera should face while it follows.
 	void SetTarget(Entity* target);
@@ -47,6 +48,7 @@ public:
 private:
 	// Private helpers: update orientation toward the target and rebuild the view matrix.
 	void FaceTarget();
+	void ApplyAuthoredFacing(const glm::vec3& facing);
 	void RebuildView();
 
 	// Projection configuration.

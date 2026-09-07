@@ -445,7 +445,7 @@ namespace ProjectStateSerializer {
 			try
 			{
 				const std::vector<std::string> fields = ProjectStateFormat::SplitFields(line);
-				if ((fields.size() == 3 && fields[0] == "enginecamera") || (fields.size() >= 7 && fields[0] == "gamecamera") || (fields.size() >= 2 && fields[0] == "camerapath") || (fields.size() >= 4 && fields[0] == "camerapathsettings") || (fields.size() == 3 && fields[0] == "editorview") || (fields.size() >= 3 && fields[0] == "debugwindows") || ((fields.size() >= 8 && fields.size() <= 11) && fields[0] == "sunlight") || ((fields.size() >= 12 && fields.size() <= 15) && fields[0] == "pointlight") || (fields.size() == 2 && fields[0] == "imguilayout"))
+				if ((fields.size() == 3 && fields[0] == "enginecamera") || (fields.size() >= 7 && fields[0] == "gamecamera") || (fields.size() >= 11 && fields[0] == "scenecamera") || (fields.size() >= 2 && fields[0] == "camerapath") || (fields.size() >= 4 && fields[0] == "camerapathsettings") || (fields.size() == 3 && fields[0] == "editorview") || (fields.size() >= 3 && fields[0] == "debugwindows") || ((fields.size() >= 8 && fields.size() <= 11) && fields[0] == "sunlight") || ((fields.size() >= 12 && fields.size() <= 15) && fields[0] == "pointlight") || (fields.size() == 2 && fields[0] == "imguilayout"))
 				{
 					if (fields.size() == 3 && fields[0] == "enginecamera")
 					{
@@ -486,14 +486,44 @@ namespace ProjectStateSerializer {
 							renderState.gameCameraColliderRadius = std::stof(fields[11]);
 						}
 					}
+					else if (fields.size() >= 11 && fields[0] == "scenecamera")
+					{
+						ProjectStateData::RenderStateData::SceneCameraData camera;
+						camera.sceneName = UnescapeField(fields[1]);
+						camera.position = glm::vec3(std::stof(fields[2]), std::stof(fields[3]), std::stof(fields[4]));
+						camera.facing = glm::vec3(std::stof(fields[5]), std::stof(fields[6]), std::stof(fields[7]));
+						camera.followSharpness = std::stof(fields[8]);
+						camera.samplesPerSegment = std::stoi(fields[9]);
+						const std::size_t count = std::min<std::size_t>(std::stoul(fields[10]), 1000);
+						constexpr std::size_t stride = 12;
+						if (fields.size() >= 11 + count * stride)
+						{
+							for (std::size_t i = 0; i < count; ++i)
+							{
+								const std::size_t offset = 11 + i * stride;
+								CameraPathPoint point;
+								point.position = glm::vec3(std::stof(fields[offset]), std::stof(fields[offset + 1]), std::stof(fields[offset + 2]));
+								point.island = fields[offset + 3] == "1";
+								point.triggerRadius = std::stof(fields[offset + 4]);
+								point.triggerPosition = glm::vec3(std::stof(fields[offset + 5]), std::stof(fields[offset + 6]), std::stof(fields[offset + 7]));
+								point.lookAtPlayer = fields[offset + 8] == "1";
+								point.facing = glm::vec3(std::stof(fields[offset + 9]), std::stof(fields[offset + 10]), std::stof(fields[offset + 11]));
+								if (std::isfinite(point.position.x) && std::isfinite(point.position.y) && std::isfinite(point.position.z))
+									camera.path.points.push_back(point);
+							}
+						}
+						renderState.sceneCameras.push_back(std::move(camera));
+					}
 					else if (fields.size() >= 2 && fields[0] == "camerapath")
 					{
 						const std::size_t count = std::min<std::size_t>(std::stoul(fields[1]), 1000);
-						const std::size_t stride = fields.size() >= 2 + count * 8
-							? 8
+						const std::size_t stride = fields.size() >= 2 + count * 12
+							? 12
+							: (fields.size() >= 2 + count * 8
+								? 8
 							: (fields.size() >= 2 + count * 5
 								? 5
-								: (fields.size() >= 2 + count * 4 ? 4 : 3));
+								: (fields.size() >= 2 + count * 4 ? 4 : 3)));
 						if (fields.size() >= 2 + count * stride)
 						{
 							renderState.cameraPath.points.clear();
@@ -526,6 +556,14 @@ namespace ProjectStateSerializer {
 										point.triggerRadius = 90.0f;
 									if (!std::isfinite(point.triggerPosition.x) || !std::isfinite(point.triggerPosition.y) || !std::isfinite(point.triggerPosition.z))
 										point.triggerPosition = point.position;
+								}
+								else if (stride == 12)
+								{
+									point.island = fields[offset + 3] == "1" || fields[offset + 3] == "true" || fields[offset + 3] == "True";
+									point.triggerRadius = std::stof(fields[offset + 4]);
+									point.triggerPosition = glm::vec3(std::stof(fields[offset + 5]), std::stof(fields[offset + 6]), std::stof(fields[offset + 7]));
+									point.lookAtPlayer = fields[offset + 8] == "1" || fields[offset + 8] == "true" || fields[offset + 8] == "True";
+									point.facing = glm::vec3(std::stof(fields[offset + 9]), std::stof(fields[offset + 10]), std::stof(fields[offset + 11]));
 								}
 								else
 								{
@@ -928,9 +966,43 @@ namespace ProjectStateSerializer {
 			contents += ";" + std::to_string(point.island ? 1 : 0);
 			contents += ";" + std::to_string(point.triggerRadius);
 			contents += ";" + std::to_string(point.triggerPosition.x) + ";" + std::to_string(point.triggerPosition.y) + ";" + std::to_string(point.triggerPosition.z);
+			contents += ";" + std::to_string(point.lookAtPlayer ? 1 : 0);
+			contents += ";" + std::to_string(point.facing.x) + ";" + std::to_string(point.facing.y) + ";" + std::to_string(point.facing.z);
 		}
 		contents += "\n";
 		contents += "camerapathsettings;" + std::to_string(renderManager.GetPathedCamera().FollowSharpness()) + ";16;" + (frontEndManager.EditorGUI().ShowCameraPath() ? "1" : "0") + "\n";
+
+		// Camera paths belong to their scene. Keep the legacy project-wide camera
+		// records above for older project files, then write one independent record
+		// for every level and cutscene.
+		if (SceneManager* scenes = Root::HasCurrent() ? &Root::Current().Scenes() : nullptr)
+		{
+			if (Scene* activeScene = scenes->ActiveLevel())
+			{
+				activeScene->CameraSystem().SetPath(frontEndManager.EditorGUI().CameraPath().Data());
+			}
+			for (const auto& scene : scenes->Levels())
+			{
+				if (!scene) continue;
+				const PathedCamera& camera = scene->CameraSystem();
+				contents += "scenecamera;" + EscapeField(scene->Name()) + ";";
+				const glm::vec3 position = camera.GetPosition();
+				const glm::vec3 facing = camera.GetFacing();
+				contents += std::to_string(position.x) + ";" + std::to_string(position.y) + ";" + std::to_string(position.z) + ";";
+				contents += std::to_string(facing.x) + ";" + std::to_string(facing.y) + ";" + std::to_string(facing.z) + ";";
+				contents += std::to_string(camera.FollowSharpness()) + ";" + std::to_string(camera.PathSamplesPerSegment()) + ";";
+				contents += std::to_string(camera.Path().points.size());
+				for (const CameraPathPoint& point : camera.Path().points)
+				{
+					contents += ";" + std::to_string(point.position.x) + ";" + std::to_string(point.position.y) + ";" + std::to_string(point.position.z);
+					contents += ";" + std::to_string(point.island ? 1 : 0) + ";" + std::to_string(point.triggerRadius);
+					contents += ";" + std::to_string(point.triggerPosition.x) + ";" + std::to_string(point.triggerPosition.y) + ";" + std::to_string(point.triggerPosition.z);
+					contents += ";" + std::to_string(point.lookAtPlayer ? 1 : 0);
+					contents += ";" + std::to_string(point.facing.x) + ";" + std::to_string(point.facing.y) + ";" + std::to_string(point.facing.z);
+				}
+				contents += "\n";
+			}
+		}
 
 		contents += "editorview;";
 		contents += frontEndManager.EditorGUI().ShowAxis() ? "1" : "0";

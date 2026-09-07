@@ -10,6 +10,7 @@
 
 Scene::Scene(std::string name)
 	: m_name(std::move(name))
+	, m_cameraSystem(std::make_unique<PathedCamera>())
 {
 }
 
@@ -22,6 +23,7 @@ void Scene::SetName(std::string name)
 
 void Scene::startUp()
 {
+	EnsureCameraSystemStarted();
 	for (const auto& entity : m_entities)
 	{
 		if (entity)
@@ -30,6 +32,26 @@ void Scene::startUp()
 		}
 	}
 	m_firstFramePending = true;
+}
+
+void Scene::EnsureCameraSystemStarted()
+{
+	if (m_cameraSystemStarted || !Root::HasCurrent() || !m_cameraSystem)
+	{
+		return;
+	}
+	m_cameraSystem->startUp();
+	m_cameraSystemStarted = true;
+}
+
+PathedCamera& Scene::CameraSystem()
+{
+	return *m_cameraSystem;
+}
+
+const PathedCamera& Scene::CameraSystem() const
+{
+	return *m_cameraSystem;
 }
 
 void Scene::FirstFrame()

@@ -8,6 +8,10 @@
 // One ordered position on the camera dolly path.
 struct CameraPathPoint {
 	glm::vec3 position{0.0f};
+	// When enabled, runtime aims this point at the active player. When disabled,
+	// the authored facing vector below controls the camera rotation.
+	bool lookAtPlayer = true;
+	glm::vec3 facing{0.0f, 0.0f, 1.0f};
 	bool island = false;
 	float triggerRadius = 90.0f;
 	glm::vec3 triggerPosition{0.0f};

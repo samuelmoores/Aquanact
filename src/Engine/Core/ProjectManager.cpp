@@ -318,6 +318,16 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 		// pose and radius afterward so loading cannot replace that saved radius.
 		Root::Current().Render().ApplyProjectState(renderState);
 		Root::Current().FrontEnd().ApplyProjectState(renderState.editorShowAxis, renderState.editorShowGrid, pendingGameGUIAssets, pendingActiveGameGUIAsset, pendingGameGUINavigationMode, renderState.imguiLayout);
+		// New project files store camera points per scene. The legacy render-state
+		// application above still restores old files, so replace the editor view
+		// with the active scene's authored path when the per-scene data exists.
+		if (!renderState.sceneCameras.empty())
+		{
+			if (const Scene* activeScene = SceneManager.ActiveLevel())
+			{
+				Root::Current().FrontEnd().EditorGUI().CameraPath().Data() = activeScene->CameraSystem().Path();
+			}
+		}
 		Root::Current().Debugger().SetShowLogWindow(renderState.debugShowLogWindow);
 		Root::Current().Debugger().SetShowStatsWindow(renderState.debugShowStatsWindow);
 		Root::Current().FrontEnd().EditorGUI().SetShowFileExplorer(renderState.showFileExplorer);
