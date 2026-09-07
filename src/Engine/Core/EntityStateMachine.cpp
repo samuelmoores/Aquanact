@@ -178,7 +178,7 @@ void EntityStateMachine::PlaySoundEvent(const SoundEvent& event)
 #else
 #ifdef AQUANACT_SOURCE_ROOT
 		if (!std::filesystem::exists(path))
-			path = std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets" / relativePath;
+			path = std::filesystem::path(AQUANACT_SOURCE_ROOT) / "projects" / "project" / "assets" / relativePath;
 #endif
 #endif
 		return path;

@@ -52,11 +52,11 @@ void BuildGameWindow::Draw(bool& popupRequested)
 		AquanactBuildSystem buildSystem;
 		const std::filesystem::path sourceRoot = SourceRoot();
 		const std::filesystem::path outputRoot = std::filesystem::path(m_buildPath);
-		const std::filesystem::path projectFile = sourceRoot / "assets" / "projects" / "project.aqua";
+		const std::filesystem::path projectFile = Root::Current().Projects().CurrentProjectPath();
 		const std::filesystem::path executablePath =
 			Root::Current().FileSystemRef().ExecutableDirectory() / "AquanactGame.exe";
 		Root::Current().FrontEnd().Creator().SaveAllRoleGUIs();
-		if (!Root::Current().Projects().SaveProject(projectFile, Root::Current().Scenes()))
+		if (projectFile.empty() || !Root::Current().Projects().SaveProject(projectFile, Root::Current().Scenes()))
 		{
 			m_statusMessage = "Build failed: could not save project.";
 		}

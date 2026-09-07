@@ -78,10 +78,11 @@ AquanactBuildSystem::Result AquanactBuildSystem::Build(
 			throw std::runtime_error("Output directory cannot be the source directory or one of its children: " + output.string());
 		if (!std::filesystem::is_regular_file(project))
 			throw std::runtime_error("Project file does not exist: " + project.string());
+		const std::filesystem::path projectAssets = project.parent_path() / "assets";
 		if (!std::filesystem::is_regular_file(executable))
 			throw std::runtime_error("Game executable does not exist: " + executable.string());
-		if (!std::filesystem::is_directory(source / "assets"))
-			throw std::runtime_error("Assets directory does not exist: " + (source / "assets").string());
+		if (!std::filesystem::is_directory(source / "resources"))
+			throw std::runtime_error("Engine resources directory does not exist: " + (source / "resources").string());
 		if (!std::filesystem::is_directory(source / "shaders"))
 			throw std::runtime_error("Shaders directory does not exist: " + (source / "shaders").string());
 
@@ -91,7 +92,11 @@ AquanactBuildSystem::Result AquanactBuildSystem::Build(
 		std::filesystem::create_directories(stagingRoot);
 
 		CopyDirectory(source / "shaders", stagingRoot / "shaders");
-		CopyDirectory(source / "assets", stagingRoot / "assets");
+		CopyDirectory(source / "resources", stagingRoot / "resources");
+		// Overlay the selected project's assets on top of engine runtime assets.
+		// Project-relative references therefore resolve inside the packaged game.
+		if (std::filesystem::is_directory(projectAssets))
+			CopyDirectory(projectAssets, stagingRoot / "assets");
 		const std::filesystem::path myGuiMedia =
 			source / "external" / "mygui-upstream" / "Media" / "MyGUI_Media";
 		if (!std::filesystem::is_directory(myGuiMedia))

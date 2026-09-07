@@ -13,7 +13,9 @@ public:
 	bool LoadProject(const std::filesystem::path& path, SceneManager& SceneManager);
 	bool CreateNewProject(const std::filesystem::path& path, SceneManager& SceneManager);
 	const std::filesystem::path& CurrentProjectPath() const;
+	std::filesystem::path ProjectsRoot() const;
 	std::filesystem::path ProjectDirectory() const;
+	std::filesystem::path ProjectAssetsDirectory() const;
 
 private:
 	FileSystem* m_fileSystem = nullptr;

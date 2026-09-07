@@ -83,12 +83,12 @@ void EngineMenuBar::DrawLoadProjectDialog(
 		return;
 	}
 
-	const std::filesystem::path projectFolder = projectManager.ProjectDirectory();
+	const std::filesystem::path projectFolder = projectManager.ProjectsRoot();
 	std::vector<std::filesystem::path> projectFiles;
 	std::error_code error;
 	if (std::filesystem::exists(projectFolder, error))
 	{
-		for (const auto& entry : std::filesystem::directory_iterator(projectFolder, error))
+		for (const auto& entry : std::filesystem::recursive_directory_iterator(projectFolder, error))
 		{
 			if (error)
 			{
@@ -113,7 +113,9 @@ void EngineMenuBar::DrawLoadProjectDialog(
 		for (const auto& projectFile : projectFiles)
 		{
 			const bool selected = projectFile == g_selectedProjectPath;
-			if (ImGui::Selectable(projectFile.filename().string().c_str(), selected))
+			const std::filesystem::path displayPath = std::filesystem::relative(projectFile, projectFolder, error);
+			const std::string label = error ? projectFile.filename().string() : displayPath.generic_string();
+			if (ImGui::Selectable(label.c_str(), selected))
 			{
 				g_selectedProjectPath = projectFile;
 			}
@@ -151,7 +153,7 @@ void EngineMenuBar::DrawNewProjectDialog(
 {
 	if (ImGui::BeginPopupModal("New Project", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 	{
-		ImGui::TextUnformatted("Create a blank project in the current project folder.");
+		ImGui::TextUnformatted("Create a self-contained project with its own assets folder.");
 		if (ImGui::IsWindowAppearing())
 		{
 			ImGui::SetKeyboardFocusHere();
@@ -165,8 +167,7 @@ void EngineMenuBar::DrawNewProjectDialog(
 		std::string name(g_newProjectName);
 		const bool validName = !name.empty() &&
 			name.find_first_of("\\/:*?\"<>|") == std::string::npos;
-		const std::filesystem::path projectFolder = projectManager.ProjectDirectory();
-		const std::filesystem::path projectPath = projectFolder / (name + ".aqua");
+		const std::filesystem::path projectPath = projectManager.ProjectsRoot() / name / "project.aqua";
 		const bool alreadyExists = validName && std::filesystem::exists(projectPath);
 
 		if (alreadyExists)

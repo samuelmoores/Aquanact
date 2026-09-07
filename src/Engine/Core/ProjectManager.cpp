@@ -5,6 +5,7 @@
 #include "Engine/Core/FrontEndManager.h"
 #include "Engine/UI/GameGUIManager.h"
 #include "Engine/Core/FileSystem.h"
+#include "Engine/Core/FileManager.h"
 #include "Engine/Core/SceneManager.h"
 #include "Engine/Core/ProjectStateSerializer.h"
 #include "Engine/Core/FrameProfiler.h"
@@ -223,12 +224,21 @@ std::filesystem::path ProjectManager::ProjectDirectory() const
 	{
 		return m_currentProjectPath.parent_path();
 	}
+	return ProjectsRoot();
+}
 
+std::filesystem::path ProjectManager::ProjectsRoot() const
+{
 #ifdef AQUANACT_SOURCE_ROOT
-	return std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets" / "projects";
+	return std::filesystem::path(AQUANACT_SOURCE_ROOT) / "projects";
 #else
-	return m_fileSystem ? m_fileSystem->ExecutableDirectory() / "assets" / "projects" : std::filesystem::current_path();
+	return m_fileSystem ? m_fileSystem->ExecutableDirectory() / "projects" : std::filesystem::current_path() / "projects";
 #endif
+}
+
+std::filesystem::path ProjectManager::ProjectAssetsDirectory() const
+{
+	return ProjectDirectory() / "assets";
 }
 
 bool ProjectManager::SaveProject(const std::filesystem::path& path, const SceneManager& SceneManager)
@@ -245,6 +255,7 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const SceneM
 	if (written)
 	{
 		m_currentProjectPath = path;
+		Root::Current().Files().SetRootDirectory(ProjectAssetsDirectory() / "models");
 	}
 	return written;
 }
@@ -281,6 +292,10 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 	const bool loaded = ProjectStateSerializer::LoadLevelState(path, file, pendingLevels, pendingControllers, pendingComponents, pendingInputActions, pendingGameGUIAssets, pendingActiveGameGUIAsset, pendingGameGUINavigationMode, renderState, startupLevelName);
 	if (loaded) // broken boundary, no longer just I/O
 	{
+		// Establish the project context before materializing assets and applying
+		// GUI/render state so every resolver points at this project's assets.
+		m_currentProjectPath = path;
+		Root::Current().Files().SetRootDirectory(ProjectAssetsDirectory() / "models");
 		MaterializePendingLevels(SceneManager, pendingLevels);
 		SceneManager.ApplyProjectState(pendingLevels, pendingControllers, pendingComponents);
 		EnsureMainMenuLevel(SceneManager);
@@ -335,7 +350,6 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 			}
 			Root::Current().InputActions().SetBindings(pendingAction.name, std::move(bindings));
 		}
-		m_currentProjectPath = path;
 	}
 	return loaded;
 }
@@ -346,6 +360,15 @@ bool ProjectManager::CreateNewProject(const std::filesystem::path& path, SceneMa
 	{
 		return false;
 	}
+	std::error_code directoryError;
+	for (const char* assetDirectory : { "audio", "gameGUI", "models", "textures" })
+	{
+		std::filesystem::create_directories(path.parent_path() / "assets" / assetDirectory, directoryError);
+		if (directoryError)
+		{
+			return false;
+		}
+	}
 
 	SceneManager.Clear();
 	EnsureMainMenuLevel(SceneManager);
@@ -355,7 +378,12 @@ bool ProjectManager::CreateNewProject(const std::filesystem::path& path, SceneMa
 	Root::Current().FrontEnd().EditorGUI().CameraPath().Clear();
 	Root::Current().FrontEnd().EditorGUI().SetShowCameraPath(false);
 
-	return SaveProject(path, SceneManager);
+	const bool saved = SaveProject(path, SceneManager);
+	if (saved)
+	{
+		Root::Current().Files().SetRootDirectory(ProjectAssetsDirectory() / "models");
+	}
+	return saved;
 }
 
 

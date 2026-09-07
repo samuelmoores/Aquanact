@@ -5,6 +5,7 @@
 #include "Engine/Core/Scene.h"
 #include "Engine/Core/Component.h"
 #include "Engine/Core/StbImage.h"
+#include "Engine/Core/ProjectManager.h"
 
 #include <imgui.h>
 #include <MYGUI/MyGUI_Colour.h>
@@ -51,6 +52,8 @@ namespace GameGUICreatorHelpers {
 
 	std::filesystem::path SourceRoot()
 	{
+		if (Root::HasCurrent() && !Root::Current().Projects().CurrentProjectPath().empty())
+			return Root::Current().Projects().ProjectDirectory();
 #ifdef AQUANACT_SOURCE_ROOT
 		return std::filesystem::path(AQUANACT_SOURCE_ROOT);
 #else
@@ -60,8 +63,10 @@ namespace GameGUICreatorHelpers {
 
 	std::filesystem::path AssetDirectory()
 	{
+		if (Root::HasCurrent() && !Root::Current().Projects().CurrentProjectPath().empty())
+			return Root::Current().Projects().ProjectAssetsDirectory() / "gameGUI";
 #ifdef AQUANACT_SOURCE_ROOT
-		return std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets" / "gameGUI";
+		return std::filesystem::path(AQUANACT_SOURCE_ROOT) / "projects" / "project" / "assets" / "gameGUI";
 #else
 		return std::filesystem::current_path() / "assets" / "gameGUI";
 #endif

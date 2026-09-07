@@ -56,12 +56,13 @@ namespace {
 
 		const std::filesystem::path executableRoot = Root::Current().FileSystemRef().ExecutableDirectory();
 		const std::filesystem::path candidatePaths[] = {
+			Root::Current().Projects().ProjectAssetsDirectory() / requestedPath,
 			requestedPath,
 			executableRoot / requestedPath,
 			executableRoot / "resources" / requestedPath,
 			executableRoot / "assets" / requestedPath,
 		#if defined(AQUANACT_SOURCE_ROOT) && !defined(AQUANACT_GAME)
-			std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets" / requestedPath,
+			std::filesystem::path(AQUANACT_SOURCE_ROOT) / "projects" / "project" / "assets" / requestedPath,
 		#endif
 		};
 
@@ -707,13 +708,11 @@ void GameGUI::startUp(Window& window)
 		dataManager.addResourceLocation(resourceRoot.string(), false);
 		Root::Current().Debugger().LogTagged("MyGUI", "registered resource location: '" + resourceRoot.string() + "'");
 #endif
-		dataManager.addResourceLocation((resourceRoot / "assets").string(), true);
-		Root::Current().Debugger().LogTagged("MyGUI", "registered resource location: '" + (resourceRoot / "assets").string() + "'");
-	#if defined(AQUANACT_SOURCE_ROOT) && !defined(AQUANACT_GAME)
-		dataManager.addResourceLocation((std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets").string(), true);
-		Root::Current().Debugger().LogTagged("MyGUI", "registered resource location: '" + (std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets").string() + "'");
-	#endif
-
+		if (Root::HasCurrent() && !Root::Current().Projects().CurrentProjectPath().empty())
+		{
+			dataManager.addResourceLocation(Root::Current().Projects().ProjectAssetsDirectory().string(), true);
+			Root::Current().Debugger().LogTagged("MyGUI", "registered project asset location: '" + Root::Current().Projects().ProjectAssetsDirectory().string() + "'");
+		}
 		// Gui has to exist only after the platform and resources are available. That
 		// ordering fixed the runtime exceptions we saw during the first integration pass.
 		m_gui = new MyGUI::Gui();

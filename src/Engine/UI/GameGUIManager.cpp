@@ -96,13 +96,15 @@ namespace {
 
 	std::filesystem::path AssetDirectory()
 	{
+		if (Root::HasCurrent() && !Root::Current().Projects().CurrentProjectPath().empty())
+			return Root::Current().Projects().ProjectAssetsDirectory() / "gameGUI";
 #ifdef AQUANACT_GAME
 		return Root::Current().FileSystemRef().ExecutableDirectory() / "assets" / "gameGUI";
 #else
 #ifdef AQUANACT_SOURCE_ROOT
 		// Keep authored GameGUI assets under the source tree so they survive
 		// rebuilds and remain editable outside the build output directory.
-		return std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets" / "gameGUI";
+		return std::filesystem::path(AQUANACT_SOURCE_ROOT) / "projects" / "project" / "assets" / "gameGUI";
 #else
 		return std::filesystem::current_path() / "assets" / "gameGUI";
 #endif

@@ -36,7 +36,7 @@ namespace
 		}
 
 #ifdef AQUANACT_SOURCE_ROOT
-		return std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets" / "projects" / "project.aqua";
+		return std::filesystem::path(AQUANACT_SOURCE_ROOT) / "projects" / "project" / "project.aqua";
 #else
 		return executableProject;
 #endif

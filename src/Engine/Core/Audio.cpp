@@ -1,5 +1,6 @@
 #include "Engine/Core/Audio.h"
 #include "Engine/Core/Root.h"
+#include "Engine/Core/ProjectManager.h"
 #include "Engine/Core/FileSystem.h"
 #include <miniaudio.h>
 
@@ -58,6 +59,17 @@ namespace
 		const std::filesystem::path requested(path);
 		if (requested.is_absolute())
 			return requested.string();
+		if (Root::HasCurrent() && !Root::Current().Projects().CurrentProjectPath().empty())
+		{
+			const std::filesystem::path projectAssets = Root::Current().Projects().ProjectAssetsDirectory();
+			const std::string requestedText = requested.generic_string();
+			const std::filesystem::path projectCandidate =
+				(requestedText.rfind("assets/", 0) == 0)
+				? projectAssets / std::filesystem::path(requestedText.substr(std::string("assets/").size()))
+				: projectAssets / requested;
+			if (std::filesystem::exists(projectCandidate))
+				return projectCandidate.string();
+		}
 #ifdef AQUANACT_GAME
 		return (Root::Current().FileSystemRef().ExecutableDirectory() / requested).string();
 #else

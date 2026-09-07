@@ -18,7 +18,7 @@ void FileManager::startUp()
 	}
 
 	#ifdef AQUANACT_SOURCE_ROOT
-	const std::filesystem::path defaultModels = std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets" / "models";
+	const std::filesystem::path defaultModels = std::filesystem::path(AQUANACT_SOURCE_ROOT) / "projects" / "project" / "assets" / "models";
 	#else
 	const std::filesystem::path defaultModels = Root::Current().FileSystemRef().ExecutableDirectory() / "assets" / "models";
 	#endif

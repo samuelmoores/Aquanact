@@ -5,6 +5,7 @@
 #include "Engine/Core/Root.h"
 #include "Engine/Core/SceneManager.h"
 #include "Engine/Core/ProjectStateData.h"
+#include "Engine/Core/ProjectManager.h"
 #include "Engine/Core/EntityStateMachine.h"
 #include "Engine/Core/Controller.h"
 #include "Game/PlayerController.h"
@@ -26,11 +27,17 @@ namespace ProjectStateFormat {
 
 		std::filesystem::path AssetsRoot()
 		{
+			if (Root::HasCurrent())
+			{
+				const std::filesystem::path projectPath = Root::Current().Projects().CurrentProjectPath();
+				if (!projectPath.empty())
+					return projectPath.parent_path() / "assets";
+			}
 #ifdef AQUANACT_GAME
 			return Root::Current().FileSystemRef().ExecutableDirectory() / "assets";
 #else
 #ifdef AQUANACT_SOURCE_ROOT
-			return std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets";
+			return std::filesystem::path(AQUANACT_SOURCE_ROOT) / "projects" / "project" / "assets";
 #else
 			return Root::Current().FileSystemRef().ExecutableDirectory() / "assets";
 #endif
@@ -150,6 +157,8 @@ namespace ProjectStateFormat {
 		const std::filesystem::path projectDir = projectPath.parent_path();
 		const std::filesystem::path projectRelative = projectDir / sourcePath;
 		if (Root::Current().FileSystemRef().Exists(projectRelative)) return projectRelative;
+		const std::filesystem::path projectAssetsRelative = projectDir / "assets" / sourcePath;
+		if (Root::Current().FileSystemRef().Exists(projectAssetsRelative)) return projectAssetsRelative;
 		const std::filesystem::path assetsRelative = AssetsRoot() / sourcePath;
 		if (Root::Current().FileSystemRef().Exists(assetsRelative)) return assetsRelative;
 		const std::filesystem::path searchRoots[] = { ModelsRoot(), TexturesRoot(), ProjectsRoot() };

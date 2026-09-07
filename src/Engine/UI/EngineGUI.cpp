@@ -67,9 +67,9 @@ void EngineGUI::startUp(Window& window)
 		StbImage bootImage;
 		const std::filesystem::path bootImageRoot =
 #ifdef AQUANACT_GAME
-			Root::Current().FileSystemRef().ExecutableDirectory() / "assets" / "bootImage";
+			Root::Current().FileSystemRef().ExecutableDirectory() / "resources" / "bootImage";
 #else
-			SourceRoot() / "assets" / "bootImage";
+			SourceRoot() / "resources" / "bootImage";
 #endif
 		const std::filesystem::path bootImagePath = bootImageRoot / "aquanact_transparent.png";
 		bootImage.loadFromFile(bootImagePath.string());
