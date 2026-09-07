@@ -31,6 +31,9 @@ public:
 	// state from the previous session.
 	void Restart(int clipIndex);
 	void Update(float dt);
+	// Evaluates the active clip at an explicit time without advancing runtime
+	// state. Used by cutscene scrubbing and deterministic timeline playback.
+	void EvaluateClipAt(int clipIndex, float seconds, bool loop = true);
 
 	// Returns the full clip length in seconds.
 	float ClipDuration(int clipIndex) const;

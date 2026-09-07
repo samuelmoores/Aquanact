@@ -2,6 +2,7 @@
 #include "Engine/Core/Audio.h"
 
 #include "Engine/Core/Controller.h"
+#include "Engine/Core/Animator.h"
 #include "Engine/Core/EntityStateMachine.h"
 #include "Engine/Core/Debug.h"
 #include "Engine/Core/FrontEndManager.h"
@@ -282,12 +283,43 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 	if (m_cutsceneActive)
 	{
 		PathedCamera& camera = activeLevel->CameraSystem();
-		const std::size_t segmentCount = camera.Path().points.size() > 1 ? camera.Path().points.size() - 1 : 1;
-		// Each authored camera segment occupies one second. This gives a useful
-		// default cinematic duration without adding a second timeline asset.
+		const float cutsceneDuration = std::max(0.1f, activeLevel->Cutscene().duration);
 		m_cutsceneElapsed += std::max(0.0f, dt);
-		camera.SetPlayerProgress(m_cutsceneElapsed / static_cast<float>(segmentCount));
-		if (m_cutsceneElapsed >= static_cast<float>(segmentCount))
+		camera.SetPlayerProgress(m_cutsceneElapsed / cutsceneDuration);
+		for (const CutsceneAnimationTrack& track : activeLevel->Cutscene().animationTracks)
+		{
+			if (m_cutsceneElapsed < track.startTime)
+				continue;
+			Entity* entity = nullptr;
+			for (const auto& object : activeLevel->Objects())
+			{
+				if (object && object->Id() == track.entityId)
+				{
+					entity = object.get();
+					break;
+				}
+			}
+			EntityStateMachine* stateMachine = entity ? entity->GetEntityState() : nullptr;
+			Animator* animator = stateMachine ? stateMachine->GetAnimator() : nullptr;
+			if (!stateMachine || !animator)
+				continue;
+			int clipIndex = -1;
+			const auto& animationNames = stateMachine->AnimationNames();
+			for (std::size_t index = 0; index < animationNames.size(); ++index)
+			{
+				if (animationNames[index] == track.animationName)
+				{
+					clipIndex = static_cast<int>(index);
+					break;
+				}
+			}
+			if (clipIndex >= 0)
+			{
+				const float localTime = std::max(0.0f, m_cutsceneElapsed - track.startTime) * std::max(0.01f, track.speed);
+				animator->EvaluateClipAt(clipIndex, std::min(localTime, track.duration), track.loop && localTime <= track.duration);
+			}
+		}
+		if (m_cutsceneElapsed >= cutsceneDuration)
 		{
 			const std::string nextLevel = m_cutsceneNextLevel;
 			m_cutsceneActive = false;
@@ -307,6 +339,9 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 			}
 			return;
 		}
+		// Cutscene tracks own animation pose and movement while the timeline is
+		// active; gameplay state machines must not overwrite the authored pose.
+		return;
 	}
 
 	// How can we move this to the debugger?

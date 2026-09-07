@@ -232,6 +232,7 @@ void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManage
 	m_windowState.showInputMapWindow = m_inputMapWindow.IsOpen();
 	m_cameraWindow.Draw(m_cameraPathCreator, m_windowState.showCameraWindow, m_showCameraPath);
 	m_audioWindow.Draw(SceneManager, projectManager, m_windowState.showAudioWindow);
+	m_cutsceneWindow.Draw(SceneManager, projectManager, m_windowState.showCutsceneWindow);
 	m_componentDeletionWindow.Draw(SceneManager, m_popupRequests.deleteComponent);
 
 	m_fileExplorerWindow.Draw(fileManager, m_windowState.showFileExplorer);
@@ -280,6 +281,10 @@ void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManage
 	if (viewResult.showLightingWindow)
 	{
 		m_windowState.showLightingWindow = *viewResult.showLightingWindow;
+	}
+	if (viewResult.showCutsceneWindow)
+	{
+		m_windowState.showCutsceneWindow = *viewResult.showCutsceneWindow;
 	}
 
 }

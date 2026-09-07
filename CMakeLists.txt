@@ -63,6 +63,7 @@ set(SOURCES
     "include/Engine/UI/ComponentDeletionWindow.h" "src/Engine/UI/ComponentDeletionWindow.cpp"
     "include/Engine/UI/BuildGameWindow.h" "src/Engine/UI/BuildGameWindow.cpp"
     "include/Engine/UI/AudioWindow.h" "src/Engine/UI/AudioWindow.cpp"
+    "include/Engine/UI/CutsceneWindow.h" "src/Engine/UI/CutsceneWindow.cpp"
     "include/Engine/UI/CameraWindow.h" "src/Engine/UI/CameraWindow.cpp"
     "include/Engine/UI/LightingWindow.h" "src/Engine/UI/LightingWindow.cpp"
     "include/Engine/UI/FileExplorerWindow.h" "src/Engine/UI/FileExplorerWindow.cpp"

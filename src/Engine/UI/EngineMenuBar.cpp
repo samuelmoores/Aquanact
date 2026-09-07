@@ -264,6 +264,7 @@ EngineMenuBarResult EngineMenuBar::DrawViewMenu(
 	{
 		result.showLightingWindow = showLightingWindow;
 	}
+	EngineGuiWidgets::ToggleMenuItem("Cutscene Timeline", windowState.showCutsceneWindow);
 
 	bool showLogWindow = Root::Current().Debugger().ShowLogWindow();
 	bool showStatsWindow = Root::Current().Debugger().ShowStatsWindow();

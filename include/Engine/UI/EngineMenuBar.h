@@ -15,6 +15,7 @@ struct EngineMenuBarResult
 	std::optional<bool> showSceneWindow;
 	std::optional<bool> showEntityWindow;
 	std::optional<bool> showLightingWindow;
+	std::optional<bool> showCutsceneWindow;
 };
 
 class EngineMenuBar

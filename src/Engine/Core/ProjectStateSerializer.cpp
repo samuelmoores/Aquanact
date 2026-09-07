@@ -409,6 +409,15 @@ namespace ProjectStateSerializer {
 				continue;
 			}
 			contents += "scenecontext;" + ProjectStateFormat::EscapeField(scene->Name()) + "\n";
+			contents += "cutscene;" + ProjectStateFormat::EscapeField(scene->Name()) + ";" + std::to_string(scene->Cutscene().duration) + "\n";
+			for (const CutsceneAnimationTrack& track : scene->Cutscene().animationTracks)
+			{
+				contents += "cutsceneanim;" + ProjectStateFormat::EscapeField(scene->Name()) + ";" +
+					std::to_string(track.entityId) + ";" + ProjectStateFormat::EscapeField(track.animationName) + ";" +
+					std::to_string(track.startTime) + ";" + std::to_string(track.duration) + ";" +
+					std::to_string(track.speed) + ";" + std::to_string(track.blendIn) + ";" +
+					std::to_string(track.blendOut) + ";" + (track.loop ? "1" : "0") + "\n";
+			}
 			for (const auto& object : scene->Objects())
 			{
 				if (object)
@@ -713,6 +722,44 @@ namespace ProjectStateSerializer {
 					currentLevel = &pendingLevel;
 					break;
 				}
+			}
+			continue;
+		}
+
+		if (fields.size() >= 3 && fields[0] == "cutscene")
+		{
+			const std::string sceneName = ProjectStateFormat::UnescapeField(fields[1]);
+			for (auto& pendingLevel : pendingLevels)
+			{
+				if (pendingLevel.name == sceneName)
+				{
+					pendingLevel.cutscene.duration = std::max(0.1f, std::stof(fields[2]));
+					break;
+				}
+			}
+			continue;
+		}
+
+		if (fields.size() >= 10 && fields[0] == "cutsceneanim")
+		{
+			const std::string sceneName = ProjectStateFormat::UnescapeField(fields[1]);
+			for (auto& pendingLevel : pendingLevels)
+			{
+				if (pendingLevel.name != sceneName)
+				{
+					continue;
+				}
+				CutsceneAnimationTrack track;
+				track.entityId = static_cast<unsigned int>(std::stoul(fields[2]));
+				track.animationName = ProjectStateFormat::UnescapeField(fields[3]);
+				track.startTime = std::max(0.0f, std::stof(fields[4]));
+				track.duration = std::max(0.01f, std::stof(fields[5]));
+				track.speed = std::max(0.01f, std::stof(fields[6]));
+				track.blendIn = std::max(0.0f, std::stof(fields[7]));
+				track.blendOut = std::max(0.0f, std::stof(fields[8]));
+				track.loop = fields[9] == "1" || fields[9] == "true";
+				pendingLevel.cutscene.animationTracks.push_back(std::move(track));
+				break;
 			}
 			continue;
 		}

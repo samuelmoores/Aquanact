@@ -2,6 +2,7 @@
 
 #include "Engine/Core/Entity.h"
 #include "Engine/Core/LevelCollider.h"
+#include "Engine/Core/CutsceneTimeline.h"
 
 #include <memory>
 #include <string>
@@ -39,6 +40,8 @@ public:
 	PathedCamera& CameraSystem();
 	const PathedCamera& CameraSystem() const;
 	void EnsureCameraSystemStarted();
+	CutsceneTimeline& Cutscene();
+	const CutsceneTimeline& Cutscene() const;
 
 private:
 	std::string m_name;
@@ -49,6 +52,7 @@ private:
 	std::unique_ptr<PathedCamera> m_cameraSystem;
 	bool m_cameraSystemStarted = false;
 	bool m_firstFramePending = false;
+	CutsceneTimeline m_cutscene;
 };
 
 

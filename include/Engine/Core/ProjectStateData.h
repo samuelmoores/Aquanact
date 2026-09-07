@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include "Engine/Core/CameraPathData.h"
+#include "Engine/Core/CutsceneTimeline.h"
 
 namespace ProjectStateData {
 	struct PendingController {
@@ -80,6 +81,7 @@ namespace ProjectStateData {
 		bool isMainMenu = false;
 		std::string musicPath;
 		float musicVolume = 50.0f;
+		CutsceneTimeline cutscene;
 		struct PendingObject {
 			std::filesystem::path sourcePath;
 			glm::vec3 position{ 0.0f };

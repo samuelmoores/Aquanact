@@ -86,6 +86,7 @@ namespace {
 				continue;
 			}
 			SceneManager.SetSceneKind(pendingLevel.name, pendingLevel.isCutscene ? SceneManager::SceneKind::Cutscene : SceneManager::SceneKind::Level);
+			Scene->Cutscene() = pendingLevel.cutscene;
 			if (pendingLevel.isMainMenu)
 			{
 				SceneManager.SetSceneKind(pendingLevel.name, SceneManager::SceneKind::Cutscene);

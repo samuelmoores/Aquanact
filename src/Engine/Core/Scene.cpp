@@ -54,6 +54,16 @@ const PathedCamera& Scene::CameraSystem() const
 	return *m_cameraSystem;
 }
 
+CutsceneTimeline& Scene::Cutscene()
+{
+	return m_cutscene;
+}
+
+const CutsceneTimeline& Scene::Cutscene() const
+{
+	return m_cutscene;
+}
+
 void Scene::FirstFrame()
 {
 	if (!m_firstFramePending)

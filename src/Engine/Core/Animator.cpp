@@ -1,5 +1,6 @@
 #include "Engine/Core/Animator.h"
 #include <assimp/scene.h>
+#include <algorithm>
 #include <cmath>
 
 static aiMatrix4x4 MakeScaling(const aiVector3D& s)
@@ -144,6 +145,27 @@ void Animator::Update(float dt)
 		FireEvents(m_currentClip, m_prevTicks, ticks, a->Duration());
 		m_prevTicks = ticks;
 	}
+}
+
+void Animator::EvaluateClipAt(int clipIndex, float seconds, bool loop)
+{
+	if (clipIndex < 0 || clipIndex >= static_cast<int>(m_clips.size()) || !m_clips[clipIndex])
+	{
+		return;
+	}
+
+	Animation* clip = m_clips[clipIndex].get();
+	const float duration = clip->Duration();
+	const float ticks = duration > 0.0f
+		? (loop ? LoopTicks(seconds, clip) : std::clamp(seconds * clip->TicksPerSecond(), 0.0f, duration))
+		: 0.0f;
+	m_currentClip = clipIndex;
+	m_nextClip = clipIndex;
+	m_currentTime = seconds;
+	m_nextTime = seconds;
+	m_blendFactor = 1.0f;
+	m_prevTicks = ticks;
+	Traverse(ticks, m_rootNode, aiMatrix4x4(), clip);
 }
 
 int Animator::ClipCount() const

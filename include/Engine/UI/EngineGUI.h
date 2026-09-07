@@ -13,6 +13,7 @@
 #include "Engine/UI/AudioWindow.h"
 #include "Engine/UI/CameraWindow.h"
 #include "Engine/UI/LightingWindow.h"
+#include "Engine/UI/CutsceneWindow.h"
 #include "Engine/UI/FileExplorerWindow.h"
 #include "Engine/UI/EditorSceneInteraction.h"
 
@@ -91,6 +92,7 @@ private:
 	AudioWindow m_audioWindow;
 	CameraWindow m_cameraWindow;
 	LightingWindow m_lightingWindow;
+	CutsceneWindow m_cutsceneWindow;
 	FileExplorerWindow m_fileExplorerWindow;
 };
 
