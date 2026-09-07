@@ -5,6 +5,8 @@
 #include "Engine/Core/SceneManager.h"
 #include "Engine/Core/LevelCollider.h"
 #include "Engine/Core/PhysicsWorld.h"
+#include "Engine/Core/Root.h"
+#include "Engine/Core/FrontEndManager.h"
 #include "Engine/UI/EngineGuiWidgets.h"
 
 #include <imgui.h>
@@ -62,6 +64,10 @@ void SceneWindow::DrawNewLevelPopup(SceneManager& sceneManager, bool& requested)
 			m_newLevelStatusMessage = "Scene already exists.";
 		else if ((m_newSceneKind == 0 ? sceneManager.CreateLevel(levelName) : sceneManager.CreateCutscene(levelName)))
 		{
+			// Persist the currently edited GUI before activating the new scene.
+			// Otherwise a New Game destination can appear to revert after the
+			// scene editor changes scenes.
+			Root::Current().FrontEnd().Creator().SaveAllRoleGUIs();
 			sceneManager.SetActiveLevel(levelName);
 			m_newLevelStatusMessage = "Created " + std::string(sceneKinds[m_newSceneKind]) + " " + levelName + ".";
 		}

@@ -1,6 +1,7 @@
 #include "Engine/Core/SceneManager.h"
 
 #include "Engine/Core/EntityStateMachine.h"
+#include "Engine/Core/CutsceneAnimator.h"
 #include "Engine/Core/ComponentFactory.h"
 #include "Engine/Core/Controller.h"
 #include "Engine/Core/Entity.h"
@@ -148,6 +149,54 @@ namespace
 			}
 		}
 		return savedAnimationSource;
+	}
+
+	void ApplyCutsceneFirstFrame(Scene& scene)
+	{
+		if (scene.Cutscene().animationTracks.empty())
+		{
+			return;
+		}
+
+		for (const std::unique_ptr<Entity>& object : scene.Objects())
+		{
+			if (object && object->GetMesh() && object->GetMesh()->Skinned())
+			{
+				object->RemoveComponent<EntityStateMachine>();
+				if (!object->GetCutsceneAnimator())
+					object->AddComponent<CutsceneAnimator>(object->GetMesh());
+			}
+		}
+
+		for (CutsceneAnimationTrack& track : scene.Cutscene().animationTracks)
+		{
+			if (track.startTime > 0.0f)
+			{
+				continue;
+			}
+
+			Entity* entity = nullptr;
+			for (const std::unique_ptr<Entity>& object : scene.Objects())
+			{
+				if (object && object->Id() == track.entityId)
+				{
+					entity = object.get();
+					break;
+				}
+			}
+			CutsceneAnimator* cutsceneAnimator = entity ? entity->GetCutsceneAnimator() : nullptr;
+			Animator* animator = cutsceneAnimator ? cutsceneAnimator->GetAnimator() : nullptr;
+			if (!cutsceneAnimator || !animator)
+			{
+				continue;
+			}
+			const int clipIndex = cutsceneAnimator->FindAnimationIndex(track.animationName);
+			if (clipIndex >= 0)
+			{
+				track.animationName = cutsceneAnimator->AnimationNames()[static_cast<std::size_t>(clipIndex)];
+				animator->EvaluateClipAt(clipIndex, 0.0f, track.loop);
+			}
+		}
 	}
 }
 
@@ -339,6 +388,10 @@ bool SceneManager::SetActiveLevel(const std::string& name)
 		Root::Current().FrontEnd().EditorGUI().CameraPath().Data() =
 			m_activeLevel->CameraSystem().Path();
 	}
+	if (SceneKindFor(m_activeLevel->Name()) == SceneKind::Cutscene)
+	{
+		ApplyCutsceneFirstFrame(*m_activeLevel);
+	}
 	return true;
 }
 
@@ -451,6 +504,26 @@ void SceneManager::ApplyProjectState(
 						controller->SetMoveSpeed(pendingController.moveSpeed);
 					}
 				}
+		}
+	}
+
+	// Cutscene animation is deliberately separate from gameplay state. Attach
+	// the animation-only component to skinned cutscene entities as part of
+	// scene restoration; it does not need gameplay component serialization.
+	for (const std::unique_ptr<Scene>& scene : m_levels)
+	{
+		if (!scene || SceneKindFor(scene->Name()) != SceneKind::Cutscene)
+		{
+			continue;
+		}
+		for (const std::unique_ptr<Entity>& object : scene->Objects())
+		{
+			if (object && object->GetMesh() && object->GetMesh()->Skinned())
+			{
+				object->RemoveComponent<EntityStateMachine>();
+				if (!object->GetCutsceneAnimator())
+					object->AddComponent<CutsceneAnimator>(object->GetMesh());
+			}
 		}
 	}
 
@@ -567,6 +640,16 @@ void SceneManager::ApplyProjectState(
 	for (const std::unique_ptr<Scene>& scene : m_levels)
 	{
 		if (!scene)
+		{
+			continue;
+		}
+		const bool pendingCutscene = std::any_of(
+			pendingLevels.begin(), pendingLevels.end(),
+			[&scene](const ProjectStateData::PendingLevel& pendingLevel)
+			{
+				return pendingLevel.name == scene->Name() && pendingLevel.isCutscene;
+			});
+		if (SceneKindFor(scene->Name()) == SceneKind::Cutscene || pendingCutscene)
 		{
 			continue;
 		}

@@ -56,6 +56,10 @@ glm::vec3 EvaluateCameraPathSegment(
 	// Keep interpolation local to this segment even if the caller supplies a
 	// slightly out-of-range parameter.
 	const float u = glm::clamp(t, 0.0f, 1.0f);
+	if (path.points[segment].interpolation == CameraPathInterpolation::Hold)
+		return p1;
+	if (path.points[segment].interpolation == CameraPathInterpolation::Linear)
+		return glm::mix(p1, p2, u);
 	const float u2 = u * u;
 	const float u3 = u2 * u;
 
@@ -63,6 +67,29 @@ glm::vec3 EvaluateCameraPathSegment(
 		(-p0 + p2) * u +
 		(2.0f * p0 - 5.0f * p1 + 4.0f * p2 - p3) * u2 +
 		(-p0 + 3.0f * p1 - 3.0f * p2 + p3) * u3);
+}
+
+float CameraPathProgressAtTime(const CameraPathData& path, float timeSeconds, float durationSeconds)
+{
+	if (path.points.size() <= 1)
+		return 0.0f;
+	const float safeDuration = std::max(durationSeconds, 0.001f);
+	const bool authored = path.points.back().timeSeconds >= 0.0f;
+	if (!authored)
+		return glm::clamp(timeSeconds / safeDuration, 0.0f, 1.0f);
+
+	const float time = std::max(0.0f, timeSeconds);
+	for (std::size_t index = 0; index + 1 < path.points.size(); ++index)
+	{
+		const float start = std::max(0.0f, path.points[index].timeSeconds);
+		const float end = std::max(start + 0.001f, path.points[index + 1].timeSeconds);
+		if (time <= end)
+		{
+			const float local = glm::clamp((time - start) / (end - start), 0.0f, 1.0f);
+			return (static_cast<float>(index) + local) / static_cast<float>(path.points.size() - 1);
+		}
+	}
+	return 1.0f;
 }
 
 CameraPathProjection ProjectOntoCameraPath(

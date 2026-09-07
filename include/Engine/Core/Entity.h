@@ -11,6 +11,7 @@
 #include <vector>
 
 class EntityStateMachine;
+class CutsceneAnimator;
 class Controller;
 
 enum class PhysicsColliderShape
@@ -49,6 +50,7 @@ public:
 	Mesh* GetMesh();
 	ShaderProgram* GetShader();
 	EntityStateMachine* GetEntityState();
+	CutsceneAnimator* GetCutsceneAnimator();
 	Controller* GetController();
 	// These return snapshots so callers can iterate safely while other code may
 	// still be mutating the underlying owned component list.

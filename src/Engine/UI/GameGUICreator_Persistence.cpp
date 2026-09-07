@@ -50,10 +50,37 @@ namespace
 
 void GameGUICreator::SaveAllRoleGUIs()
 {
+	const GUIRole selectedGUI = m_selectedGUI;
 	for (std::size_t i = 0; i < m_assets.size(); ++i)
 	{
 		m_selectedGUI = static_cast<GUIRole>(i);
 		SaveSelectedRoleGUI();
+	}
+	m_selectedGUI = selectedGUI;
+	LoadNavigationSettingsFromAsset();
+}
+
+void GameGUICreator::ApplyProjectState(const std::vector<ProjectStateData::PendingGameGUIAction>& actions)
+{
+	ReloadAssetsFromDisk();
+	for (const ProjectStateData::PendingGameGUIAction& action : actions)
+	{
+		for (GameGUIAsset& asset : m_assets)
+		{
+			if (asset.name != action.assetName)
+			{
+				continue;
+			}
+			for (GameGUIWidgetDef& widget : asset.widgets)
+			{
+				if (widget.name == action.widgetName && widget.action == GameGUIActionType::NewGame)
+				{
+					widget.launchLevel = action.launchLevel;
+					break;
+				}
+			}
+			break;
+		}
 	}
 }
 

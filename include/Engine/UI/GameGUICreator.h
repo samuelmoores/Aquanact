@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Engine/Core/ProjectStateData.h"
 #include "Engine/UI/GameGUIAsset.h"
 #include <filesystem>
 #include <unordered_map>
@@ -27,6 +28,8 @@ public:
 	void PreviewSelectedGUI();
 	void RestoreEditorViewState();
 	void SaveAllRoleGUIs();
+	void ReloadAssetsFromDisk();
+	void ApplyProjectState(const std::vector<ProjectStateData::PendingGameGUIAction>& actions);
 	void SetMenuNavigationMode(MenuNavigationMode mode);
 
 	friend class GameGUICreatorView;

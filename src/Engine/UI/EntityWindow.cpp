@@ -75,15 +75,18 @@ EntityWindowResult EntityWindow::Draw(const EngineGuiFrameContext& context, bool
 			{
 				DrawTransform(object);
 				ImGui::Separator();
-				if (EntityStateMachine* stateMachine = object.GetEntityState())
+				if (!cutscene)
 				{
-					result.stateMachineToDraw = stateMachine;
-					if (DrawStateMachineButton())
-						result.openStateMachine = true;
+					if (EntityStateMachine* stateMachine = object.GetEntityState())
+					{
+						result.stateMachineToDraw = stateMachine;
+						if (DrawStateMachineButton())
+							result.openStateMachine = true;
+						ImGui::Separator();
+					}
+					DrawPhysics(object);
 					ImGui::Separator();
 				}
-				DrawPhysics(object);
-				ImGui::Separator();
 				ImGui::TextUnformatted("Components");
 				ImGui::Separator();
 				const std::vector<Component*> components = object.Components();

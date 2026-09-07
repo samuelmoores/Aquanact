@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Engine/Core/ProjectStateData.h"
 #include "Engine/UI/GameGUIAsset.h"
 
 #include <memory>
@@ -55,7 +56,11 @@ public:
 	void RecordClick(const std::string& message);
 	void RecordButtonClick(const std::string& assetName, const std::string& widgetName, GameGUIActionType action);
 	void AppendProjectState(std::string& contents) const;
-	void ApplyProjectState(const std::vector<std::string>& sceneAssets, const std::string& activeAssetName, const std::string& navigationMode = {});
+	void ApplyProjectState(
+		const std::vector<std::string>& sceneAssets,
+		const std::string& activeAssetName,
+		const std::string& navigationMode,
+		const std::vector<ProjectStateData::PendingGameGUIAction>& actions);
 	void ClearUI();
 	GameGUI* Runtime() const;
 	std::size_t LoadedAssetCount() const;

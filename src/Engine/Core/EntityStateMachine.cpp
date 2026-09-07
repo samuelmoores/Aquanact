@@ -704,6 +704,20 @@ const std::vector<std::string>& EntityStateMachine::AnimationNames() const
 	return m_animationNames;
 }
 
+int EntityStateMachine::FindAnimationIndex(const std::string& animationName) const
+{
+	const std::string requested = PortableAnimationPath(animationName);
+	for (std::size_t index = 0; index < m_animationNames.size(); ++index)
+	{
+		if (m_animationNames[index] == animationName ||
+			PortableAnimationPath(m_animationNames[index]) == requested)
+		{
+			return static_cast<int>(index);
+		}
+	}
+	return -1;
+}
+
 const std::vector<EntityStateMachine::State>& EntityStateMachine::States() const
 {
 	return m_states;

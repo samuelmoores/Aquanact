@@ -1,5 +1,7 @@
 #include "Engine/Core/Entity.h"
 
+#include "Engine/Core/CutsceneAnimator.h"
+
 #include "Engine/Core/EntityStateMachine.h"
 #include "Engine/Core/Controller.h"
 #include "Engine/Core/Debug.h"
@@ -104,6 +106,7 @@ Entity::~Entity()
 Mesh* Entity::GetMesh() { return m_mesh; }
 ShaderProgram* Entity::GetShader() { return &m_shader; }
 EntityStateMachine* Entity::GetEntityState() { return GetComponent<EntityStateMachine>(); }
+CutsceneAnimator* Entity::GetCutsceneAnimator() { return GetComponent<CutsceneAnimator>(); }
 Controller* Entity::GetController() { return GetComponent<Controller>(); }
 std::vector<Component*> Entity::Components()
 {
@@ -280,7 +283,11 @@ void Entity::Scale(glm::vec3 delta) { m_scale += delta; }
 void Entity::SetScale(glm::vec3 scale) { m_scale = scale; }
 void Entity::updateMeshAABB(glm::vec3 delta) { if (m_mesh) m_mesh->updateAABB(delta, m_scale); }
 bool Entity::intersectsRayMesh(glm::vec3 origin, glm::vec3& direction) { return m_mesh && m_mesh->intersectsRay(origin, direction); }
-bool Entity::skinned() { return m_skinned && GetComponent<EntityStateMachine>() != nullptr; }
+bool Entity::skinned()
+{
+	return m_skinned &&
+		(GetComponent<EntityStateMachine>() != nullptr || GetComponent<CutsceneAnimator>() != nullptr);
+}
 std::string Entity::SourcePath() const { return m_sourcePath; }
 glm::vec3 Entity::Position() const { return m_position; }
 glm::vec3 Entity::WorldPosition() { return glm::vec3(BuildModelMatrix()[3]); }

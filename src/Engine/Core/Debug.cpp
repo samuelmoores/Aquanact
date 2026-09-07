@@ -335,6 +335,8 @@ void Debug::shutDown()
 	for (Line* sphere : m_cameraPathSpheres) delete sphere;
 	for (Line* sphere : m_cameraPathTriggerSpheres) delete sphere;
 	for (Line* segment : m_cameraPathSegments) delete segment;
+	delete m_cutsceneCameraMarker;
+	m_cutsceneCameraMarker = nullptr;
 	m_cameraPathSpheres.clear();
 	m_cameraPathTriggerSpheres.clear();
 	m_cameraPathSegments.clear();
@@ -379,11 +381,11 @@ void Debug::DrawCameraCollisionDebug(const Camera& camera)
 	return;
 }
 
-void Debug::DrawCameraPath(const Camera& camera, const CameraPathData& path, int selectedPoint)
+void Debug::DrawCameraPath(const Camera& camera, const CameraPathData& path, int selectedPoint, bool drawPath)
 {
 	// Rebuild each editor frame so dragging a point immediately moves its sphere
 	// and the connecting segments.
-	if (!path.points.empty() || !m_cameraPathSpheres.empty() || !m_cameraPathTriggerSpheres.empty())
+	if (drawPath && (!path.points.empty() || !m_cameraPathSpheres.empty() || !m_cameraPathTriggerSpheres.empty()))
 	{
 		for (Line* sphere : m_cameraPathSpheres) delete sphere;
 		for (Line* sphere : m_cameraPathTriggerSpheres) delete sphere;
@@ -434,7 +436,7 @@ void Debug::DrawCameraPath(const Camera& camera, const CameraPathData& path, int
 	const glm::mat4 projection = camera.GetProjectionMatrix();
 	const glm::mat4 view = camera.GetViewMatrix();
 	constexpr float pointRadius = 7.5f;
-	for (std::size_t i = 0; i < path.points.size() && i < m_cameraPathSpheres.size(); ++i)
+	for (std::size_t i = 0; drawPath && i < path.points.size() && i < m_cameraPathSpheres.size(); ++i)
 	{
 		m_cameraPathSpheres[i]->UpdateProjection(projection);
 		const float radius = static_cast<int>(i) == selectedPoint
@@ -443,7 +445,7 @@ void Debug::DrawCameraPath(const Camera& camera, const CameraPathData& path, int
 		m_cameraPathSpheres[i]->draw(view, glm::translate(glm::mat4(1.0f), path.points[i].position) * glm::scale(glm::mat4(1.0f), glm::vec3(radius)));
 	}
 	std::size_t triggerSphereIndex = 0;
-	for (const CameraPathPoint& point : path.points)
+	for (const CameraPathPoint& point : drawPath ? path.points : std::vector<CameraPathPoint>{})
 	{
 		if (!point.island || triggerSphereIndex >= m_cameraPathTriggerSpheres.size())
 		{
@@ -453,10 +455,29 @@ void Debug::DrawCameraPath(const Camera& camera, const CameraPathData& path, int
 		triggerSphere->UpdateProjection(projection);
 		triggerSphere->draw(view, glm::translate(glm::mat4(1.0f), point.triggerPosition) * glm::scale(glm::mat4(1.0f), glm::vec3(point.triggerRadius)));
 	}
-	for (std::size_t i = 0; i < m_cameraPathSegments.size(); ++i)
+	for (std::size_t i = 0; drawPath && i < m_cameraPathSegments.size(); ++i)
 	{
 		m_cameraPathSegments[i]->UpdateProjection(projection);
 		m_cameraPathSegments[i]->draw(view);
+	}
+
+	const Scene* activeScene = Root::Current().Scenes().ActiveLevel();
+	const bool showCutsceneCameraMarker = activeScene &&
+		Root::Current().Scenes().SceneKindFor(activeScene->Name()) == SceneManager::SceneKind::Cutscene &&
+		!Root::Current().Render().CutscenePreviewCamera();
+	if (showCutsceneCameraMarker)
+	{
+		if (!m_cutsceneCameraMarker)
+			m_cutsceneCameraMarker = new Line(MakeWireSphereVertices(glm::vec3(1.0f, 0.25f, 0.1f)));
+		m_cutsceneCameraMarker->UpdateProjection(projection);
+		m_cutsceneCameraMarker->draw(view,
+			glm::translate(glm::mat4(1.0f), activeScene->CameraSystem().GetPosition()) *
+			glm::scale(glm::mat4(1.0f), glm::vec3(12.0f)));
+	}
+	else if (m_cutsceneCameraMarker)
+	{
+		delete m_cutsceneCameraMarker;
+		m_cutsceneCameraMarker = nullptr;
 	}
 }
 
@@ -531,9 +552,13 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 			}
 		}
 	}
-	if (gui.ShowCameraPath())
+	const Scene* activeScene = Root::Current().Scenes().ActiveLevel();
+	const bool showCutsceneCameraMarker = activeScene &&
+		Root::Current().Scenes().SceneKindFor(activeScene->Name()) == SceneManager::SceneKind::Cutscene &&
+		!Root::Current().Render().CutscenePreviewCamera();
+	if (gui.ShowCameraPath() || showCutsceneCameraMarker)
 	{
-		DrawCameraPath(camera, gui.CameraPath().Data(), gui.CameraPath().SelectedPoint());
+		DrawCameraPath(camera, gui.CameraPath().Data(), gui.CameraPath().SelectedPoint(), gui.ShowCameraPath());
 	}
 
 	if (m_axis && gui.ShowAxis())

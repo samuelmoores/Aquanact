@@ -3,6 +3,7 @@
 #include "Engine/Core/Debug.h"
 #include "Engine/Core/FileSystem.h"
 #include "Engine/Core/GLHeaders.h"
+#include "Engine/Core/ProjectManager.h"
 #include "Engine/Core/RenderManager.h"
 #include "Engine/Core/Root.h"
 #include "Engine/Core/Scene.h"
@@ -17,10 +18,12 @@
 #include "ImGuizmo.h"
 #endif
 
+#include <algorithm>
 #include <cstdint>
 #include <exception>
 #include <filesystem>
 #include <string>
+#include <utility>
 
 namespace
 {
@@ -59,11 +62,13 @@ void EngineGUI::startUp(Window& window)
 	ImGui_ImplGlfw_InitForOpenGL(window.GLFW(), true);
 	ImGui_ImplOpenGL3_Init("#version 330");
 	m_initialized = true;
+	m_waitingForStartupProject = Root::Current().State().IsEditorMode();
+	m_bootImageTimeRemaining = 0.0f;
+	m_startupProjectToOpen.clear();
 
 	try
 	{
-		// Load the boot image used during the first frame so the editor does not
-		// appear empty while the rest of the frontend is initializing.
+		// Load the image used between project selection and the normal editor.
 		StbImage bootImage;
 		const std::filesystem::path bootImageRoot =
 #ifdef AQUANACT_GAME
@@ -112,41 +117,6 @@ void EngineGUI::startUp(Window& window)
 		m_bootTextureHeight = 0;
 	}
 
-	// Present a first ImGui frame immediately so the window has visible content
-	// while the remaining frontend systems and project assets finish starting up.
-	BeginFrame();
-	ImDrawList* drawList = ImGui::GetBackgroundDrawList();
-	const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
-	const ImVec2 center(displaySize.x * 0.5f, displaySize.y * 0.5f);
-	if (m_bootTexture != 0)
-	{
-		const float imageAspect = static_cast<float>(m_bootTextureWidth) / static_cast<float>(m_bootTextureHeight);
-		const float maxImageWidth = displaySize.x * 0.195f;
-		const float maxImageHeight = displaySize.y * 0.175f;
-		float imageWidth = maxImageWidth;
-		float imageHeight = imageWidth / imageAspect;
-		if (imageHeight > maxImageHeight)
-		{
-			imageHeight = maxImageHeight;
-			imageWidth = imageHeight * imageAspect;
-		}
-
-		const ImVec2 imageMin(center.x - imageWidth * 0.5f, center.y - imageHeight * 0.5f - 24.0f);
-		const ImVec2 imageMax(imageMin.x + imageWidth, imageMin.y + imageHeight);
-			drawList->AddImage(
-			reinterpret_cast<ImTextureID>(static_cast<intptr_t>(m_bootTexture)),
-			imageMin,
-			imageMax,
-			ImVec2(0.0f, 0.0f),
-			ImVec2(1.0f, 1.0f));
-	}
-
-	glClearColor(0.02f, 0.02f, 0.025f, 1.0f);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	ImGui::Render();
-	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-	window.SwapBuffers();
-	window.PollEvents();
 }
 
 void EngineGUI::shutDown()
@@ -164,6 +134,9 @@ void EngineGUI::shutDown()
 	}
 	m_bootTextureWidth = 0;
 	m_bootTextureHeight = 0;
+	m_waitingForStartupProject = true;
+	m_bootImageTimeRemaining = 0.0f;
+	m_startupProjectToOpen.clear();
 	ImGui_ImplOpenGL3_Shutdown();
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
@@ -181,6 +154,40 @@ void EngineGUI::BeginFrame()
 #endif
 }
 
+void EngineGUI::DrawBootImage() const
+{
+	// Draw above every editor/debug window so the transition contains only the
+	// boot image, even when the loaded project restores visible diagnostics.
+	ImDrawList* drawList = ImGui::GetForegroundDrawList();
+	const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+	drawList->AddRectFilled(ImVec2(0.0f, 0.0f), displaySize, IM_COL32(5, 5, 7, 255));
+	if (m_bootTexture == 0 || m_bootTextureWidth <= 0 || m_bootTextureHeight <= 0)
+	{
+		return;
+	}
+
+	const ImVec2 center(displaySize.x * 0.5f, displaySize.y * 0.5f);
+	const float imageAspect = static_cast<float>(m_bootTextureWidth) / static_cast<float>(m_bootTextureHeight);
+	const float maxImageWidth = displaySize.x * 0.195f;
+	const float maxImageHeight = displaySize.y * 0.175f;
+	float imageWidth = maxImageWidth;
+	float imageHeight = imageWidth / imageAspect;
+	if (imageHeight > maxImageHeight)
+	{
+		imageHeight = maxImageHeight;
+		imageWidth = imageHeight * imageAspect;
+	}
+
+	const ImVec2 imageMin(center.x - imageWidth * 0.5f, center.y - imageHeight * 0.5f - 24.0f);
+	const ImVec2 imageMax(imageMin.x + imageWidth, imageMin.y + imageHeight);
+	drawList->AddImage(
+		reinterpret_cast<ImTextureID>(static_cast<intptr_t>(m_bootTexture)),
+		imageMin,
+		imageMax,
+		ImVec2(0.0f, 0.0f),
+		ImVec2(1.0f, 1.0f));
+}
+
 void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManager& SceneManager, ProjectManager& projectManager)
 {
 	EngineGuiFrameContext context{
@@ -196,6 +203,58 @@ void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManage
 		&m_boxFaceDragMode,
 		&m_cameraPathCreator,
 		&m_showCameraPath };
+
+	if (m_waitingForStartupProject)
+	{
+		if (!projectManager.CurrentProjectPath().empty())
+		{
+			m_waitingForStartupProject = false;
+			m_bootImageTimeRemaining = 0.65f;
+			DrawBootImage();
+		}
+		else
+		{
+			m_startupProjectToOpen = m_menuBar.DrawStartupProjectWindow(context);
+			if (!m_startupProjectToOpen.empty())
+			{
+				m_waitingForStartupProject = false;
+				m_bootImageTimeRemaining = 0.65f;
+				// This foreground image covers the selector in the same rendered
+				// frame as the click. Loading is deferred until the next frame.
+				DrawBootImage();
+			}
+			else if (!projectManager.CurrentProjectPath().empty())
+			{
+				// New Project creates its project immediately through the existing
+				// modal; use the same boot transition once creation succeeds.
+				m_waitingForStartupProject = false;
+				m_bootImageTimeRemaining = 0.65f;
+				DrawBootImage();
+			}
+		}
+		return;
+	}
+
+	if (m_bootImageTimeRemaining != 0.0f)
+	{
+		if (!m_startupProjectToOpen.empty())
+		{
+			const std::filesystem::path projectToOpen = std::move(m_startupProjectToOpen);
+			m_startupProjectToOpen.clear();
+			if (!projectManager.LoadProject(projectToOpen, SceneManager))
+			{
+				m_waitingForStartupProject = true;
+				m_bootImageTimeRemaining = 0.0f;
+				(void)m_menuBar.DrawStartupProjectWindow(context);
+				return;
+			}
+			SceneManager.startUp();
+		}
+
+		DrawBootImage();
+		m_bootImageTimeRemaining = std::max(0.0f, m_bootImageTimeRemaining - ImGui::GetIO().DeltaTime);
+		return;
+	}
 
 	Scene* activeLevel = SceneManager.ActiveLevel();
 	bool selectedEntityStillExists = false;

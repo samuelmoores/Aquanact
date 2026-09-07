@@ -17,6 +17,8 @@
 #include "Engine/UI/FileExplorerWindow.h"
 #include "Engine/UI/EditorSceneInteraction.h"
 
+#include <filesystem>
+
 class Window; 
 class Camera; 
 class FileManager; 
@@ -58,12 +60,17 @@ public:
 	unsigned int SelectedEntityId() const { return m_selection.entityId; }
 
 private:
+	void DrawBootImage() const;
+
 	// EngineGUI runtime state
 	Window* m_window = nullptr;
 	bool m_initialized = false;
 	unsigned int m_bootTexture = 0;
 	int m_bootTextureWidth = 0;
 	int m_bootTextureHeight = 0;
+	bool m_waitingForStartupProject = true;
+	float m_bootImageTimeRemaining = 0.0f;
+	std::filesystem::path m_startupProjectToOpen;
 	EngineGuiSelection m_selection;
 	bool m_gizmoTranslate = true;
 	bool m_gizmoRotate = false;

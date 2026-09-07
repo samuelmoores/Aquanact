@@ -5,6 +5,7 @@
 #include "Engine/Core/Debug.h"
 #include "Engine/Core/EngineCamera.h"
 #include "Engine/Core/PathedCamera.h"
+#include "Engine/Core/ProjectManager.h"
 #include "Engine/Core/Window.h"
 #include "Engine/Core/Entity.h"
 #include "Engine/Core/EntityStateMachine.h"
@@ -143,6 +144,11 @@ void RenderManager::SetEditorMode()
 void RenderManager::SetGameMode()
 {
 	m_cameraManager.SetGameMode(GetPathedCamera());
+}
+
+void RenderManager::SetCutscenePreviewCamera(bool enabled)
+{
+	m_cutscenePreviewCamera = enabled;
 }
 
 void RenderManager::SetCameraMode(CameraMode mode)
@@ -286,7 +292,7 @@ void RenderManager::ApplyProjectState(const ProjectStateData::RenderStateData& r
 void RenderManager::ApplyCameraMode(const EngineState& engineState)
 {
 	if (engineState.IsGameMode() ||
-		(engineState.IsEditorMode() && Root::Current().FrontEnd().FrontEndModeValue() == FrontEndMode::GameGUICreator))
+		(engineState.IsEditorMode() && (Root::Current().FrontEnd().FrontEndModeValue() == FrontEndMode::GameGUICreator || m_cutscenePreviewCamera)))
 	{
 		// The editor owns the authored path. Synchronize it when entering the
 		// pathed-camera mode so point edits made after project load are used by
@@ -594,17 +600,26 @@ void RenderManager::BuildRenderCommands(FrontEndManager& frontEndManager, SceneM
 void RenderManager::DrawEditorFrame(FrontEndManager& frontEndManager, FileManager& fileManager, SceneManager& SceneManager, ProjectManager& projectManager, Debug& debug)
 {
 	frontEndManager.BeginFrame();
+	const bool projectWasLoadedAtFrameStart = !projectManager.CurrentProjectPath().empty();
 	const auto debugStart = std::chrono::high_resolution_clock::now();
-	debug.draw(ActiveCamera(), frontEndManager.EditorGUI());
+	// Before a project is chosen, the startup selector is the editor's only UI.
+	// Suppress project/debug overlays that would otherwise appear behind it.
+	if (projectWasLoadedAtFrameStart)
+	{
+		debug.draw(ActiveCamera(), frontEndManager.EditorGUI());
+	}
 	const auto debugEnd = std::chrono::high_resolution_clock::now();
 	m_lastFrameDebugOverlayTime = debugEnd - debugStart;
 
 	const auto editorGuiStart = std::chrono::high_resolution_clock::now();
 	frontEndManager.DrawEngineGUI(*m_engineCamera, fileManager, SceneManager, projectManager);
-	frontEndManager.DrawCreatorGUI(*m_engineCamera);
-	if (frontEndManager.FrontEndModeValue() == FrontEndMode::GameGUICreator)
+	if (projectWasLoadedAtFrameStart)
 	{
-		frontEndManager.DrawRuntimePreviewGUI();
+		frontEndManager.DrawCreatorGUI(*m_engineCamera);
+		if (frontEndManager.FrontEndModeValue() == FrontEndMode::GameGUICreator)
+		{
+			frontEndManager.DrawRuntimePreviewGUI();
+		}
 	}
 	const auto editorGuiEnd = std::chrono::high_resolution_clock::now();
 	m_lastFrameEditorGuiTime = editorGuiEnd - editorGuiStart;

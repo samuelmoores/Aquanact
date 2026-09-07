@@ -42,6 +42,9 @@ public:
 
 	// Runtime follow behavior: advance toward the path position and tune smoothing.
 	void Update(float deltaTime);
+	// Immediately applies the current path progress without smoothing. This is
+	// used when an editor timeline is scrubbed.
+	void SnapToPath();
 	void SetFollowSharpness(float sharpness);
 	float FollowSharpness() const { return m_followSharpness; }
 
@@ -49,6 +52,7 @@ private:
 	// Private helpers: update orientation toward the target and rebuild the view matrix.
 	void FaceTarget();
 	void ApplyAuthoredFacing(const glm::vec3& facing);
+	void ApplyInterpolatedPathFacing(std::size_t segment, float t);
 	void RebuildView();
 
 	// Projection configuration.

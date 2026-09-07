@@ -193,6 +193,7 @@ void FrontEndManager::ApplyProjectState(
 	bool editorShowAxis,
 	bool editorShowGrid,
 	const std::vector<std::string>& sceneAssets,
+	const std::vector<ProjectStateData::PendingGameGUIAction>& gameGUIActions,
 	const std::string& activeAssetName,
 	const std::string& gameGUINavigationMode,
 	const std::string& imguiLayout)
@@ -204,7 +205,11 @@ void FrontEndManager::ApplyProjectState(
 	}
 	if (m_gameGUI)
 	{
-		m_gameGUI->ApplyProjectState(sceneAssets, activeAssetName, gameGUINavigationMode);
+		m_gameGUI->ApplyProjectState(sceneAssets, activeAssetName, gameGUINavigationMode, gameGUIActions);
+	}
+	if (m_uiCreator)
+	{
+		m_uiCreator->ApplyProjectState(gameGUIActions);
 	}
 	if (!imguiLayout.empty())
 	{

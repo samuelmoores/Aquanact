@@ -436,6 +436,7 @@ namespace ProjectStateSerializer {
 		std::vector<PendingComponent>& pendingComponents,
 		std::vector<ProjectStateData::PendingInputAction>& pendingInputActions,
 	std::vector<std::string>& pendingGameGUIAssets,
+	std::vector<ProjectStateData::PendingGameGUIAction>& pendingGameGUIActions,
 	std::string& pendingActiveGameGUIAsset,
 	std::string& pendingGameGUINavigationMode,
 		RenderStateData& renderState,
@@ -504,7 +505,7 @@ namespace ProjectStateSerializer {
 						camera.followSharpness = std::stof(fields[8]);
 						camera.samplesPerSegment = std::stoi(fields[9]);
 						const std::size_t count = std::min<std::size_t>(std::stoul(fields[10]), 1000);
-						constexpr std::size_t stride = 12;
+						const std::size_t stride = fields.size() >= 11 + count * 14 ? 14 : 12;
 						if (fields.size() >= 11 + count * stride)
 						{
 							for (std::size_t i = 0; i < count; ++i)
@@ -517,6 +518,12 @@ namespace ProjectStateSerializer {
 								point.triggerPosition = glm::vec3(std::stof(fields[offset + 5]), std::stof(fields[offset + 6]), std::stof(fields[offset + 7]));
 								point.lookAtPlayer = fields[offset + 8] == "1";
 								point.facing = glm::vec3(std::stof(fields[offset + 9]), std::stof(fields[offset + 10]), std::stof(fields[offset + 11]));
+								if (stride >= 14)
+								{
+									point.timeSeconds = std::stof(fields[offset + 12]);
+									const int interpolation = std::stoi(fields[offset + 13]);
+									point.interpolation = interpolation == 1 ? CameraPathInterpolation::Linear : interpolation == 2 ? CameraPathInterpolation::Hold : CameraPathInterpolation::Smooth;
+								}
 								if (std::isfinite(point.position.x) && std::isfinite(point.position.y) && std::isfinite(point.position.z))
 									camera.path.points.push_back(point);
 							}
@@ -751,7 +758,9 @@ namespace ProjectStateSerializer {
 				}
 				CutsceneAnimationTrack track;
 				track.entityId = static_cast<unsigned int>(std::stoul(fields[2]));
-				track.animationName = ProjectStateFormat::UnescapeField(fields[3]);
+				// SplitFields already removes project-format escaping. Unescaping the
+				// animation path again strips Windows path separators on reload.
+				track.animationName = fields[3];
 				track.startTime = std::max(0.0f, std::stof(fields[4]));
 				track.duration = std::max(0.01f, std::stof(fields[5]));
 				track.speed = std::max(0.01f, std::stof(fields[6]));
@@ -793,6 +802,17 @@ namespace ProjectStateSerializer {
 		if (fields.size() == 2 && fields[0] == "gameguiasset")
 		{
 			pendingGameGUIAssets.push_back(ProjectStateFormat::UnescapeField(fields[1]));
+			continue;
+		}
+
+		if (fields.size() == 4 && fields[0] == "gameguinewgame")
+		{
+			// SplitFields has already removed field escaping at this point.
+			ProjectStateData::PendingGameGUIAction action;
+			action.assetName = fields[1];
+			action.widgetName = fields[2];
+			action.launchLevel = fields[3];
+			pendingGameGUIActions.push_back(std::move(action));
 			continue;
 		}
 
@@ -1046,6 +1066,7 @@ namespace ProjectStateSerializer {
 					contents += ";" + std::to_string(point.triggerPosition.x) + ";" + std::to_string(point.triggerPosition.y) + ";" + std::to_string(point.triggerPosition.z);
 					contents += ";" + std::to_string(point.lookAtPlayer ? 1 : 0);
 					contents += ";" + std::to_string(point.facing.x) + ";" + std::to_string(point.facing.y) + ";" + std::to_string(point.facing.z);
+					contents += ";" + std::to_string(point.timeSeconds) + ";" + std::to_string(static_cast<int>(point.interpolation));
 				}
 				contents += "\n";
 			}

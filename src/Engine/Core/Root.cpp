@@ -68,6 +68,7 @@ bool Root::HasCurrent()
 
 Window& Root::WindowRef() { return *m_window; }
 RenderManager& Root::Render() { return *m_renderManager; }
+void Root::SetCutscenePreviewCamera(bool enabled) { m_renderManager->SetCutscenePreviewCamera(enabled); }
 FrontEndManager& Root::FrontEnd() { return *m_frontEndManager; }
 Debug& Root::Debugger() { return *m_debug; }
 EventManager& Root::Events() { return *m_eventManager; }

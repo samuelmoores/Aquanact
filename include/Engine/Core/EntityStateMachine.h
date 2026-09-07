@@ -108,6 +108,7 @@ public:
 	Animator* GetAnimator();
 	const Animator* GetAnimator() const;
 	const std::vector<std::string>& AnimationNames() const;
+	int FindAnimationIndex(const std::string& animationName) const;
 	const std::vector<State>& States() const;
 	const std::vector<Transition>& Transitions() const;
 	const std::vector<Condition>& Conditions(const Transition& transition) const;

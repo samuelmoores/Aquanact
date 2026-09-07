@@ -42,6 +42,8 @@ public:
 	const PathedCamera& GetPathedCamera() const;
 	void SetEditorMode();
 	void SetGameMode();
+	void SetCutscenePreviewCamera(bool enabled);
+	bool CutscenePreviewCamera() const { return m_cutscenePreviewCamera; }
 	void SetCameraMode(CameraMode mode);
 	CameraMode CameraModeValue() const { return m_cameraMode; }
 	void SetActiveCamera(Camera& camera);
@@ -100,6 +102,7 @@ private:
 	std::vector<bool> m_cameraIslandTriggerInside;
 	CameraManager m_cameraManager;
 	CameraMode m_cameraMode = CameraMode::ThirdPerson;
+	bool m_cutscenePreviewCamera = false;
 	OpenGLGraphicsDevice m_device;
 	FrameAllocator m_frameAllocator;
 	RenderCommand* m_commands = nullptr;

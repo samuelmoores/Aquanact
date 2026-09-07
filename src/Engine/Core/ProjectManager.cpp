@@ -286,11 +286,12 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 	std::vector<ProjectStateData::PendingComponent> pendingComponents;
 	std::vector<ProjectStateData::PendingInputAction> pendingInputActions;
 	std::vector<std::string> pendingGameGUIAssets;
+	std::vector<ProjectStateData::PendingGameGUIAction> pendingGameGUIActions;
 	std::string pendingActiveGameGUIAsset;
 	std::string pendingGameGUINavigationMode;
 	ProjectStateData::RenderStateData renderState;
 	std::string startupLevelName;
-	const bool loaded = ProjectStateSerializer::LoadLevelState(path, file, pendingLevels, pendingControllers, pendingComponents, pendingInputActions, pendingGameGUIAssets, pendingActiveGameGUIAsset, pendingGameGUINavigationMode, renderState, startupLevelName);
+	const bool loaded = ProjectStateSerializer::LoadLevelState(path, file, pendingLevels, pendingControllers, pendingComponents, pendingInputActions, pendingGameGUIAssets, pendingGameGUIActions, pendingActiveGameGUIAsset, pendingGameGUINavigationMode, renderState, startupLevelName);
 	if (loaded) // broken boundary, no longer just I/O
 	{
 		// Establish the project context before materializing assets and applying
@@ -303,12 +304,10 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 		ApplyStartupLevel(SceneManager, startupLevelName, pendingLevels);
 		if (Root::Current().State().IsEditorMode())
 		{
-			const auto gameplayLevels = SceneManager.SceneNames(SceneManager::SceneKind::Level);
-			if (!gameplayLevels.empty())
-			{
-				SceneManager.SetActiveLevel(gameplayLevels.front());
-				SceneManager.SetStartupLevelName(gameplayLevels.front());
-			}
+			// Opening a project always begins at its frontend. New Game destinations
+			// are stored per button and must not determine the editor's opening scene.
+			SceneManager.SetActiveLevel("MainMenu");
+			SceneManager.SetStartupLevelName("MainMenu");
 		}
 		if (SceneManager.StartupLevelName().empty())
 		{
@@ -318,7 +317,7 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 		// SetTarget establishes the default orbit distance. Apply the saved camera
 		// pose and radius afterward so loading cannot replace that saved radius.
 		Root::Current().Render().ApplyProjectState(renderState);
-		Root::Current().FrontEnd().ApplyProjectState(renderState.editorShowAxis, renderState.editorShowGrid, pendingGameGUIAssets, pendingActiveGameGUIAsset, pendingGameGUINavigationMode, renderState.imguiLayout);
+		Root::Current().FrontEnd().ApplyProjectState(renderState.editorShowAxis, renderState.editorShowGrid, pendingGameGUIAssets, pendingGameGUIActions, pendingActiveGameGUIAsset, pendingGameGUINavigationMode, renderState.imguiLayout);
 		// New project files store camera points per scene. The legacy render-state
 		// application above still restores old files, so replace the editor view
 		// with the active scene's authored path when the per-scene data exists.
@@ -381,6 +380,20 @@ bool ProjectManager::CreateNewProject(const std::filesystem::path& path, SceneMa
 		}
 	}
 
+	// Switch the asset context before resetting project-owned UI. Otherwise a
+	// project created from the startup selector can inherit GUI data discovered
+	// before any project was selected.
+	const std::filesystem::path previousProjectPath = m_currentProjectPath;
+	m_currentProjectPath = path;
+	GameGUIManager& runtimeGUI = Root::Current().FrontEnd().RuntimeGUI();
+	runtimeGUI.ReloadAssetsFromDisk();
+	runtimeGUI.SetSceneAssets({});
+	runtimeGUI.SetMenuNavigationMode(GameGUIMenuNavigationMode::Pointer);
+	if (Root::Current().State().IsEditorMode())
+	{
+		Root::Current().FrontEnd().Creator().ReloadAssetsFromDisk();
+	}
+
 	SceneManager.Clear();
 	EnsureMainMenuLevel(SceneManager);
 	SceneManager.SetStartupLevelName("MainMenu");
@@ -393,6 +406,10 @@ bool ProjectManager::CreateNewProject(const std::filesystem::path& path, SceneMa
 	if (saved)
 	{
 		Root::Current().Files().SetRootDirectory(ProjectAssetsDirectory() / "models");
+	}
+	else
+	{
+		m_currentProjectPath = previousProjectPath;
 	}
 	return saved;
 }

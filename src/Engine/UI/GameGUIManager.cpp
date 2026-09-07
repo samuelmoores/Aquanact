@@ -14,6 +14,7 @@
 #include "Engine/Core/FrameProfiler.h"
 #include "Engine/Core/Audio.h"
 #include "Engine/Core/FileSystem.h"
+#include "Engine/Core/ProjectStateFormat.h"
 
 #include <algorithm>
 #include <cmath>
@@ -935,6 +936,37 @@ void GameGUIManager::AppendProjectState(std::string& contents) const
 		contents += assetName;
 		contents += "\n";
 	}
+
+	bool previewAssetWritten = false;
+	for (const GameGUIAsset& asset : m_assets)
+	{
+		const bool usePreview = m_previewActive && EqualsIgnoreCase(asset.name, m_previewAsset.name);
+		const GameGUIAsset& savedAsset = usePreview ? m_previewAsset : asset;
+		previewAssetWritten = previewAssetWritten || usePreview;
+		for (const GameGUIWidgetDef& widget : savedAsset.widgets)
+		{
+			if (widget.action != GameGUIActionType::NewGame)
+			{
+				continue;
+			}
+			contents += "gameguinewgame;" + ProjectStateFormat::EscapeField(savedAsset.name) + ";" +
+				ProjectStateFormat::EscapeField(widget.name) + ";" +
+				ProjectStateFormat::EscapeField(widget.launchLevel) + "\n";
+		}
+	}
+	if (m_previewActive && !previewAssetWritten)
+	{
+		for (const GameGUIWidgetDef& widget : m_previewAsset.widgets)
+		{
+			if (widget.action != GameGUIActionType::NewGame)
+			{
+				continue;
+			}
+			contents += "gameguinewgame;" + ProjectStateFormat::EscapeField(m_previewAsset.name) + ";" +
+				ProjectStateFormat::EscapeField(widget.name) + ";" +
+				ProjectStateFormat::EscapeField(widget.launchLevel) + "\n";
+		}
+	}
 	contents += "gameguinavigationmode;";
 	contents += m_menuNavigationMode == GameGUIMenuNavigationMode::TextHighlight ? "TextHighlight" : m_menuNavigationMode == GameGUIMenuNavigationMode::Boxed ? "Boxed" : "Pointer";
 	contents += "\n";
@@ -948,8 +980,34 @@ void GameGUIManager::AppendProjectState(std::string& contents) const
 	}
 }
 
-void GameGUIManager::ApplyProjectState(const std::vector<std::string>& sceneAssets, const std::string& activeAssetName, const std::string& navigationMode)
+void GameGUIManager::ApplyProjectState(
+	const std::vector<std::string>& sceneAssets,
+	const std::string& activeAssetName,
+	const std::string& navigationMode,
+	const std::vector<ProjectStateData::PendingGameGUIAction>& actions)
 {
+	// The project path is established immediately before this call. Reload now
+	// so runtime UI state comes from this project's self-contained assets.
+	ReloadAssetsFromDisk();
+	for (const ProjectStateData::PendingGameGUIAction& action : actions)
+	{
+		auto asset = std::find_if(m_assets.begin(), m_assets.end(), [&action](const GameGUIAsset& candidate)
+		{
+			return EqualsIgnoreCase(candidate.name, action.assetName);
+		});
+		if (asset == m_assets.end())
+		{
+			continue;
+		}
+		auto widget = std::find_if(asset->widgets.begin(), asset->widgets.end(), [&action](const GameGUIWidgetDef& candidate)
+		{
+			return candidate.name == action.widgetName && candidate.action == GameGUIActionType::NewGame;
+		});
+		if (widget != asset->widgets.end())
+		{
+			widget->launchLevel = action.launchLevel;
+		}
+	}
 	SetSceneAssets(sceneAssets);
 	if (!navigationMode.empty())
 	{

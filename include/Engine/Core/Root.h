@@ -47,6 +47,7 @@ public:
 
 	Window& WindowRef();
 	RenderManager& Render();
+	void SetCutscenePreviewCamera(bool enabled);
 	FrontEndManager& FrontEnd();
 	Debug& Debugger();
 	EventManager& Events();

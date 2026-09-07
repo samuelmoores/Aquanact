@@ -1,6 +1,7 @@
 #include "Engine/UI/GameGUICreator.h"
 #include "Engine/UI/GameGUICreatorHelpers.h"
 #include "Engine/Core/Root.h"
+#include "Engine/Core/ProjectManager.h"
 #include "Engine/Core/SceneManager.h"
 
 #include <imgui.h>
@@ -92,6 +93,11 @@ void GameGUICreator::DrawButtonLaunchSceneField(GameGUIWidgetDef& widget)
 	{
 		SyncRuntimePreview();
 		SaveSelectedRoleGUI();
+		ProjectManager& projects = Root::Current().Projects();
+		if (!projects.CurrentProjectPath().empty())
+		{
+			projects.SaveProject(projects.CurrentProjectPath(), Root::Current().Scenes());
+		}
 	}
 }
 

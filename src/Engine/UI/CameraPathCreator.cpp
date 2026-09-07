@@ -31,6 +31,7 @@ void CameraPathCreator::AddPoint(
 	CameraPathPoint point;
 	point.position = position;
 	point.triggerPosition = position;
+	point.timeSeconds = m_data.points.empty() ? 0.0f : m_data.points.back().timeSeconds + 1.0f;
 	m_data.points.push_back(point);
 	m_selectedPoint = static_cast<int>(m_data.points.size()) - 1;
 }

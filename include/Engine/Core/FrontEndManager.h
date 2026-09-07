@@ -41,6 +41,7 @@ public:
 		bool editorShowAxis,
 		bool editorShowGrid,
 		const std::vector<std::string>& sceneAssets,
+		const std::vector<ProjectStateData::PendingGameGUIAction>& gameGUIActions,
 		const std::string& activeAssetName,
 		const std::string& gameGUINavigationMode,
 		const std::string& imguiLayout);

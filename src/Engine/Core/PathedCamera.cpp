@@ -142,12 +142,59 @@ void PathedCamera::Update(float deltaTime)
 		: EvaluateCameraPathSegment(m_path, segment, t);
 	m_position = glm::mix(m_position, desiredPosition, blend);
 
-	const CameraPathPoint& orientationPoint = t >= 0.5f ? m_path.points[segment + 1] : m_path.points[segment];
-	if (orientationPoint.lookAtPlayer)
-		FaceTarget();
-	else
-		ApplyAuthoredFacing(orientationPoint.facing);
+	ApplyInterpolatedPathFacing(segment, t);
 	RebuildView();
+}
+
+void PathedCamera::SnapToPath()
+{
+	if (m_path.points.empty())
+		return;
+	if (m_path.points.size() == 1 || m_playerProgress <= 0.0f)
+	{
+		m_position = m_path.points.front().position;
+		if (m_path.points.front().lookAtPlayer)
+			FaceTarget();
+		else
+			ApplyAuthoredFacing(m_path.points.front().facing);
+		RebuildView();
+		return;
+	}
+
+	const std::size_t segmentCount = m_path.points.size() - 1;
+	const float pathPosition = glm::clamp(m_playerProgress, 0.0f, 1.0f) * static_cast<float>(segmentCount);
+	const std::size_t segment = std::min(static_cast<std::size_t>(pathPosition), segmentCount - 1);
+	const float t = pathPosition - static_cast<float>(segment);
+	m_position = EvaluateCameraPathSegment(m_path, segment, t);
+	ApplyInterpolatedPathFacing(segment, t);
+	RebuildView();
+}
+
+void PathedCamera::ApplyInterpolatedPathFacing(std::size_t segment, float t)
+{
+	if (m_path.points.size() < 2)
+		return;
+
+	segment = std::min(segment, m_path.points.size() - 2);
+	const CameraPathPoint& first = m_path.points[segment];
+	const CameraPathPoint& second = m_path.points[segment + 1];
+	auto directionFor = [this](const CameraPathPoint& point)
+	{
+		if (point.lookAtPlayer && m_target && m_target->GetMesh())
+		{
+			const glm::vec3 targetDirection = m_target->WorldCenterPosition() - m_position;
+			if (glm::dot(targetDirection, targetDirection) > 1e-8f)
+				return glm::normalize(targetDirection);
+		}
+		return glm::dot(point.facing, point.facing) > 1e-8f
+			? glm::normalize(point.facing)
+			: m_facing;
+	};
+
+	const glm::vec3 firstFacing = directionFor(first);
+	const glm::vec3 secondFacing = directionFor(second);
+	const glm::vec3 blendedFacing = glm::mix(firstFacing, secondFacing, glm::clamp(t, 0.0f, 1.0f));
+	ApplyAuthoredFacing(blendedFacing);
 }
 
 void PathedCamera::SetFollowSharpness(float sharpness)

@@ -2,6 +2,7 @@
 
 #include "Engine/UI/EngineGuiContext.h"
 
+#include <filesystem>
 #include <optional>
 
 class FileManager;
@@ -21,6 +22,7 @@ struct EngineMenuBarResult
 class EngineMenuBar
 {
 public:
+	std::filesystem::path DrawStartupProjectWindow(const EngineGuiFrameContext& context) const;
 	EngineMenuBarResult Draw(
 		const EngineGuiFrameContext& context,
 		bool& showAxis,
@@ -35,7 +37,7 @@ private:
 		EngineGuiWindowState& windowState) const;
 	void DrawLightingMenu() const;
 	void DrawAquanactMenu(Window* window, bool& showInputMap, bool& buildGameRequested) const;
-	void DrawNewProjectDialog(SceneManager& sceneManager, ProjectManager& projectManager) const;
+	bool DrawNewProjectDialog(SceneManager& sceneManager, ProjectManager& projectManager) const;
 	void DrawLoadProjectDialog(SceneManager& sceneManager, ProjectManager& projectManager) const;
 	void DrawFileMenu(SceneManager& sceneManager, ProjectManager& projectManager) const;
 	void DrawSceneMenu(SceneManager& sceneManager, bool& newLevelRequested) const;

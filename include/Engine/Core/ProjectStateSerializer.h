@@ -30,6 +30,7 @@ namespace ProjectStateSerializer {
 		std::vector<ProjectStateData::PendingComponent>& pendingComponents,
 		std::vector<ProjectStateData::PendingInputAction>& pendingInputActions,
 		std::vector<std::string>& pendingGameGUIAssets,
+		std::vector<ProjectStateData::PendingGameGUIAction>& pendingGameGUIActions,
 		std::string& pendingActiveGameGUIAsset,
 		std::string& pendingGameGUINavigationMode,
 		ProjectStateData::RenderStateData& renderState,

@@ -5,6 +5,13 @@
 #include <vector>
 #include <cstddef>
 
+enum class CameraPathInterpolation
+{
+	Smooth = 0,
+	Linear = 1,
+	Hold = 2
+};
+
 // One ordered position on the camera dolly path.
 struct CameraPathPoint {
 	glm::vec3 position{0.0f};
@@ -12,6 +19,10 @@ struct CameraPathPoint {
 	// the authored facing vector below controls the camera rotation.
 	bool lookAtPlayer = true;
 	glm::vec3 facing{0.0f, 0.0f, 1.0f};
+	// Negative means legacy/evenly-spaced timing. Cutscene points use authored
+	// seconds when this is non-negative.
+	float timeSeconds = -1.0f;
+	CameraPathInterpolation interpolation = CameraPathInterpolation::Smooth;
 	bool island = false;
 	float triggerRadius = 90.0f;
 	glm::vec3 triggerPosition{0.0f};
@@ -38,6 +49,10 @@ glm::vec3 EvaluateCameraPathSegment(
 	const CameraPathData& path,
 	std::size_t index,
 	float t);
+
+// Converts authored cutscene time into the normalized path progress consumed by
+// PathedCamera. Legacy paths without point times remain evenly distributed.
+float CameraPathProgressAtTime(const CameraPathData& path, float timeSeconds, float durationSeconds);
 
 CameraPathProjection ProjectOntoCameraPath(
 	const CameraPathData& path,

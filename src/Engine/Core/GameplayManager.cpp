@@ -4,6 +4,7 @@
 #include "Engine/Core/Controller.h"
 #include "Engine/Core/Animator.h"
 #include "Engine/Core/EntityStateMachine.h"
+#include "Engine/Core/CutsceneAnimator.h"
 #include "Engine/Core/Debug.h"
 #include "Engine/Core/FrontEndManager.h"
 #include "Engine/Core/Scene.h"
@@ -176,6 +177,25 @@ void GameplayManager::StartGameSession(FrontEndManager& frontEndManager, Debug& 
 		}
 	}
 
+	// Play Scene can start directly on a cutscene, bypassing the New Game
+	// action path. Route it through the same timeline state so authored camera
+	// timing and animation tracks are evaluated before the next level loads.
+	if (Scene* activeScene = m_levelManager->ActiveLevel(); activeScene &&
+		m_levelManager->SceneKindFor(activeScene->Name()) == SceneManager::SceneKind::Cutscene &&
+		!m_levelManager->IsMainMenuScene(activeScene->Name()))
+	{
+		if (Scene* nextLevel = FindPlayableLevel(*m_levelManager))
+		{
+			if (StartCutscene(activeScene->Name(), nextLevel->Name(), frontEndManager, debug))
+			{
+				debug.LogMessage("GameplayManager::StartGameSession() started cutscene timeline for Play Scene");
+				return;
+			}
+		}
+		debug.LogMessage("GameplayManager::StartGameSession() could not find a gameplay level after the cutscene.");
+		return;
+	}
+
 	m_levelManager->startUp();
 	m_levelManager->CaptureActiveLevelEditorTransforms();
 	Scene* activeLevel = m_levelManager->ActiveLevel();
@@ -285,7 +305,7 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 		PathedCamera& camera = activeLevel->CameraSystem();
 		const float cutsceneDuration = std::max(0.1f, activeLevel->Cutscene().duration);
 		m_cutsceneElapsed += std::max(0.0f, dt);
-		camera.SetPlayerProgress(m_cutsceneElapsed / cutsceneDuration);
+		camera.SetPlayerProgress(CameraPathProgressAtTime(camera.Path(), m_cutsceneElapsed, cutsceneDuration));
 		for (const CutsceneAnimationTrack& track : activeLevel->Cutscene().animationTracks)
 		{
 			if (m_cutsceneElapsed < track.startTime)
@@ -299,20 +319,11 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 					break;
 				}
 			}
-			EntityStateMachine* stateMachine = entity ? entity->GetEntityState() : nullptr;
-			Animator* animator = stateMachine ? stateMachine->GetAnimator() : nullptr;
-			if (!stateMachine || !animator)
+			CutsceneAnimator* cutsceneAnimator = entity ? entity->GetCutsceneAnimator() : nullptr;
+			Animator* animator = cutsceneAnimator ? cutsceneAnimator->GetAnimator() : nullptr;
+			if (!cutsceneAnimator || !animator)
 				continue;
-			int clipIndex = -1;
-			const auto& animationNames = stateMachine->AnimationNames();
-			for (std::size_t index = 0; index < animationNames.size(); ++index)
-			{
-				if (animationNames[index] == track.animationName)
-				{
-					clipIndex = static_cast<int>(index);
-					break;
-				}
-			}
+			const int clipIndex = cutsceneAnimator->FindAnimationIndex(track.animationName);
 			if (clipIndex >= 0)
 			{
 				const float localTime = std::max(0.0f, m_cutsceneElapsed - track.startTime) * std::max(0.01f, track.speed);

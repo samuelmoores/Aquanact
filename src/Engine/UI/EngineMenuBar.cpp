@@ -22,10 +22,105 @@ namespace
 {
 	char g_newProjectName[128] = "NewProject";
 	bool g_openNewProjectPopup = false;
-	// The editor starts with the project selector open. Canceling leaves the
-	// editor in its empty startup state.
-	bool g_openLoadProjectPopup = true;
+	// File -> Load Project uses this popup after normal editor startup. The
+	// initial project-only screen has its own persistent window below.
+	bool g_openLoadProjectPopup = false;
 	std::filesystem::path g_selectedProjectPath;
+}
+
+std::filesystem::path EngineMenuBar::DrawStartupProjectWindow(const EngineGuiFrameContext& context) const
+{
+	if (!context.projectManager || !context.sceneManager)
+	{
+		return {};
+	}
+
+	ProjectManager& projectManager = *context.projectManager;
+	SceneManager& sceneManager = *context.sceneManager;
+	const std::filesystem::path projectFolder = projectManager.ProjectsRoot();
+	std::vector<std::filesystem::path> projectFiles;
+	std::error_code error;
+	if (std::filesystem::exists(projectFolder, error))
+	{
+		for (const auto& entry : std::filesystem::recursive_directory_iterator(projectFolder, error))
+		{
+			if (error)
+			{
+				break;
+			}
+			if (entry.is_regular_file(error) && entry.path().extension() == ".aqua")
+			{
+				projectFiles.push_back(entry.path());
+			}
+		}
+	}
+	std::sort(projectFiles.begin(), projectFiles.end());
+
+	const ImGuiViewport* viewport = ImGui::GetMainViewport();
+	ImGui::GetBackgroundDrawList()->AddRectFilled(
+		viewport->Pos,
+		ImVec2(viewport->Pos.x + viewport->Size.x, viewport->Pos.y + viewport->Size.y),
+		IM_COL32(5, 5, 7, 255));
+	ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+	ImGui::SetNextWindowSize(ImVec2(520.0f, 360.0f), ImGuiCond_Always);
+	ImGui::Begin("Projects", nullptr,
+		ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
+	ImGui::BeginChild("StartupProjectFileList", ImVec2(0.0f, 285.0f), true);
+	if (projectFiles.empty())
+	{
+		ImGui::TextDisabled("No projects found.");
+	}
+	else
+	{
+		for (const std::filesystem::path& projectFile : projectFiles)
+		{
+			std::string projectName = projectFile.parent_path().filename().string();
+			if (projectName.empty())
+			{
+				projectName = projectFile.stem().string();
+			}
+			const std::string label = projectName + "##" + projectFile.generic_string();
+			if (ImGui::Selectable(label.c_str(), projectFile == g_selectedProjectPath))
+			{
+				g_selectedProjectPath = projectFile;
+			}
+		}
+	}
+	ImGui::EndChild();
+
+	std::filesystem::path projectToOpen;
+	const bool canLoad = !g_selectedProjectPath.empty();
+	ImGui::BeginDisabled(!canLoad);
+	if (ImGui::Button("Open Project"))
+	{
+		// Defer the expensive project load until after EngineGUI has presented a
+		// complete boot-image frame. The already-presented image then remains on
+		// screen while the synchronous load is running.
+		projectToOpen = g_selectedProjectPath;
+		g_selectedProjectPath.clear();
+	}
+	ImGui::EndDisabled();
+	ImGui::SameLine();
+	if (ImGui::Button("New Project"))
+	{
+		std::strncpy(g_newProjectName, "NewProject", sizeof(g_newProjectName));
+		g_newProjectName[sizeof(g_newProjectName) - 1] = '\0';
+		g_openNewProjectPopup = true;
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Quit") && context.window)
+	{
+		glfwSetWindowShouldClose(context.window->GLFW(), GLFW_TRUE);
+	}
+	ImGui::End();
+
+	if (g_openNewProjectPopup)
+	{
+		ImGui::OpenPopup("New Project");
+		g_openNewProjectPopup = false;
+	}
+	(void)DrawNewProjectDialog(sceneManager, projectManager);
+	return projectToOpen;
 }
 
 EngineMenuBarResult EngineMenuBar::Draw(
@@ -69,7 +164,7 @@ EngineMenuBarResult EngineMenuBar::Draw(
 		ImGui::OpenPopup("Load Project");
 		g_openLoadProjectPopup = false;
 	}
-	DrawNewProjectDialog(sceneManager, projectManager);
+	(void)DrawNewProjectDialog(sceneManager, projectManager);
 	DrawLoadProjectDialog(sceneManager, projectManager);
 	return result;
 }
@@ -147,10 +242,11 @@ void EngineMenuBar::DrawLoadProjectDialog(
 	ImGui::EndPopup();
 }
 
-void EngineMenuBar::DrawNewProjectDialog(
+bool EngineMenuBar::DrawNewProjectDialog(
 	SceneManager& sceneManager,
 	ProjectManager& projectManager) const
 {
+	bool projectCreated = false;
 	if (ImGui::BeginPopupModal("New Project", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 	{
 		ImGui::TextUnformatted("Create a self-contained project with its own assets folder.");
@@ -184,6 +280,7 @@ void EngineMenuBar::DrawNewProjectDialog(
 		if ((submitted || createPressed) && canCreate &&
 			projectManager.CreateNewProject(projectPath, sceneManager))
 		{
+			projectCreated = true;
 			ImGui::CloseCurrentPopup();
 		}
 		if (!canCreate)
@@ -197,6 +294,7 @@ void EngineMenuBar::DrawNewProjectDialog(
 		}
 		ImGui::EndPopup();
 	}
+	return projectCreated;
 }
 
 EngineMenuBarResult EngineMenuBar::DrawViewMenu(
@@ -366,6 +464,10 @@ void EngineMenuBar::DrawSceneMenu(SceneManager& sceneManager, bool& newLevelRequ
 			const Scene* scene = sceneManager.FindLevel(name);
 			if (ImGui::MenuItem(name.c_str(), nullptr, sceneManager.ActiveLevel() == scene))
 			{
+				// Flush GUI edits before changing the active scene. This is especially
+				// important for New Game destinations, which are edited in the GUI
+				// creator but should not be lost during a scene transition.
+				Root::Current().FrontEnd().Creator().SaveAllRoleGUIs();
 				sceneManager.SetActiveLevel(name);
 				sceneManager.SetStartupLevelName(name);
 			}
@@ -385,6 +487,10 @@ void EngineMenuBar::DrawSceneMenu(SceneManager& sceneManager, bool& newLevelRequ
 			const Scene* scene = sceneManager.FindLevel(name);
 			if (ImGui::MenuItem(name.c_str(), nullptr, sceneManager.ActiveLevel() == scene))
 			{
+				// Flush GUI edits before changing the active scene. This is especially
+				// important for New Game destinations, which are edited in the GUI
+				// creator but should not be lost during a scene transition.
+				Root::Current().FrontEnd().Creator().SaveAllRoleGUIs();
 				sceneManager.SetActiveLevel(name);
 				sceneManager.SetStartupLevelName(name);
 			}

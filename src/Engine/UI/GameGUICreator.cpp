@@ -125,6 +125,13 @@ void GameGUICreator::startUp(Window& window)
 {
 	if (m_initialized) return;
 	m_window = &window;
+	m_selectedGUI = GUIRole::MainMenu;
+	ReloadAssetsFromDisk();
+	m_initialized = true;
+}
+
+void GameGUICreator::ReloadAssetsFromDisk()
+{
 	m_assets.clear();
 	m_assets.resize(GUIIndex(GUIRole::Count));
 	for (std::size_t i = 0; i < m_assets.size(); ++i)
@@ -132,10 +139,9 @@ void GameGUICreator::startUp(Window& window)
 		const std::filesystem::path assetPath = GameGUICreatorHelpers::AssetDirectory() / (std::string(GUIAssetName(i)) + ".json");
 		m_assets[i] = std::filesystem::exists(assetPath) ? GameGUICreatorHelpers::LoadAssetFile(assetPath) : MakeEmptyAsset(GUIAssetName(i));
 	}
-	m_selectedGUI = GUIRole::MainMenu;
 	m_selectedWidgetIndex = m_assets[GUIIndex(m_selectedGUI)].widgets.empty() ? -1 : 0;
 	LoadNavigationSettingsFromAsset();
-	m_initialized = true;
+	RefreshActiveEditingPanel();
 }
 
 void GameGUICreator::shutDown()

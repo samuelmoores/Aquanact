@@ -189,6 +189,12 @@ namespace ProjectStateData {
 		};
 		std::vector<InputBindingData> bindings;
 	};
+
+	struct PendingGameGUIAction {
+		std::string assetName;
+		std::string widgetName;
+		std::string launchLevel;
+	};
 }
 
 
