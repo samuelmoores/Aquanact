@@ -769,22 +769,13 @@ void GameGUIManager::DrawReturnButton()
 			Root::Current().Scenes().SetActiveLevel(gameplayLevels.front());
 			Root::Current().Scenes().SetStartupLevelName(gameplayLevels.front());
 		}
-		if (Root::Current().Projects().CurrentProjectPath().empty())
-		{
-			Root::Current().Debugger().LogMessage("Return to editor requested, but no project is currently loaded.");
-		}
-		else
-		{
-			const auto projectPath = Root::Current().Projects().CurrentProjectPath();
-			if (!Root::Current().Projects().SaveProject(projectPath, Root::Current().Scenes()))
-			{
-				Root::Current().Debugger().LogMessage("Failed to save diagnostic window state before returning to the editor.");
-			}
-			if (!Root::Current().Projects().LoadProject(projectPath, Root::Current().Scenes()))
-			{
-				Root::Current().Debugger().LogMessage("Failed to reload the current project while returning to the editor.");
-			}
-		}
+		// The project was autosaved when Play Game/Play Scene was started. Do not
+		// save and reload it here: that would synchronously re-import every model
+		// and rebuild every scene just to leave gameplay mode. Re-register the
+		// already-materialized active scene instead.
+		Root::Current().Gameplay().shutDown();
+		Root::Current().Scenes().startUp();
+		Root::Current().InputRef().ReleaseCursorForUI();
 		Root::Current().EditorLaunchedGameSession() = false;
 		Root::Current().State().SetMode(EngineMode::Editor);
 		Root::Current().Render().SetEditorMode();
