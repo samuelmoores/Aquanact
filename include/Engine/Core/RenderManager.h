@@ -50,6 +50,7 @@ public:
 	LightingManager& Lights() { return *m_lightingManager; }
 	const LightingManager& Lights() const { return *m_lightingManager; }
 	void ApplyProjectState(const ProjectStateData::RenderStateData& renderState);
+	void ResetForNewProject();
 	void Submit(const RenderCommand& command);
 	void Flush(const Camera& camera, unsigned int selectedEntityId = 0);
 	void Loop(FrontEndManager& frontEndManager, FileManager& fileManager, SceneManager& SceneManager, ProjectManager& projectManager, Debug& debug, Input& input, Window& window, EngineState& engineState);

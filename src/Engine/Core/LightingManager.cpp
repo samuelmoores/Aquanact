@@ -24,6 +24,13 @@ void LightingManager::shutDown()
 {
 }
 
+void LightingManager::ResetToDefaults()
+{
+	m_sun = DirectionalLight{};
+	m_shadowsEnabled = true;
+	m_pointLights.clear();
+}
+
 void LightingManager::ApplyToShader(const ShaderProgram* shader) const
 {
 	shader->setUniform("sunLight.direction", m_sun.direction);

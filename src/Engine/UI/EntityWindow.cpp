@@ -10,6 +10,7 @@
 #include "Engine/Core/SceneManager.h"
 #include "Engine/Core/Scene.h"
 #include "Engine/Core/EntityStateMachine.h"
+#include "Engine/Core/PhysicsWorld.h"
 #include "Game/Enemy.h"
 #include "Game/PlayerController.h"
 
@@ -162,6 +163,10 @@ void EntityWindow::DrawTransform(Entity& entity) const
 
 void EntityWindow::DrawPhysics(Entity& entity) const
 {
+	if (!entity.GetMesh())
+	{
+		return;
+	}
 	if (!ImGui::CollapsingHeader("Physics", ImGuiTreeNodeFlags_DefaultOpen))
 	{
 		return;
@@ -170,12 +175,14 @@ void EntityWindow::DrawPhysics(Entity& entity) const
 	const char* colliderShapes[] = { "Box", "Capsule", "Convex" };
 	int colliderShape = entity.GetPhysicsColliderShape() == PhysicsColliderShape::Capsule ? 1
 		: entity.GetPhysicsColliderShape() == PhysicsColliderShape::Convex ? 2 : 0;
-	if (ImGui::Combo("Collider", &colliderShape, colliderShapes, IM_ARRAYSIZE(colliderShapes)))
+	if (ImGui::Combo("Collision Shape", &colliderShape, colliderShapes, IM_ARRAYSIZE(colliderShapes)))
 	{
 		entity.SetPhysicsColliderShape(colliderShape == 1
 			? PhysicsColliderShape::Capsule
 			: colliderShape == 2 ? PhysicsColliderShape::Convex : PhysicsColliderShape::Box);
+		PhysicsWorld::Instance().Update(entity);
 	}
+
 	bool showBoundingBox = entity.ShowPhysicsBoundingBox();
 	if (ImGui::Checkbox("Draw Bounding Volume", &showBoundingBox))
 		entity.SetShowPhysicsBoundingBox(showBoundingBox);

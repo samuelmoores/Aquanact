@@ -34,6 +34,8 @@ private:
 		EngineGuiWindowState& windowState) const;
 	void DrawLightingMenu() const;
 	void DrawAquanactMenu(Window* window, bool& showInputMap, bool& buildGameRequested) const;
+	void DrawNewProjectDialog(SceneManager& sceneManager, ProjectManager& projectManager) const;
+	void DrawLoadProjectDialog(SceneManager& sceneManager, ProjectManager& projectManager) const;
 	void DrawFileMenu(SceneManager& sceneManager, ProjectManager& projectManager) const;
 	void DrawSceneMenu(SceneManager& sceneManager, bool& newLevelRequested) const;
 	void DrawCodeMenu(bool& addCodeFileRequested, bool& deleteComponentRequested) const;

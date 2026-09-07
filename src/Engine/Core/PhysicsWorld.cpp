@@ -777,10 +777,9 @@ std::vector<Entity*> PhysicsWorld::QuerySphere(const glm::vec3& center, float ra
 
 ColliderHandle PhysicsWorld::Add(Entity& entity)
 {
-	// Ordinary entities are render-only by default. The player controller is the
-	// explicit opt-in for entity collision; environment collision uses the
-	// independent LevelCollider type.
-	if (!entity.GetMesh() || entity.GetController() == nullptr)
+	// Mesh entities provide static collision geometry; controller entities use
+	// their registered collider as the moving shape.
+	if (!entity.GetMesh())
 	{
 		return InvalidColliderHandle;
 	}
@@ -826,11 +825,6 @@ void PhysicsWorld::Update(ColliderHandle handle)
 	}
 
 	PhysicsCollider& collider = m_colliders[handle];
-	if (collider.isStatic)
-	{
-		return;
-	}
-
 	if (!collider.owner || !collider.owner->GetMesh())
 	{
 		collider.enabled = false;
@@ -849,6 +843,15 @@ void PhysicsWorld::Update(ColliderHandle handle)
 	collider.shape = collider.owner->GetPhysicsColliderShape();
 	collider.minBounds = minBounds;
 	collider.maxBounds = maxBounds;
+	if (collider.shape == PhysicsColliderShape::Capsule)
+	{
+		glm::vec3 capsuleBase;
+		glm::vec3 capsuleTip;
+		BuildVerticalCapsule(minBounds, maxBounds, capsuleBase, capsuleTip, collider.capsuleRadius);
+		collider.capsuleRadii = glm::vec3(collider.capsuleRadius);
+		collider.capsuleHalfLength = glm::length(capsuleTip - capsuleBase) * 0.5f;
+		collider.capsuleAxis = glm::vec3(0.0f, 1.0f, 0.0f);
+	}
 	collider.enabled = true;
 }
 

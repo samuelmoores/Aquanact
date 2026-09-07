@@ -35,6 +35,7 @@ public:
 
 	void startUp();
 	void shutDown();
+	void ResetToDefaults();
 	void ApplyToShader(const ShaderProgram* shader) const;
 	DirectionalLight& SunLight();
 	const DirectionalLight& SunLight() const;

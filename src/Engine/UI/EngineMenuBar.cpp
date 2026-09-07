@@ -13,6 +13,20 @@
 
 #include <imgui.h>
 #include <algorithm>
+#include <cstring>
+#include <filesystem>
+#include <vector>
+#include <string>
+
+namespace
+{
+	char g_newProjectName[128] = "NewProject";
+	bool g_openNewProjectPopup = false;
+	// The editor starts with the project selector open. Canceling leaves the
+	// editor in its empty startup state.
+	bool g_openLoadProjectPopup = true;
+	std::filesystem::path g_selectedProjectPath;
+}
 
 EngineMenuBarResult EngineMenuBar::Draw(
 	const EngineGuiFrameContext& context,
@@ -45,7 +59,143 @@ EngineMenuBarResult EngineMenuBar::Draw(
 	DrawUiMenu();
 
 	ImGui::EndMainMenuBar();
+	if (g_openNewProjectPopup)
+	{
+		ImGui::OpenPopup("New Project");
+		g_openNewProjectPopup = false;
+	}
+	if (g_openLoadProjectPopup)
+	{
+		ImGui::OpenPopup("Load Project");
+		g_openLoadProjectPopup = false;
+	}
+	DrawNewProjectDialog(sceneManager, projectManager);
+	DrawLoadProjectDialog(sceneManager, projectManager);
 	return result;
+}
+
+void EngineMenuBar::DrawLoadProjectDialog(
+	SceneManager& sceneManager,
+	ProjectManager& projectManager) const
+{
+	if (!ImGui::BeginPopupModal("Load Project", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		return;
+	}
+
+	const std::filesystem::path projectFolder = projectManager.ProjectDirectory();
+	std::vector<std::filesystem::path> projectFiles;
+	std::error_code error;
+	if (std::filesystem::exists(projectFolder, error))
+	{
+		for (const auto& entry : std::filesystem::directory_iterator(projectFolder, error))
+		{
+			if (error)
+			{
+				break;
+			}
+			if (entry.is_regular_file(error) && entry.path().extension() == ".aqua")
+			{
+				projectFiles.push_back(entry.path());
+			}
+		}
+	}
+	std::sort(projectFiles.begin(), projectFiles.end());
+
+	ImGui::Text("Project files in %s", projectFolder.string().c_str());
+	ImGui::BeginChild("ProjectFileList", ImVec2(420.0f, 220.0f), true);
+	if (projectFiles.empty())
+	{
+		ImGui::TextDisabled("No .aqua project files found.");
+	}
+	else
+	{
+		for (const auto& projectFile : projectFiles)
+		{
+			const bool selected = projectFile == g_selectedProjectPath;
+			if (ImGui::Selectable(projectFile.filename().string().c_str(), selected))
+			{
+				g_selectedProjectPath = projectFile;
+			}
+		}
+	}
+	ImGui::EndChild();
+
+	const bool canLoad = !g_selectedProjectPath.empty();
+	if (!canLoad)
+	{
+		ImGui::BeginDisabled();
+	}
+	if (ImGui::Button("Load") && projectManager.LoadProject(g_selectedProjectPath, sceneManager))
+	{
+		sceneManager.startUp();
+		g_selectedProjectPath.clear();
+		ImGui::CloseCurrentPopup();
+	}
+	if (!canLoad)
+	{
+		ImGui::EndDisabled();
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Cancel"))
+	{
+		g_selectedProjectPath.clear();
+		ImGui::CloseCurrentPopup();
+	}
+	ImGui::EndPopup();
+}
+
+void EngineMenuBar::DrawNewProjectDialog(
+	SceneManager& sceneManager,
+	ProjectManager& projectManager) const
+{
+	if (ImGui::BeginPopupModal("New Project", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		ImGui::TextUnformatted("Create a blank project in the current project folder.");
+		if (ImGui::IsWindowAppearing())
+		{
+			ImGui::SetKeyboardFocusHere();
+		}
+		const bool submitted = ImGui::InputText(
+			"Project name",
+			g_newProjectName,
+			sizeof(g_newProjectName),
+			ImGuiInputTextFlags_EnterReturnsTrue);
+
+		std::string name(g_newProjectName);
+		const bool validName = !name.empty() &&
+			name.find_first_of("\\/:*?\"<>|") == std::string::npos;
+		const std::filesystem::path projectFolder = projectManager.ProjectDirectory();
+		const std::filesystem::path projectPath = projectFolder / (name + ".aqua");
+		const bool alreadyExists = validName && std::filesystem::exists(projectPath);
+
+		if (alreadyExists)
+		{
+			ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.25f, 1.0f), "A project with this name already exists.");
+		}
+
+		const bool canCreate = validName && !alreadyExists;
+		if (!canCreate)
+		{
+			ImGui::BeginDisabled();
+		}
+		const bool createPressed = ImGui::Button("Create");
+		if ((submitted || createPressed) && canCreate &&
+			projectManager.CreateNewProject(projectPath, sceneManager))
+		{
+			ImGui::CloseCurrentPopup();
+		}
+		if (!canCreate)
+		{
+			ImGui::EndDisabled();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Cancel"))
+		{
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
 }
 
 EngineMenuBarResult EngineMenuBar::DrawViewMenu(
@@ -177,20 +327,26 @@ void EngineMenuBar::DrawFileMenu(
 	SceneManager& sceneManager,
 	ProjectManager& projectManager) const
 {
-	if (!ImGui::BeginMenu("File"))
+	if (ImGui::BeginMenu("File"))
 	{
-		return;
-	}
+		if (ImGui::MenuItem("New Project"))
+		{
+			std::strncpy(g_newProjectName, "NewProject", sizeof(g_newProjectName));
+			g_newProjectName[sizeof(g_newProjectName) - 1] = '\0';
+			g_openNewProjectPopup = true;
+		}
 
-	if (ImGui::MenuItem("Save Project"))
-	{
-		projectManager.SaveProject(projectManager.CurrentProjectPath(), sceneManager);
+		if (ImGui::MenuItem("Save Project"))
+		{
+			projectManager.SaveProject(projectManager.CurrentProjectPath(), sceneManager);
+		}
+		if (ImGui::MenuItem("Load Project"))
+		{
+			g_selectedProjectPath.clear();
+			g_openLoadProjectPopup = true;
+		}
+		ImGui::EndMenu();
 	}
-	if (ImGui::MenuItem("Load Project"))
-	{
-		projectManager.LoadProject(projectManager.CurrentProjectPath(), sceneManager);
-	}
-	ImGui::EndMenu();
 }
 
 void EngineMenuBar::DrawSceneMenu(SceneManager& sceneManager, bool& newLevelRequested) const

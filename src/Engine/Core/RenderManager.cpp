@@ -391,6 +391,41 @@ void RenderManager::UpdateCameraPhase(const Input& input, const EngineState& eng
 	}
 }
 
+void RenderManager::ResetForNewProject()
+{
+	if (!m_engineCamera || !m_gameCamera)
+	{
+		return;
+	}
+
+	const glm::vec3 defaultEditorPosition(200.0f, 300.0f, 450.0f);
+	m_engineCamera->SetMoveSpeed(300.0f);
+	m_engineCamera->SetLookSensitivity(0.08f);
+	m_engineCamera->SetPose(defaultEditorPosition, glm::normalize(-defaultEditorPosition));
+
+	m_gameCamera->SetPose(glm::vec3(0.0f, 0.0f, -10.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	m_gameCamera->SetPath(CameraPathData{});
+	m_gameCamera->ClearOverridePosition();
+	m_gameCamera->SetPlayerProgress(0.0f);
+	m_gameCamera->SetFollowSharpness(8.0f);
+	m_gameCamera->SetPathSamplesPerSegment(16);
+
+	m_cameraTarget = nullptr;
+	m_cameraLastTargetPosition = glm::vec3(0.0f);
+	m_cameraPlayerProgress = 0.0f;
+	m_hasCameraTargetPosition = false;
+	m_engineCameraPathInitialized = false;
+	m_cameraOverrideActive = false;
+	m_cameraToggleAtIsland = false;
+	m_cameraIslandPoint = static_cast<std::size_t>(-1);
+	m_cameraIslandPosition = glm::vec3(0.0f);
+	m_cameraPreviousPosition = glm::vec3(0.0f);
+	m_cameraIslandTriggerInside.clear();
+	m_cameraMode = CameraMode::ThirdPerson;
+	m_lightingManager->ResetToDefaults();
+	SetEditorMode();
+}
+
 void RenderManager::ToggleCameraPoint(std::size_t pointIndex)
 {
 	const CameraPathData& path = m_gameCamera->Path();

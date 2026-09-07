@@ -217,6 +217,20 @@ const std::filesystem::path& ProjectManager::CurrentProjectPath() const
 	return m_currentProjectPath;
 }
 
+std::filesystem::path ProjectManager::ProjectDirectory() const
+{
+	if (!m_currentProjectPath.empty())
+	{
+		return m_currentProjectPath.parent_path();
+	}
+
+#ifdef AQUANACT_SOURCE_ROOT
+	return std::filesystem::path(AQUANACT_SOURCE_ROOT) / "assets" / "projects";
+#else
+	return m_fileSystem ? m_fileSystem->ExecutableDirectory() / "assets" / "projects" : std::filesystem::current_path();
+#endif
+}
+
 bool ProjectManager::SaveProject(const std::filesystem::path& path, const SceneManager& SceneManager)
 {
 	if (!m_fileSystem)
@@ -324,6 +338,24 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 		m_currentProjectPath = path;
 	}
 	return loaded;
+}
+
+bool ProjectManager::CreateNewProject(const std::filesystem::path& path, SceneManager& SceneManager)
+{
+	if (!m_fileSystem || path.empty())
+	{
+		return false;
+	}
+
+	SceneManager.Clear();
+	EnsureMainMenuLevel(SceneManager);
+	SceneManager.SetStartupLevelName("MainMenu");
+	Root::Current().InputActions().ResetToDefaults();
+	Root::Current().Render().ResetForNewProject();
+	Root::Current().FrontEnd().EditorGUI().CameraPath().Clear();
+	Root::Current().FrontEnd().EditorGUI().SetShowCameraPath(false);
+
+	return SaveProject(path, SceneManager);
 }
 
 

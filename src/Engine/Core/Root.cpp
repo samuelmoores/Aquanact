@@ -133,17 +133,21 @@ void Root::startUp(int argc, char** argv)
 
 	// TODO: put this into a startUp function for projectmanager
 	RegisterGameComponents();
+#ifdef AQUANACT_GAME
 	const std::filesystem::path projectPath = DefaultProjectPath();
 	m_projectManager->LoadProject(projectPath, *m_sceneManager);
+#endif
 
 	// scene
 	m_sceneManager->startUp();
 
 	// TODO: put this into scenemanager
+#ifdef AQUANACT_GAME
 	if (m_sceneManager->AppliedNewClassConfigurationOnStartup())
 	{
 		m_projectManager->SaveProject(projectPath, *m_sceneManager);
 	}
+#endif
 
 	// launch game or editor
 	if (m_engineState.IsGameMode())
