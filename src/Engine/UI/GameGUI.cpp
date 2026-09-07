@@ -94,7 +94,8 @@ namespace {
 	{
 		for (const auto& scene : sceneManager.Levels())
 		{
-			if (scene && sceneManager.SceneKindFor(scene->Name()) == SceneManager::SceneKind::Level)
+			if (scene && sceneManager.SceneKindFor(scene->Name()) == SceneManager::SceneKind::Level &&
+				!sceneManager.IsMainMenuScene(scene->Name()))
 			{
 				return scene.get();
 			}
@@ -109,7 +110,7 @@ namespace {
 			return nullptr;
 		}
 		Scene* scene = sceneManager.FindLevel(levelName);
-		if (scene && sceneManager.SceneKindFor(scene->Name()) == SceneManager::SceneKind::Level)
+		if (scene)
 		{
 			return scene;
 		}
@@ -1407,6 +1408,12 @@ void GameGUI::OnWidgetClicked(MyGUI::Widget* sender)
 		}
 		Root::Current().FrontEnd().RuntimeGUI().HideAll();
 		Scene* targetScene = FindNamedLevel(Root::Current().Scenes(), launchLevel);
+		if (!targetScene && !launchLevel.empty())
+		{
+			Scene* namedScene = Root::Current().Scenes().FindLevel(launchLevel);
+			if (namedScene && Root::Current().Scenes().SceneKindFor(launchLevel) == SceneManager::SceneKind::Cutscene)
+				targetScene = namedScene;
+		}
 		Root::Current().Debugger().LogMessage(
 			"GameGUI NewGame initial scene lookup: " +
 			std::string(targetScene ? targetScene->Name() : "<not found>"));
@@ -1433,6 +1440,22 @@ void GameGUI::OnWidgetClicked(MyGUI::Widget* sender)
 				"GameGUI NewGame fallback playable scene: " +
 				std::string(targetScene ? targetScene->Name() : "<not found>"));
 			std::cout << "GameGUI NewGame fallback playable scene: " << (targetScene ? targetScene->Name() : "<not found>") << '\n';
+		}
+		if (targetScene && Root::Current().Scenes().SceneKindFor(targetScene->Name()) == SceneManager::SceneKind::Cutscene)
+		{
+			std::string nextLevel = Root::Current().Scenes().StartupLevelName();
+			if (nextLevel.empty() || Root::Current().Scenes().SceneKindFor(nextLevel) != SceneManager::SceneKind::Level)
+			{
+				if (Scene* fallbackLevel = FindPlayableScene(Root::Current().Scenes()))
+					nextLevel = fallbackLevel->Name();
+			}
+			if (!Root::Current().Gameplay().StartCutscene(targetScene->Name(), nextLevel, Root::Current().FrontEnd(), Root::Current().Debugger()))
+			{
+				Root::Current().Debugger().LogMessage("GameGUI NewGame failed: cutscene target or next level is invalid.");
+				break;
+			}
+			Root::Current().FrontEnd().RuntimeGUI().RecordClick("New Game cutscene started");
+			break;
 		}
 		if (targetScene)
 		{

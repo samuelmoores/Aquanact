@@ -98,7 +98,7 @@
       "clickedColor": "",
       "focusSound": "",
       "action": "NewGame",
-      "launchLevel": "Level1",
+      "launchLevel": "Opening",
       "targetPanel": "",
       "bindEntity": "",
       "bindComponent": "",

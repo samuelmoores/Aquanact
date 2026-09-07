@@ -50,6 +50,8 @@ void SceneWindow::DrawNewLevelPopup(SceneManager& sceneManager, bool& requested)
 		return;
 
 	ImGui::TextUnformatted("Create a new scene:");
+	const char* sceneKinds[] = { "Level", "Cutscene" };
+	ImGui::Combo("Type", &m_newSceneKind, sceneKinds, 2);
 	ImGui::InputText("Name", m_newLevelName, sizeof(m_newLevelName));
 	if (ImGui::Button("Create"))
 	{
@@ -58,10 +60,10 @@ void SceneWindow::DrawNewLevelPopup(SceneManager& sceneManager, bool& requested)
 			m_newLevelStatusMessage = "Enter a valid scene name.";
 		else if (sceneManager.FindLevel(levelName))
 			m_newLevelStatusMessage = "Scene already exists.";
-		else if (sceneManager.CreateLevel(levelName))
+		else if ((m_newSceneKind == 0 ? sceneManager.CreateLevel(levelName) : sceneManager.CreateCutscene(levelName)))
 		{
 			sceneManager.SetActiveLevel(levelName);
-			m_newLevelStatusMessage = "Created scene " + levelName + ".";
+			m_newLevelStatusMessage = "Created " + std::string(sceneKinds[m_newSceneKind]) + " " + levelName + ".";
 		}
 		else
 			m_newLevelStatusMessage = "Failed to create scene.";

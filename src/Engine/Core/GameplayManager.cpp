@@ -6,6 +6,7 @@
 #include "Engine/Core/Debug.h"
 #include "Engine/Core/FrontEndManager.h"
 #include "Engine/Core/Scene.h"
+#include "Engine/Core/PathedCamera.h"
 #include "Engine/Core/Root.h"
 #include "Engine/Core/FrameProfiler.h"
 #include "Engine/Core/Input.h"
@@ -72,6 +73,9 @@ void GameplayManager::shutDown()
 	Audio::StopMusic();
 	m_levelManager = nullptr;
 	m_state = GameState::MainMenu;
+	m_cutsceneActive = false;
+	m_cutsceneElapsed = 0.0f;
+	m_cutsceneNextLevel.clear();
 }
 
 void GameplayManager::BootMainMenu(FrontEndManager& frontEndManager, Debug& debug)
@@ -121,6 +125,32 @@ bool GameplayManager::BootPlayableLevel(FrontEndManager& frontEndManager, Debug&
 		Audio::PlayMusic("assets/" + playableLevel->MusicPath(), true, playableLevel->MusicVolume());
 	EnterGameplay(frontEndManager, debug);
 	debug.LogMessage("GameplayManager::BootPlayableLevel() state=Playing Scene=" + playableLevel->Name());
+	return true;
+}
+
+bool GameplayManager::StartCutscene(const std::string& cutsceneName, const std::string& levelName, FrontEndManager& frontEndManager, Debug& debug)
+{
+	if (!m_levelManager)
+	{
+		return false;
+	}
+	Scene* cutscene = m_levelManager->FindLevel(cutsceneName);
+	Scene* nextLevel = m_levelManager->FindLevel(levelName);
+	if (!cutscene || m_levelManager->SceneKindFor(cutsceneName) != SceneManager::SceneKind::Cutscene ||
+		!nextLevel || m_levelManager->SceneKindFor(levelName) != SceneManager::SceneKind::Level)
+	{
+		return false;
+	}
+
+	m_levelManager->SetActiveLevel(cutsceneName);
+	m_levelManager->startUp();
+	m_levelManager->CaptureActiveLevelEditorTransforms();
+	cutscene->FirstFrame();
+	m_cutsceneActive = true;
+	m_cutsceneElapsed = 0.0f;
+	m_cutsceneNextLevel = levelName;
+	EnterGameplay(frontEndManager, debug);
+	debug.LogMessage("GameplayManager::StartCutscene() scene=" + cutsceneName + " next=" + levelName);
 	return true;
 }
 
@@ -247,6 +277,36 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 	if (!activeLevel)
 	{
 		return;
+	}
+
+	if (m_cutsceneActive)
+	{
+		PathedCamera& camera = activeLevel->CameraSystem();
+		const std::size_t segmentCount = camera.Path().points.size() > 1 ? camera.Path().points.size() - 1 : 1;
+		// Each authored camera segment occupies one second. This gives a useful
+		// default cinematic duration without adding a second timeline asset.
+		m_cutsceneElapsed += std::max(0.0f, dt);
+		camera.SetPlayerProgress(m_cutsceneElapsed / static_cast<float>(segmentCount));
+		if (m_cutsceneElapsed >= static_cast<float>(segmentCount))
+		{
+			const std::string nextLevel = m_cutsceneNextLevel;
+			m_cutsceneActive = false;
+			m_cutsceneElapsed = 0.0f;
+			m_cutsceneNextLevel.clear();
+			if (m_levelManager->SetActiveLevel(nextLevel))
+			{
+				m_levelManager->startUp();
+				m_levelManager->CaptureActiveLevelEditorTransforms();
+				if (Scene* transitionedLevel = m_levelManager->ActiveLevel())
+				{
+					transitionedLevel->FirstFrame();
+					if (!transitionedLevel->MusicPath().empty())
+						Audio::PlayMusic("assets/" + transitionedLevel->MusicPath(), true, transitionedLevel->MusicVolume());
+				}
+				debug.LogMessage("GameplayManager::StartCutscene() transitioned to " + nextLevel);
+			}
+			return;
+		}
 	}
 
 	// How can we move this to the debugger?

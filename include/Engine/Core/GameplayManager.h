@@ -28,6 +28,7 @@ public:
 	void shutDown();
 	void BootMainMenu(FrontEndManager& frontEndManager, Debug& debug);
 	bool BootPlayableLevel(FrontEndManager& frontEndManager, Debug& debug);
+	bool StartCutscene(const std::string& cutsceneName, const std::string& levelName, FrontEndManager& frontEndManager, Debug& debug);
 	void StartGameSession(FrontEndManager& frontEndManager, Debug& debug, EngineState& engineState);
 	void SyncRuntimeUI(FrontEndManager& frontEndManager) const;
 
@@ -47,5 +48,8 @@ private:
 
 	SceneManager* m_levelManager = nullptr;
 	GameState m_state = GameState::MainMenu;
+	bool m_cutsceneActive = false;
+	float m_cutsceneElapsed = 0.0f;
+	std::string m_cutsceneNextLevel;
 };
 

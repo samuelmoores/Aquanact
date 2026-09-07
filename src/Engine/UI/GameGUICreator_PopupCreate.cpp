@@ -245,15 +245,17 @@ void GameGUICreator::DrawCreateLaunchLevelField()
 		return;
 	}
 
-	// The launch-level picker follows the same ImGui combo pattern as the action
+	// The launch-scene picker follows the same ImGui combo pattern as the action
 	// combo above: compute the label, open the combo, draw each selectable row,
 	// and preserve keyboard focus on the selected row.
 	SceneManager& sceneManager = Root::Current().Scenes();
-	const std::vector<std::string> levelNames = sceneManager.SceneNames(SceneManager::SceneKind::Level);
-	const char* launchLabel = m_newWidgetLaunchLevel.empty() ? "<Select Level>" : m_newWidgetLaunchLevel.c_str();
-	if (ImGui::BeginCombo("Launch Level", launchLabel))
+	std::vector<std::string> sceneNames = sceneManager.SceneNames(SceneManager::SceneKind::Level);
+	const std::vector<std::string> cutsceneNames = sceneManager.SceneNames(SceneManager::SceneKind::Cutscene);
+	sceneNames.insert(sceneNames.end(), cutsceneNames.begin(), cutsceneNames.end());
+	const char* launchLabel = m_newWidgetLaunchLevel.empty() ? "<Select Scene>" : m_newWidgetLaunchLevel.c_str();
+	if (ImGui::BeginCombo("Launch Scene", launchLabel))
 	{
-		for (const std::string& levelName : levelNames)
+		for (const std::string& levelName : sceneNames)
 		{
 			const bool selected = m_newWidgetLaunchLevel == levelName;
 			if (ImGui::Selectable(levelName.c_str(), selected))
@@ -267,9 +269,9 @@ void GameGUICreator::DrawCreateLaunchLevelField()
 		}
 		ImGui::EndCombo();
 	}
-	if (levelNames.empty())
+	if (sceneNames.empty())
 	{
-		ImGui::TextDisabled("No gameplay scenes are available.");
+		ImGui::TextDisabled("No levels or cutscenes are available.");
 	}
 }
 

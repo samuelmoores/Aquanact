@@ -1,5 +1,7 @@
 #include "Engine/UI/GameGUICreator.h"
 #include "Engine/UI/GameGUICreatorHelpers.h"
+#include "Engine/Core/Root.h"
+#include "Engine/Core/SceneManager.h"
 
 #include <imgui.h>
 #include <algorithm>
@@ -43,6 +45,53 @@ namespace
 				otherWidget.parentName = widget.name;
 			}
 		}
+	}
+
+	void DrawSceneCombo(const char* label, std::string& selectedScene)
+	{
+		SceneManager& sceneManager = Root::Current().Scenes();
+		std::vector<std::string> sceneNames = sceneManager.SceneNames(SceneManager::SceneKind::Level);
+		const std::vector<std::string> cutsceneNames = sceneManager.SceneNames(SceneManager::SceneKind::Cutscene);
+		sceneNames.insert(sceneNames.end(), cutsceneNames.begin(), cutsceneNames.end());
+
+		const char* sceneLabel = selectedScene.empty() ? "<Select Scene>" : selectedScene.c_str();
+		if (ImGui::BeginCombo(label, sceneLabel))
+		{
+			for (const std::string& sceneName : sceneNames)
+			{
+				const bool selected = selectedScene == sceneName;
+				if (ImGui::Selectable(sceneName.c_str(), selected))
+				{
+					selectedScene = sceneName;
+				}
+				if (selected)
+				{
+					ImGui::SetItemDefaultFocus();
+				}
+			}
+			ImGui::EndCombo();
+		}
+		if (sceneNames.empty())
+		{
+			ImGui::TextDisabled("No levels or cutscenes are available.");
+		}
+	}
+}
+
+void GameGUICreator::DrawButtonLaunchSceneField(GameGUIWidgetDef& widget)
+{
+	if (widget.action != GameGUIActionType::NewGame)
+	{
+		widget.launchLevel.clear();
+		return;
+	}
+
+	const std::string previousScene = widget.launchLevel;
+	DrawSceneCombo("Level to load", widget.launchLevel);
+	if (widget.launchLevel != previousScene)
+	{
+		SyncRuntimePreview();
+		SaveSelectedRoleGUI();
 	}
 }
 
@@ -133,6 +182,10 @@ void GameGUICreator::DrawButtonWidgetDetails(GameGUIAsset& asset, GameGUIWidgetD
 		}
 		ImGui::EndCombo();
 	}
+
+	// Keep the New Game destination directly beneath the action selector so it
+	// is immediately visible when editing the widget's behavior.
+	DrawButtonLaunchSceneField(widget);
 
 	if (!controlledByPanel)
 	{

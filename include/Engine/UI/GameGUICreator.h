@@ -82,6 +82,7 @@ private:
 	void DrawCreateTextPopup();
 	void DrawBindingPopup();
 	void DrawButtonWidgetDetails(GameGUIAsset& asset, GameGUIWidgetDef& widget);
+	void DrawButtonLaunchSceneField(GameGUIWidgetDef& widget);
 	void DrawPanelWidgetDetails(GameGUIAsset& asset, GameGUIWidgetDef& widget);
 	void DrawImageWidgetDetails(GameGUIAsset& asset, GameGUIWidgetDef& widget);
 	void DrawTextWidgetDetails(GameGUIAsset& asset, GameGUIWidgetDef& widget);

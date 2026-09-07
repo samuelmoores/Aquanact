@@ -14,5 +14,6 @@ public:
 
 private:
 	char m_newLevelName[128] = "Level1";
+	int m_newSceneKind = 0;
 	std::string m_newLevelStatusMessage;
 };
