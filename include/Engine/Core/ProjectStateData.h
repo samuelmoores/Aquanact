@@ -8,6 +8,28 @@
 #include "Engine/Core/CutsceneTimeline.h"
 
 namespace ProjectStateData {
+	struct DirectionalLightData {
+		glm::vec3 direction{ 0.0f, -1.0f, 0.0f };
+		glm::vec3 color{ 1.0f };
+		float intensity = 1.0f;
+		float ambient = 0.2f;
+		bool shadowsEnabled = true;
+		bool castsShadows = true;
+	};
+
+	struct PointLightData {
+		glm::vec3 position{ 0.0f };
+		glm::vec3 color{ 1.0f };
+		float intensity = 1.0f;
+		float ambient = 0.2f;
+		float radius = 1.0f;
+		float radiusFade = 1.0f;
+		float constant = 1.0f;
+		float linear = 0.0f;
+		float quadratic = 0.0f;
+		bool castsShadows = false;
+	};
+
 	struct PendingController {
 		std::filesystem::path sourcePath;
 		unsigned int entityId = 0;
@@ -82,6 +104,9 @@ namespace ProjectStateData {
 		std::string musicPath;
 		float musicVolume = 50.0f;
 		CutsceneTimeline cutscene;
+		bool hasSunLight = false;
+		DirectionalLightData sunLight;
+		std::vector<PointLightData> pointLights;
 		struct PendingObject {
 			std::filesystem::path sourcePath;
 			glm::vec3 position{ 0.0f };
@@ -152,28 +177,12 @@ namespace ProjectStateData {
 		bool profilerEnabled = false;
 		bool showCameraCollisionDebug = false;
 		bool showPhysicsDiagnosticsWindow = false;
-		struct DirectionalLightData {
-			glm::vec3 direction{ 0.0f, -1.0f, 0.0f };
-			glm::vec3 color{ 1.0f };
-			float intensity = 1.0f;
-			float ambient = 0.2f;
-			bool shadowsEnabled = true;
-			bool castsShadows = true;
-		};
-		struct PointLightData {
-			glm::vec3 position{ 0.0f };
-			glm::vec3 color{ 1.0f };
-			float intensity = 1.0f;
-			float ambient = 0.2f;
-			float radius = 1.0f;
-			float radiusFade = 1.0f;
-			float constant = 1.0f;
-			float linear = 0.0f;
-			float quadratic = 0.0f;
-			bool castsShadows = false;
-		};
+		using DirectionalLightData = ProjectStateData::DirectionalLightData;
+		using PointLightData = ProjectStateData::PointLightData;
 		DirectionalLightData sunLight;
 		std::vector<PointLightData> pointLights;
+		bool hasLegacyLighting = false;
+		bool hasSceneLighting = false;
 		std::string imguiLayout;
 	};
 

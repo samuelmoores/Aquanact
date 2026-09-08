@@ -2,6 +2,7 @@
 
 #include "Engine/Core/Entity.h"
 #include "Engine/Core/LevelCollider.h"
+#include "Engine/Core/LightingManager.h"
 #include "Engine/Core/CutsceneTimeline.h"
 
 #include <memory>
@@ -42,6 +43,8 @@ public:
 	void EnsureCameraSystemStarted();
 	CutsceneTimeline& Cutscene();
 	const CutsceneTimeline& Cutscene() const;
+	LightingManager& Lights() { return m_lighting; }
+	const LightingManager& Lights() const { return m_lighting; }
 
 private:
 	std::string m_name;
@@ -53,6 +56,7 @@ private:
 	bool m_cameraSystemStarted = false;
 	bool m_firstFramePending = false;
 	CutsceneTimeline m_cutscene;
+	LightingManager m_lighting;
 };
 
 

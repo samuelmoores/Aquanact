@@ -136,6 +136,30 @@ const PathedCamera& RenderManager::GetPathedCamera() const
 	return *m_gameCamera;
 }
 
+LightingManager& RenderManager::Lights()
+{
+	if (Root::HasCurrent())
+	{
+		if (Scene* scene = Root::Current().Scenes().ActiveLevel())
+		{
+			return scene->Lights();
+		}
+	}
+	return *m_lightingManager;
+}
+
+const LightingManager& RenderManager::Lights() const
+{
+	if (Root::HasCurrent())
+	{
+		if (const Scene* scene = Root::Current().Scenes().ActiveLevel())
+		{
+			return scene->Lights();
+		}
+	}
+	return *m_lightingManager;
+}
+
 void RenderManager::SetEditorMode()
 {
 	m_cameraManager.SetEditorMode(*m_engineCamera);
@@ -265,27 +289,6 @@ void RenderManager::ApplyProjectState(const ProjectStateData::RenderStateData& r
 			}
 		}
 		m_engineCamera->SetPose(renderState.cameraPath.points.front().position, facing);
-	}
-	m_lightingManager->SunLight().direction = renderState.sunLight.direction;
-	m_lightingManager->SunLight().color = renderState.sunLight.color;
-	m_lightingManager->SunLight().intensity = renderState.sunLight.intensity;
-	m_lightingManager->SunLight().ambient = renderState.sunLight.ambient;
-	m_lightingManager->SunLight().castsShadows = renderState.sunLight.castsShadows;
-	m_lightingManager->SetShadowsEnabled(renderState.sunLight.shadowsEnabled);
-	m_lightingManager->PointLights().clear();
-	for (const auto& pointLightData : renderState.pointLights)
-	{
-		PointLight& pointLight = m_lightingManager->AddPointLight();
-		pointLight.position = pointLightData.position;
-		pointLight.color = pointLightData.color;
-		pointLight.intensity = pointLightData.intensity;
-		pointLight.ambient = pointLightData.ambient;
-		pointLight.SetRadius(pointLightData.radius);
-		pointLight.radiusFade = pointLightData.radiusFade;
-		pointLight.constant = pointLightData.constant;
-		pointLight.linear = pointLightData.linear;
-		pointLight.quadratic = pointLightData.quadratic;
-		pointLight.castsShadows = pointLightData.castsShadows;
 	}
 }
 
@@ -466,7 +469,7 @@ void RenderManager::ResetForNewProject()
 	m_cameraPreviousPosition = glm::vec3(0.0f);
 	m_cameraIslandTriggerInside.clear();
 	m_cameraMode = CameraMode::ThirdPerson;
-	m_lightingManager->ResetToDefaults();
+	Lights().ResetToDefaults();
 	SetEditorMode();
 }
 
@@ -727,7 +730,8 @@ void RenderManager::Flush(const Camera& camera, unsigned int /*selectedEntityId*
 			std::max(m_commands[i].mesh->NumBuffers(), 0));
 	}
 
-	m_device.RenderShadowMaps(m_commands, m_commandCount, *m_lightingManager);
+	const LightingManager& lighting = Lights();
+	m_device.RenderShadowMaps(m_commands, m_commandCount, lighting);
 
 	const Frustum frustum = Frustum::FromViewProjection(
 		camera.GetProjectionMatrix() * camera.GetViewMatrix());
@@ -752,14 +756,14 @@ void RenderManager::Flush(const Camera& camera, unsigned int /*selectedEntityId*
 
 		if (command.isSkinned)
 		{
-			m_device.Draw(command, camera, *m_lightingManager);
+			m_device.Draw(command, camera, lighting);
 		}
 		else
 		{
 			std::size_t visibleSubMeshes = 0;
 			std::size_t culledSubMeshes = 0;
 
-			m_device.DrawCulled(command, camera, *m_lightingManager, frustum,
+			m_device.DrawCulled(command, camera, lighting, frustum,
 				visibleSubMeshes, culledSubMeshes);
 
 			m_lastFrameFrustumCulledObjects += culledSubMeshes;

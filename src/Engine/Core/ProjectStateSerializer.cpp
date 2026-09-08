@@ -409,6 +409,24 @@ namespace ProjectStateSerializer {
 				continue;
 			}
 			contents += "scenecontext;" + ProjectStateFormat::EscapeField(scene->Name()) + "\n";
+			const LightingManager& lighting = scene->Lights();
+			const DirectionalLight& sunLight = lighting.SunLight();
+			contents += "scenesunlight;" + ProjectStateFormat::EscapeField(scene->Name()) + ";";
+			contents += std::to_string(sunLight.direction.x) + ";" + std::to_string(sunLight.direction.y) + ";" + std::to_string(sunLight.direction.z) + ";";
+			contents += std::to_string(sunLight.color.x) + ";" + std::to_string(sunLight.color.y) + ";" + std::to_string(sunLight.color.z) + ";";
+			contents += std::to_string(sunLight.intensity) + ";" + std::to_string(sunLight.ambient) + ";";
+			contents += (lighting.ShadowsEnabled() ? "1;" : "0;");
+			contents += (sunLight.castsShadows ? "1\n" : "0\n");
+			for (const PointLight& pointLight : lighting.PointLights())
+			{
+				contents += "scenepointlight;" + ProjectStateFormat::EscapeField(scene->Name()) + ";";
+				contents += std::to_string(pointLight.position.x) + ";" + std::to_string(pointLight.position.y) + ";" + std::to_string(pointLight.position.z) + ";";
+				contents += std::to_string(pointLight.color.x) + ";" + std::to_string(pointLight.color.y) + ";" + std::to_string(pointLight.color.z) + ";";
+				contents += std::to_string(pointLight.intensity) + ";" + std::to_string(pointLight.ambient) + ";";
+				contents += std::to_string(pointLight.radius) + ";" + std::to_string(pointLight.radiusFade) + ";";
+				contents += std::to_string(pointLight.constant) + ";" + std::to_string(pointLight.linear) + ";" + std::to_string(pointLight.quadratic) + ";";
+				contents += (pointLight.castsShadows ? "1\n" : "0\n");
+			}
 			contents += "cutscene;" + ProjectStateFormat::EscapeField(scene->Name()) + ";" + std::to_string(scene->Cutscene().duration) + "\n";
 			for (const CutsceneAnimationTrack& track : scene->Cutscene().animationTracks)
 			{
@@ -455,6 +473,48 @@ namespace ProjectStateSerializer {
 			try
 			{
 				const std::vector<std::string> fields = ProjectStateFormat::SplitFields(line);
+				if (fields.size() >= 12 && fields[0] == "scenesunlight")
+				{
+					for (PendingLevel& pendingLevel : pendingLevels)
+					{
+						if (pendingLevel.name != fields[1]) continue;
+						pendingLevel.hasSunLight = true;
+						pendingLevel.sunLight.direction = glm::vec3(std::stof(fields[2]), std::stof(fields[3]), std::stof(fields[4]));
+						pendingLevel.sunLight.color = glm::vec3(std::stof(fields[5]), std::stof(fields[6]), std::stof(fields[7]));
+						pendingLevel.sunLight.intensity = std::stof(fields[8]);
+						pendingLevel.sunLight.ambient = std::stof(fields[9]);
+						pendingLevel.sunLight.shadowsEnabled = fields[10] == "1" || fields[10] == "true" || fields[10] == "True";
+						pendingLevel.sunLight.castsShadows = fields[11] == "1" || fields[11] == "true" || fields[11] == "True";
+						renderState.hasSceneLighting = true;
+						break;
+					}
+					continue;
+				}
+				if (fields.size() >= 16 && fields[0] == "scenepointlight")
+				{
+					for (PendingLevel& pendingLevel : pendingLevels)
+					{
+						if (pendingLevel.name != fields[1]) continue;
+						ProjectStateData::PointLightData pointLight;
+						pointLight.position = glm::vec3(std::stof(fields[2]), std::stof(fields[3]), std::stof(fields[4]));
+						pointLight.color = glm::vec3(std::stof(fields[5]), std::stof(fields[6]), std::stof(fields[7]));
+						pointLight.intensity = std::stof(fields[8]);
+						pointLight.ambient = std::stof(fields[9]);
+						pointLight.radius = std::stof(fields[10]);
+						pointLight.radiusFade = std::stof(fields[11]);
+						pointLight.constant = std::stof(fields[12]);
+						pointLight.linear = std::stof(fields[13]);
+						pointLight.quadratic = std::stof(fields[14]);
+						pointLight.castsShadows = fields[15] == "1" || fields[15] == "true" || fields[15] == "True";
+						if (pendingLevel.pointLights.size() < static_cast<std::size_t>(LightingManager::MaxPointLights))
+						{
+							pendingLevel.pointLights.push_back(std::move(pointLight));
+						}
+						renderState.hasSceneLighting = true;
+						break;
+					}
+					continue;
+				}
 				if ((fields.size() == 3 && fields[0] == "enginecamera") || (fields.size() >= 7 && fields[0] == "gamecamera") || (fields.size() >= 11 && fields[0] == "scenecamera") || (fields.size() >= 2 && fields[0] == "camerapath") || (fields.size() >= 4 && fields[0] == "camerapathsettings") || (fields.size() == 3 && fields[0] == "editorview") || (fields.size() >= 3 && fields[0] == "debugwindows") || ((fields.size() >= 8 && fields.size() <= 11) && fields[0] == "sunlight") || ((fields.size() >= 12 && fields.size() <= 15) && fields[0] == "pointlight") || (fields.size() == 2 && fields[0] == "imguilayout"))
 				{
 					if (fields.size() == 3 && fields[0] == "enginecamera")
@@ -626,6 +686,7 @@ namespace ProjectStateSerializer {
 					}
 					else if (fields.size() >= 8 && fields.size() <= 11 && fields[0] == "sunlight")
 					{
+						renderState.hasLegacyLighting = true;
 						renderState.sunLight.direction = glm::vec3(std::stof(fields[1]), std::stof(fields[2]), std::stof(fields[3]));
 						renderState.sunLight.color = glm::vec3(std::stof(fields[4]), std::stof(fields[5]), std::stof(fields[6]));
 						renderState.sunLight.intensity = std::stof(fields[7]);
@@ -644,6 +705,7 @@ namespace ProjectStateSerializer {
 					}
 					else if (fields.size() >= 12 && fields.size() <= 15 && fields[0] == "pointlight")
 					{
+						renderState.hasLegacyLighting = true;
 						RenderStateData::PointLightData pointLight;
 						pointLight.position = glm::vec3(std::stof(fields[1]), std::stof(fields[2]), std::stof(fields[3]));
 						pointLight.color = glm::vec3(std::stof(fields[4]), std::stof(fields[5]), std::stof(fields[6]));
@@ -1124,29 +1186,6 @@ namespace ProjectStateSerializer {
 		contents += showPhysicsDiagnosticsWindow ? "1" : "0";
 		contents += "\n";
 
-		const DirectionalLight& sunLight = renderManager.Lights().SunLight();
-		contents += "sunlight;";
-		contents += std::to_string(sunLight.direction.x) + ";" + std::to_string(sunLight.direction.y) + ";" + std::to_string(sunLight.direction.z) + ";";
-		contents += std::to_string(sunLight.color.x) + ";" + std::to_string(sunLight.color.y) + ";" + std::to_string(sunLight.color.z) + ";";
-		contents += std::to_string(sunLight.intensity) + ";";
-		contents += std::to_string(sunLight.ambient) + ";";
-		contents += (renderManager.Lights().ShadowsEnabled() ? "1;" : "0;");
-		contents += (sunLight.castsShadows ? "1\n" : "0\n");
-
-		for (const PointLight& pointLight : renderManager.Lights().PointLights())
-		{
-			contents += "pointlight;";
-			contents += std::to_string(pointLight.position.x) + ";" + std::to_string(pointLight.position.y) + ";" + std::to_string(pointLight.position.z) + ";";
-			contents += std::to_string(pointLight.color.x) + ";" + std::to_string(pointLight.color.y) + ";" + std::to_string(pointLight.color.z) + ";";
-			contents += std::to_string(pointLight.intensity) + ";";
-			contents += std::to_string(pointLight.ambient) + ";";
-			contents += std::to_string(pointLight.radius) + ";";
-			contents += std::to_string(pointLight.radiusFade) + ";";
-			contents += std::to_string(pointLight.constant) + ";";
-			contents += std::to_string(pointLight.linear) + ";";
-			contents += std::to_string(pointLight.quadratic) + ";";
-			contents += (pointLight.castsShadows ? "1\n" : "0\n");
-		}
 	}
 }
 

@@ -54,16 +54,20 @@ uniform samplerCube pointShadowMap7;
 uniform bool pointShadowReady[8];
 uniform float pointShadowFarPlanes[8];
 
-const vec3 PointShadowSampleOffsets[12] = vec3[](
+const vec3 PointShadowSampleOffsets[20] = vec3[](
 	vec3(1.0, 1.0, 1.0), vec3(1.0, 1.0, -1.0),
 	vec3(1.0, -1.0, 1.0), vec3(1.0, -1.0, -1.0),
 	vec3(-1.0, 1.0, 1.0), vec3(-1.0, 1.0, -1.0),
 	vec3(-1.0, -1.0, 1.0), vec3(-1.0, -1.0, -1.0),
-	vec3(1.0, 0.0, 0.0), vec3(-1.0, 0.0, 0.0),
-	vec3(0.0, 1.0, 0.0), vec3(0.0, -1.0, 0.0)
+	vec3(1.0, 1.0, 0.0), vec3(1.0, -1.0, 0.0),
+	vec3(-1.0, 1.0, 0.0), vec3(-1.0, -1.0, 0.0),
+	vec3(1.0, 0.0, 1.0), vec3(1.0, 0.0, -1.0),
+	vec3(-1.0, 0.0, 1.0), vec3(-1.0, 0.0, -1.0),
+	vec3(0.0, 1.0, 1.0), vec3(0.0, 1.0, -1.0),
+	vec3(0.0, -1.0, 1.0), vec3(0.0, -1.0, -1.0)
 );
 
-float CalculateShadow(vec3 vertexNormal, vec3 lightDirection)
+float CalculateShadow(vec3 geometricNormal, vec3 lightDirection)
 {
 	if (!directionalShadowEnabled)
 	{
@@ -77,7 +81,8 @@ float CalculateShadow(vec3 vertexNormal, vec3 lightDirection)
 		return 0.0;
 	}
 
-	float bias = max(0.0025 * (1.0 - dot(vertexNormal, lightDirection)), 0.00035);
+	float normalAlignment = clamp(dot(geometricNormal, lightDirection), 0.0, 1.0);
+	float bias = max(0.0025 * (1.0 - normalAlignment), 0.00035);
 	vec2 texelSize = 1.0 / vec2(textureSize(shadowMap, 0));
 	float shadow = 0.0;
 	for (int x = -1; x <= 1; ++x)
@@ -103,7 +108,14 @@ float SamplePointShadowMap(int lightIndex, vec3 direction)
 	return texture(pointShadowMap7, direction).r;
 }
 
-float CalculatePointShadow(int lightIndex, PointLight light, vec3 vertexNormal, vec3 lightDirection)
+float InterleavedGradientNoise(vec2 pixelPosition)
+{
+	// Half an 8-bit color step is enough to break up coherent radial bands while
+	// remaining visually imperceptible as noise at normal viewing distances.
+	return fract(52.9829189 * fract(dot(pixelPosition, vec2(0.06711056, 0.00583715))));
+}
+
+float CalculatePointShadow(int lightIndex, PointLight light, vec3 geometricNormal, vec3 lightDirection)
 {
 	if (!pointShadowReady[lightIndex])
 	{
@@ -118,24 +130,32 @@ float CalculatePointShadow(int lightIndex, PointLight light, vec3 vertexNormal, 
 		return 0.0;
 	}
 
-	float normalizedDepth = currentDepth / farPlane;
-	float bias = max(0.0025 * (1.0 - dot(vertexNormal, lightDirection)), 0.00035);
+	float normalAlignment = clamp(dot(geometricNormal, lightDirection), 0.0, 1.0);
+	// Compare in world units so changing a point light's radius does not also
+	// change its effective shadow bias. Smooth each comparison to avoid the
+	// discrete binary-sample intensity steps that produced visible contours.
+	float bias = 0.05 + 0.35 * (1.0 - normalAlignment);
+	float filterWidth = max(currentDepth * 0.0015, 0.04);
 	float sampleRadius = max(currentDepth * 0.003, 0.002);
 	float shadow = 0.0;
-	for (int sampleIndex = 0; sampleIndex < 12; ++sampleIndex)
+	for (int sampleIndex = 0; sampleIndex < 20; ++sampleIndex)
 	{
 		float closestDepth = SamplePointShadowMap(
 			lightIndex,
-			fragToLight + PointShadowSampleOffsets[sampleIndex] * sampleRadius);
-		shadow += normalizedDepth - bias > closestDepth ? 1.0 : 0.0;
+			fragToLight + PointShadowSampleOffsets[sampleIndex] * sampleRadius) * farPlane;
+		float depthDifference = currentDepth - bias - closestDepth;
+		// Keep equal/self depth fully lit. A symmetric transition around zero
+		// partially shadowed the receiver itself, and its distance-scaled width
+		// showed up as faint concentric rings around the point light.
+		shadow += smoothstep(0.0, filterWidth, depthDifference);
 	}
-	return shadow / 12.0;
+	return shadow / 20.0;
 }
 
-vec3 CalculateDirectionalLight(vec3 baseColor, vec3 specularStrength, vec3 vertexNormal, vec3 viewDirection)
+vec3 CalculateDirectionalLight(vec3 baseColor, vec3 specularStrength, vec3 vertexNormal, vec3 geometricNormal, vec3 viewDirection)
 {
 	vec3 lightDir = normalize(-sunLight.direction);
-	float shadow = CalculateShadow(vertexNormal, lightDir);
+	float shadow = CalculateShadow(geometricNormal, lightDir);
 	float diffuseStrength = max(dot(vertexNormal, lightDir), 0.0);
 	vec3 reflectDirection = reflect(-lightDir, vertexNormal);
 	float spec = pow(max(dot(viewDirection, reflectDirection), 0.0), 32.0);
@@ -146,7 +166,7 @@ vec3 CalculateDirectionalLight(vec3 baseColor, vec3 specularStrength, vec3 verte
 	return (ambient + (1.0 - shadow) * (diffuse + specular)) * sunLight.intensity;
 }
 
-vec3 CalculatePointLight(int lightIndex, PointLight light, vec3 baseColor, vec3 specularStrength, vec3 vertexNormal, vec3 viewDirection)
+vec3 CalculatePointLight(int lightIndex, PointLight light, vec3 baseColor, vec3 specularStrength, vec3 vertexNormal, vec3 geometricNormal, vec3 viewDirection)
 {
 	vec3 lightOffset = light.position - FragWorldPos;
 	float lightDistance = length(lightOffset);
@@ -158,7 +178,7 @@ vec3 CalculatePointLight(int lightIndex, PointLight light, vec3 baseColor, vec3 
 	}
 
 	vec3 lightDir = normalize(lightOffset);
-	float shadow = CalculatePointShadow(lightIndex, light, vertexNormal, lightDir);
+	float shadow = CalculatePointShadow(lightIndex, light, geometricNormal, lightDir);
 	float attenuation = 1.0 / (light.constant + light.linear * lightDistance + light.quadratic * lightDistance * lightDistance);
 	float diffuseStrength = max(dot(vertexNormal, lightDir), 0.0);
 	vec3 reflectDirection = reflect(-lightDir, vertexNormal);
@@ -172,7 +192,8 @@ vec3 CalculatePointLight(int lightIndex, PointLight light, vec3 baseColor, vec3 
 
 void main()
 {
-	vec3 vertexNormal = normalize(Normal);
+	vec3 geometricNormal = normalize(Normal);
+	vec3 vertexNormal = geometricNormal;
 	if (hasNormalTexture)
 	{
 		vec3 tangentNormal = texture(normalTexture, TexCoord).rgb * 2.0 - 1.0;
@@ -183,12 +204,14 @@ void main()
 	vec3 baseColor = hasBaseTexture ? texture(baseTexture, TexCoord).rgb : vec3(0.20);
 	vec3 specularStrength = hasSpecularTexture ? texture(specularTexture, TexCoord).rgb : vec3(0.0);
 
-	vec3 litColor = CalculateDirectionalLight(baseColor, specularStrength, vertexNormal, viewDirection);
+	vec3 litColor = CalculateDirectionalLight(baseColor, specularStrength, vertexNormal, geometricNormal, viewDirection);
 	
 	for (int i = 0; i < pointLightCount; ++i)
 	{
-		litColor += CalculatePointLight(i, pointLights[i], baseColor, specularStrength, vertexNormal, viewDirection);
+		litColor += CalculatePointLight(i, pointLights[i], baseColor, specularStrength, vertexNormal, geometricNormal, viewDirection);
 	}
 	
-	FragColor = vec4(litColor, 1.0);
+	const float outputColorStep = 1.0 / 255.0;
+	float dither = (InterleavedGradientNoise(gl_FragCoord.xy) - 0.5) * outputColorStep;
+	FragColor = vec4(max(litColor + vec3(dither), vec3(0.0)), 1.0);
 }

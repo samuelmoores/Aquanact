@@ -87,6 +87,31 @@ namespace {
 			}
 			SceneManager.SetSceneKind(pendingLevel.name, pendingLevel.isCutscene ? SceneManager::SceneKind::Cutscene : SceneManager::SceneKind::Level);
 			Scene->Cutscene() = pendingLevel.cutscene;
+			LightingManager& lighting = Scene->Lights();
+			if (pendingLevel.hasSunLight)
+			{
+				lighting.SunLight().direction = pendingLevel.sunLight.direction;
+				lighting.SunLight().color = pendingLevel.sunLight.color;
+				lighting.SunLight().intensity = pendingLevel.sunLight.intensity;
+				lighting.SunLight().ambient = pendingLevel.sunLight.ambient;
+				lighting.SunLight().castsShadows = pendingLevel.sunLight.castsShadows;
+				lighting.SetShadowsEnabled(pendingLevel.sunLight.shadowsEnabled);
+			}
+			lighting.PointLights().clear();
+			for (const ProjectStateData::PointLightData& pointLightData : pendingLevel.pointLights)
+			{
+				PointLight& pointLight = lighting.AddPointLight();
+				pointLight.position = pointLightData.position;
+				pointLight.color = pointLightData.color;
+				pointLight.intensity = pointLightData.intensity;
+				pointLight.ambient = pointLightData.ambient;
+				pointLight.SetRadius(pointLightData.radius);
+				pointLight.radiusFade = pointLightData.radiusFade;
+				pointLight.constant = pointLightData.constant;
+				pointLight.linear = pointLightData.linear;
+				pointLight.quadratic = pointLightData.quadratic;
+				pointLight.castsShadows = pointLightData.castsShadows;
+			}
 			if (pendingLevel.isMainMenu)
 			{
 				SceneManager.SetSceneKind(pendingLevel.name, SceneManager::SceneKind::Cutscene);
@@ -294,6 +319,18 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 	const bool loaded = ProjectStateSerializer::LoadLevelState(path, file, pendingLevels, pendingControllers, pendingComponents, pendingInputActions, pendingGameGUIAssets, pendingGameGUIActions, pendingActiveGameGUIAsset, pendingGameGUINavigationMode, renderState, startupLevelName);
 	if (loaded) // broken boundary, no longer just I/O
 	{
+		// Legacy projects stored one global light rig. Give every materialized scene
+		// its own initial copy so subsequent edits and scene switches are isolated.
+		if (renderState.hasLegacyLighting && !renderState.hasSceneLighting)
+		{
+			for (ProjectStateData::PendingLevel& pendingLevel : pendingLevels)
+			{
+				pendingLevel.hasSunLight = true;
+				pendingLevel.sunLight = renderState.sunLight;
+				pendingLevel.pointLights = renderState.pointLights;
+			}
+		}
+
 		// Establish the project context before materializing assets and applying
 		// GUI/render state so every resolver points at this project's assets.
 		m_currentProjectPath = path;

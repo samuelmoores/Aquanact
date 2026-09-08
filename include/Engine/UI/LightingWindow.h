@@ -5,5 +5,5 @@ class LightingManager;
 class LightingWindow
 {
 public:
-	void Draw(LightingManager& lightingManager, bool& open);
+	void Draw(LightingManager& lightingManager, bool& open, int& selectedPointLightIndex);
 };

@@ -9,7 +9,7 @@
 
 #include <string>
 
-void LightingWindow::Draw(LightingManager& lightingManager, bool& open)
+void LightingWindow::Draw(LightingManager& lightingManager, bool& open, int& selectedPointLightIndex)
 {
 	if (!open) return;
 
@@ -51,6 +51,7 @@ void LightingWindow::Draw(LightingManager& lightingManager, bool& open)
 		Root::Current().Debugger().SetShowPointLightDebugSpheres(showDebugSpheres);
 	}
 	std::vector<PointLight>& pointLights = lightingManager.PointLights();
+	int pointLightToDelete = -1;
 	for (int i = 0; i < static_cast<int>(pointLights.size()); ++i)
 	{
 		PointLight& pointLight = pointLights[i];
@@ -69,7 +70,24 @@ void LightingWindow::Draw(LightingManager& lightingManager, bool& open)
 				pointLight.SetRadius(radius);
 			}
 			ImGui::DragFloat("Radius Fade", &pointLight.radiusFade, 0.01f, 0.0f, 1.0f, "%.2f");
+			if (ImGui::Button("Delete Light"))
+			{
+				pointLightToDelete = i;
+			}
 		}
 		ImGui::PopID();
+	}
+
+	if (pointLightToDelete >= 0 && pointLightToDelete < static_cast<int>(pointLights.size()))
+	{
+		pointLights.erase(pointLights.begin() + pointLightToDelete);
+		if (selectedPointLightIndex == pointLightToDelete)
+		{
+			selectedPointLightIndex = -1;
+		}
+		else if (selectedPointLightIndex > pointLightToDelete)
+		{
+			--selectedPointLightIndex;
+		}
 	}
 }

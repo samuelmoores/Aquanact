@@ -219,8 +219,8 @@ void OpenGLGraphicsDevice::InitializeShadowMap()
 			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, 0, GL_DEPTH_COMPONENT24,
 				PointShadowMapResolution, PointShadowMapResolution, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
 		}
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
@@ -238,6 +238,9 @@ void OpenGLGraphicsDevice::InitializeShadowMap()
 	}
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+	// Point-shadow PCF crosses cubemap faces. Seamless sampling prevents visible
+	// face-edge curves where adjacent depth faces meet.
+	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 	m_pointShadowFarPlanes.fill(1.0f);
 	m_pointShadowMapsReady.fill(false);
 }

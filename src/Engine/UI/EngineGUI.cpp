@@ -316,7 +316,10 @@ void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManage
 		}
 	}
 
-	m_lightingWindow.Draw(Root::Current().Render().Lights(), m_windowState.showLightingWindow);
+	m_lightingWindow.Draw(
+		Root::Current().Render().Lights(),
+		m_windowState.showLightingWindow,
+		m_selection.pointLightIndex);
 
 	// Evaluate scene interaction after every editor window has been submitted so
 	// real UI ownership can be distinguished from ImGuizmo's next-frame mouse

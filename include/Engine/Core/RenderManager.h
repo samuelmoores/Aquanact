@@ -49,8 +49,8 @@ public:
 	void SetActiveCamera(Camera& camera);
 	Camera& ActiveCamera();
 	const Camera& ActiveCamera() const;
-	LightingManager& Lights() { return *m_lightingManager; }
-	const LightingManager& Lights() const { return *m_lightingManager; }
+	LightingManager& Lights();
+	const LightingManager& Lights() const;
 	void ApplyProjectState(const ProjectStateData::RenderStateData& renderState);
 	void ResetForNewProject();
 	void Submit(const RenderCommand& command);
