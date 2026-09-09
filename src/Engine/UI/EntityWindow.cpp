@@ -7,11 +7,13 @@
 #include "Engine/Core/Debug.h"
 #include "Engine/Core/ComponentFactory.h"
 #include "Engine/Core/TriggerSphere.h"
+#include "Engine/Core/Hitbox.h"
 #include "Engine/Core/SceneManager.h"
 #include "Engine/Core/Scene.h"
 #include "Engine/Core/EntityStateMachine.h"
 #include "Engine/Core/PhysicsWorld.h"
-#include "Game/Enemy.h"
+#include "Game/AIController.h"
+#include "Game/Health.h"
 #include "Game/PlayerController.h"
 
 #include <imgui.h>
@@ -217,15 +219,23 @@ void EntityWindow::DrawComponentControls(Component& component) const
 		ImGui::SetNextItemWidth(140.0f);
 		if (ImGui::DragFloat("Max Slope Angle", &slope, 0.5f, 0.0f, 89.0f, "%.1f degrees")) player->SetMaxSlopeAngle(slope);
 	}
+	else if (AIController* ai = dynamic_cast<AIController*>(&component))
+	{
+		float detectionRange = ai->DetectionRange();
+		if (ImGui::DragFloat("Detection Range", &detectionRange, 1.0f, 0.0f, 10000.0f)) ai->SetDetectionRange(detectionRange);
+		float attackRange = ai->AttackRange();
+		if (ImGui::DragFloat("Attack Range", &attackRange, 1.0f, 0.0f, 10000.0f)) ai->SetAttackRange(attackRange);
+		float cooldown = ai->AttackCooldown();
+		if (ImGui::DragFloat("Attack Cooldown", &cooldown, 0.01f, 0.0f, 60.0f)) ai->SetAttackCooldown(cooldown);
+		float turnSpeed = ai->TurnSpeed();
+		if (ImGui::DragFloat("Turn Speed", &turnSpeed, 0.1f, 0.0f, 100.0f)) ai->SetTurnSpeed(turnSpeed);
+		ImGui::Text("Target distance: %.1f", ai->TargetDistance());
+	}
 	else if (Controller* controller = dynamic_cast<Controller*>(&component))
 	{
 		float moveSpeed = controller->MoveSpeed();
 		ImGui::SetNextItemWidth(140.0f);
 		if (ImGui::InputFloat("Move Speed", &moveSpeed, 0.0f, 0.0f, "%.1f")) controller->SetMoveSpeed(moveSpeed);
-	}
-	else if (dynamic_cast<Enemy*>(&component))
-	{
-		ImGui::TextUnformatted("Enemy behavior component");
 	}
 	else if (TriggerSphere* trigger = dynamic_cast<TriggerSphere*>(&component))
 	{
@@ -236,6 +246,59 @@ void EntityWindow::DrawComponentControls(Component& component) const
 		if (ImGui::Checkbox("Enabled", &enabled)) trigger->SetEnabled(enabled);
 		bool debugDraw = Root::Current().Debugger().ShowTriggerSpheres();
 		if (ImGui::Checkbox("Debug Draw", &debugDraw)) Root::Current().Debugger().SetShowTriggerSpheres(debugDraw);
+	}
+	else if (Hitbox* hitbox = dynamic_cast<Hitbox*>(&component))
+	{
+		bool drawEnabled = hitbox->DrawEnabled();
+		if (ImGui::Checkbox("Draw Hitbox", &drawEnabled))
+			hitbox->SetDrawEnabled(drawEnabled);
+
+		const char* shapes[] = { "Box", "Sphere" };
+		int shape = hitbox->Shape() == PhysicsColliderShape::Sphere ? 1 : 0;
+		if (ImGui::Combo("Shape", &shape, shapes, IM_ARRAYSIZE(shapes)))
+			hitbox->SetShape(shape == 1 ? PhysicsColliderShape::Sphere : PhysicsColliderShape::Box);
+
+		float radius = hitbox->Radius();
+		if (ImGui::DragFloat("Radius", &radius, 0.1f, 0.001f, 10000.0f, "%.2f"))
+			hitbox->SetRadius(radius);
+		float damage = hitbox->Damage();
+		if (ImGui::DragFloat("Damage", &damage, 0.5f, 0.0f, 100000.0f, "%.1f"))
+			hitbox->SetDamage(damage);
+		float activeStart = hitbox->ActiveStart();
+		if (ImGui::SliderFloat("Active Start", &activeStart, 0.0f, 1.0f, "%.2f"))
+			hitbox->SetActiveStart(activeStart);
+		float activeEnd = hitbox->ActiveEnd();
+		if (ImGui::SliderFloat("Active End", &activeEnd, 0.0f, 1.0f, "%.2f"))
+			hitbox->SetActiveEnd(activeEnd);
+		ImGui::Text("Currently Active: %s", hitbox->Active() ? "yes" : "no");
+
+		Entity* owner = component.Owner();
+		const std::vector<std::string> boneNames = owner && owner->GetMesh()
+			? owner->GetMesh()->BoneNames() : std::vector<std::string>{};
+		const char* bonePreview = hitbox->BoneName().empty() ? "Entity center" : hitbox->BoneName().c_str();
+		if (ImGui::BeginCombo("Bone", bonePreview))
+		{
+			if (ImGui::Selectable("Entity center", hitbox->BoneName().empty()))
+				hitbox->SetBoneName({});
+			for (const std::string& boneName : boneNames)
+			{
+				const bool selected = hitbox->BoneName() == boneName;
+				if (ImGui::Selectable(boneName.c_str(), selected))
+					hitbox->SetBoneName(boneName);
+				if (selected) ImGui::SetItemDefaultFocus();
+			}
+			ImGui::EndCombo();
+		}
+		if (boneNames.empty())
+			ImGui::TextDisabled("No skeletal bones available; using entity center.");
+	}
+	else if (Health* health = dynamic_cast<Health*>(&component))
+	{
+		float maxHealth = health->MaxHealth();
+		if (ImGui::DragFloat("Max Health", &maxHealth, 1.0f, 1.0f, 100000.0f, "%.1f"))
+			health->SetMaxHealth(maxHealth);
+		ImGui::Text("Current Health: %.1f", health->CurrentHealth());
+		ImGui::Text("Dead: %s", health->IsDead() ? "yes" : "no");
 	}
 	else
 	{

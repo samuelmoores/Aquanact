@@ -71,6 +71,38 @@ Mesh::Mesh(ImportedModel&& importedModel)
 	AdoptImportedModel(std::move(importedModel));
 }
 
+std::vector<std::string> Mesh::BoneNames() const
+{
+	std::vector<std::string> names;
+	names.reserve(m_skeleton.boneMapping.size());
+	for (const auto& entry : m_skeleton.boneMapping)
+		names.push_back(entry.first);
+	return names;
+}
+
+glm::vec3 Mesh::BonePosition(const std::string& boneName) const
+{
+	const auto found = m_skeleton.boneMapping.find(boneName);
+	if (found == m_skeleton.boneMapping.end()
+		|| found->second < 0
+		|| found->second >= static_cast<int>(m_skeleton.finalTransformations.size())
+		|| found->second >= static_cast<int>(m_skeleton.boneOffsetMatrices.size()))
+		return glm::vec3(0.0f);
+
+	const int boneIndex = found->second;
+	// finalTransformations contains the matrix used to skin vertices:
+	// animatedJointTransform * inverseBindMatrix. Applying that directly to the
+	// origin includes the inverse-bind offset and does not return the joint's
+	// center. Remove the inverse-bind component to recover the animated joint
+	// transform before reading its model-space position.
+	aiMatrix4x4 bindMatrix = m_skeleton.boneOffsetMatrices[boneIndex];
+	bindMatrix.Inverse();
+	const aiMatrix4x4 animatedJointTransform =
+		m_skeleton.finalTransformations[boneIndex] * bindMatrix;
+	const aiVector3D origin = animatedJointTransform * aiVector3D(0.0f, 0.0f, 0.0f);
+	return glm::vec3(origin.x, origin.y, origin.z);
+}
+
 void Mesh::AdoptImportedModel(ImportedModel&& importedModel)
 {
 	// Animation bridge state kept until the engine fully owns imported animation data.

@@ -346,6 +346,8 @@ EngineMenuBarResult EngineMenuBar::DrawViewMenu(
 	ImGui::Separator();
 	EngineGuiWidgets::ToggleMenuItem("Audio Window", windowState.showAudioWindow);
 	EngineGuiWidgets::ToggleMenuItem("Camera Window", windowState.showCameraWindow);
+	EngineGuiWidgets::ToggleMenuItem("Instance Manager", windowState.showInstanceManagerWindow);
+	EngineGuiWidgets::ToggleMenuItem("SpawnManager", windowState.showSpawnManagerWindow);
 	bool showEntityWindow = windowState.showEntityWindow;
 	if (EngineGuiWidgets::ToggleMenuItem("Entity Window", showEntityWindow))
 	{

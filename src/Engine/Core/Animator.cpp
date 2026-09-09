@@ -33,6 +33,17 @@ static float LoopTicks(float seconds, const Animation* animation)
 	return fmodf(seconds * animation->TicksPerSecond(), animation->Duration());
 }
 
+static float PlaybackTicks(float seconds, const Animation* animation, bool looping)
+{
+	if (!animation || animation->Duration() <= 0.0f)
+	{
+		return 0.0f;
+	}
+	return looping
+		? LoopTicks(seconds, animation)
+		: std::clamp(seconds * animation->TicksPerSecond(), 0.0f, animation->Duration());
+}
+
 Animator::Animator(const aiNode* rootNode, Skeleton* skeleton)
 	: m_rootNode(rootNode), m_skeleton(skeleton) {}
 
@@ -126,8 +137,8 @@ void Animator::Update(float dt)
 		}
 		Animation* a = m_clips[m_currentClip].get();
 		Animation* b = m_clips[m_nextClip].get();
-		float ticksA = LoopTicks(m_currentTime, a);
-		float ticksB = LoopTicks(m_nextTime, b);
+		float ticksA = PlaybackTicks(m_currentTime, a, m_looping);
+		float ticksB = PlaybackTicks(m_nextTime, b, m_looping);
 		TraverseBlend(ticksA, ticksB, m_blendFactor, m_rootNode, aiMatrix4x4(), a, b);
 		FireEvents(m_nextClip, m_prevTicks, ticksB, b->Duration());
 		m_prevTicks = ticksB;
@@ -140,7 +151,7 @@ void Animator::Update(float dt)
 	else
 	{
 		Animation* a = m_clips[m_currentClip].get();
-		float ticks = LoopTicks(m_currentTime, a);
+		float ticks = PlaybackTicks(m_currentTime, a, m_looping);
 		Traverse(ticks, m_rootNode, aiMatrix4x4(), a);
 		FireEvents(m_currentClip, m_prevTicks, ticks, a->Duration());
 		m_prevTicks = ticks;
@@ -196,7 +207,7 @@ float Animator::CurrentTimeTicks() const
 	{
 		return 0.0f;
 	}
-	return LoopTicks(m_currentTime, m_clips[m_currentClip].get());
+	return PlaybackTicks(m_currentTime, m_clips[m_currentClip].get(), m_looping);
 }
 
 float Animator::CurrentClipDurationTicks() const

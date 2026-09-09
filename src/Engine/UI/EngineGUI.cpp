@@ -290,6 +290,18 @@ void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManage
 	m_inputMapWindow.Draw();
 	m_windowState.showInputMapWindow = m_inputMapWindow.IsOpen();
 	m_cameraWindow.Draw(m_cameraPathCreator, m_windowState.showCameraWindow, m_showCameraPath);
+	const InstanceManagerResult instanceManagerResult =
+		m_instanceManager.Draw(SceneManager, m_windowState.showInstanceManagerWindow);
+	if (instanceManagerResult.closeStateMachine)
+		m_stateMachineWindow.Close();
+	if (instanceManagerResult.openStateMachine && instanceManagerResult.stateMachineToDraw)
+		m_stateMachineWindow.Open(*instanceManagerResult.stateMachineToDraw);
+	if (instanceManagerResult.stateMachineToDraw && m_stateMachineWindow.OpenRequested())
+	{
+		m_stateMachineWindow.Draw(*instanceManagerResult.stateMachineToDraw);
+		m_instanceManager.SyncStateMachineConfiguration();
+	}
+	m_spawnManagerWindow.Draw(SceneManager, m_windowState.showSpawnManagerWindow);
 	m_audioWindow.Draw(SceneManager, projectManager, m_windowState.showAudioWindow);
 	m_cutsceneWindow.Draw(SceneManager, projectManager, m_windowState.showCutsceneWindow);
 	m_componentDeletionWindow.Draw(SceneManager, m_popupRequests.deleteComponent);
@@ -396,6 +408,11 @@ bool EngineGUI::ShowInputMapWindow() const
 bool EngineGUI::ShowCameraWindow() const
 {
 	return m_windowState.showCameraWindow;
+}
+
+bool EngineGUI::ShowInstanceManagerWindow() const
+{
+	return m_windowState.showInstanceManagerWindow;
 }
 
 void EngineGUI::SetShowAxis(bool showAxis)

@@ -26,6 +26,7 @@ public:
 
 	// Playback
 	void Play(int clipIndex, float blendSeconds = 0.33f);
+	void SetLooping(bool looping) { m_looping = looping; }
 	// Selects a clip immediately and rewinds it to its first pose. This is used
 	// at scene/play-session boundaries where playback must not inherit runtime
 	// state from the previous session.
@@ -81,6 +82,7 @@ private:
 	float m_nextTime = 0.0f;
 	float m_blendFactor = 1.0f;
 	float m_blendSpeed = 3.0f;
+	bool m_looping = true;
 
 	// Event cursor state
 	float m_prevTicks = 0.0f;

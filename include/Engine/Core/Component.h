@@ -164,6 +164,10 @@ public:
 	// enters or exits a TriggerSphere.
 	virtual void OnTriggerEnter(Entity&) {}
 	virtual void OnTriggerExit(Entity&) {}
+	// Combat hooks keep Hitbox independent of game-specific health classes.
+	// A non-zero team id prevents friendly fire against the same team.
+	virtual int TeamId() const { return 0; }
+	virtual bool ReceiveDamage(Entity&, float) { return false; }
 	virtual std::vector<BindableMember> GetBindableMembers() const { return {}; }
 	virtual bool TryGetBindableValue(const std::string&, float&) const { return false; }
 	virtual std::vector<BindableEvent> GetBindableEvents() const { return {}; }

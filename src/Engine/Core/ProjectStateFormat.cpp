@@ -9,7 +9,7 @@
 #include "Engine/Core/EntityStateMachine.h"
 #include "Engine/Core/Controller.h"
 #include "Game/PlayerController.h"
-#include "Game/Enemy.h"
+#include "Game/AIController.h"
 
 #include <glm/glm.hpp>
 

@@ -15,6 +15,7 @@
 #include "Engine/Core/InputManager.h"
 #include "Engine/Core/UIInputRouter.h"
 #include "Engine/Core/FrameProfiler.h"
+#include "Engine/Core/SpawnManager.h"
 #include "Engine/Core/Audio.h"
 #include "Engine/Core/GLHeaders.h"
 #include "Engine/Core/ComponentRegistry.h"
@@ -80,6 +81,7 @@ GameplayManager& Root::Gameplay() { return *m_gameplayManager; }
 Input& Root::InputRef() { return *m_input; }
 InputManager& Root::InputActions() { return *m_inputManager; }
 FrameProfiler& Root::Profiler() { return *m_profiler; }
+SpawnManager& Root::Spawns() { return *m_spawnManager; }
 EngineState& Root::State() { return m_engineState; }
 bool& Root::GameModeDebugFlag() { return m_gameModeDebug; }
 bool& Root::EditorLaunchedGameSession() { return m_editorLaunchedGameSession; }
@@ -99,6 +101,7 @@ void Root::InitializeOwnedSystems()
 	m_input = std::make_unique<Input>();
 	m_inputManager = std::make_unique<InputManager>();
 	m_profiler = std::make_unique<FrameProfiler>();
+	m_spawnManager = std::make_unique<SpawnManager>();
 }
 
 void Root::startUp(int argc, char** argv)

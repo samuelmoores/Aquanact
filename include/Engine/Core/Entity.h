@@ -18,7 +18,8 @@ enum class PhysicsColliderShape
 {
 	Box = 0,
 	Capsule = 1,
-	Convex = 2
+	Convex = 2,
+	Sphere = 3
 };
 
 class Entity

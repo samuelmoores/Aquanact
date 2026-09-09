@@ -16,6 +16,8 @@
 #include "Engine/UI/CutsceneWindow.h"
 #include "Engine/UI/FileExplorerWindow.h"
 #include "Engine/UI/EditorSceneInteraction.h"
+#include "Engine/UI/InstanceManager.h"
+#include "Engine/UI/SpawnManagerWindow.h"
 
 #include <filesystem>
 
@@ -43,6 +45,7 @@ public:
 	bool ShowLightingWindow() const;
 	bool ShowFileExplorer() const;
 	bool ShowInputMapWindow() const;
+	bool ShowInstanceManagerWindow() const;
 	bool ShowCameraWindow() const;
 	void SetShowAxis(bool showAxis);
 	void SetShowGrid(bool showGrid);
@@ -98,6 +101,8 @@ private:
 	BuildGameWindow m_buildGameWindow;
 	AudioWindow m_audioWindow;
 	CameraWindow m_cameraWindow;
+	InstanceManager m_instanceManager;
+	SpawnManagerWindow m_spawnManagerWindow;
 	LightingWindow m_lightingWindow;
 	CutsceneWindow m_cutsceneWindow;
 	FileExplorerWindow m_fileExplorerWindow;

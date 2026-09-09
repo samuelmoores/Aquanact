@@ -16,6 +16,7 @@ public:
 
 	// Component identity and runtime entry points.
 	const char* Name() const override { return "PlayerController"; }
+	int TeamId() const override { return 1; }
 	void startUp(Entity& owner) override;
 	void FirstFrame(Entity& owner) override;
 	void Update(Entity& owner, float dt) override;

@@ -61,6 +61,9 @@ public:
 		float radius,
 		const Entity* ignoredEntity = nullptr) const;
 	std::vector<Entity*> QuerySphere(const glm::vec3& center, float radius, const Entity* ignoredEntity = nullptr) const;
+	// Returns unique entities whose ordinary collision volume overlaps an attack
+	// hitbox. Attack hitboxes themselves are deliberately excluded as targets.
+	std::vector<Entity*> QueryHitbox(ColliderHandle hitbox, const Entity* ignoredEntity = nullptr) const;
 	// Tests the segment from cameraPosition to targetPosition against each
 	// blocker's box, capsule, or convex shape. The target itself and non-blocking
 	// entities are ignored; true means no other collider obscures the target.
@@ -72,6 +75,11 @@ public:
 	// Add only accepts entities with a mesh and a valid world AABB.
 	// The returned handle is InvalidColliderHandle when registration fails.
 	ColliderHandle Add(Entity& entity);
+	ColliderHandle AddHitbox(Entity& entity, PhysicsColliderShape shape,
+		const glm::vec3& center, const glm::vec3& halfExtents);
+	void RemoveHitbox(ColliderHandle handle, Entity& entity);
+	bool UpdateHitbox(ColliderHandle handle, Entity& entity, PhysicsColliderShape shape,
+		const glm::vec3& center, const glm::vec3& halfExtents);
 	ColliderHandle Add(LevelCollider& collider);
 	void Update(LevelCollider& collider);
 	void Remove(LevelCollider& collider);

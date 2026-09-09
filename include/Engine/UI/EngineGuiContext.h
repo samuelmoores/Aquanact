@@ -31,6 +31,8 @@ struct EngineGuiWindowState
 	bool showCameraWindow = false;
 	bool showAudioWindow = false;
 	bool showCutsceneWindow = true;
+	bool showInstanceManagerWindow = false;
+	bool showSpawnManagerWindow = false;
 };
 
 // One-frame requests emitted by the menu and consumed by popup owners.

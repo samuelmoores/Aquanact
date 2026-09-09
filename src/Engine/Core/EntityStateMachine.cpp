@@ -36,6 +36,7 @@ namespace
 			? value
 			: value.substr(assetsMarker + std::string("assets/").size());
 	}
+
 }
 
 // -----------------------------------------------------------------------------
@@ -277,8 +278,9 @@ bool EntityStateMachine::ProcessDesiredStateChange()
 	}
 
 	const Transition* desiredTransition = FindTransition(m_currentState, m_desiredState);
-	const bool waitingForCurrentState = desiredTransition
-		&& desiredTransition->waitForCurrentStateComplete
+	const State* currentState = FindState(m_currentState);
+	const bool waitingForCurrentState = currentState
+		&& currentState->waitForCompletion
 		&& !CurrentStateCanTransitionOut();
 
 	if (waitingForCurrentState)
@@ -293,7 +295,7 @@ bool EntityStateMachine::ProcessDesiredStateChange()
 	// Resolve the requested state before changing runtime state. A missing state
 	// or animation leaves the request active without corrupting playback.
 	const State* targetState = FindState(m_desiredState);
-	const int targetClipIndex = targetState ? ResolveAnimationClipIndex(*targetState) : -1;
+	const int targetClipIndex = targetState ? ResolveAnimationClipForEntry(*targetState) : -1;
 	if (!targetState || targetClipIndex < 0)
 	{
 		return true;
@@ -304,7 +306,7 @@ bool EntityStateMachine::ProcessDesiredStateChange()
 	const float blendSeconds = desiredTransition ? desiredTransition->blendSeconds : 0.25f;
 	m_lastTransitionDebug = "Forced state change to " + m_desiredState
 		+ " using blend " + std::to_string(blendSeconds);
-	m_animator->Play(targetClipIndex, blendSeconds);
+		m_animator->Play(targetClipIndex, blendSeconds);
 	ActivateState(m_desiredState);
 	return true;
 }
@@ -325,7 +327,8 @@ void EntityStateMachine::EvaluateTransitions(Entity& owner)
 			continue;
 		}
 
-		if (transition.waitForCurrentStateComplete && !CurrentStateCanTransitionOut())
+		const State* currentState = FindState(m_currentState);
+		if (currentState && currentState->waitForCompletion && !CurrentStateCanTransitionOut())
 		{
 			m_lastTransitionFrom = transition.from;
 			m_lastTransitionTo = transition.to;
@@ -428,7 +431,7 @@ bool EntityStateMachine::FireTransition(const Transition& transition)
 	// Step 1: resolve the destination before changing the current state. This
 	// keeps malformed transitions from leaving the machine in a half-state.
 	const State* targetState = FindState(transition.to);
-	const int targetClipIndex = targetState ? ResolveAnimationClipIndex(*targetState) : -1;
+	const int targetClipIndex = targetState ? ResolveAnimationClipForEntry(*targetState) : -1;
 	if (!targetState || targetClipIndex < 0)
 	{
 		m_lastResolvedTargetState = transition.to;
@@ -474,7 +477,7 @@ void EntityStateMachine::SetInitialState(const std::string& stateName)
 		m_initialState = state->name;
 		// Apply the saved/editor-selected state immediately. Scene FirstFrame will
 		// restart it again at the play boundary, guaranteeing a clean session.
-		StartInitialState(false);
+		StartInitialState(false, false);
 	}
 }
 
@@ -486,18 +489,44 @@ void EntityStateMachine::SetDesiredState(const std::string& stateName)
 	}
 }
 
-bool EntityStateMachine::AddState(std::string name, std::string animationName, bool blocksMovement, bool blocksInput)
+bool EntityStateMachine::AddState(std::string name, std::string animationName, bool blocksMovement, bool blocksInput,
+	bool useAnimationSequence, std::vector<std::string> animationSequence, bool waitForCompletion, bool loop)
 {
 	if (name.empty() || FindState(name))
 	{
 		return false;
 	}
+	if (!CanonicalizeAnimationReference(animationName))
+		return false;
+	for (std::string& animation : animationSequence)
+	{
+		if (!CanonicalizeAnimationReference(animation))
+			return false;
+	}
+	if (useAnimationSequence && animationSequence.empty())
+		return false;
+	if (animationName.empty() && !animationSequence.empty())
+		animationName = animationSequence.front();
 
-	m_states.push_back({ std::move(name), std::move(animationName), blocksMovement, blocksInput });
+	// A graph with states should always have a usable startup state. The editor
+	// can still replace this choice explicitly through SetInitialState().
+	if (m_states.empty())
+		m_initialState = name;
+	State state;
+	state.name = std::move(name);
+	state.animationName = std::move(animationName);
+	state.useAnimationSequence = useAnimationSequence;
+	state.animationSequence = std::move(animationSequence);
+	state.blocksMovement = blocksMovement;
+	state.blocksInput = blocksInput;
+	state.waitForCompletion = waitForCompletion;
+	state.loop = loop;
+	m_states.push_back(std::move(state));
 	return true;
 }
 
-bool EntityStateMachine::UpdateState(std::size_t index, std::string name, std::string animationName, bool blocksMovement, bool blocksInput)
+bool EntityStateMachine::UpdateState(std::size_t index, std::string name, std::string animationName, bool blocksMovement, bool blocksInput,
+	bool useAnimationSequence, std::vector<std::string> animationSequence, bool waitForCompletion, bool loop)
 {
 	if (index >= m_states.size() || name.empty())
 	{
@@ -511,8 +540,37 @@ bool EntityStateMachine::UpdateState(std::size_t index, std::string name, std::s
 			return false;
 		}
 	}
+	if (!CanonicalizeAnimationReference(animationName))
+		return false;
+	for (std::string& animation : animationSequence)
+	{
+		if (!CanonicalizeAnimationReference(animation))
+			return false;
+	}
+	if (useAnimationSequence && animationSequence.empty())
+		return false;
+	if (animationName.empty() && !animationSequence.empty())
+		animationName = animationSequence.front();
 
-	m_states[index] = { std::move(name), std::move(animationName), blocksMovement, blocksInput };
+	const std::string previousName = m_states[index].name;
+	const std::string updatedName = name;
+	State updatedState;
+	updatedState.name = std::move(name);
+	updatedState.animationName = std::move(animationName);
+	updatedState.useAnimationSequence = useAnimationSequence;
+	updatedState.animationSequence = std::move(animationSequence);
+	updatedState.blocksMovement = blocksMovement;
+	updatedState.blocksInput = blocksInput;
+	updatedState.waitForCompletion = waitForCompletion;
+	updatedState.loop = loop;
+	m_states[index] = std::move(updatedState);
+	m_animationSequenceIndices.erase(previousName);
+	if (m_initialState == previousName)
+		m_initialState = updatedName;
+	if (m_currentState == previousName)
+		m_currentState = updatedName;
+	if (m_desiredState == previousName)
+		m_desiredState = updatedName;
 	return true;
 }
 
@@ -715,6 +773,27 @@ int EntityStateMachine::FindAnimationIndex(const std::string& animationName) con
 			return static_cast<int>(index);
 		}
 	}
+
+	// Keep legacy/truncated animation references usable by matching their file
+	// stem to the imported source stem. The exact source path remains preferred.
+	std::string requestedStem = std::filesystem::path(animationName).stem().string();
+	std::transform(requestedStem.begin(), requestedStem.end(), requestedStem.begin(),
+		[](unsigned char character) { return static_cast<char>(std::tolower(character)); });
+	if (!requestedStem.empty())
+	{
+		for (std::size_t index = 0; index < m_animationNames.size(); ++index)
+		{
+			std::string sourceStem = std::filesystem::path(m_animationNames[index]).stem().string();
+			std::transform(sourceStem.begin(), sourceStem.end(), sourceStem.begin(),
+				[](unsigned char character) { return static_cast<char>(std::tolower(character)); });
+			if (sourceStem == requestedStem
+				|| sourceStem.rfind(requestedStem, 0) == 0
+				|| (sourceStem.size() > requestedStem.size()
+					&& sourceStem.compare(sourceStem.size() - requestedStem.size(), requestedStem.size(), requestedStem) == 0
+					&& sourceStem[sourceStem.size() - requestedStem.size() - 1] == '_'))
+				return static_cast<int>(index);
+		}
+	}
 	return -1;
 }
 
@@ -755,14 +834,8 @@ bool EntityStateMachine::CurrentStateLockedUntilComplete() const
 
 bool EntityStateMachine::CurrentStateWaitsForCompletion() const
 {
-	for (const Transition& transition : m_transitions)
-	{
-		if ((transition.from == m_currentState || transition.from == "*") && transition.waitForCurrentStateComplete)
-		{
-			return true;
-		}
-	}
-	return false;
+	const State* state = FindCurrentState();
+	return state && state->waitForCompletion;
 }
 
 float EntityStateMachine::CurrentStateElapsedSeconds() const
@@ -783,7 +856,8 @@ float EntityStateMachine::CurrentStateClipDurationSeconds() const
 		return 0.0f;
 	}
 
-	const int clipIndex = ResolveAnimationClipIndex(*state);
+	const int clipIndex = m_animator->CurrentClipIndex() >= 0
+		? m_animator->CurrentClipIndex() : ResolveAnimationClipIndex(*state);
 	return clipIndex >= 0 ? m_animator->ClipDuration(clipIndex) : 0.0f;
 }
 
@@ -936,7 +1010,7 @@ std::string EntityStateMachine::OperandToString(const Operand& operand)
 // Internal state management.
 // -----------------------------------------------------------------------------
 
-void EntityStateMachine::StartInitialState(bool playSoundEvents)
+void EntityStateMachine::StartInitialState(bool playSoundEvents, bool advanceAnimationSequence)
 {
 	const State* initialState = FindState(m_initialState);
 	if (!initialState)
@@ -944,7 +1018,11 @@ void EntityStateMachine::StartInitialState(bool playSoundEvents)
 		return;
 	}
 
-	const int clipIndex = ResolveAnimationClipIndex(*initialState);
+	const int clipIndex = advanceAnimationSequence
+		? ResolveAnimationClipForEntry(*initialState)
+		: ResolveAnimationClipIndex(State{ initialState->name,
+			initialState->useAnimationSequence && !initialState->animationSequence.empty()
+				? initialState->animationSequence.front() : initialState->animationName });
 	if (clipIndex < 0 || !m_animator)
 	{
 		Root::Current().Debugger().LogTagged(
@@ -963,6 +1041,7 @@ void EntityStateMachine::StartInitialState(bool playSoundEvents)
 
 	if (m_animator)
 	{
+		m_animator->SetLooping(initialState->loop);
 		m_animator->Restart(clipIndex);
 		if (playSoundEvents)
 		{
@@ -980,11 +1059,13 @@ void EntityStateMachine::ActivateState(const std::string& stateName)
 	}
 
 	// Activation resets state-local timing. The transition evaluator owns the
-	// cooldown and the wait gate is derived from outgoing transitions.
+	// cooldown, while the state's completion setting controls when its outgoing
+	// transition conditions are allowed to be evaluated.
 	m_currentState = state->name;
 	m_desiredState = state->name;
 	m_currentStateElapsed = 0.0f;
 	m_currentStateLockedUntilComplete = false;
+	m_animator->SetLooping(state->loop);
 	PlaySoundEventsAtStateStart();
 }
 
@@ -1014,7 +1095,60 @@ int EntityStateMachine::ResolveAnimationClipIndex(const State& state) const
 			return static_cast<int>(i);
 		}
 	}
+
+	// Older instance/project data may contain a truncated or otherwise stale
+	// source path. Recover those states from the state name and the imported
+	// animation filename (for example, `idle` -> `drsalvador_idle.fbx`).
+	std::string stateName = state.name;
+	std::transform(stateName.begin(), stateName.end(), stateName.begin(),
+		[](unsigned char character) { return static_cast<char>(std::tolower(character)); });
+	for (std::size_t i = 0; i < m_animationNames.size(); ++i)
+	{
+		std::string sourceStem = std::filesystem::path(m_animationNames[i]).stem().string();
+		std::transform(sourceStem.begin(), sourceStem.end(), sourceStem.begin(),
+			[](unsigned char character) { return static_cast<char>(std::tolower(character)); });
+		if (sourceStem == stateName
+			|| (sourceStem.size() > stateName.size()
+				&& sourceStem.compare(sourceStem.size() - stateName.size(), stateName.size(), stateName) == 0
+				&& sourceStem[sourceStem.size() - stateName.size() - 1] == '_'))
+		{
+			return static_cast<int>(i);
+		}
+	}
 	return -1;
+}
+
+int EntityStateMachine::ResolveAnimationClipForEntry(const State& state)
+{
+	if (state.useAnimationSequence && !state.animationSequence.empty())
+	{
+		std::size_t& nextIndex = m_animationSequenceIndices[state.name];
+		for (std::size_t attempt = 0; attempt < state.animationSequence.size(); ++attempt)
+		{
+			const std::size_t sequenceIndex = (nextIndex + attempt) % state.animationSequence.size();
+			const int clipIndex = ResolveAnimationClipIndex(State{ state.name, state.animationSequence[sequenceIndex] });
+			if (clipIndex >= 0)
+			{
+				nextIndex = (sequenceIndex + 1) % state.animationSequence.size();
+				return clipIndex;
+			}
+		}
+		return -1;
+	}
+	return ResolveAnimationClipIndex(state);
+}
+
+bool EntityStateMachine::CanonicalizeAnimationReference(std::string& animationName) const
+{
+	if (animationName.empty())
+		return true;
+
+	const int animationIndex = FindAnimationIndex(animationName);
+	if (animationIndex < 0)
+		return false;
+
+	animationName = m_animationNames[static_cast<std::size_t>(animationIndex)];
+	return true;
 }
 
 // -----------------------------------------------------------------------------
@@ -1089,7 +1223,8 @@ bool EntityStateMachine::CurrentStateCanTransitionOut() const
 		return true;
 	}
 
-	const int clipIndex = ResolveAnimationClipIndex(*state);
+	const int clipIndex = m_animator->CurrentClipIndex() >= 0
+		? m_animator->CurrentClipIndex() : ResolveAnimationClipIndex(*state);
 	const float clipDuration = clipIndex >= 0 ? m_animator->ClipDuration(clipIndex) : 0.0f;
 	if (clipDuration <= 0.0f)
 	{

@@ -83,7 +83,9 @@ class Mesh {
 		int NumAnimations() const;
 		aiAnimation* GetAnimation(int i) const;
 		const std::string& GetAnimationSource(int i) const;
-		const aiNode* GetRootNode() const;
+	const aiNode* GetRootNode() const;
+	std::vector<std::string> BoneNames() const;
+	glm::vec3 BonePosition(const std::string& boneName) const;
 
 
 

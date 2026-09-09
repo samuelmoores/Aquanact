@@ -8,6 +8,7 @@
 #include <vector>
 #include <cstring>
 #include <cstddef>
+#include <filesystem>
 
 class Entity;
 
@@ -37,6 +38,11 @@ struct EntityStateMachineUiState
 	char stateEditAnimationName[64] = "";
 	bool stateEditBlocksMovement = false;
 	bool stateEditBlocksInput = false;
+	bool stateEditWaitForCompletion = false;
+	bool stateEditLoop = true;
+	bool stateEditUseAnimationSequence = false;
+	std::vector<std::string> stateEditAnimationSequence;
+	std::string stateEditError;
 	int selectedSoundEventIndex = -1;
 	int soundEventFrame = 0;
 	float soundEventVolume = 100.0f;
@@ -123,19 +129,29 @@ public:
 		return false;
 	}
 
+	static std::string AnimationFileName(const std::string& animationPath)
+	{
+		const std::size_t separator = animationPath.find_last_of("/\\");
+		return separator == std::string::npos ? animationPath : animationPath.substr(separator + 1);
+	}
+
 	static bool DrawAnimationSelector(
 		const std::vector<std::string>& animationNames,
 		char* selectedAnimation,
 		std::size_t selectedAnimationSize)
 	{
-		const char* preview = selectedAnimation[0] != '\0' ? selectedAnimation : "<none>";
+		const std::string previewName = selectedAnimation[0] != '\0'
+			? AnimationFileName(selectedAnimation) : "<none>";
+		const char* preview = previewName.c_str();
 		bool changed = false;
 		if (ImGui::BeginCombo("Animation", preview))
 		{
 			for (const std::string& animationName : animationNames)
 			{
 				const bool selected = std::strcmp(selectedAnimation, animationName.c_str()) == 0;
-				if (ImGui::Selectable(animationName.c_str(), selected))
+				const std::string displayName = AnimationFileName(animationName);
+				const std::string selectableLabel = displayName + "##" + animationName;
+				if (ImGui::Selectable(selectableLabel.c_str(), selected))
 				{
 					CopyStateName(selectedAnimation, selectedAnimationSize, animationName);
 					changed = true;

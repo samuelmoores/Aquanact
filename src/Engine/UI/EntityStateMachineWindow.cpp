@@ -242,6 +242,11 @@ void EntityStateMachineWindow::DrawStateOverview(
 			CopyStateName(ui.stateEditAnimationName, sizeof(ui.stateEditAnimationName), state.animationName);
 			ui.stateEditBlocksMovement = state.blocksMovement;
 			ui.stateEditBlocksInput = state.blocksInput;
+			ui.stateEditWaitForCompletion = state.waitForCompletion;
+			ui.stateEditLoop = state.loop;
+			ui.stateEditUseAnimationSequence = state.useAnimationSequence;
+			ui.stateEditAnimationSequence = state.animationSequence;
+			ui.stateEditError.clear();
 			ui.editingStateIndex = static_cast<int>(stateIndex);
 			ui.addStatePopupInitialized = false;
 			ui.editStatePopupRequested = true;
@@ -370,7 +375,6 @@ void EntityStateMachineWindow::DrawTransitionEndpoints(
 		}
 		ImGui::EndCombo();
 	}
-	ImGui::Checkbox("No interrupt", &ui.transitionWaitForCurrentStateComplete);
 }
 
 void EntityStateMachineWindow::DrawTransitionConditionControls(EntityStateMachineUiState& ui)
@@ -395,12 +399,12 @@ bool EntityStateMachineWindow::DrawTransitionCommitControls(
 		{
 			machine.UpdateTransition(static_cast<std::size_t>(ui.editingTransitionIndex), ui.transitionFromState,
 				ui.transitionToState, ui.transitionBlendSeconds,
-				ui.transitionWaitForCurrentStateComplete, ui.conditions);
+				false, ui.conditions);
 		}
 		else
 		{
 			machine.AddTransition(ui.transitionFromState, ui.transitionToState, ui.transitionBlendSeconds,
-				ui.transitionWaitForCurrentStateComplete, ui.conditions);
+				false, ui.conditions);
 			ui.visibleStateTransitions[ui.transitionFromState] = true;
 		}
 		ui.editingTransitionIndex = -1;
@@ -683,6 +687,11 @@ bool EntityStateMachineWindow::DrawStateEditPopup(
 			CopyStateName(ui.stateEditAnimationName, sizeof(ui.stateEditAnimationName), state.animationName);
 			ui.stateEditBlocksMovement = state.blocksMovement;
 			ui.stateEditBlocksInput = state.blocksInput;
+			ui.stateEditWaitForCompletion = state.waitForCompletion;
+			ui.stateEditLoop = state.loop;
+			ui.stateEditUseAnimationSequence = state.useAnimationSequence;
+			ui.stateEditAnimationSequence = state.animationSequence;
+			ui.stateEditError.clear();
 		}
 		else
 		{
@@ -690,14 +699,80 @@ bool EntityStateMachineWindow::DrawStateEditPopup(
 			ui.stateEditAnimationName[0] = '\0';
 			ui.stateEditBlocksMovement = false;
 			ui.stateEditBlocksInput = false;
+			ui.stateEditWaitForCompletion = false;
+			ui.stateEditLoop = true;
+			ui.stateEditUseAnimationSequence = false;
+			ui.stateEditAnimationSequence.clear();
+			ui.stateEditError.clear();
 		}
 		ui.addStatePopupInitialized = true;
 	}
 
 	ImGui::InputText("State Name", ui.stateEditName, sizeof(ui.stateEditName));
-	DrawAnimationSelector(animationNames, ui.stateEditAnimationName, sizeof(ui.stateEditAnimationName));
+	if (ImGui::Checkbox("Sequence", &ui.stateEditUseAnimationSequence))
+	{
+		if (ui.stateEditUseAnimationSequence && ui.stateEditAnimationSequence.empty()
+			&& ui.stateEditAnimationName[0] != '\0')
+		{
+			ui.stateEditAnimationSequence.emplace_back(ui.stateEditAnimationName);
+		}
+	}
+	if (!ui.stateEditUseAnimationSequence)
+	{
+		DrawAnimationSelector(animationNames, ui.stateEditAnimationName, sizeof(ui.stateEditAnimationName));
+	}
+	else
+	{
+		ImGui::TextUnformatted("Animations played in order:");
+		for (std::size_t index = 0; index < ui.stateEditAnimationSequence.size(); ++index)
+		{
+			ImGui::PushID(static_cast<int>(index));
+			std::string selected = ui.stateEditAnimationSequence[index];
+			const std::string previewName = selected.empty()
+				? "<none>" : AnimationFileName(selected);
+			const char* preview = previewName.c_str();
+			if (ImGui::BeginCombo("Animation", preview))
+			{
+				for (const std::string& animationName : animationNames)
+				{
+					const bool isSelected = selected == animationName;
+					const std::string displayName = AnimationFileName(animationName);
+					const std::string selectableLabel = displayName + "##" + animationName;
+					if (ImGui::Selectable(selectableLabel.c_str(), isSelected))
+						ui.stateEditAnimationSequence[index] = animationName;
+					if (isSelected) ImGui::SetItemDefaultFocus();
+				}
+				ImGui::EndCombo();
+			}
+			ImGui::SameLine();
+			if (index > 0 && ImGui::SmallButton("Up"))
+				std::swap(ui.stateEditAnimationSequence[index], ui.stateEditAnimationSequence[index - 1]);
+			ImGui::SameLine();
+			if (index + 1 < ui.stateEditAnimationSequence.size() && ImGui::SmallButton("Down"))
+				std::swap(ui.stateEditAnimationSequence[index], ui.stateEditAnimationSequence[index + 1]);
+			ImGui::SameLine();
+			if (ImGui::SmallButton("Remove"))
+			{
+				ui.stateEditAnimationSequence.erase(ui.stateEditAnimationSequence.begin() + static_cast<std::ptrdiff_t>(index));
+				ImGui::PopID();
+				break;
+			}
+			ImGui::PopID();
+		}
+		DrawAnimationSelector(animationNames, ui.stateEditAnimationName, sizeof(ui.stateEditAnimationName));
+		if (ImGui::Button("Add Animation") && ui.stateEditAnimationName[0] != '\0'
+			&& std::find(ui.stateEditAnimationSequence.begin(), ui.stateEditAnimationSequence.end(), ui.stateEditAnimationName)
+				== ui.stateEditAnimationSequence.end())
+		{
+			ui.stateEditAnimationSequence.emplace_back(ui.stateEditAnimationName);
+		}
+	}
 	ImGui::Checkbox("Block Movement", &ui.stateEditBlocksMovement);
 	ImGui::Checkbox("Blocks Input", &ui.stateEditBlocksInput);
+	ImGui::Checkbox("Wait for animation to finish", &ui.stateEditWaitForCompletion);
+	ImGui::Checkbox("Loop", &ui.stateEditLoop);
+	if (!ui.stateEditError.empty())
+		ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.25f, 1.0f), "%s", ui.stateEditError.c_str());
 
 	const bool editing = ui.editingStateIndex >= 0
 		&& static_cast<std::size_t>(ui.editingStateIndex) < states.size();
@@ -756,27 +831,47 @@ bool EntityStateMachineWindow::DrawStateEditPopup(
 	ImGui::BeginDisabled(ui.stateEditName[0] == '\0' || duplicateName);
 	if (ImGui::Button(editing ? "Update" : "Create"))
 	{
+		bool stateCommitted = false;
 		if (editing)
 		{
 			const std::string previousName = states[static_cast<std::size_t>(ui.editingStateIndex)].name;
 			const bool visible = ui.visibleStateTransitions[previousName];
 			if (machine.UpdateState(static_cast<std::size_t>(ui.editingStateIndex), ui.stateEditName,
-				ui.stateEditAnimationName, ui.stateEditBlocksMovement, ui.stateEditBlocksInput))
+				ui.stateEditAnimationName, ui.stateEditBlocksMovement, ui.stateEditBlocksInput,
+				ui.stateEditUseAnimationSequence, ui.stateEditAnimationSequence,
+				ui.stateEditWaitForCompletion, ui.stateEditLoop))
 			{
 				ui.visibleStateTransitions.erase(previousName);
 				ui.visibleStateTransitions[ui.stateEditName] = visible;
 				changed = true;
+				stateCommitted = true;
+			}
+			else
+			{
+				ui.stateEditError = "Choose a valid animation for every sequence entry.";
 			}
 		}
 		else
 		{
-			machine.AddState(ui.stateEditName, ui.stateEditAnimationName,
-				ui.stateEditBlocksMovement, ui.stateEditBlocksInput);
-			changed = true;
+			if (machine.AddState(ui.stateEditName, ui.stateEditAnimationName,
+				ui.stateEditBlocksMovement, ui.stateEditBlocksInput,
+				ui.stateEditUseAnimationSequence, ui.stateEditAnimationSequence,
+				ui.stateEditWaitForCompletion, ui.stateEditLoop))
+			{
+				changed = true;
+				stateCommitted = true;
+			}
+			else
+			{
+				ui.stateEditError = "Choose a valid animation for every sequence entry.";
+			}
 		}
-		ui.editingStateIndex = -1;
-		ui.addStatePopupInitialized = false;
-		ImGui::CloseCurrentPopup();
+		if (stateCommitted)
+		{
+			ui.editingStateIndex = -1;
+			ui.addStatePopupInitialized = false;
+			ImGui::CloseCurrentPopup();
+		}
 	}
 	ImGui::EndDisabled();
 	ImGui::SameLine();

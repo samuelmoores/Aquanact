@@ -8,6 +8,7 @@
 #include "Engine/Core/FileManager.h"
 #include "Engine/Core/SceneManager.h"
 #include "Engine/Core/ProjectStateSerializer.h"
+#include "Engine/Core/SpawnManager.h"
 #include "Engine/Core/FrameProfiler.h"
 #include "Engine/Core/RenderManager.h"
 #include "Engine/Core/InputManager.h"
@@ -43,6 +44,7 @@ namespace {
 	void AppendProjectStateSnapshot(std::string& contents, const std::filesystem::path& path, const SceneManager& SceneManager)
 	{
 		ProjectStateSerializer::AppendLevelState(contents, path, SceneManager);
+	Root::Current().Spawns().AppendProjectState(contents, path, SceneManager);
 		for (const auto& [actionName, bindings] : Root::Current().InputActions().Bindings())
 		{
 			contents += "inputaction;";
@@ -335,6 +337,8 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 		// GUI/render state so every resolver points at this project's assets.
 		m_currentProjectPath = path;
 		Root::Current().Files().SetRootDirectory(ProjectAssetsDirectory() / "models");
+		Root::Current().Spawns().ResetForProject();
+		Root::Current().Spawns().LoadProjectState(path);
 		MaterializePendingLevels(SceneManager, pendingLevels);
 		SceneManager.ApplyProjectState(pendingLevels, pendingControllers, pendingComponents);
 		EnsureMainMenuLevel(SceneManager);
@@ -432,6 +436,7 @@ bool ProjectManager::CreateNewProject(const std::filesystem::path& path, SceneMa
 	}
 
 	SceneManager.Clear();
+	Root::Current().Spawns().ResetForProject();
 	EnsureMainMenuLevel(SceneManager);
 	SceneManager.SetStartupLevelName("MainMenu");
 	Root::Current().InputActions().ResetToDefaults();

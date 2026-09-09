@@ -162,6 +162,8 @@ private:
 	void RebuildAxis();
 	void RebuildPointLightDebugSpheres();
 	void ClearEntityBoundingBoxes();
+	void ClearHitboxDebugVolumes();
+	void DrawHitboxVolumes(const Camera& camera);
 	// Small formatting helper used by the log window.
 	std::string SeverityPrefix(Severity severity) const;
 
@@ -175,6 +177,8 @@ private:
 	class Line* m_cutsceneCameraMarker = nullptr;
 	std::vector<class Line*> m_entityBoundingBoxes;
 	std::vector<class Entity*> m_entityBoundingBoxObjects;
+	std::vector<class Line*> m_hitboxDebugVolumes;
+	std::vector<class Hitbox*> m_hitboxDebugObjects;
 	std::vector<class Line*> m_levelColliderBounds;
 	std::vector<class Line*> m_levelColliderFaceGizmos;
 	std::vector<class Line*> m_levelColliderFaceHighlights;

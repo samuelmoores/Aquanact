@@ -15,6 +15,7 @@ class GameplayManager;
 class Input;
 class InputManager;
 class FrameProfiler;
+class SpawnManager;
 
 enum class EngineMode {
 	Editor,
@@ -59,6 +60,7 @@ public:
 	Input& InputRef();
 	InputManager& InputActions();
 	FrameProfiler& Profiler();
+	SpawnManager& Spawns();
 	EngineState& State();
 	bool& GameModeDebugFlag();
 	bool& EditorLaunchedGameSession();
@@ -79,6 +81,7 @@ private:
 	std::unique_ptr<Input> m_input;
 	std::unique_ptr<InputManager> m_inputManager;
 	std::unique_ptr<FrameProfiler> m_profiler;
+	std::unique_ptr<SpawnManager> m_spawnManager;
 	bool m_frameCapEnabled = true;
 	double m_targetFrameRate = 60.0;
 	EngineState m_engineState;

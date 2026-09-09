@@ -25,6 +25,7 @@
 #include "Engine/Core/FileSystem.h"
 #include "Engine/Core/Entity.h"
 #include "Engine/Core/EntityStateMachine.h"
+#include "Engine/Core/Hitbox.h"
 #include "Engine/Core/PhysicsWorld.h"
 
 #include <imgui.h>
@@ -343,6 +344,7 @@ void Debug::shutDown()
 	for (auto& entry : m_triggerSpheres) delete entry.second;
 	m_triggerSpheres.clear();
 	ClearEntityBoundingBoxes();
+	ClearHitboxDebugVolumes();
 	for (Line* volume : m_levelColliderBounds) delete volume;
 	m_levelColliderBounds.clear();
 	for (Line* gizmo : m_levelColliderFaceGizmos) delete gizmo;
@@ -369,6 +371,16 @@ void Debug::ClearEntityBoundingBoxes()
 	}
 	m_entityBoundingBoxes.clear();
 	m_entityBoundingBoxObjects.clear();
+}
+
+void Debug::ClearHitboxDebugVolumes()
+{
+	for (Line* volume : m_hitboxDebugVolumes)
+	{
+		delete volume;
+	}
+	m_hitboxDebugVolumes.clear();
+	m_hitboxDebugObjects.clear();
 }
 
 void Debug::DrawCameraCollisionDebug(const Camera& camera)
@@ -713,6 +725,8 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 			highlight->draw(view);
 		}
 	}
+
+	DrawHitboxVolumes(camera);
 
 	std::vector<Entity*> currentBoundingBoxObjects;
 	if (activeLevel)
@@ -1292,14 +1306,71 @@ void Debug::drawGameModeInput(const Input& input)
 	}
 }
 
-void Debug::DrawPhysicsBoundingVolumes(const Camera& camera)
+void Debug::DrawHitboxVolumes(const Camera& camera)
 {
-	if (!m_showLevelColliderDebugShapes)
+	const Scene* activeLevel = Root::Current().Scenes().ActiveLevel();
+
+	const glm::mat4 projection = camera.GetProjectionMatrix();
+	const glm::mat4 view = camera.GetViewMatrix();
+
+	// Hitbox visibility is controlled directly by the Hitbox component, then
+	// rendered through the same debug overlay path as entity physics volumes.
+	std::vector<Hitbox*> currentHitboxObjects;
+	if (activeLevel)
 	{
-		return;
+		for (const auto& object : activeLevel->Objects())
+		{
+			if (!object) continue;
+			for (Component* component : object->Components())
+			{
+				Hitbox* hitbox = dynamic_cast<Hitbox*>(component);
+				if (hitbox && hitbox->DrawEnabled())
+					currentHitboxObjects.push_back(hitbox);
+			}
+		}
+	}
+	if (currentHitboxObjects != m_hitboxDebugObjects)
+	{
+		ClearHitboxDebugVolumes();
+		m_hitboxDebugObjects = currentHitboxObjects;
+		for (std::size_t i = 0; i < m_hitboxDebugObjects.size(); ++i)
+			m_hitboxDebugVolumes.push_back(new Line(glm::vec3(0.0f), glm::vec3(0.0f)));
+	}
+	for (std::size_t i = 0; i < m_hitboxDebugObjects.size(); ++i)
+	{
+		const Hitbox* hitbox = m_hitboxDebugObjects[i];
+		if (!hitbox || !hitbox->Owner() || !hitbox->Owner()->GetMesh())
+			continue;
+		Line* volume = m_hitboxDebugVolumes[i];
+		const glm::vec3 debugColor(1.0f, 0.15f, 0.1f);
+		const glm::vec3 center = hitbox->DebugCenter();
+		if (hitbox->Shape() == PhysicsColliderShape::Sphere)
+		{
+			volume->SetVertices(MakeWireSphereVertices(debugColor));
+			glm::mat4 model = glm::translate(glm::mat4(1.0f), center);
+			model = glm::scale(model, glm::vec3(std::max(0.001f, hitbox->Radius())));
+			volume->UpdateProjection(projection);
+			volume->draw(view, model);
+		}
+		else
+		{
+			const glm::vec3 halfExtents(hitbox->Radius());
+			volume->SetBounds(center - halfExtents, center + halfExtents, debugColor);
+			volume->UpdateProjection(projection);
+			volume->draw(view);
+		}
 	}
 
+}
+
+void Debug::DrawPhysicsBoundingVolumes(const Camera& camera)
+{
 	const Scene* activeLevel = Root::Current().Scenes().ActiveLevel();
+	const glm::mat4 projection = camera.GetProjectionMatrix();
+	const glm::mat4 view = camera.GetViewMatrix();
+
+	DrawHitboxVolumes(camera);
+
 	std::vector<Entity*> currentBoundingBoxObjects;
 	if (activeLevel)
 	{
@@ -1323,12 +1394,11 @@ void Debug::DrawPhysicsBoundingVolumes(const Camera& camera)
 		}
 	}
 
-	const glm::mat4 projection = camera.GetProjectionMatrix();
-	const glm::mat4 view = camera.GetViewMatrix();
 	for (std::size_t i = 0; i < m_entityBoundingBoxObjects.size(); ++i)
 	{
 		Entity* object = m_entityBoundingBoxObjects[i];
-		if (!object || !object->GetMesh() || object->GetController() == nullptr)
+		if (!object || !object->GetMesh() || object->GetController() == nullptr
+			|| !object->ShowPhysicsBoundingBox())
 		{
 			continue;
 		}
@@ -1364,6 +1434,11 @@ void Debug::DrawPhysicsBoundingVolumes(const Camera& camera)
 
 		volume->UpdateProjection(projection);
 		volume->draw(view);
+	}
+
+	if (!m_showLevelColliderDebugShapes)
+	{
+		return;
 	}
 
 	std::vector<LevelCollider*> currentLevelColliders;

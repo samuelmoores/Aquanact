@@ -12,7 +12,7 @@ namespace
 {
 	bool IsCameraCollisionCandidate(const PhysicsCollider& collider)
 	{
-		return collider.enabled &&
+		return collider.enabled && !collider.isHitbox &&
 			((collider.owner && !collider.owner->IgnoreCameraCollision()) || collider.levelOwner);
 	}
 
@@ -534,7 +534,11 @@ Physics::SweepCollision PhysicsWorld::Sweep(
 		}
 
 		const PhysicsCollider& candidate = m_colliders[handle];
-		if (!candidate.enabled || (!candidate.owner && !candidate.levelOwner))
+		if (!candidate.enabled || candidate.isHitbox || (!candidate.owner && !candidate.levelOwner))
+		{
+			continue;
+		}
+		if (candidate.owner && candidate.owner == moving.owner)
 		{
 			continue;
 		}
@@ -757,19 +761,84 @@ std::vector<Entity*> PhysicsWorld::QuerySphere(const glm::vec3& center, float ra
 	{
 		// Disabled, ownerless, and explicitly ignored colliders cannot enter a
 		// trigger query.
-		if (!collider.enabled || !collider.owner || collider.owner == ignoredEntity) 
+		if (!collider.enabled || collider.isHitbox || !collider.owner || collider.owner == ignoredEntity)
 			continue;
 
 		// Find the closest point on the collider AABB to the sphere center. The
 		// sphere overlaps when that distance is within the sphere radius.
-		const glm::vec3 closest = glm::clamp(center, collider.minBounds, collider.maxBounds);
-		const glm::vec3 delta = center - closest;
+		bool overlaps = false;
+		if (collider.shape == PhysicsColliderShape::Sphere && collider.sphereRadius > 0.0f)
+		{
+			const glm::vec3 colliderCenter = (collider.minBounds + collider.maxBounds) * 0.5f;
+			const float combinedRadius = safeRadius + collider.sphereRadius;
+			overlaps = glm::dot(center - colliderCenter, center - colliderCenter)
+				<= combinedRadius * combinedRadius;
+		}
+		else
+		{
+			const glm::vec3 closest = glm::clamp(center, collider.minBounds, collider.maxBounds);
+			const glm::vec3 delta = center - closest;
+			overlaps = glm::dot(delta, delta) <= safeRadius * safeRadius;
+		}
 
-		if (glm::dot(delta, delta) <= safeRadius * safeRadius)
+		if (overlaps)
 		{
 			// PhysicsWorld does not own entities; only report the collider owner.
 			result.push_back(collider.owner);
 		}
+	}
+
+	return result;
+}
+
+std::vector<Entity*> PhysicsWorld::QueryHitbox(ColliderHandle hitboxHandle, const Entity* ignoredEntity) const
+{
+	std::vector<Entity*> result;
+	if (hitboxHandle >= m_colliders.size())
+		return result;
+
+	const PhysicsCollider& hitbox = m_colliders[hitboxHandle];
+	if (!hitbox.enabled || !hitbox.isHitbox || !hitbox.owner)
+		return result;
+
+	const glm::vec3 hitboxCenter = (hitbox.minBounds + hitbox.maxBounds) * 0.5f;
+	for (const PhysicsCollider& candidate : m_colliders)
+	{
+		if (!candidate.enabled || candidate.isHitbox || !candidate.owner
+			|| candidate.owner == hitbox.owner || candidate.owner == ignoredEntity)
+			continue;
+
+		bool overlaps = false;
+		if (hitbox.shape == PhysicsColliderShape::Sphere && hitbox.sphereRadius > 0.0f)
+		{
+			if (candidate.shape == PhysicsColliderShape::Sphere && candidate.sphereRadius > 0.0f)
+			{
+				const glm::vec3 candidateCenter = (candidate.minBounds + candidate.maxBounds) * 0.5f;
+				const float combinedRadius = hitbox.sphereRadius + candidate.sphereRadius;
+				overlaps = glm::dot(hitboxCenter - candidateCenter, hitboxCenter - candidateCenter)
+					<= combinedRadius * combinedRadius;
+			}
+			else if (candidate.shape == PhysicsColliderShape::Capsule && candidate.capsuleRadius > 0.0f)
+			{
+				const glm::vec3 candidateCenter = (candidate.minBounds + candidate.maxBounds) * 0.5f;
+				const glm::vec3 halfAxis = candidate.capsuleAxis * candidate.capsuleHalfLength;
+				overlaps = Physics::SphereCapsuleOverlap(hitboxCenter, hitbox.sphereRadius,
+					candidateCenter - halfAxis, candidateCenter + halfAxis, candidate.capsuleRadius);
+			}
+			else
+			{
+				overlaps = Physics::SphereAABBOverlap(hitboxCenter, hitbox.sphereRadius,
+					candidate.minBounds, candidate.maxBounds);
+			}
+		}
+		else
+		{
+			overlaps = Physics::AABBOverlap(hitbox.minBounds, hitbox.maxBounds,
+				candidate.minBounds, candidate.maxBounds);
+		}
+
+		if (overlaps && std::find(result.begin(), result.end(), candidate.owner) == result.end())
+			result.push_back(candidate.owner);
 	}
 
 	return result;
@@ -813,6 +882,42 @@ ColliderHandle PhysicsWorld::Add(Entity& entity)
 
 	m_colliders.push_back(collider);
 	return m_colliders.size() - 1;
+}
+
+ColliderHandle PhysicsWorld::AddHitbox(Entity& entity, PhysicsColliderShape shape,
+	const glm::vec3& center, const glm::vec3& halfExtents)
+{
+	PhysicsCollider collider;
+	collider.owner = &entity;
+	collider.shape = shape;
+	collider.minBounds = center - halfExtents;
+	collider.maxBounds = center + halfExtents;
+	collider.isStatic = false;
+	collider.isHitbox = true;
+	collider.sphereRadius = shape == PhysicsColliderShape::Sphere ? halfExtents.x : 0.0f;
+	m_colliders.push_back(collider);
+	return m_colliders.size() - 1;
+}
+
+void PhysicsWorld::RemoveHitbox(ColliderHandle handle, Entity& entity)
+{
+	if (handle >= m_colliders.size()) return;
+	if (!m_colliders[handle].isHitbox || m_colliders[handle].owner != &entity) return;
+	Remove(handle);
+}
+
+bool PhysicsWorld::UpdateHitbox(ColliderHandle handle, Entity& entity, PhysicsColliderShape shape,
+	const glm::vec3& center, const glm::vec3& halfExtents)
+{
+	if (handle >= m_colliders.size()) return false;
+	PhysicsCollider& collider = m_colliders[handle];
+	if (!collider.isHitbox || collider.owner != &entity) return false;
+	collider.shape = shape;
+	collider.minBounds = center - halfExtents;
+	collider.maxBounds = center + halfExtents;
+	collider.sphereRadius = shape == PhysicsColliderShape::Sphere ? halfExtents.x : 0.0f;
+	collider.enabled = true;
+	return true;
 }
 
 void PhysicsWorld::Update(ColliderHandle handle)

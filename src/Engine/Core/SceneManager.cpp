@@ -1,6 +1,8 @@
 #include "Engine/Core/SceneManager.h"
 
 #include "Engine/Core/EntityStateMachine.h"
+#include "Engine/Core/Hitbox.h"
+#include "Game/Health.h"
 #include "Engine/Core/CutsceneAnimator.h"
 #include "Engine/Core/ComponentFactory.h"
 #include "Engine/Core/Controller.h"
@@ -13,7 +15,7 @@
 #include "Engine/Core/RenderManager.h"
 #include "Engine/Core/PathedCamera.h"
 #include "Engine/Core/TriggerSphere.h"
-#include "Game/Enemy.h"
+#include "Game/AIController.h"
 
 #include <fstream>
 #include <algorithm>
@@ -493,6 +495,18 @@ void SceneManager::ApplyProjectState(
 						playerController->SetTurnSpeed(pendingController.turnSpeed);
 					}
 				}
+			else if (pendingController.aiControlled)
+			{
+				if (!object->GetComponent<AIController>()) object->AddComponent<AIController>();
+				if (AIController* ai = object->GetComponent<AIController>())
+				{
+					ai->SetMoveSpeed(pendingController.moveSpeed);
+					ai->SetDetectionRange(pendingController.detectionRange);
+					ai->SetAttackRange(pendingController.attackRange);
+					ai->SetAttackCooldown(pendingController.attackCooldown);
+					ai->SetTurnSpeed(pendingController.turnSpeed);
+				}
+			}
 			else
 			{
 				if (!object->GetController())
@@ -546,11 +560,11 @@ void SceneManager::ApplyProjectState(
 				continue;
 			}
 
-			if (pendingComponent.type == "enemy")
+			if (pendingComponent.type == "enemy" || pendingComponent.type == "aicontroller")
 			{
-				if (!object->GetComponent<Enemy>())
+				if (!object->GetComponent<AIController>())
 				{
-					object->AddComponent<Enemy>();
+					object->AddComponent<AIController>();
 				}
 			}
 			else if (pendingComponent.type == "gamecomponent")
@@ -564,6 +578,20 @@ void SceneManager::ApplyProjectState(
 						{
 							if (pendingComponent.triggerRadius >= 0.0f) trigger->SetRadius(pendingComponent.triggerRadius);
 							trigger->SetEnabled(pendingComponent.triggerEnabled);
+						}
+						if (auto* hitbox = dynamic_cast<Hitbox*>(component.get()))
+						{
+							hitbox->SetShape(static_cast<PhysicsColliderShape>(pendingComponent.hitboxShape));
+							hitbox->SetRadius(pendingComponent.hitboxRadius);
+							hitbox->SetBoneName(pendingComponent.hitboxBoneName);
+							hitbox->SetDrawEnabled(pendingComponent.hitboxDrawEnabled);
+							hitbox->SetDamage(pendingComponent.hitboxDamage);
+							hitbox->SetActiveStart(pendingComponent.hitboxActiveStart);
+							hitbox->SetActiveEnd(pendingComponent.hitboxActiveEnd);
+						}
+						if (auto* health = dynamic_cast<Health*>(component.get()))
+						{
+							health->SetMaxHealth(pendingComponent.healthMax);
 						}
 						object->AddComponent(std::move(component));
 					}
@@ -580,11 +608,27 @@ void SceneManager::ApplyProjectState(
 				{
 					for (const ProjectStateData::PendingComponent::EntityStateData& state : pendingComponent.entityStateStates)
 					{
+						const bool waitForCompletion = state.waitForCompletion || std::any_of(
+							pendingComponent.entityStateTransitions.begin(), pendingComponent.entityStateTransitions.end(),
+							[&state](const auto& transition)
+							{
+								return transition.from == state.name && transition.waitForCurrentStateComplete;
+							});
 						entityStateMachine->AddState(
 							state.name,
 							ResolveSavedAnimationSource(*object, state.animationName),
 							state.blocksMovement,
-							state.blocksInput);
+							state.blocksInput,
+							state.useAnimationSequence,
+							[&object, &state]()
+							{
+								std::vector<std::string> sequence;
+								for (const std::string& animation : state.animationSequence)
+									sequence.push_back(ResolveSavedAnimationSource(*object, animation));
+								return sequence;
+							}(),
+							waitForCompletion,
+							state.loop);
 						for (const auto& event : state.soundEvents)
 						{
 							entityStateMachine->AddStateSoundEvent(

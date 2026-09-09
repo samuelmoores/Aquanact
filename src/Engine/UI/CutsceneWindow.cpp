@@ -13,6 +13,7 @@
 #include <imgui.h>
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -225,12 +226,16 @@ void CutsceneWindow::Draw(SceneManager& scenes, ProjectManager& projects, bool& 
 			}
 		}
 		CutsceneAnimator* machine = entity ? entity->GetCutsceneAnimator() : nullptr;
-		if (machine && ImGui::BeginCombo("Animation", track.animationName.c_str()))
+		const std::string animationPreview = track.animationName.empty()
+			? "<none>" : std::filesystem::path(track.animationName).filename().string();
+		if (machine && ImGui::BeginCombo("Animation", animationPreview.c_str()))
 		{
 			for (const std::string& name : machine->AnimationNames())
 			{
 				const bool selected = track.animationName == name;
-				if (ImGui::Selectable(name.c_str(), selected))
+				const std::string displayName = std::filesystem::path(name).filename().string();
+				const std::string selectableLabel = displayName + "##" + name;
+				if (ImGui::Selectable(selectableLabel.c_str(), selected))
 				{
 					track.animationName = name;
 					changed = true;

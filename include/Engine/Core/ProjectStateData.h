@@ -35,8 +35,12 @@ namespace ProjectStateData {
 		unsigned int entityId = 0;
 		float moveSpeed = 50.0f;
 		float turnSpeed = 8.0f;
+		float detectionRange = 1200.0f;
+		float attackRange = 150.0f;
+		float attackCooldown = 1.0f;
 		std::string levelName;
 		bool playerControlled = false;
+		bool aiControlled = false;
 	};
 
 	struct PendingComponent {
@@ -47,6 +51,14 @@ namespace ProjectStateData {
 		std::string componentClassName;
 		float triggerRadius = 90.0f;
 		bool triggerEnabled = true;
+		int hitboxShape = 3;
+		float hitboxRadius = 25.0f;
+		std::string hitboxBoneName;
+		bool hitboxDrawEnabled = false;
+		float hitboxDamage = 10.0f;
+		float hitboxActiveStart = 0.2f;
+		float hitboxActiveEnd = 0.65f;
+		float healthMax = 100.0f;
 		std::string initialState;
 		struct EntityStateData {
 			struct SoundEventData {
@@ -57,8 +69,12 @@ namespace ProjectStateData {
 			};
 			std::string name;
 			std::string animationName;
+			bool useAnimationSequence = false;
+			std::vector<std::string> animationSequence;
 			bool blocksMovement = false;
 			bool blocksInput = false;
+			bool waitForCompletion = false;
+			bool loop = true;
 			std::vector<SoundEventData> soundEvents;
 		};
 		struct EntityStateConditionData {

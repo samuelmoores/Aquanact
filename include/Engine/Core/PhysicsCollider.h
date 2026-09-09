@@ -22,9 +22,11 @@ struct PhysicsCollider
 	glm::vec3 capsuleRadii{ 0.0f };
 	float capsuleHalfLength = 0.0f;
 	glm::vec3 capsuleAxis{ 0.0f, 1.0f, 0.0f };
+	float sphereRadius = 0.0f;
 
 	bool isStatic = true;
 	bool enabled = true;
+	bool isHitbox = false;
 };
 
 using ColliderHandle = std::size_t;

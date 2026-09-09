@@ -193,7 +193,10 @@ ImportedModel ModelImporter::Import(const std::string& path, bool flipUvs) const
 			for (unsigned int i = 0; i < animScene->mNumAnimations; ++i)
 			{
 				model.animations.push_back(animScene->mAnimations[i]);
-				model.animationSources.push_back(animPath);
+				// Use the imported file name as the stable animation identity. The
+				// state-machine editor should show the authored clip file, not an
+				// embedded FBX animation name or an absolute source path.
+				model.animationSources.push_back(entry.path().filename().string());
 			}
 			model.animImporters.push_back(std::move(animImporter));
 		}

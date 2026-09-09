@@ -3,6 +3,8 @@
 #include "Engine/Core/ProjectStateFormat.h"
 
 #include "Engine/Core/EntityStateMachine.h"
+#include "Engine/Core/Hitbox.h"
+#include "Game/Health.h"
 #include "Engine/Core/Controller.h"
 #include "Engine/Core/Entity.h"
 #include "Engine/Core/FrontEndManager.h"
@@ -13,7 +15,7 @@
 #include "Engine/Core/SceneManager.h"
 #include "Game/PlayerController.h"
 #include "Engine/Core/RenderManager.h"
-#include "Game/Enemy.h"
+#include "Game/AIController.h"
 
 #include <glm/glm.hpp>
 #include <istream>
@@ -187,6 +189,26 @@ namespace ProjectStateSerializer {
 					state.animationName = fields.at(index++);
 					state.blocksMovement = fields.at(index++) == "1" || fields.at(index - 1) == "true" || fields.at(index - 1) == "True";
 					state.blocksInput = fields.at(index++) == "1" || fields.at(index - 1) == "true" || fields.at(index - 1) == "True";
+					// Optional sequence data follows the legacy four state fields.
+					// Older project files go straight to the sound-events marker.
+					if (index < fields.size() && fields[index] == "sequence2")
+					{
+						++index;
+						const int sequenceCount = std::stoi(fields.at(index++));
+						state.useAnimationSequence = sequenceCount > 0;
+						for (int sequenceIndex = 0; sequenceIndex < sequenceCount; ++sequenceIndex)
+							state.animationSequence.push_back(fields.at(index++));
+					}
+					if (index < fields.size() && fields[index] == "waitforcompletion")
+					{
+						++index;
+						state.waitForCompletion = fields.at(index++) == "1";
+					}
+					if (index < fields.size() && fields[index] == "loop")
+					{
+						++index;
+						state.loop = fields.at(index++) == "1";
+					}
 					result.states.push_back(std::move(state));
 				}
 
@@ -253,7 +275,7 @@ namespace ProjectStateSerializer {
 
 		bool IsComponentType(const std::string& type)
 		{
-			return type == "controller" || type == "playercontroller" || type == "enemy" || type == "entitystate" || type == "gamecomponent";
+			return type == "controller" || type == "playercontroller" || type == "aicontroller" || type == "enemy" || type == "entitystate" || type == "gamecomponent";
 		}
 
 		struct ComponentRecordLayout
@@ -308,16 +330,20 @@ namespace ProjectStateSerializer {
 						contents += ";" + std::to_string(playerController->MoveSpeed());
 						contents += ";" + std::to_string(playerController->TurnSpeed()) + "\n";
 					}
+					else if (const AIController* ai = dynamic_cast<const AIController*>(component))
+					{
+						AppendComponentLine(contents, projectPath, object, "aicontroller");
+						contents += ";" + std::to_string(ai->MoveSpeed());
+						contents += ";" + std::to_string(ai->DetectionRange());
+						contents += ";" + std::to_string(ai->AttackRange());
+						contents += ";" + std::to_string(ai->AttackCooldown());
+						contents += ";" + std::to_string(ai->TurnSpeed()) + "\n";
+					}
 					else if (const Controller* controller = dynamic_cast<const Controller*>(component))
 					{
 						AppendComponentLine(contents, projectPath, object, "controller");
 						contents += ";" + std::to_string(controller->MoveSpeed()) + "\n";
 					}
-				else if (dynamic_cast<const Enemy*>(component))
-				{
-					AppendComponentLine(contents, projectPath, object, "enemy");
-					contents += "\n";
-				}
 				else if (const EntityStateMachine* animator = dynamic_cast<const EntityStateMachine*>(component))
 				{
 					AppendComponentLine(contents, projectPath, object, "entitystate");
@@ -331,6 +357,13 @@ namespace ProjectStateSerializer {
 						contents += ";" + ProjectStateFormat::EscapeField(portableAnimationPath.string());
 						contents += ";" + std::to_string(state.blocksMovement ? 1 : 0);
 						contents += ";" + std::to_string(state.blocksInput ? 1 : 0);
+						contents += ";sequence2;" + std::to_string(state.useAnimationSequence ? state.animationSequence.size() : 0);
+						if (state.useAnimationSequence)
+							for (const std::string& animation : state.animationSequence)
+								contents += ";" + ProjectStateFormat::EscapeField(
+									ProjectStateFormat::MakePortableSourcePath(projectPath, animation).string());
+						contents += ";waitforcompletion;" + std::to_string(state.waitForCompletion ? 1 : 0);
+						contents += ";loop;" + std::to_string(state.loop ? 1 : 0);
 					}
 					contents += ";soundevents2";
 					for (const auto& state : animator->States())
@@ -359,7 +392,7 @@ namespace ProjectStateSerializer {
 						contents += ";" + ProjectStateFormat::EscapeField(transition.from);
 						contents += ";" + ProjectStateFormat::EscapeField(transition.to);
 						contents += ";" + std::to_string(transition.blendSeconds);
-						contents += ";" + std::to_string(transition.waitForCurrentStateComplete ? 1 : 0);
+						contents += ";0";
 						const auto& conditions = transition.conditions.empty()
 							? std::vector<EntityStateMachine::Condition>{ transition.condition }
 							: transition.conditions;
@@ -372,6 +405,22 @@ namespace ProjectStateSerializer {
 					}
 					}
 					contents += "\n";
+				}
+				else if (const Hitbox* hitbox = dynamic_cast<const Hitbox*>(component))
+				{
+					AppendComponentLine(contents, projectPath, object, "gamecomponent");
+					contents += ";Hitbox;" + std::to_string(static_cast<int>(hitbox->Shape()));
+					contents += ";" + std::to_string(hitbox->Radius());
+					contents += ";" + ProjectStateFormat::EscapeField(hitbox->BoneName());
+					contents += ";" + std::to_string(hitbox->DrawEnabled() ? 1 : 0);
+					contents += ";" + std::to_string(hitbox->Damage());
+					contents += ";" + std::to_string(hitbox->ActiveStart());
+					contents += ";" + std::to_string(hitbox->ActiveEnd()) + "\n";
+				}
+				else if (const Health* health = dynamic_cast<const Health*>(component))
+				{
+					AppendComponentLine(contents, projectPath, object, "gamecomponent");
+					contents += ";Health;" + std::to_string(health->MaxHealth()) + "\n";
 				}
 				else if (const TriggerSphere* trigger = dynamic_cast<const TriggerSphere*>(component))
 				{
@@ -900,7 +949,7 @@ namespace ProjectStateSerializer {
 
 					const std::string& componentType = fields[componentLayout.typeIndex];
 					const std::filesystem::path sourcePath = ProjectStateFormat::ResolveSourcePath(projectPath, fields[1]);
-					if (componentType == "controller" || componentType == "playercontroller")
+					if (componentType == "controller" || componentType == "playercontroller" || componentType == "aicontroller")
 					{
 						if (fields.size() <= componentLayout.dataIndex)
 						{
@@ -913,11 +962,19 @@ namespace ProjectStateSerializer {
 						controller.moveSpeed = std::stof(fields[componentLayout.dataIndex]);
 						controller.levelName = currentLevel->name;
 						controller.playerControlled = componentType == "playercontroller";
+						controller.aiControlled = componentType == "aicontroller" || componentType == "enemy";
 						if (componentLayout.entityId != 0)
 						{
 							if (controller.playerControlled && fields.size() > componentLayout.dataIndex + 1)
 							{
 								controller.turnSpeed = std::stof(fields[componentLayout.dataIndex + 1]);
+							}
+							if (controller.aiControlled)
+							{
+								if (fields.size() > componentLayout.dataIndex + 1) controller.detectionRange = std::stof(fields[componentLayout.dataIndex + 1]);
+								if (fields.size() > componentLayout.dataIndex + 2) controller.attackRange = std::stof(fields[componentLayout.dataIndex + 2]);
+								if (fields.size() > componentLayout.dataIndex + 3) controller.attackCooldown = std::stof(fields[componentLayout.dataIndex + 3]);
+								if (fields.size() > componentLayout.dataIndex + 4) controller.turnSpeed = std::stof(fields[componentLayout.dataIndex + 4]);
 							}
 						}
 						pendingControllers.push_back(std::move(controller));
@@ -930,7 +987,7 @@ namespace ProjectStateSerializer {
 					component.levelName = currentLevel->name;
 					component.type = componentType;
 
-					if (componentType == "enemy")
+					if (componentType == "enemy" || componentType == "aicontroller")
 					{
 						pendingComponents.push_back(std::move(component));
 						continue;
@@ -947,6 +1004,20 @@ namespace ProjectStateSerializer {
 						{
 							if (fields.size() > componentLayout.dataIndex + 1) component.triggerRadius = std::stof(fields[componentLayout.dataIndex + 1]);
 							if (fields.size() > componentLayout.dataIndex + 2) component.triggerEnabled = fields[componentLayout.dataIndex + 2] == "1";
+						}
+						else if (component.componentClassName == "Hitbox")
+						{
+							if (fields.size() > componentLayout.dataIndex + 1) component.hitboxShape = std::stoi(fields[componentLayout.dataIndex + 1]);
+							if (fields.size() > componentLayout.dataIndex + 2) component.hitboxRadius = std::stof(fields[componentLayout.dataIndex + 2]);
+							if (fields.size() > componentLayout.dataIndex + 3) component.hitboxBoneName = ProjectStateFormat::UnescapeField(fields[componentLayout.dataIndex + 3]);
+							if (fields.size() > componentLayout.dataIndex + 4) component.hitboxDrawEnabled = fields[componentLayout.dataIndex + 4] == "1";
+							if (fields.size() > componentLayout.dataIndex + 5) component.hitboxDamage = std::stof(fields[componentLayout.dataIndex + 5]);
+							if (fields.size() > componentLayout.dataIndex + 6) component.hitboxActiveStart = std::stof(fields[componentLayout.dataIndex + 6]);
+							if (fields.size() > componentLayout.dataIndex + 7) component.hitboxActiveEnd = std::stof(fields[componentLayout.dataIndex + 7]);
+						}
+						else if (component.componentClassName == "Health")
+						{
+							if (fields.size() > componentLayout.dataIndex + 1) component.healthMax = std::stof(fields[componentLayout.dataIndex + 1]);
 						}
 						if (component.componentClassName.empty())
 						{

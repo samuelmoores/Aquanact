@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <assimp/scene.h>
@@ -61,8 +62,12 @@ public:
 	struct State {
 		std::string name;
 		std::string animationName;
+		bool useAnimationSequence = false;
+		std::vector<std::string> animationSequence;
 		bool blocksMovement = false;
 		bool blocksInput = false;
+		bool waitForCompletion = false;
+		bool loop = true;
 		std::vector<SoundEvent> soundEvents;
 	};
 
@@ -90,8 +95,10 @@ public:
 	// State editing.
 	void SetInitialState(const std::string& stateName);
 	void SetDesiredState(const std::string& stateName);
-	bool AddState(std::string name, std::string animationName = {}, bool blocksMovement = false, bool blocksInput = false);
-	bool UpdateState(std::size_t index, std::string name, std::string animationName = {}, bool blocksMovement = false, bool blocksInput = false);
+	bool AddState(std::string name, std::string animationName = {}, bool blocksMovement = false, bool blocksInput = false,
+		bool useAnimationSequence = false, std::vector<std::string> animationSequence = {}, bool waitForCompletion = false, bool loop = true);
+	bool UpdateState(std::size_t index, std::string name, std::string animationName = {}, bool blocksMovement = false, bool blocksInput = false,
+		bool useAnimationSequence = false, std::vector<std::string> animationSequence = {}, bool waitForCompletion = false, bool loop = true);
 	bool RemoveState(std::size_t index);
 	bool AddStateSoundEvent(const std::string& stateName, SoundEvent event);
 	bool UpdateStateSoundEvent(const std::string& stateName, std::size_t eventIndex, SoundEvent event);
@@ -151,12 +158,14 @@ private:
 	void EvaluateTransitions(Entity& owner);
 	bool EvaluateTransitionConditions(const Transition& transition, const Entity& owner, float& leftValue, float& rightValue, bool& operandsResolved);
 	bool FireTransition(const Transition& transition);
-	void StartInitialState(bool playSoundEvents = true);
+	void StartInitialState(bool playSoundEvents = true, bool advanceAnimationSequence = true);
 	void ActivateState(const std::string& stateName);
 	void PlaySoundEventsAtStateStart();
 	void PlaySoundEvent(const SoundEvent& event);
 	void PlaySoundEventsCrossed(float previousTicks, float currentTicks, float duration);
 	int ResolveAnimationClipIndex(const State& state) const;
+	int ResolveAnimationClipForEntry(const State& state);
+	bool CanonicalizeAnimationReference(std::string& animationName) const;
 	bool TransitionConditionPasses(const Transition& transition, const Entity& owner, float& leftValue, float& rightValue, bool& operandsResolved) const;
 	bool ResolveOperand(const Operand& operand, const Entity& owner, float& value) const;
 	bool Compare(float lhs, float rhs, Comparator comparator) const;
@@ -180,6 +189,7 @@ private:
 
 	// State table and transition table. These define the machine's behavior.
 	std::vector<State> m_states;
+	std::unordered_map<std::string, std::size_t> m_animationSequenceIndices;
 	std::vector<Transition> m_transitions;
 
 	// Animation source names pulled from the mesh. Used to resolve state clips.

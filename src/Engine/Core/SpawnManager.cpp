@@ -1,0 +1,347 @@
+#include "Engine/Core/SpawnManager.h"
+
+#include "Engine/Core/Entity.h"
+#include "Engine/Core/ComponentFactory.h"
+#include "Engine/Core/Scene.h"
+#include "Engine/Core/SceneManager.h"
+#include "Engine/Core/ProjectStateSerializer.h"
+#include "Engine/Core/PhysicsWorld.h"
+
+#include <algorithm>
+#include <fstream>
+#include <memory>
+#include <stdexcept>
+
+namespace
+{
+	void AppendOperand(std::string& contents, const EntityStateMachine::Operand& operand)
+	{
+		contents += ";" + std::to_string(static_cast<int>(operand.type)) + ";" + std::to_string(operand.constantValue);
+		contents += ";" + ProjectStateSerializer::EscapeField(operand.componentName);
+		contents += ";" + ProjectStateSerializer::EscapeField(operand.memberName);
+	}
+
+	void AppendCondition(std::string& contents, const EntityStateMachine::Condition& condition)
+	{
+		AppendOperand(contents, condition.left);
+		contents += ";" + std::to_string(static_cast<int>(condition.comparator));
+		AppendOperand(contents, condition.right);
+	}
+
+	bool ReadOperand(const std::vector<std::string>& fields, std::size_t& index, EntityStateMachine::Operand& operand)
+	{
+		if (index + 3 >= fields.size()) return false;
+		operand.type = static_cast<EntityStateMachine::OperandType>(std::stoi(fields[index++]));
+		operand.constantValue = std::stof(fields[index++]);
+		operand.componentName = ProjectStateSerializer::UnescapeField(fields[index++]);
+		operand.memberName = ProjectStateSerializer::UnescapeField(fields[index++]);
+		return true;
+	}
+
+	bool ReadCondition(const std::vector<std::string>& fields, std::size_t& index, EntityStateMachine::Condition& condition)
+	{
+		if (!ReadOperand(fields, index, condition.left) || index >= fields.size()) return false;
+		condition.comparator = static_cast<EntityStateMachine::Comparator>(std::stoi(fields[index++]));
+		return ReadOperand(fields, index, condition.right);
+	}
+
+	void RecoverDefinitionFromEntity(InstanceDefinition& definition, const Entity& entity)
+	{
+		definition.name = entity.Name();
+		definition.modelPath = entity.SourcePath();
+		for (const Component* component : entity.Components())
+		{
+			if (!component) continue;
+			definition.componentTypes.push_back(component->Name());
+			if (const auto* machine = dynamic_cast<const EntityStateMachine*>(component))
+			{
+				definition.hasEntityStateMachineConfiguration = true;
+				definition.entityStateMachineInitialState = machine->InitialState();
+				definition.entityStateMachineStates = machine->States();
+				definition.entityStateMachineTransitions = machine->Transitions();
+			}
+		}
+	}
+}
+
+bool SpawnManager::CreateInstance(InstanceDefinition definition)
+{
+	if (definition.name.empty() || definition.modelPath.empty()) return false;
+	m_definitions[definition.name] = std::move(definition);
+	return true;
+}
+
+InstanceDefinition* SpawnManager::FindDefinition(const std::string& name)
+{
+	const auto found = m_definitions.find(name);
+	return found == m_definitions.end() ? nullptr : &found->second;
+}
+
+const InstanceDefinition* SpawnManager::FindDefinition(const std::string& name) const
+{
+	const auto found = m_definitions.find(name);
+	return found == m_definitions.end() ? nullptr : &found->second;
+}
+
+bool SpawnManager::DeleteInstance(const std::string& definitionName)
+{
+	return m_definitions.erase(definitionName) != 0;
+}
+
+void SpawnManager::ResetForProject()
+{
+	m_definitions.clear();
+	m_instances.clear();
+}
+
+void SpawnManager::AppendProjectState(std::string& contents, const std::filesystem::path& projectPath, const SceneManager& scenes)
+{
+	for (Entity* entity : m_instances)
+	{
+		if (!entity || m_definitions.find(entity->Name()) != m_definitions.end()) continue;
+		InstanceDefinition recovered;
+		RecoverDefinitionFromEntity(recovered, *entity);
+		if (!recovered.name.empty() && !recovered.modelPath.empty())
+			m_definitions[recovered.name] = std::move(recovered);
+	}
+	for (const auto& scene : scenes.Levels())
+	{
+		if (!scene) continue;
+		for (const auto& entity : scene->Objects())
+		{
+			if (!entity || m_definitions.find(entity->Name()) != m_definitions.end()
+				|| !entity->GetComponentByName("AIController") || !entity->GetEntityState())
+				continue;
+			InstanceDefinition recovered;
+			RecoverDefinitionFromEntity(recovered, *entity);
+			if (!recovered.name.empty() && !recovered.modelPath.empty())
+				m_definitions[recovered.name] = std::move(recovered);
+		}
+	}
+
+	for (const auto& entry : m_definitions)
+	{
+		const InstanceDefinition& definition = entry.second;
+		contents += "instance;" + ProjectStateSerializer::EscapeField(definition.name);
+		contents += ";" + ProjectStateSerializer::EscapeField(
+			ProjectStateSerializer::MakePortableSourcePath(projectPath, definition.modelPath).string());
+		contents += ";" + std::to_string(definition.componentTypes.size());
+		for (const std::string& type : definition.componentTypes)
+			contents += ";" + ProjectStateSerializer::EscapeField(type);
+		contents += ";" + std::to_string(definition.hasEntityStateMachineConfiguration ? 1 : 0);
+		contents += ";" + ProjectStateSerializer::EscapeField(definition.entityStateMachineInitialState);
+		contents += ";" + std::to_string(definition.entityStateMachineStates.size());
+		for (const auto& state : definition.entityStateMachineStates)
+		{
+			contents += ";" + ProjectStateSerializer::EscapeField(state.name);
+			contents += ";" + ProjectStateSerializer::EscapeField(
+				ProjectStateSerializer::MakePortableSourcePath(projectPath, state.animationName).string());
+			contents += ";" + std::to_string(state.blocksMovement ? 1 : 0);
+			contents += ";" + std::to_string(state.blocksInput ? 1 : 0);
+			contents += ";sequence2;" + std::to_string(state.useAnimationSequence ? state.animationSequence.size() : 0);
+			if (state.useAnimationSequence)
+				for (const std::string& animation : state.animationSequence)
+					contents += ";" + ProjectStateSerializer::MakePortableSourcePath(projectPath, animation).string();
+			contents += ";waitforcompletion;" + std::to_string(state.waitForCompletion ? 1 : 0);
+			contents += ";loop;" + std::to_string(state.loop ? 1 : 0);
+			contents += ";" + std::to_string(state.soundEvents.size());
+			for (const auto& event : state.soundEvents)
+			{
+				contents += ";" + ProjectStateSerializer::EscapeField(event.soundName);
+				contents += ";" + std::to_string(event.frame) + ";" + std::to_string(event.volume);
+				contents += ";" + std::to_string(event.randomSample ? 1 : 0);
+			}
+		}
+		contents += ";" + std::to_string(definition.entityStateMachineTransitions.size());
+		for (const auto& transition : definition.entityStateMachineTransitions)
+		{
+			contents += ";" + ProjectStateSerializer::EscapeField(transition.from);
+			contents += ";" + ProjectStateSerializer::EscapeField(transition.to);
+			contents += ";" + std::to_string(transition.blendSeconds);
+		contents += ";0";
+			const auto& conditions = transition.conditions.empty()
+				? std::vector<EntityStateMachine::Condition>{ transition.condition } : transition.conditions;
+			contents += ";" + std::to_string(conditions.size());
+			for (const auto& condition : conditions) AppendCondition(contents, condition);
+		}
+		contents += "\n";
+	}
+}
+
+void SpawnManager::LoadProjectState(const std::filesystem::path& projectPath)
+{
+	std::ifstream file(projectPath);
+	if (!file) return;
+	std::string line;
+	while (std::getline(file, line))
+	{
+		const std::vector<std::string> fields = ProjectStateSerializer::SplitFields(line);
+		if (fields.empty() || fields[0] != "instance") continue;
+		try
+		{
+			std::size_t index = 1;
+			InstanceDefinition definition;
+			definition.name = ProjectStateSerializer::UnescapeField(fields.at(index++));
+			definition.modelPath = ProjectStateSerializer::ResolveSourcePath(projectPath, fields.at(index++)).string();
+			const int componentCount = std::stoi(fields.at(index++));
+			for (int i = 0; i < componentCount; ++i)
+				definition.componentTypes.push_back(ProjectStateSerializer::UnescapeField(fields.at(index++)));
+			definition.hasEntityStateMachineConfiguration = std::stoi(fields.at(index++)) != 0;
+			definition.entityStateMachineInitialState = ProjectStateSerializer::UnescapeField(fields.at(index++));
+			const int stateCount = std::stoi(fields.at(index++));
+			for (int i = 0; i < stateCount; ++i)
+			{
+				EntityStateMachine::State state;
+				state.name = ProjectStateSerializer::UnescapeField(fields.at(index++));
+				state.animationName = ProjectStateSerializer::ResolveSourcePath(
+					projectPath, ProjectStateSerializer::UnescapeField(fields.at(index++))).string();
+				state.blocksMovement = std::stoi(fields.at(index++)) != 0;
+				state.blocksInput = std::stoi(fields.at(index++)) != 0;
+				if (index < fields.size() && fields[index] == "sequence2")
+				{
+					++index;
+					const int sequenceCount = std::stoi(fields.at(index++));
+					state.useAnimationSequence = sequenceCount > 0;
+					for (int sequenceIndex = 0; sequenceIndex < sequenceCount; ++sequenceIndex)
+						state.animationSequence.push_back(ProjectStateSerializer::ResolveSourcePath(
+							projectPath, fields.at(index++)).string());
+				}
+				if (index < fields.size() && fields[index] == "waitforcompletion")
+				{
+					++index;
+					state.waitForCompletion = std::stoi(fields.at(index++)) != 0;
+				}
+				if (index < fields.size() && fields[index] == "loop")
+				{
+					++index;
+					state.loop = std::stoi(fields.at(index++)) != 0;
+				}
+				const int soundCount = std::stoi(fields.at(index++));
+				for (int soundIndex = 0; soundIndex < soundCount; ++soundIndex)
+				{
+					EntityStateMachine::SoundEvent event;
+					event.soundName = ProjectStateSerializer::UnescapeField(fields.at(index++));
+					event.frame = std::stof(fields.at(index++));
+					event.volume = std::stof(fields.at(index++));
+					event.randomSample = std::stoi(fields.at(index++)) != 0;
+					state.soundEvents.push_back(std::move(event));
+				}
+				definition.entityStateMachineStates.push_back(std::move(state));
+			}
+			const int transitionCount = std::stoi(fields.at(index++));
+			for (int i = 0; i < transitionCount; ++i)
+			{
+				EntityStateMachine::Transition transition;
+				transition.from = ProjectStateSerializer::UnescapeField(fields.at(index++));
+				transition.to = ProjectStateSerializer::UnescapeField(fields.at(index++));
+				transition.blendSeconds = std::stof(fields.at(index++));
+				transition.waitForCurrentStateComplete = std::stoi(fields.at(index++)) != 0;
+				const int conditionCount = std::stoi(fields.at(index++));
+				for (int conditionIndex = 0; conditionIndex < conditionCount; ++conditionIndex)
+				{
+					EntityStateMachine::Condition condition;
+					if (!ReadCondition(fields, index, condition)) throw std::runtime_error("invalid instance condition");
+					transition.conditions.push_back(std::move(condition));
+				}
+				if (!transition.conditions.empty()) transition.condition = transition.conditions.front();
+				definition.entityStateMachineTransitions.push_back(std::move(transition));
+			}
+			if (!definition.name.empty() && !definition.modelPath.empty())
+				m_definitions[definition.name] = std::move(definition);
+		}
+		catch (...)
+		{
+			// Optional instance records must not make an otherwise valid project unloadable.
+		}
+	}
+}
+
+Entity* SpawnManager::SpawnInstance(Scene& scene, const std::string& definitionName,
+	const glm::vec3& position, const glm::vec3& rotation)
+{
+	const auto definition = m_definitions.find(definitionName);
+	if (definition == m_definitions.end()) return nullptr;
+
+	auto instance = std::make_unique<Entity>(definition->second.modelPath.c_str(), false);
+	if (!instance->GetMesh())
+		return nullptr;
+
+	instance->SetName(definition->second.name);
+	instance->Translate(position);
+	instance->SetRotation(rotation);
+	for (const std::string& componentType : definition->second.componentTypes)
+	{
+		if (componentType == "EntityStateMachine" && !instance->GetMesh()->Skinned())
+			continue;
+		if (instance->GetComponentByName(componentType))
+			continue;
+		if (std::unique_ptr<Component> component = ComponentFactory::Instance().Create(componentType, *instance))
+			instance->AddComponent(std::move(component));
+	}
+	if (EntityStateMachine* stateMachine = instance->GetEntityState())
+	{
+		const InstanceDefinition& source = definition->second;
+		if (source.hasEntityStateMachineConfiguration)
+		{
+			for (const EntityStateMachine::State& state : source.entityStateMachineStates)
+			{
+				const bool waitForCompletion = state.waitForCompletion || std::any_of(
+					source.entityStateMachineTransitions.begin(), source.entityStateMachineTransitions.end(),
+					[&state](const auto& transition)
+					{
+						return transition.from == state.name && transition.waitForCurrentStateComplete;
+					});
+				std::string animationName = state.animationName;
+				int animationIndex = stateMachine->FindAnimationIndex(animationName);
+				if (animationIndex < 0)
+					animationIndex = stateMachine->FindAnimationIndex(state.name);
+				if (animationIndex >= 0)
+					animationName = stateMachine->AnimationNames()[static_cast<std::size_t>(animationIndex)];
+				std::vector<std::string> animationSequence;
+				for (const std::string& animation : state.animationSequence)
+				{
+					const int sequenceIndex = stateMachine->FindAnimationIndex(animation);
+					animationSequence.push_back(sequenceIndex >= 0
+						? stateMachine->AnimationNames()[static_cast<std::size_t>(sequenceIndex)] : animation);
+				}
+				if (!stateMachine->AddState(state.name, std::move(animationName), state.blocksMovement, state.blocksInput,
+					state.useAnimationSequence, std::move(animationSequence), waitForCompletion, state.loop))
+					continue;
+				for (const EntityStateMachine::SoundEvent& event : state.soundEvents)
+					stateMachine->AddStateSoundEvent(state.name, event);
+			}
+			stateMachine->SetInitialState(source.entityStateMachineInitialState);
+			for (const EntityStateMachine::Transition& transition : source.entityStateMachineTransitions)
+			{
+				const std::vector<EntityStateMachine::Condition> conditions = transition.conditions.empty()
+					? std::vector<EntityStateMachine::Condition>{ transition.condition } : transition.conditions;
+				stateMachine->AddTransition(transition.from, transition.to, transition.blendSeconds,
+					transition.waitForCurrentStateComplete, conditions);
+			}
+		}
+	}
+	Entity* result = scene.AddObject(std::move(instance));
+	if (!result)
+		return nullptr;
+
+	// Runtime-spawned entities are added after the scene-wide physics
+	// registration pass, so register their ordinary hurt/collision volume here.
+	PhysicsWorld::Instance().Add(*result);
+	result->startUp();
+	result->FirstFrameComponents();
+	m_instances.push_back(result);
+	return result;
+}
+
+bool SpawnManager::Despawn(Scene& scene, Entity* entity)
+{
+	if (!entity)
+		return false;
+	const auto found = std::find(m_instances.begin(), m_instances.end(), entity);
+	if (found == m_instances.end())
+		return false;
+	if (!scene.RemoveObject(entity))
+		return false;
+	m_instances.erase(found);
+	return true;
+}
