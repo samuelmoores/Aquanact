@@ -78,6 +78,7 @@ public:
 	// Editor-mode overlay: draws axis/grid plus the visible debug windows.
 	void draw(const Camera& camera, const EngineGUI& gui);
 	void DrawCameraPath(const Camera& camera, const CameraPathData& path, int selectedPoint, bool drawPath = true);
+	void DrawPlayerAttackSpawnPreviews(const Camera& camera);
 	// Game-mode overlay: shows only the runtime input and gameplay diagnostics.
 	void drawGameModeInput(const Input& input);
 	// Cached controller/object state that powers the gameplay diagnostic panel.
@@ -171,6 +172,7 @@ private:
 	class Grid* m_grid = nullptr;
 	std::vector<class Line*> m_pointLightDebugSpheres;
 	std::unordered_map<Entity*, class Line*> m_triggerSpheres;
+	std::unordered_map<Entity*, class Line*> m_playerAttackSpawnSpheres;
 	std::vector<class Line*> m_cameraPathSpheres;
 	std::vector<class Line*> m_cameraPathTriggerSpheres;
 	std::vector<class Line*> m_cameraPathSegments;

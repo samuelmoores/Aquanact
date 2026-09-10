@@ -306,6 +306,11 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 		const float cutsceneDuration = std::max(0.1f, activeLevel->Cutscene().duration);
 		m_cutsceneElapsed += std::max(0.0f, dt);
 		camera.SetPlayerProgress(CameraPathProgressAtTime(camera.Path(), m_cutsceneElapsed, cutsceneDuration));
+		// Cutscene playback must land on the authored curve for the current
+		// timeline time. The normal camera update intentionally smooths toward a
+		// target, which would make the camera lag behind and miss the final pose
+		// when the scene transitions.
+		camera.SnapToPath();
 		for (const CutsceneAnimationTrack& track : activeLevel->Cutscene().animationTracks)
 		{
 			if (m_cutsceneElapsed < track.startTime)
@@ -364,8 +369,14 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 
 
 	bool animationDiagnosticsPublished = false;
-	for (const auto& object : activeLevel->Objects())
+	// Runtime components may spawn instances. Iterate over the entities that
+	// existed at the start of this pass so adding a unique_ptr to the scene's
+	// vector cannot invalidate a range-for iterator or unexpectedly update a new
+	// entity during the same frame.
+	const std::size_t objectCountAtFrameStart = activeLevel->Objects().size();
+	for (std::size_t objectIndex = 0; objectIndex < objectCountAtFrameStart; ++objectIndex)
 	{
+		Entity* object = activeLevel->Objects()[objectIndex].get();
 		if (object)
 		{
 			if (object->GetController())

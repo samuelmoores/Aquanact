@@ -35,13 +35,20 @@ public:
 	// Evaluates the active clip at an explicit time without advancing runtime
 	// state. Used by cutscene scrubbing and deterministic timeline playback.
 	void EvaluateClipAt(int clipIndex, float seconds, bool loop = true);
+	bool SampleClipRootTransform(int clipIndex, float seconds, bool loop,
+		glm::vec3& position, glm::vec3& rotation, glm::vec3& scale) const;
 
 	// Returns the full clip length in seconds.
 	float ClipDuration(int clipIndex) const;
+	float ClipDurationTicks(int clipIndex) const;
+	float ClipStartTicks(int clipIndex) const;
+	float ClipTicksPerSecond(int clipIndex) const;
 
 	// Current playback position, expressed in the active clip's animation ticks.
 	int CurrentClipIndex() const;
 	float CurrentTimeTicks() const;
+	float CurrentClipTicksPerSecond() const;
+	float CurrentClipStartTicks() const;
 	float CurrentClipDurationTicks() const;
 	int CurrentClipFrameCount() const;
 

@@ -15,7 +15,9 @@
 #include "Engine/Core/RenderManager.h"
 #include "Engine/Core/PathedCamera.h"
 #include "Engine/Core/TriggerSphere.h"
+#include "Engine/Core/SpawnManager.h"
 #include "Game/AIController.h"
+#include "Game/PlayerAttack.h"
 
 #include <fstream>
 #include <algorithm>
@@ -30,6 +32,8 @@ struct NewClassConfiguration
 	bool attachToExistingEntity = false;
 	bool createNewEntity = false;
 	std::string targetEntityName;
+	bool attachToExistingInstance = false;
+	std::string targetInstanceName;
 };
 
 // Helper function to trim spaces and remove the prefix (e.g., "ClassName: ")
@@ -60,6 +64,8 @@ NewClassConfiguration loadConfiguration(const std::string& filename)
 	std::string localAttachStr = "";
 	std::string localCreateStr = "";
 	std::string localTargetName = "";
+	std::string localAttachInstanceStr = "";
+	std::string localTargetInstanceName = "";
 
 	// Read the file line by line
 	while (std::getline(inFile, line))
@@ -80,6 +86,14 @@ NewClassConfiguration loadConfiguration(const std::string& filename)
 		{
 			localTargetName = extractValue(line, "TargetEntityName: ");
 		}
+		else if (line.rfind("AttachToExistingInstance: ", 0) == 0)
+		{
+			localAttachInstanceStr = extractValue(line, "AttachToExistingInstance: ");
+		}
+		else if (line.rfind("TargetInstanceName: ", 0) == 0)
+		{
+			localTargetInstanceName = extractValue(line, "TargetInstanceName: ");
+		}
 	}
 
 	// Convert local text variables to the final struct types
@@ -87,6 +101,8 @@ NewClassConfiguration loadConfiguration(const std::string& filename)
 	config.attachToExistingEntity = (localAttachStr == "true");
 	config.createNewEntity = (localCreateStr == "true");
 	config.targetEntityName = localTargetName;
+	config.attachToExistingInstance = (localAttachInstanceStr == "true");
+	config.targetInstanceName = localTargetInstanceName;
 
 	return config;
 }
@@ -266,6 +282,26 @@ Scene* SceneManager::startUp()
 
 			m_appliedNewClassConfigurationOnStartup = attachComponent(*entity);
 			break;
+		}
+	}
+	else if (configuration.attachToExistingInstance && !configuration.targetInstanceName.empty())
+	{
+		if (InstanceDefinition* definition = Root::Current().Spawns().FindDefinition(configuration.targetInstanceName))
+		{
+			const bool alreadyAttached = std::find(definition->componentTypes.begin(),
+				definition->componentTypes.end(), configuration.className) != definition->componentTypes.end();
+			const std::vector<std::string> registeredNames = ComponentFactory::Instance().Names();
+			const bool registered = std::find(registeredNames.begin(), registeredNames.end(),
+				configuration.className) != registeredNames.end();
+			if (!alreadyAttached && !registered)
+			{
+				std::cerr << "Error: Unknown component type '" << configuration.className << "'.\n";
+			}
+			else
+			{
+				if (!alreadyAttached) definition->componentTypes.push_back(configuration.className);
+				m_appliedNewClassConfigurationOnStartup = true;
+			}
 		}
 	}
 
@@ -593,6 +629,17 @@ void SceneManager::ApplyProjectState(
 						{
 							health->SetMaxHealth(pendingComponent.healthMax);
 						}
+						if (auto* attack = dynamic_cast<PlayerAttack*>(component.get()))
+						{
+							if (!pendingComponent.attackInstanceName.empty()) attack->SetAttackInstanceName(pendingComponent.attackInstanceName);
+							attack->SetAttackInstanceSpeed(pendingComponent.attackInstanceSpeed);
+							attack->SetAttackLaunchFrame(pendingComponent.attackLaunchFrame);
+							attack->SetAttackInstanceOffset(pendingComponent.attackInstanceOffset);
+							attack->SetAttackInstanceBoneName(pendingComponent.attackInstanceBoneName);
+							attack->SetDrawAttackInstance(pendingComponent.attackDrawInstance);
+							attack->SetAttackTargetInstanceName(pendingComponent.attackTargetInstanceName);
+							attack->SetAttackTargetBoneName(pendingComponent.attackTargetBoneName);
+						}
 						object->AddComponent(std::move(component));
 					}
 				}
@@ -614,7 +661,7 @@ void SceneManager::ApplyProjectState(
 							{
 								return transition.from == state.name && transition.waitForCurrentStateComplete;
 							});
-						entityStateMachine->AddState(
+						const bool added = entityStateMachine->AddState(
 							state.name,
 							ResolveSavedAnimationSource(*object, state.animationName),
 							state.blocksMovement,
@@ -629,6 +676,16 @@ void SceneManager::ApplyProjectState(
 							}(),
 							waitForCompletion,
 							state.loop);
+						if (added)
+						{
+							if (!state.transformAnimationName.empty())
+								entityStateMachine->SetStateTransform(entityStateMachine->States().size() - 1, state.transformAnimationName);
+							else
+								entityStateMachine->SetStateTransform(entityStateMachine->States().size() - 1, state.useTransformAnimation,
+									state.transformStartPosition, state.transformEndPosition, state.transformStartRotation,
+									state.transformEndRotation, state.transformStartScale, state.transformEndScale,
+									state.transformDuration);
+						}
 						for (const auto& event : state.soundEvents)
 						{
 							entityStateMachine->AddStateSoundEvent(

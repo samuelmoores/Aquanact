@@ -130,6 +130,18 @@ void Root::startUp(int argc, char** argv)
 	// render -> frontend -> input -> input -> debug -> files
 	m_renderManager->startUp(*m_window);
 	m_frontEndManager->startUp(*m_window);
+
+#ifdef AQUANACT_GAME
+	// Present the packaged splash before initializing the remaining runtime
+	// systems or loading project state. This gives the user visible feedback
+	// during model, animation, and GUI asset loading.
+	m_renderManager->BeginFrame();
+	m_frontEndManager->BeginFrame();
+	m_frontEndManager->EditorGUI().DrawBootImage();
+	m_frontEndManager->EndFrame();
+	m_renderManager->PresentFrame(*m_window);
+#endif
+
 	m_input->startUp(*m_window);
 	m_inputManager->startUp(*m_input);
 	m_debug->startUp();

@@ -4,6 +4,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <glm/glm.hpp>
 
 #include <assimp/scene.h>
 
@@ -68,6 +69,17 @@ public:
 		bool blocksInput = false;
 		bool waitForCompletion = false;
 		bool loop = true;
+		// Optional clip whose root-node position/rotation/scale drives the entity transform.
+		// An empty value preserves the legacy hand-authored transform behavior.
+		std::string transformAnimationName;
+		bool useTransformAnimation = false;
+		glm::vec3 transformStartPosition{0.0f};
+		glm::vec3 transformEndPosition{0.0f};
+		glm::vec3 transformStartRotation{0.0f};
+		glm::vec3 transformEndRotation{0.0f};
+		glm::vec3 transformStartScale{1.0f};
+		glm::vec3 transformEndScale{1.0f};
+		float transformDuration = 1.0f;
 		std::vector<SoundEvent> soundEvents;
 	};
 
@@ -95,11 +107,20 @@ public:
 	// State editing.
 	void SetInitialState(const std::string& stateName);
 	void SetDesiredState(const std::string& stateName);
+	void SetCurrentStateLooping(bool loop);
+	// Optional local-space base position used by attached entities whose
+	// transform animation should play relative to their spawn point.
+	void SetTransformAnimationOffset(glm::vec3 offset) { m_transformAnimationOffset = offset; }
+	void SetTransformAnimationEnabled(bool enabled) { m_transformAnimationEnabled = enabled; }
 	bool AddState(std::string name, std::string animationName = {}, bool blocksMovement = false, bool blocksInput = false,
 		bool useAnimationSequence = false, std::vector<std::string> animationSequence = {}, bool waitForCompletion = false, bool loop = true);
 	bool UpdateState(std::size_t index, std::string name, std::string animationName = {}, bool blocksMovement = false, bool blocksInput = false,
 		bool useAnimationSequence = false, std::vector<std::string> animationSequence = {}, bool waitForCompletion = false, bool loop = true);
 	bool RemoveState(std::size_t index);
+	bool SetStateTransform(std::size_t index, bool enabled, glm::vec3 startPosition,
+		glm::vec3 endPosition, glm::vec3 startRotation, glm::vec3 endRotation,
+		glm::vec3 startScale, glm::vec3 endScale, float duration);
+	bool SetStateTransform(std::size_t index, std::string animationName);
 	bool AddStateSoundEvent(const std::string& stateName, SoundEvent event);
 	bool UpdateStateSoundEvent(const std::string& stateName, std::size_t eventIndex, SoundEvent event);
 	bool RemoveStateSoundEvent(const std::string& stateName, std::size_t eventIndex);
@@ -160,6 +181,7 @@ private:
 	bool FireTransition(const Transition& transition);
 	void StartInitialState(bool playSoundEvents = true, bool advanceAnimationSequence = true);
 	void ActivateState(const std::string& stateName);
+	void ApplyTransformAnimation(Entity& owner);
 	void PlaySoundEventsAtStateStart();
 	void PlaySoundEvent(const SoundEvent& event);
 	void PlaySoundEventsCrossed(float previousTicks, float currentTicks, float duration);
@@ -199,6 +221,8 @@ private:
 	float m_transitionCooldown = 0.0f;
 	float m_currentStateElapsed = 0.0f;
 	bool m_currentStateLockedUntilComplete = false;
+	glm::vec3 m_transformAnimationOffset{0.0f};
+	bool m_transformAnimationEnabled = true;
 
 	// Last comparator used by the UI when inspecting a transition.
 	Comparator m_lastTransitionComparator = Comparator::Equal;

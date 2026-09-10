@@ -59,6 +59,14 @@ namespace ProjectStateData {
 		float hitboxActiveStart = 0.2f;
 		float hitboxActiveEnd = 0.65f;
 		float healthMax = 100.0f;
+		std::string attackInstanceName;
+		float attackInstanceSpeed = 120.0f;
+		int attackLaunchFrame = 0;
+		glm::vec3 attackInstanceOffset{0.0f, 0.0f, -35.0f};
+		std::string attackInstanceBoneName;
+		bool attackDrawInstance = false;
+		std::string attackTargetInstanceName;
+		std::string attackTargetBoneName;
 		std::string initialState;
 		struct EntityStateData {
 			struct SoundEventData {
@@ -75,6 +83,15 @@ namespace ProjectStateData {
 			bool blocksInput = false;
 			bool waitForCompletion = false;
 			bool loop = true;
+			std::string transformAnimationName;
+			bool useTransformAnimation = false;
+			glm::vec3 transformStartPosition{0.0f};
+			glm::vec3 transformEndPosition{0.0f};
+			glm::vec3 transformStartRotation{0.0f};
+			glm::vec3 transformEndRotation{0.0f};
+			glm::vec3 transformStartScale{1.0f};
+			glm::vec3 transformEndScale{1.0f};
+			float transformDuration = 1.0f;
 			std::vector<SoundEventData> soundEvents;
 		};
 		struct EntityStateConditionData {
@@ -129,6 +146,7 @@ namespace ProjectStateData {
 			glm::vec3 rotation{ 0.0f };
 			glm::vec3 scale{ 1.0f };
 			unsigned int id = 0;
+			bool blocksCollision = true;
 			bool ignoreCameraCollision = false;
 			bool blocksCameraView = true;
 			bool showPhysicsBoundingBox = false;

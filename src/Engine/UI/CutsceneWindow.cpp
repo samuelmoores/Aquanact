@@ -1,5 +1,6 @@
 #include "Engine/UI/CutsceneWindow.h"
 
+#include "Engine/Core/GLHeaders.h"
 #include "Engine/Core/Entity.h"
 #include "Engine/Core/EntityStateMachine.h"
 #include "Engine/Core/CutsceneAnimator.h"
@@ -9,6 +10,7 @@
 #include "Engine/Core/PathedCamera.h"
 #include "Engine/Core/Animator.h"
 #include "Engine/Core/Root.h"
+#include "Engine/Core/RenderManager.h"
 
 #include <imgui.h>
 #include <algorithm>
@@ -137,7 +139,7 @@ void CutsceneWindow::Draw(SceneManager& scenes, ProjectManager& projects, bool& 
 
 	ImGui::Separator();
 	ImGui::TextUnformatted("Camera Timing");
-	const CameraPathData& cameraPath = scene->CameraSystem().Path();
+	CameraPathData& cameraPath = scene->CameraSystem().MutablePath();
 	for (std::size_t index = 0; index < cameraPath.points.size(); ++index)
 	{
 		const std::string label = "Camera Point " + std::to_string(index + 1);
@@ -170,6 +172,16 @@ void CutsceneWindow::Draw(SceneManager& scenes, ProjectManager& projects, bool& 
 				}
 			}
 			ImGui::EndCombo();
+		}
+		if (ImGui::Button("Capture Camera Pose (Position + Orientation)"))
+		{
+			const Camera& editorCamera = Root::Current().Render().GetEngineCamera();
+			point.position = editorCamera.GetPosition();
+			point.facing = editorCamera.GetFacing();
+			// A captured orientation must not be replaced by look-at-player
+			// behavior during playback.
+			point.lookAtPlayer = false;
+			changed = true;
 		}
 	}
 

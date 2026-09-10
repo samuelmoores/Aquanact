@@ -27,6 +27,7 @@
 #include "Engine/Core/EntityStateMachine.h"
 #include "Engine/Core/Hitbox.h"
 #include "Engine/Core/PhysicsWorld.h"
+#include "Game/PlayerAttack.h"
 
 #include <imgui.h>
 #include <chrono>
@@ -343,6 +344,8 @@ void Debug::shutDown()
 	m_cameraPathSegments.clear();
 	for (auto& entry : m_triggerSpheres) delete entry.second;
 	m_triggerSpheres.clear();
+	for (auto& entry : m_playerAttackSpawnSpheres) delete entry.second;
+	m_playerAttackSpawnSpheres.clear();
 	ClearEntityBoundingBoxes();
 	ClearHitboxDebugVolumes();
 	for (Line* volume : m_levelColliderBounds) delete volume;
@@ -490,6 +493,48 @@ void Debug::DrawCameraPath(const Camera& camera, const CameraPathData& path, int
 	{
 		delete m_cutsceneCameraMarker;
 		m_cutsceneCameraMarker = nullptr;
+	}
+}
+
+void Debug::DrawPlayerAttackSpawnPreviews(const Camera& camera)
+{
+	if (!Root::Current().State().IsEditorMode())
+		return;
+
+	const Scene* scene = Root::Current().Scenes().ActiveLevel();
+	std::unordered_set<Entity*> activePreviewOwners;
+	if (scene)
+	{
+		for (const auto& object : scene->Objects())
+		{
+			if (!object) continue;
+			PlayerAttack* attack = object->GetComponent<PlayerAttack>();
+			if (!attack || !attack->DrawAttackInstance()) continue;
+
+			activePreviewOwners.insert(object.get());
+			if (!m_playerAttackSpawnSpheres.contains(object.get()))
+				m_playerAttackSpawnSpheres.emplace(object.get(), new Line(MakeWireSphereVertices(glm::vec3(0.2f, 1.0f, 1.0f))));
+
+			glm::vec3 bonePosition(0.0f);
+			if (!attack->AttackInstanceBoneName().empty() && object->GetMesh())
+				bonePosition = object->GetMesh()->BonePosition(attack->AttackInstanceBoneName());
+			const glm::vec3 position = glm::vec3(object->BuildModelMatrix()
+				* glm::vec4(bonePosition + attack->AttackInstanceOffset(), 1.0f));
+			Line* sphere = m_playerAttackSpawnSpheres[object.get()];
+			sphere->UpdateProjection(camera.GetProjectionMatrix());
+			sphere->draw(camera.GetViewMatrix(), glm::translate(glm::mat4(1.0f), position)
+				* glm::scale(glm::mat4(1.0f), glm::vec3(8.0f)));
+		}
+	}
+
+	for (auto iterator = m_playerAttackSpawnSpheres.begin(); iterator != m_playerAttackSpawnSpheres.end();)
+	{
+		if (!activePreviewOwners.contains(iterator->first))
+		{
+			delete iterator->second;
+			iterator = m_playerAttackSpawnSpheres.erase(iterator);
+		}
+		else ++iterator;
 	}
 }
 

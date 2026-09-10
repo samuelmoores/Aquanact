@@ -78,7 +78,13 @@ float CameraPathProgressAtTime(const CameraPathData& path, float timeSeconds, fl
 	if (!authored)
 		return glm::clamp(timeSeconds / safeDuration, 0.0f, 1.0f);
 
-	const float time = std::max(0.0f, timeSeconds);
+	// Authored point times describe the relative timing of the keyframes. Map
+	// that range onto the scene duration so the camera reaches the final point
+	// exactly when the cutscene ends, even when the path was authored with a
+	// different working duration.
+	const float firstTime = std::max(0.0f, path.points.front().timeSeconds);
+	const float lastTime = std::max(firstTime + 0.001f, path.points.back().timeSeconds);
+	const float time = firstTime + glm::clamp(timeSeconds / safeDuration, 0.0f, 1.0f) * (lastTime - firstTime);
 	for (std::size_t index = 0; index + 1 < path.points.size(); ++index)
 	{
 		const float start = std::max(0.0f, path.points[index].timeSeconds);

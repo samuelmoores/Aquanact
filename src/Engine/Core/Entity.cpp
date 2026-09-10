@@ -10,6 +10,10 @@
 
 #include <algorithm>
 #include <glm/gtc/matrix_transform.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/euler_angles.hpp>
+#include <glm/gtx/matrix_decompose.hpp>
+#undef GLM_ENABLE_EXPERIMENTAL
 #include <utility>
 #include <limits>
 
@@ -57,13 +61,13 @@ Entity::Entity(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 	}
 }
 
-Entity::Entity(const char* modelFile, bool addDefaultComponents)
+Entity::Entity(const char* modelFile, bool addDefaultComponents, bool loadAnimations)
 {
 	// Imported models are converted into entities with a mesh, shader, and any
 	// default components required by the asset type.
 	m_id = g_nextEntityId++;
 	Root::Current().Debugger().LogTagged("MeshLoad", std::string("Importing model: ") + modelFile);
-	auto model = ModelImporter().Import(modelFile, true);
+	auto model = ModelImporter().Import(modelFile, true, loadAnimations);
 	m_mesh = new Mesh(std::move(model));
 	m_skinned = m_mesh->Skinned();
 	if (addDefaultComponents)
@@ -100,6 +104,13 @@ void Entity::SetId(unsigned int id)
 
 Entity::~Entity()
 {
+	// Children are not owned by their parent. Detach them before this entity's
+	// transform becomes invalid so they never retain a dangling parent pointer.
+	while (!m_children.empty())
+	{
+		m_children.back()->Detach(true);
+	}
+	Detach(false);
 	delete m_mesh;
 }
 
@@ -273,7 +284,8 @@ glm::mat4 Entity::BuildModelMatrix()
 	m = glm::rotate(m, m_rotation[1], glm::vec3(0, 1, 0));
 	m = glm::rotate(m, m_rotation[0], glm::vec3(1, 0, 0));
 	m = glm::rotate(m, m_rotation[2], glm::vec3(0, 0, 1));
-	return glm::scale(m, m_scale);
+	m = glm::scale(m, m_scale);
+	return m_parent ? m_parent->BuildModelMatrix() * m : m;
 }
 
 void Entity::Rotate(glm::vec3 delta) { m_rotation += delta; }
@@ -328,6 +340,59 @@ glm::vec3 Entity::DefaultRotation() const { return m_defaultRotation; }
 glm::vec3 Entity::Rotation() const { return m_rotation; }
 glm::vec3 Entity::Scale() const { return m_scale; }
 void Entity::SetRotation(glm::vec3 newRotation) { m_rotation = newRotation; }
+bool Entity::AttachTo(Entity& parent, glm::vec3 localPosition, glm::vec3 localRotation)
+{
+	if (&parent == this)
+		return false;
+
+	// Reject cycles because BuildModelMatrix recursively walks the parent chain.
+	for (Entity* ancestor = &parent; ancestor; ancestor = ancestor->m_parent)
+	{
+		if (ancestor == this)
+			return false;
+	}
+
+	Detach(false);
+	m_parent = &parent;
+	m_position = localPosition;
+	m_rotation = localRotation;
+	parent.m_children.push_back(this);
+	return true;
+}
+
+void Entity::Detach(bool preserveWorldTransform)
+{
+	if (!m_parent)
+		return;
+
+	glm::mat4 worldTransform(1.0f);
+	if (preserveWorldTransform)
+		worldTransform = BuildModelMatrix();
+
+	Entity* oldParent = m_parent;
+	m_parent = nullptr;
+	const auto child = std::find(oldParent->m_children.begin(), oldParent->m_children.end(), this);
+	if (child != oldParent->m_children.end())
+		oldParent->m_children.erase(child);
+
+	if (!preserveWorldTransform)
+		return;
+
+	glm::vec3 skew;
+	glm::vec4 perspective;
+	glm::quat orientation;
+	// Translation is unambiguous in the world matrix. Preserve it directly
+	// instead of relying on decomposition to reconstruct the detached position.
+	const glm::vec3 worldPosition = glm::vec3(worldTransform[3]);
+	m_position = worldPosition;
+	if (glm::decompose(worldTransform, m_scale, orientation, m_position, skew, perspective))
+	{
+		// eulerAngles uses radians, matching Entity's existing rotation storage.
+		m_rotation = glm::eulerAngles(orientation);
+	}
+	m_position = worldPosition;
+}
+
 void Entity::SetDefaultPosition(glm::vec3 position) { m_defaultPosition = position; }
 void Entity::SetDefaultRotation(glm::vec3 rotation) { m_defaultRotation = rotation; }
 void Entity::ResetToDefaultPosition()

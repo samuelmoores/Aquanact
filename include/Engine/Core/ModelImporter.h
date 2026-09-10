@@ -36,7 +36,7 @@ class ModelImporter {
 public:
 	ModelImporter() = default;
 
-	ImportedModel Import(const std::string& path, bool flipUvs = true) const;
+	ImportedModel Import(const std::string& path, bool flipUvs = true, bool loadAnimations = true) const;
 };
 
 

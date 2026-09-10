@@ -5,6 +5,7 @@
 #include "Engine/Core/ProjectManager.h"
 
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <cctype>
 
@@ -227,6 +228,72 @@ void EntityStateMachineWindow::DrawStateOverview(
 		return;
 	}
 
+	ImGui::SeparatorText("Animation Preview Timeline");
+	if (ui.previewStateIndex < 0 || ui.previewStateIndex >= static_cast<int>(states.size()))
+	{
+		ui.previewStateIndex = 0;
+		for (std::size_t index = 0; index < states.size(); ++index)
+			if (states[index].name == machine.CurrentState())
+			{
+				ui.previewStateIndex = static_cast<int>(index);
+				break;
+			}
+	}
+	const char* previewStateName = states[static_cast<std::size_t>(ui.previewStateIndex)].name.c_str();
+	if (ImGui::BeginCombo("Preview State", previewStateName))
+	{
+		for (std::size_t index = 0; index < states.size(); ++index)
+		{
+			const bool selected = static_cast<int>(index) == ui.previewStateIndex;
+			if (ImGui::Selectable(states[index].name.c_str(), selected))
+			{
+				ui.previewStateIndex = static_cast<int>(index);
+				ui.previewFrame = 0;
+			}
+			if (selected) ImGui::SetItemDefaultFocus();
+		}
+		ImGui::EndCombo();
+	}
+
+	const EntityStateMachine::State& previewState = states[static_cast<std::size_t>(ui.previewStateIndex)];
+	const std::string previewAnimation = previewState.useAnimationSequence
+		&& !previewState.animationSequence.empty()
+		? previewState.animationSequence.front() : previewState.animationName;
+	const int previewClip = machine.FindAnimationIndex(previewAnimation);
+	Animator* animator = machine.GetAnimator();
+	if (!animator || previewClip < 0)
+	{
+		ImGui::TextDisabled("No animation clip is available for this state.");
+	}
+	else
+	{
+		constexpr float mayaFramesPerSecond = 24.0f;
+		const float ticksPerSecond = animator->ClipTicksPerSecond(previewClip);
+		const float clipStartTicks = animator->ClipStartTicks(previewClip);
+		const float clipDurationSeconds = ticksPerSecond > 0.0f
+			? std::max(0.0f, animator->ClipDurationTicks(previewClip) - clipStartTicks) / ticksPerSecond
+			: 0.0f;
+		const int lastFrame = std::max(0, static_cast<int>(std::ceil(
+			clipDurationSeconds * mayaFramesPerSecond)));
+		ui.previewFrame = std::clamp(ui.previewFrame, 0, lastFrame);
+		ImGui::BeginDisabled(ui.previewFrame <= 0);
+		if (ImGui::SmallButton("<<")) --ui.previewFrame;
+		ImGui::EndDisabled();
+		ImGui::SameLine();
+		ImGui::BeginDisabled(ui.previewFrame >= lastFrame);
+		if (ImGui::SmallButton(">>")) ++ui.previewFrame;
+		ImGui::EndDisabled();
+		ImGui::SameLine();
+		ImGui::SetNextItemWidth(-1.0f);
+		ImGui::SliderInt("Preview Frame", &ui.previewFrame, 0, lastFrame);
+		const float previewSeconds = ticksPerSecond > 0.0f
+			? clipStartTicks / ticksPerSecond
+				+ static_cast<float>(ui.previewFrame) / mayaFramesPerSecond : 0.0f;
+		animator->EvaluateClipAt(previewClip, previewSeconds, false);
+		ImGui::Text("Frame %d / %d  |  %.3f seconds  |  %.3f ticks/sec",
+			ui.previewFrame, lastFrame, previewSeconds, ticksPerSecond);
+	}
+
 	for (std::size_t stateIndex = 0; stateIndex < states.size(); ++stateIndex)
 	{
 		const EntityStateMachine::State& state = states[stateIndex];
@@ -246,6 +313,14 @@ void EntityStateMachineWindow::DrawStateOverview(
 			ui.stateEditLoop = state.loop;
 			ui.stateEditUseAnimationSequence = state.useAnimationSequence;
 			ui.stateEditAnimationSequence = state.animationSequence;
+			ui.stateEditUseTransformAnimation = state.useTransformAnimation;
+			ui.stateEditTransformStartPosition = state.transformStartPosition;
+			ui.stateEditTransformEndPosition = state.transformEndPosition;
+			ui.stateEditTransformStartRotation = state.transformStartRotation;
+			ui.stateEditTransformEndRotation = state.transformEndRotation;
+			ui.stateEditTransformStartScale = state.transformStartScale;
+			ui.stateEditTransformEndScale = state.transformEndScale;
+			ui.stateEditTransformDuration = state.transformDuration;
 			ui.stateEditError.clear();
 			ui.editingStateIndex = static_cast<int>(stateIndex);
 			ui.addStatePopupInitialized = false;
@@ -691,6 +766,7 @@ bool EntityStateMachineWindow::DrawStateEditPopup(
 			ui.stateEditLoop = state.loop;
 			ui.stateEditUseAnimationSequence = state.useAnimationSequence;
 			ui.stateEditAnimationSequence = state.animationSequence;
+			ui.stateEditTransformAnimationName = state.transformAnimationName;
 			ui.stateEditError.clear();
 		}
 		else
@@ -703,6 +779,15 @@ bool EntityStateMachineWindow::DrawStateEditPopup(
 			ui.stateEditLoop = true;
 			ui.stateEditUseAnimationSequence = false;
 			ui.stateEditAnimationSequence.clear();
+			ui.stateEditTransformAnimationName.clear();
+			ui.stateEditUseTransformAnimation = false;
+			ui.stateEditTransformStartPosition = glm::vec3(0.0f);
+			ui.stateEditTransformEndPosition = glm::vec3(0.0f);
+			ui.stateEditTransformStartRotation = glm::vec3(0.0f);
+			ui.stateEditTransformEndRotation = glm::vec3(0.0f);
+			ui.stateEditTransformStartScale = glm::vec3(1.0f);
+			ui.stateEditTransformEndScale = glm::vec3(1.0f);
+			ui.stateEditTransformDuration = 1.0f;
 			ui.stateEditError.clear();
 		}
 		ui.addStatePopupInitialized = true;
@@ -771,6 +856,7 @@ bool EntityStateMachineWindow::DrawStateEditPopup(
 	ImGui::Checkbox("Blocks Input", &ui.stateEditBlocksInput);
 	ImGui::Checkbox("Wait for animation to finish", &ui.stateEditWaitForCompletion);
 	ImGui::Checkbox("Loop", &ui.stateEditLoop);
+	DrawTransformAnimationSelector(animationNames, ui.stateEditTransformAnimationName);
 	if (!ui.stateEditError.empty())
 		ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.25f, 1.0f), "%s", ui.stateEditError.c_str());
 
@@ -845,6 +931,7 @@ bool EntityStateMachineWindow::DrawStateEditPopup(
 				ui.visibleStateTransitions[ui.stateEditName] = visible;
 				changed = true;
 				stateCommitted = true;
+				machine.SetStateTransform(static_cast<std::size_t>(ui.editingStateIndex), ui.stateEditTransformAnimationName);
 			}
 			else
 			{
@@ -860,6 +947,7 @@ bool EntityStateMachineWindow::DrawStateEditPopup(
 			{
 				changed = true;
 				stateCommitted = true;
+				machine.SetStateTransform(states.size(), ui.stateEditTransformAnimationName);
 			}
 			else
 			{

@@ -538,6 +538,10 @@ Physics::SweepCollision PhysicsWorld::Sweep(
 		{
 			continue;
 		}
+		if (candidate.owner && !candidate.owner->BlocksCollision())
+		{
+			continue;
+		}
 		if (candidate.owner && candidate.owner == moving.owner)
 		{
 			continue;

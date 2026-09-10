@@ -34,6 +34,9 @@ public:
 	void startUp(Window& window);
 	void shutDown();
 	void BeginFrame();
+	// Draw the splash image without drawing editor or runtime UI. This is used
+	// by the packaged game before project loading starts.
+	void DrawBootImage() const;
 	void Draw(const Camera& camera, FileManager& fileManager, SceneManager& SceneManager, ProjectManager& projectManager);
 	void EndFrame();
 
@@ -63,8 +66,6 @@ public:
 	unsigned int SelectedEntityId() const { return m_selection.entityId; }
 
 private:
-	void DrawBootImage() const;
-
 	// EngineGUI runtime state
 	Window* m_window = nullptr;
 	bool m_initialized = false;

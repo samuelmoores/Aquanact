@@ -104,6 +104,18 @@ Entity* Scene::AddObject(std::unique_ptr<Entity> entity)
 	return rawEntity;
 }
 
+Entity* Scene::FindObjectByName(const std::string& name) const
+{
+	if (name.empty())
+		return nullptr;
+	for (const auto& entity : m_entities)
+	{
+		if (entity && entity->Name() == name)
+			return entity.get();
+	}
+	return nullptr;
+}
+
 LevelCollider* Scene::AddLevelCollider(std::unique_ptr<LevelCollider> collider)
 {
 	if (!collider)
@@ -138,6 +150,14 @@ bool Scene::RemoveObject(Entity* entity)
 	{
 		return false;
 	}
+	// A removed entity may be a parent or child. Break those non-owning
+	// transform links before destroying the object.
+	for (const auto& candidate : m_entities)
+	{
+		if (candidate && candidate->Parent() == entity)
+			candidate->Detach(true);
+	}
+	entity->Detach(true);
 	if (Root::HasCurrent() &&
 		Root::Current().Render().GetPathedCamera().Target() == entity)
 	{

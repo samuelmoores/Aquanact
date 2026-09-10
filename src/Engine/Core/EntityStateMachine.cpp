@@ -14,6 +14,7 @@
 #include <filesystem>
 #include <random>
 #include <sstream>
+#include <glm/common.hpp>
 
 namespace
 {
@@ -45,7 +46,7 @@ namespace
 
 EntityStateMachine::EntityStateMachine(Mesh* mesh)
 {
-	if (!mesh || !mesh->Skinned())
+	if (!mesh)
 	{
 		return;
 	}
@@ -60,10 +61,12 @@ EntityStateMachine::EntityStateMachine(Mesh* mesh)
 
 const char* EntityStateMachine::Name() const { return "EntityStateMachine"; }
 void EntityStateMachine::startUp(Entity&) {}
-void EntityStateMachine::FirstFrame(Entity&)
+void EntityStateMachine::FirstFrame(Entity& entity)
 {
 	if (!m_animator)
 	{
+		StartInitialState();
+		ApplyTransformAnimation(entity);
 		return;
 	}
 
@@ -92,7 +95,7 @@ void EntityStateMachine::Update(Entity& entity, float dt)
 	// Step 2: process an explicit desired-state request before normal transitions.
 	// A desired state takes priority, so normal transitions are skipped whenever
 	// the request is still active, even if its target is not currently valid.
-	if (!ProcessDesiredStateChange())
+		if (!ProcessDesiredStateChange())
 	{
 		EvaluateTransitions(entity);
 	}
@@ -108,6 +111,7 @@ void EntityStateMachine::Update(Entity& entity, float dt)
 	//|       animator update     |
 	//-----------------------------
 	m_animator->Update(dt);
+	ApplyTransformAnimation(entity);
 	//-----------------------------
 	//|       animator update     |
 	//-----------------------------
@@ -131,6 +135,40 @@ void EntityStateMachine::Update(Entity& entity, float dt)
 			PlaySoundEventsCrossed(previousTicks, currentTicks, m_animator->CurrentClipDurationTicks());
 		}
 	}
+}
+
+void EntityStateMachine::ApplyTransformAnimation(Entity& owner)
+{
+	if (!m_transformAnimationEnabled)
+		return;
+	const State* state = FindCurrentState();
+	if (!state || !state->useTransformAnimation)
+		return;
+	if (!state->transformAnimationName.empty() && m_animator)
+	{
+		const int clipIndex = FindAnimationIndex(state->transformAnimationName);
+		glm::vec3 position;
+		glm::vec3 rotation;
+		glm::vec3 scale;
+		if (m_animator->SampleClipRootTransform(clipIndex, m_currentStateElapsed, state->loop,
+			position, rotation, scale))
+		{
+			owner.Translate(position + m_transformAnimationOffset - owner.Position());
+			owner.SetRotation(rotation);
+			owner.SetScale(scale);
+		}
+		return;
+	}
+	const float duration = std::max(0.0001f, state->transformDuration);
+	float progress = glm::clamp(m_currentStateElapsed / duration, 0.0f, 1.0f);
+	if (state->loop)
+		progress = std::fmod(std::max(0.0f, m_currentStateElapsed), duration) / duration;
+	const glm::vec3 position = glm::mix(state->transformStartPosition, state->transformEndPosition, progress);
+	const glm::vec3 rotation = glm::mix(state->transformStartRotation, state->transformEndRotation, progress);
+	const glm::vec3 scale = glm::mix(state->transformStartScale, state->transformEndScale, progress);
+	owner.Translate(position - owner.Position());
+	owner.SetRotation(rotation);
+	owner.SetScale(scale);
 }
 
 void EntityStateMachine::PlaySoundEventsCrossed(float previousTicks, float currentTicks, float duration)
@@ -296,7 +334,7 @@ bool EntityStateMachine::ProcessDesiredStateChange()
 	// or animation leaves the request active without corrupting playback.
 	const State* targetState = FindState(m_desiredState);
 	const int targetClipIndex = targetState ? ResolveAnimationClipForEntry(*targetState) : -1;
-	if (!targetState || targetClipIndex < 0)
+	if (!targetState || (targetClipIndex < 0 && (!m_animator || !targetState->useTransformAnimation)))
 	{
 		return true;
 	}
@@ -306,6 +344,7 @@ bool EntityStateMachine::ProcessDesiredStateChange()
 	const float blendSeconds = desiredTransition ? desiredTransition->blendSeconds : 0.25f;
 	m_lastTransitionDebug = "Forced state change to " + m_desiredState
 		+ " using blend " + std::to_string(blendSeconds);
+	if (m_animator)
 		m_animator->Play(targetClipIndex, blendSeconds);
 	ActivateState(m_desiredState);
 	return true;
@@ -432,7 +471,7 @@ bool EntityStateMachine::FireTransition(const Transition& transition)
 	// keeps malformed transitions from leaving the machine in a half-state.
 	const State* targetState = FindState(transition.to);
 	const int targetClipIndex = targetState ? ResolveAnimationClipForEntry(*targetState) : -1;
-	if (!targetState || targetClipIndex < 0)
+	if (!targetState || (targetClipIndex < 0 && (!m_animator || !targetState->useTransformAnimation)))
 	{
 		m_lastResolvedTargetState = transition.to;
 		m_lastResolvedTargetClipIndex = targetClipIndex;
@@ -456,7 +495,8 @@ bool EntityStateMachine::FireTransition(const Transition& transition)
 
 	// Step 3: play the new clip, activate the state, and reset state-local timing.
 	// Playback starts first so animation and state bookkeeping stay synchronized.
-	m_animator->Play(targetClipIndex, transition.blendSeconds);
+	if (m_animator)
+		m_animator->Play(targetClipIndex, transition.blendSeconds);
 	ActivateState(transition.to);
 	m_currentStateElapsed = 0.0f;
 
@@ -487,6 +527,20 @@ void EntityStateMachine::SetDesiredState(const std::string& stateName)
 	{
 		m_desiredState = stateName;
 	}
+}
+
+void EntityStateMachine::SetCurrentStateLooping(bool loop)
+{
+	for (State& state : m_states)
+	{
+		if (state.name == m_currentState)
+		{
+			state.loop = loop;
+			break;
+		}
+	}
+	if (m_animator)
+		m_animator->SetLooping(loop);
 }
 
 bool EntityStateMachine::AddState(std::string name, std::string animationName, bool blocksMovement, bool blocksInput,
@@ -604,6 +658,36 @@ bool EntityStateMachine::RemoveState(std::size_t index)
 			return transition.from == removedName || transition.to == removedName;
 		}),
 		m_transitions.end());
+	return true;
+}
+
+bool EntityStateMachine::SetStateTransform(std::size_t index, bool enabled, glm::vec3 startPosition,
+	glm::vec3 endPosition, glm::vec3 startRotation, glm::vec3 endRotation,
+	glm::vec3 startScale, glm::vec3 endScale, float duration)
+{
+	if (index >= m_states.size() || !std::isfinite(duration) || duration <= 0.0f)
+		return false;
+	State& state = m_states[index];
+	state.useTransformAnimation = enabled;
+	state.transformStartPosition = startPosition;
+	state.transformEndPosition = endPosition;
+	state.transformStartRotation = startRotation;
+	state.transformEndRotation = endRotation;
+	state.transformStartScale = startScale;
+	state.transformEndScale = endScale;
+	state.transformDuration = duration;
+	return true;
+}
+
+bool EntityStateMachine::SetStateTransform(std::size_t index, std::string animationName)
+{
+	if (index >= m_states.size())
+		return false;
+	if (!animationName.empty() && !CanonicalizeAnimationReference(animationName))
+		return false;
+	State& state = m_states[index];
+	state.transformAnimationName = std::move(animationName);
+	state.useTransformAnimation = !state.transformAnimationName.empty();
 	return true;
 }
 
@@ -1023,7 +1107,9 @@ void EntityStateMachine::StartInitialState(bool playSoundEvents, bool advanceAni
 		: ResolveAnimationClipIndex(State{ initialState->name,
 			initialState->useAnimationSequence && !initialState->animationSequence.empty()
 				? initialState->animationSequence.front() : initialState->animationName });
-	if (clipIndex < 0 || !m_animator)
+	const bool hasTransformClip = !initialState->transformAnimationName.empty()
+		&& FindAnimationIndex(initialState->transformAnimationName) >= 0;
+	if (clipIndex < 0 && m_animator && !hasTransformClip)
 	{
 		Root::Current().Debugger().LogTagged(
 			Debug::Severity::Warning,
@@ -1038,22 +1124,21 @@ void EntityStateMachine::StartInitialState(bool playSoundEvents, bool advanceAni
 	m_transitionCooldown = 0.0f;
 	m_currentStateElapsed = 0.0f;
 	m_currentStateLockedUntilComplete = false;
-
-	if (m_animator)
+	if (!m_animator)
 	{
-		m_animator->SetLooping(initialState->loop);
-		m_animator->Restart(clipIndex);
-		if (playSoundEvents)
-		{
-			PlaySoundEventsAtStateStart();
-		}
+		return;
 	}
+
+	m_animator->SetLooping(initialState->loop);
+	m_animator->Restart(clipIndex);
+	if (playSoundEvents)
+		PlaySoundEventsAtStateStart();
 }
 
 void EntityStateMachine::ActivateState(const std::string& stateName)
 {
 	const State* state = FindState(stateName);
-	if (!state || !m_animator)
+	if (!state)
 	{
 		return;
 	}
@@ -1065,6 +1150,8 @@ void EntityStateMachine::ActivateState(const std::string& stateName)
 	m_desiredState = state->name;
 	m_currentStateElapsed = 0.0f;
 	m_currentStateLockedUntilComplete = false;
+	if (!m_animator)
+		return;
 	m_animator->SetLooping(state->loop);
 	PlaySoundEventsAtStateStart();
 }

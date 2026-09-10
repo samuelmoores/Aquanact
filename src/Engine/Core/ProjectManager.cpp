@@ -132,6 +132,7 @@ namespace {
 				object->Translate(pendingObject.position);
 				object->SetRotation(pendingObject.rotation);
 				object->SetScale(pendingObject.scale);
+				object->SetBlocksCollision(pendingObject.blocksCollision);
 				object->SetIgnoreCameraCollision(pendingObject.ignoreCameraCollision);
 				object->SetBlocksCameraView(pendingObject.blocksCameraView);
 				object->SetShowPhysicsBoundingBox(pendingObject.showPhysicsBoundingBox);
@@ -345,10 +346,19 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 		ApplyStartupLevel(SceneManager, startupLevelName, pendingLevels);
 		if (Root::Current().State().IsEditorMode())
 		{
-			// Opening a project always begins at its frontend. New Game destinations
-			// are stored per button and must not determine the editor's opening scene.
-			SceneManager.SetActiveLevel("MainMenu");
-			SceneManager.SetStartupLevelName("MainMenu");
+			// Open the primary gameplay level directly in the editor so level and
+			// gameplay previews are immediately available. Keep MainMenu as a
+			// fallback for projects that do not have a Level1 scene.
+			if (SceneManager.FindLevel("Level1"))
+			{
+				SceneManager.SetActiveLevel("Level1");
+				SceneManager.SetStartupLevelName("Level1");
+			}
+			else
+			{
+				SceneManager.SetActiveLevel("MainMenu");
+				SceneManager.SetStartupLevelName("MainMenu");
+			}
 		}
 		if (SceneManager.StartupLevelName().empty())
 		{

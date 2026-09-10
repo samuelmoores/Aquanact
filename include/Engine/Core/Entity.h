@@ -27,7 +27,7 @@ class Entity
 public:
 	// Entities own their components and drive their lifecycle in a fixed order.
 	Entity(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces);
-	Entity(const char* modelFile, bool addDefaultComponents = true);
+	Entity(const char* modelFile, bool addDefaultComponents = true, bool loadAnimations = true);
 	explicit Entity(std::string name = "Entity");
 	virtual ~Entity();
 
@@ -97,6 +97,16 @@ public:
 	glm::vec3 Rotation() const;
 	glm::vec3 Scale() const;
 	void SetRotation(glm::vec3 newRotation);
+	// Attachments are transform relationships only; scene ownership remains
+	// unchanged. While attached, Position/Rotation/Scale are local to Parent().
+	// The default local transform places the child at the parent's origin.
+	bool AttachTo(Entity& parent, glm::vec3 localPosition = glm::vec3(0.0f),
+		glm::vec3 localRotation = glm::vec3(0.0f));
+	// Detaching normally preserves the child's current world transform, which is
+	// useful for releasing a projectile without a visible teleport.
+	void Detach(bool preserveWorldTransform = true);
+	bool IsAttached() const { return m_parent != nullptr; }
+	Entity* Parent() const { return m_parent; }
 	void SetDefaultPosition(glm::vec3 position);
 	void SetDefaultRotation(glm::vec3 rotation);
 	void ResetToDefaultPosition();
@@ -104,6 +114,8 @@ public:
 
 	void SetIgnoreCameraCollision(bool ignore) { m_ignoreCameraCollision = ignore; }
 	bool IgnoreCameraCollision() const { return m_ignoreCameraCollision; }
+	void SetBlocksCollision(bool blocks) { m_blocksCollision = blocks; }
+	bool BlocksCollision() const { return m_blocksCollision; }
 	void SetBlocksCameraView(bool blocks) { m_blocksCameraView = blocks; }
 	bool BlocksCameraView() const { return m_blocksCameraView; }
 	void SetShowPhysicsBoundingBox(bool show) { m_showPhysicsBoundingBox = show; }
@@ -122,6 +134,7 @@ protected:
 	glm::vec3 m_defaultPosition{0.0f};
 	glm::vec3 m_defaultRotation{0.0f};
 	bool m_skinned = false;
+	bool m_blocksCollision = true;
 	bool m_ignoreCameraCollision = false;
 	bool m_blocksCameraView = true;
 	bool m_showPhysicsBoundingBox = false;
@@ -130,6 +143,8 @@ protected:
 	std::string m_sourcePath;
 	unsigned int m_id = 0;
 	std::vector<std::unique_ptr<Component>> m_components;
+	Entity* m_parent = nullptr;
+	std::vector<Entity*> m_children;
 
 public:
 	static inline std::vector<Vertex3D> cubeVertices = {

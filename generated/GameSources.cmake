@@ -1,9 +1,10 @@
 set(GAME_SOURCES
-	"${CMAKE_SOURCE_DIR}/src/Game/AIController.cpp"
-	"${CMAKE_SOURCE_DIR}/src/Game/Health.cpp"
-	"${CMAKE_SOURCE_DIR}/src/Game/PlayerCombat.cpp"
-	"${CMAKE_SOURCE_DIR}/src/Game/PlayerAttack.cpp"
-	"${CMAKE_SOURCE_DIR}/src/Game/PlayerController.cpp"
-	"${CMAKE_SOURCE_DIR}/src/Game/PlayerHealth.cpp"
+    "${CMAKE_SOURCE_DIR}/src/Game/AIController.cpp"
+    "${CMAKE_SOURCE_DIR}/src/Game/AttackSphere.cpp"
+    "${CMAKE_SOURCE_DIR}/src/Game/Health.cpp"
+    "${CMAKE_SOURCE_DIR}/src/Game/PlayerAttack.cpp"
+    "${CMAKE_SOURCE_DIR}/src/Game/PlayerCombat.cpp"
+    "${CMAKE_SOURCE_DIR}/src/Game/PlayerController.cpp"
+    "${CMAKE_SOURCE_DIR}/src/Game/PlayerHealth.cpp"
     "${CMAKE_SOURCE_DIR}/src/Engine/Core/ComponentRegistry.cpp"
 )

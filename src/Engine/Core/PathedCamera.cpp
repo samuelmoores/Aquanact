@@ -116,6 +116,13 @@ void PathedCamera::SetPathSamplesPerSegment(int samples)
 // Runtime follow behavior: advance toward the path position and tune smoothing.
 void PathedCamera::Update(float deltaTime)
 {
+	if (m_snapPending)
+	{
+		// SnapToPath was requested by a timeline (editor or cutscene). Preserve
+		// that exact pose for this frame instead of smoothing back toward it.
+		m_snapPending = false;
+		return;
+	}
 	const float blend = 1.0f - std::exp(-std::max(0.0f, m_followSharpness) * std::max(0.0f, deltaTime));
 	if (m_path.points.empty())
 	{
@@ -158,6 +165,7 @@ void PathedCamera::SnapToPath()
 		else
 			ApplyAuthoredFacing(m_path.points.front().facing);
 		RebuildView();
+		m_snapPending = true;
 		return;
 	}
 
@@ -168,6 +176,7 @@ void PathedCamera::SnapToPath()
 	m_position = EvaluateCameraPathSegment(m_path, segment, t);
 	ApplyInterpolatedPathFacing(segment, t);
 	RebuildView();
+	m_snapPending = true;
 }
 
 void PathedCamera::ApplyInterpolatedPathFacing(std::size_t segment, float t)

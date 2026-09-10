@@ -14,10 +14,12 @@
 #include "Engine/UI/EngineGUI.h"
 #include "Engine/Core/SceneManager.h"
 #include "Game/PlayerController.h"
+#include "Game/PlayerAttack.h"
 #include "Engine/Core/RenderManager.h"
 #include "Game/AIController.h"
 
 #include <glm/glm.hpp>
+#include <algorithm>
 #include <istream>
 #include <sstream>
 
@@ -209,6 +211,19 @@ namespace ProjectStateSerializer {
 						++index;
 						state.loop = fields.at(index++) == "1";
 					}
+					if (index < fields.size() && fields[index] == "transform2")
+					{
+						++index;
+						state.useTransformAnimation = fields.at(index++) == "1";
+						glm::vec3* values[] = { &state.transformStartPosition, &state.transformEndPosition, &state.transformStartRotation, &state.transformEndRotation, &state.transformStartScale, &state.transformEndScale };
+						for (glm::vec3* value : values) { value->x = std::stof(fields.at(index++)); value->y = std::stof(fields.at(index++)); value->z = std::stof(fields.at(index++)); }
+						state.transformDuration = std::stof(fields.at(index++));
+					if (index < fields.size() && fields[index] == "transformclip")
+					{
+						++index;
+						state.transformAnimationName = fields.at(index++);
+					}
+					}
 					result.states.push_back(std::move(state));
 				}
 
@@ -339,6 +354,20 @@ namespace ProjectStateSerializer {
 						contents += ";" + std::to_string(ai->AttackCooldown());
 						contents += ";" + std::to_string(ai->TurnSpeed()) + "\n";
 					}
+					else if (const PlayerAttack* attack = dynamic_cast<const PlayerAttack*>(component))
+					{
+						AppendComponentLine(contents, projectPath, object, "gamecomponent");
+						contents += ";PlayerAttack;" + ProjectStateFormat::EscapeField(attack->AttackInstanceName());
+						contents += ";" + std::to_string(attack->AttackInstanceSpeed());
+						contents += ";" + std::to_string(attack->AttackInstanceOffset().x);
+						contents += ";" + std::to_string(attack->AttackInstanceOffset().y);
+						contents += ";" + std::to_string(attack->AttackInstanceOffset().z);
+						contents += ";" + ProjectStateFormat::EscapeField(attack->AttackInstanceBoneName());
+						contents += ";" + std::to_string(attack->DrawAttackInstance() ? 1 : 0);
+						contents += ";launchframe;" + std::to_string(attack->AttackLaunchFrame());
+						contents += ";targetinstance;" + ProjectStateFormat::EscapeField(attack->AttackTargetInstanceName());
+						contents += ";" + ProjectStateFormat::EscapeField(attack->AttackTargetBoneName()) + "\n";
+					}
 					else if (const Controller* controller = dynamic_cast<const Controller*>(component))
 					{
 						AppendComponentLine(contents, projectPath, object, "controller");
@@ -364,6 +393,12 @@ namespace ProjectStateSerializer {
 									ProjectStateFormat::MakePortableSourcePath(projectPath, animation).string());
 						contents += ";waitforcompletion;" + std::to_string(state.waitForCompletion ? 1 : 0);
 						contents += ";loop;" + std::to_string(state.loop ? 1 : 0);
+						contents += ";transform2;" + std::to_string(state.useTransformAnimation ? 1 : 0);
+						for (const glm::vec3& value : { state.transformStartPosition, state.transformEndPosition, state.transformStartRotation, state.transformEndRotation, state.transformStartScale, state.transformEndScale })
+							contents += ";" + std::to_string(value.x) + ";" + std::to_string(value.y) + ";" + std::to_string(value.z);
+						contents += ";" + std::to_string(state.transformDuration);
+						contents += ";transformclip;" + ProjectStateFormat::EscapeField(
+							state.transformAnimationName);
 					}
 					contents += ";soundevents2";
 					for (const auto& state : animator->States())
@@ -479,8 +514,12 @@ namespace ProjectStateSerializer {
 			contents += "cutscene;" + ProjectStateFormat::EscapeField(scene->Name()) + ";" + std::to_string(scene->Cutscene().duration) + "\n";
 			for (const CutsceneAnimationTrack& track : scene->Cutscene().animationTracks)
 			{
+				// Animation names are also asset references. Store them relative to
+				// the project so a package can be moved to another machine.
+				const std::filesystem::path portableAnimationPath =
+					ProjectStateFormat::MakePortableSourcePath(projectPath, track.animationName);
 				contents += "cutsceneanim;" + ProjectStateFormat::EscapeField(scene->Name()) + ";" +
-					std::to_string(track.entityId) + ";" + ProjectStateFormat::EscapeField(track.animationName) + ";" +
+					std::to_string(track.entityId) + ";" + ProjectStateFormat::EscapeField(portableAnimationPath.string()) + ";" +
 					std::to_string(track.startTime) + ";" + std::to_string(track.duration) + ";" +
 					std::to_string(track.speed) + ";" + std::to_string(track.blendIn) + ";" +
 					std::to_string(track.blendOut) + ";" + (track.loop ? "1" : "0") + "\n";
@@ -869,9 +908,10 @@ namespace ProjectStateSerializer {
 				}
 				CutsceneAnimationTrack track;
 				track.entityId = static_cast<unsigned int>(std::stoul(fields[2]));
-				// SplitFields already removes project-format escaping. Unescaping the
-				// animation path again strips Windows path separators on reload.
-				track.animationName = fields[3];
+				// Resolve legacy absolute paths as well as the portable paths written
+				// by the serializer. CutsceneAnimator compares this to the model's
+				// animation source names.
+				track.animationName = ProjectStateFormat::ResolveSourcePath(projectPath, fields[3]).string();
 				track.startTime = std::max(0.0f, std::stof(fields[4]));
 				track.duration = std::max(0.01f, std::stof(fields[5]));
 				track.speed = std::max(0.01f, std::stof(fields[6]));
@@ -1019,6 +1059,29 @@ namespace ProjectStateSerializer {
 						{
 							if (fields.size() > componentLayout.dataIndex + 1) component.healthMax = std::stof(fields[componentLayout.dataIndex + 1]);
 						}
+						else if (component.componentClassName == "PlayerAttack")
+						{
+							if (fields.size() > componentLayout.dataIndex + 1) component.attackInstanceName = ProjectStateFormat::UnescapeField(fields[componentLayout.dataIndex + 1]);
+							if (fields.size() > componentLayout.dataIndex + 2) component.attackInstanceSpeed = std::stof(fields[componentLayout.dataIndex + 2]);
+							if (fields.size() > componentLayout.dataIndex + 5)
+							{
+								component.attackInstanceOffset.x = std::stof(fields[componentLayout.dataIndex + 3]);
+								component.attackInstanceOffset.y = std::stof(fields[componentLayout.dataIndex + 4]);
+								component.attackInstanceOffset.z = std::stof(fields[componentLayout.dataIndex + 5]);
+							}
+							if (fields.size() > componentLayout.dataIndex + 6) component.attackInstanceBoneName = ProjectStateFormat::UnescapeField(fields[componentLayout.dataIndex + 6]);
+							if (fields.size() > componentLayout.dataIndex + 7) component.attackDrawInstance = fields[componentLayout.dataIndex + 7] == "1";
+							if (fields.size() > componentLayout.dataIndex + 9
+								&& fields[componentLayout.dataIndex + 8] == "launchframe")
+								component.attackLaunchFrame = std::max(0, std::stoi(fields[componentLayout.dataIndex + 9]));
+							if (fields.size() > componentLayout.dataIndex + 11
+								&& fields[componentLayout.dataIndex + 10] == "targetinstance")
+							{
+								component.attackTargetInstanceName = ProjectStateFormat::UnescapeField(fields[componentLayout.dataIndex + 11]);
+								if (fields.size() > componentLayout.dataIndex + 12)
+									component.attackTargetBoneName = ProjectStateFormat::UnescapeField(fields[componentLayout.dataIndex + 12]);
+							}
+						}
 						if (component.componentClassName.empty())
 						{
 							return false;
@@ -1079,7 +1142,7 @@ namespace ProjectStateSerializer {
 					continue;
 				}
 
-				if (((fields.size() < 11 || fields.size() > 16) || fields[0] != "object"))
+				if (((fields.size() < 11 || fields.size() > 17) || fields[0] != "object"))
 				{
 					continue;
 				}
@@ -1107,17 +1170,22 @@ namespace ProjectStateSerializer {
 				}
 				if (fields.size() >= 13)
 				{
-					object.ignoreCameraCollision = fields[12] == "1" || fields[12] == "true" || fields[12] == "True";
+					const std::size_t physicsOffset = fields.size() >= 17 ? 1 : 0;
+					object.blocksCollision = physicsOffset == 1
+						? fields[12] == "1" || fields[12] == "true" || fields[12] == "True" : true;
+					object.ignoreCameraCollision = fields[12 + physicsOffset] == "1" || fields[12 + physicsOffset] == "true" || fields[12 + physicsOffset] == "True";
 				}
-				if (fields.size() >= 14)
+				if (fields.size() >= 13 + (fields.size() >= 17 ? 1 : 0))
 				{
-					object.showPhysicsBoundingBox = fields[13] == "1" || fields[13] == "true" || fields[13] == "True";
+					const std::size_t physicsOffset = fields.size() >= 17 ? 1 : 0;
+					object.showPhysicsBoundingBox = fields[13 + physicsOffset] == "1" || fields[13 + physicsOffset] == "true" || fields[13 + physicsOffset] == "True";
 				}
-				if (fields.size() >= 15)
+				if (fields.size() >= 14 + (fields.size() >= 17 ? 1 : 0))
 				{
 					try
 					{
-						const int colliderShape = std::stoi(fields[14]);
+						const std::size_t physicsOffset = fields.size() >= 17 ? 1 : 0;
+						const int colliderShape = std::stoi(fields[14 + physicsOffset]);
 						object.physicsColliderShape = colliderShape == 1 ? 1 : colliderShape == 2 ? 2 : 0;
 					}
 					catch (...)
@@ -1125,12 +1193,13 @@ namespace ProjectStateSerializer {
 						object.physicsColliderShape = 0;
 					}
 				}
-				if (fields.size() >= 16)
+				if (fields.size() >= 15 + (fields.size() >= 17 ? 1 : 0))
 				{
+					const std::size_t physicsOffset = fields.size() >= 17 ? 1 : 0;
 					object.blocksCameraView =
-						fields[15] == "1" ||
-						fields[15] == "true" ||
-						fields[15] == "True";
+						fields[15 + physicsOffset] == "1" ||
+						fields[15 + physicsOffset] == "true" ||
+						fields[15 + physicsOffset] == "True";
 				}
 				currentLevel->objects.push_back(std::move(object));
 			}

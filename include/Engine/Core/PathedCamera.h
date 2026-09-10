@@ -72,6 +72,7 @@ private:
 	Entity* m_target = nullptr;
 	glm::vec3 m_overridePosition{0.0f};
 	bool m_hasOverridePosition = false;
+	bool m_snapPending = false;
 
 	// Follow controls: normalized player progress, smoothing, and fixed sampling.
 	float m_playerProgress = 0.0f;

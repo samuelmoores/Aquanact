@@ -597,6 +597,7 @@ void RenderManager::BuildRenderCommands(FrontEndManager& frontEndManager, SceneM
 		Submit(RenderCommand{ object->GetMesh(), object->GetShader(),
 			object->BuildModelMatrix(), object->skinned(), object->Id(),
 			worldBoundsMin, worldBoundsMax, hasWorldBounds, -1 });
+
 	}
 }
 
@@ -829,7 +830,6 @@ void RenderManager::Loop(FrontEndManager& frontEndManager, FileManager& fileMana
 			}
 		}
 	}
-
 	{
 		FrameProfiler::Scope scope(Root::Current().Profiler(), "RenderCommands");
 		BuildRenderCommands(frontEndManager, SceneManager, engineState);
@@ -841,6 +841,8 @@ void RenderManager::Loop(FrontEndManager& frontEndManager, FileManager& fileMana
 		FrameProfiler::Scope scope(Root::Current().Profiler(), "Camera");
 		UpdateCameraPhase(input, engineState);
 	}
+	if (engineState.IsEditorMode() && !ShouldPreviewMainMenu(frontEndManager, engineState))
+		debug.DrawPlayerAttackSpawnPreviews(ActiveCamera());
 	{
 		FrameProfiler::Scope scope(Root::Current().Profiler(), "Flush");
 	unsigned int selectedEntityId = 0;

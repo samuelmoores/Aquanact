@@ -41,6 +41,17 @@ struct EntityStateMachineUiState
 	bool stateEditWaitForCompletion = false;
 	bool stateEditLoop = true;
 	bool stateEditUseAnimationSequence = false;
+	int previewStateIndex = -1;
+	int previewFrame = 0;
+	std::string stateEditTransformAnimationName;
+	bool stateEditUseTransformAnimation = false;
+	glm::vec3 stateEditTransformStartPosition{0.0f};
+	glm::vec3 stateEditTransformEndPosition{0.0f};
+	glm::vec3 stateEditTransformStartRotation{0.0f};
+	glm::vec3 stateEditTransformEndRotation{0.0f};
+	glm::vec3 stateEditTransformStartScale{1.0f};
+	glm::vec3 stateEditTransformEndScale{1.0f};
+	float stateEditTransformDuration = 1.0f;
 	std::vector<std::string> stateEditAnimationSequence;
 	std::string stateEditError;
 	int selectedSoundEventIndex = -1;
@@ -158,6 +169,36 @@ public:
 				}
 				if (selected)
 					ImGui::SetItemDefaultFocus();
+			}
+			ImGui::EndCombo();
+		}
+		return changed;
+	}
+
+	static bool DrawTransformAnimationSelector(
+		const std::vector<std::string>& animationNames, std::string& selectedAnimation)
+	{
+		const std::string previewName = selectedAnimation.empty()
+			? "<none>" : AnimationFileName(selectedAnimation);
+		bool changed = false;
+		if (ImGui::BeginCombo("Transform Animation", previewName.c_str()))
+		{
+			if (ImGui::Selectable("<none>", selectedAnimation.empty()))
+			{
+				selectedAnimation.clear();
+				changed = true;
+			}
+			for (const std::string& animationName : animationNames)
+			{
+				const bool selected = selectedAnimation == animationName;
+				const std::string displayName = AnimationFileName(animationName);
+				const std::string selectableLabel = displayName + "##Transform_" + animationName;
+				if (ImGui::Selectable(selectableLabel.c_str(), selected))
+				{
+					selectedAnimation = animationName;
+					changed = true;
+				}
+				if (selected) ImGui::SetItemDefaultFocus();
 			}
 			ImGui::EndCombo();
 		}

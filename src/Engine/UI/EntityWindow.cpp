@@ -10,10 +10,13 @@
 #include "Engine/Core/Hitbox.h"
 #include "Engine/Core/SceneManager.h"
 #include "Engine/Core/Scene.h"
+#include "Engine/Core/SpawnManager.h"
 #include "Engine/Core/EntityStateMachine.h"
 #include "Engine/Core/PhysicsWorld.h"
+#include "Engine/UI/EngineGuiWidgets.h"
 #include "Game/AIController.h"
 #include "Game/Health.h"
+#include "Game/PlayerAttack.h"
 #include "Game/PlayerController.h"
 
 #include <imgui.h>
@@ -191,6 +194,12 @@ void EntityWindow::DrawPhysics(Entity& entity) const
 	bool showBoundingBox = entity.ShowPhysicsBoundingBox();
 	if (ImGui::Checkbox("Draw Bounding Volume", &showBoundingBox))
 		entity.SetShowPhysicsBoundingBox(showBoundingBox);
+	bool blocksCollision = entity.BlocksCollision();
+	if (ImGui::Checkbox("Blocking Collision", &blocksCollision))
+	{
+		entity.SetBlocksCollision(blocksCollision);
+		PhysicsWorld::Instance().Update(entity);
+	}
 	bool ignoreCameraCollision = entity.IgnoreCameraCollision();
 	if (ImGui::Checkbox("Ignore Camera Collision", &ignoreCameraCollision))
 		entity.SetIgnoreCameraCollision(ignoreCameraCollision);
@@ -207,7 +216,98 @@ bool EntityWindow::DrawStateMachineButton() const
 
 void EntityWindow::DrawComponentControls(Component& component) const
 {
-	if (PlayerController* player = dynamic_cast<PlayerController*>(&component))
+	if (PlayerAttack* attack = dynamic_cast<PlayerAttack*>(&component))
+	{
+		const auto& definitions = Root::Current().Spawns().Definitions();
+		const std::string& currentName = attack->AttackInstanceName();
+		if (ImGui::BeginCombo("Attack Instance", currentName.empty() ? "None" : currentName.c_str()))
+		{
+			if (ImGui::Selectable("None", currentName.empty()))
+				attack->SetAttackInstanceName({});
+			for (const auto& entry : definitions)
+			{
+				const bool selected = currentName == entry.first;
+				if (ImGui::Selectable(entry.first.c_str(), selected))
+					attack->SetAttackInstanceName(entry.first);
+				if (selected) ImGui::SetItemDefaultFocus();
+			}
+			ImGui::EndCombo();
+		}
+		float speed = attack->AttackInstanceSpeed();
+		if (ImGui::DragFloat("Attack Instance Speed", &speed, 0.5f, 0.0f, 10000.0f, "%.1f"))
+			attack->SetAttackInstanceSpeed(speed);
+		int launchFrame = attack->AttackLaunchFrame();
+		if (ImGui::InputInt("Attack Launch Frame", &launchFrame))
+			attack->SetAttackLaunchFrame(launchFrame);
+		glm::vec3 offset = attack->AttackInstanceOffset();
+		if (EngineGuiWidgets::Vector3Editor("Attack Instance Offset", offset, 0.1f))
+			attack->SetAttackInstanceOffset(offset);
+		Entity* owner = attack->Owner();
+		const std::vector<std::string> boneNames = owner && owner->GetMesh()
+			? owner->GetMesh()->BoneNames() : std::vector<std::string>{};
+		const char* bonePreview = attack->AttackInstanceBoneName().empty()
+			? "Entity origin" : attack->AttackInstanceBoneName().c_str();
+		if (ImGui::BeginCombo("Attack Instance Bone", bonePreview))
+		{
+			if (ImGui::Selectable("Entity origin", attack->AttackInstanceBoneName().empty()))
+				attack->SetAttackInstanceBoneName({});
+			for (const std::string& boneName : boneNames)
+			{
+				const bool selected = attack->AttackInstanceBoneName() == boneName;
+				if (ImGui::Selectable(boneName.c_str(), selected))
+					attack->SetAttackInstanceBoneName(boneName);
+				if (selected) ImGui::SetItemDefaultFocus();
+			}
+			ImGui::EndCombo();
+		}
+		if (boneNames.empty())
+			ImGui::TextDisabled("No skeletal bones available; using entity origin.");
+		bool drawAttackInstance = attack->DrawAttackInstance();
+		if (ImGui::Checkbox("Draw Attack Instance", &drawAttackInstance))
+			attack->SetDrawAttackInstance(drawAttackInstance);
+		const auto& instanceDefinitions = Root::Current().Spawns().Definitions();
+		const std::string& targetInstance = attack->AttackTargetInstanceName();
+		if (ImGui::BeginCombo("Attack Target Instance", targetInstance.empty() ? "None" : targetInstance.c_str()))
+		{
+			if (ImGui::Selectable("None", targetInstance.empty()))
+				attack->SetAttackTargetInstanceName({});
+			for (const auto& entry : instanceDefinitions)
+			{
+				const bool selected = targetInstance == entry.first;
+				if (ImGui::Selectable(entry.first.c_str(), selected))
+					attack->SetAttackTargetInstanceName(entry.first);
+				if (selected) ImGui::SetItemDefaultFocus();
+			}
+			ImGui::EndCombo();
+		}
+		if (!attack->AttackTargetInstanceName().empty())
+		{
+			std::vector<std::string> boneNames{ "Entity origin" };
+			if (Scene* scene = Root::Current().Scenes().ActiveLevel())
+			{
+				if (Entity* target = Root::Current().Spawns().FindActiveInstance(*scene, attack->AttackTargetInstanceName()))
+					if (target->GetMesh())
+					{
+						const std::vector<std::string> targetBones = target->GetMesh()->BoneNames();
+						boneNames.insert(boneNames.end(), targetBones.begin(), targetBones.end());
+					}
+			}
+			int selectedBone = 0;
+			for (std::size_t index = 1; index < boneNames.size(); ++index)
+				if (boneNames[index] == attack->AttackTargetBoneName()) selectedBone = static_cast<int>(index);
+			if (ImGui::Combo("Attack Target Bone", &selectedBone, [](void* data, int index, const char** outText)
+			{
+				const auto& values = *static_cast<const std::vector<std::string>*>(data);
+				if (index < 0 || index >= static_cast<int>(values.size())) return false;
+				*outText = values[static_cast<std::size_t>(index)].c_str();
+				return true;
+			}, &boneNames, static_cast<int>(boneNames.size())))
+				attack->SetAttackTargetBoneName(selectedBone > 0 ? boneNames[static_cast<std::size_t>(selectedBone)] : std::string{});
+			if (boneNames.size() == 1)
+				ImGui::TextDisabled("Spawn the selected instance to choose a skeletal bone.");
+		}
+	}
+	else if (PlayerController* player = dynamic_cast<PlayerController*>(&component))
 	{
 		float moveSpeed = player->MoveSpeed();
 		ImGui::SetNextItemWidth(140.0f);

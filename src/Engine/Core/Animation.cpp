@@ -1,17 +1,28 @@
 #include "Engine/Core/Animation.h"
 #include <cassert>
 #include <algorithm>
+#include <cfloat>
 
 Animation::Animation(aiAnimation* anim)
 	: m_anim(anim)
 	, m_duration((float)anim->mDuration)
+	, m_startTime(FLT_MAX)
 	, m_ticksPerSecond(anim->mTicksPerSecond != 0 ? (float)anim->mTicksPerSecond : 60.0f)
 {
 	for (unsigned int i = 0; i < anim->mNumChannels; i++)
+	{
 		m_channelMap[anim->mChannels[i]->mNodeName.C_Str()] = anim->mChannels[i];
+		if (!m_firstChannel) m_firstChannel = anim->mChannels[i];
+		const aiNodeAnim* channel = anim->mChannels[i];
+		if (channel->mNumPositionKeys > 0) m_startTime = std::min(m_startTime, static_cast<float>(channel->mPositionKeys[0].mTime));
+		if (channel->mNumRotationKeys > 0) m_startTime = std::min(m_startTime, static_cast<float>(channel->mRotationKeys[0].mTime));
+		if (channel->mNumScalingKeys > 0) m_startTime = std::min(m_startTime, static_cast<float>(channel->mScalingKeys[0].mTime));
+	}
+	if (m_startTime == FLT_MAX) m_startTime = 0.0f;
 }
 
 float Animation::Duration() const { return m_duration; }
+float Animation::StartTime() const { return m_startTime; }
 float Animation::TicksPerSecond() const { return m_ticksPerSecond; }
 
 int Animation::FrameCount() const

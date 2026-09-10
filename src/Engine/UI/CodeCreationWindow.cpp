@@ -6,6 +6,7 @@
 #include "Engine/Core/Root.h"
 #include "Engine/Core/Scene.h"
 #include "Engine/Core/SceneManager.h"
+#include "Engine/Core/SpawnManager.h"
 #include "Engine/Core/Window.h"
 #include "Engine/UI/EngineGuiWidgets.h"
 #include "Engine/UI/GameCodeMaintenance.h"
@@ -33,14 +34,17 @@ std::string CodeCreationWindow::NormalizeClassName(const std::string& input)
 	return output;
 }
 
-void CodeCreationWindow::SaveNewClassConfiguration(const std::string& className, bool attachToExistingEntity, const std::string& targetEntityName)
+void CodeCreationWindow::SaveNewClassConfiguration(const std::string& className, bool attachToExistingEntity,
+	const std::string& targetEntityName, bool attachToExistingInstance, const std::string& targetInstanceName)
 {
 	std::ofstream outFile("NewClassConfiguration");
 	if (!outFile) return;
 	outFile << "ClassName: " << className << "\n"
 		<< "AttachToExistingEntity: " << std::boolalpha << attachToExistingEntity << "\n"
-		<< "CreateNewEntity: " << std::boolalpha << !attachToExistingEntity << "\n"
-		<< "TargetEntityName: " << targetEntityName << "\n";
+		<< "CreateNewEntity: " << std::boolalpha << (!attachToExistingEntity && !attachToExistingInstance) << "\n"
+		<< "TargetEntityName: " << targetEntityName << "\n"
+		<< "AttachToExistingInstance: " << std::boolalpha << attachToExistingInstance << "\n"
+		<< "TargetInstanceName: " << targetInstanceName << "\n";
 }
 
 void CodeCreationWindow::Draw(Window* window, bool& popupRequested, ProjectManager& projectManager)
@@ -51,6 +55,8 @@ void CodeCreationWindow::Draw(Window* window, bool& popupRequested, ProjectManag
 		m_statusMessage.clear();
 		m_createAndBuildClassName.clear();
 		m_selectedEntityIndex = 0;
+		m_selectedInstanceIndex = 0;
+		m_targetKind = 0;
 	}
 	EngineGuiWidgets::ConsumePopupRequest("Add Code File##AquanactAddCodeFile", popupRequested);
 
@@ -64,10 +70,23 @@ void CodeCreationWindow::Draw(Window* window, bool& popupRequested, ProjectManag
 	std::vector<std::string> entityNames{ "none" };
 	for (const auto& entity : entities) entityNames.push_back(entity ? entity->Name() : "<unnamed>");
 	if (m_selectedEntityIndex < 0 || m_selectedEntityIndex >= static_cast<int>(entityNames.size())) m_selectedEntityIndex = 0;
-	EngineGuiWidgets::StringCombo("Entity", m_selectedEntityIndex, entityNames, "none");
+	const std::vector<std::string> targetKinds{ "New Entity", "Level Entity", "Instance" };
+	EngineGuiWidgets::StringCombo("Attach To", m_targetKind, targetKinds, "New Entity");
 
-	Entity* selectedEntity = (m_selectedEntityIndex > 0 && static_cast<std::size_t>(m_selectedEntityIndex - 1) < entities.size())
+	const auto& instances = Root::Current().Spawns().Definitions();
+	std::vector<std::string> instanceNames{ "none" };
+	for (const auto& entry : instances) instanceNames.push_back(entry.first);
+	if (m_selectedInstanceIndex < 0 || m_selectedInstanceIndex >= static_cast<int>(instanceNames.size())) m_selectedInstanceIndex = 0;
+	if (m_targetKind == 1)
+		EngineGuiWidgets::StringCombo("Entity", m_selectedEntityIndex, entityNames, "none");
+	else if (m_targetKind == 2)
+		EngineGuiWidgets::StringCombo("Instance", m_selectedInstanceIndex, instanceNames, "none");
+
+	Entity* selectedEntity = (m_targetKind == 1 && m_selectedEntityIndex > 0 && static_cast<std::size_t>(m_selectedEntityIndex - 1) < entities.size())
 		? entities[static_cast<std::size_t>(m_selectedEntityIndex - 1)].get() : nullptr;
+	const std::string selectedInstance = (m_targetKind == 2 && m_selectedInstanceIndex > 0
+		&& static_cast<std::size_t>(m_selectedInstanceIndex - 1) < instanceNames.size())
+		? instanceNames[static_cast<std::size_t>(m_selectedInstanceIndex - 1)] : "";
 	if (ImGui::Button("Create and Build"))
 	{
 		m_createAndBuildClassName = NormalizeClassName(m_newCodeFileName);
@@ -76,16 +95,17 @@ void CodeCreationWindow::Draw(Window* window, bool& popupRequested, ProjectManag
 	}
 	if (ImGui::BeginPopupModal("Create and Build##AquanactCreateAndBuild", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 	{
-		const bool attach = selectedEntity != nullptr;
 		ImGui::Text("Create a new component type: %s", m_createAndBuildClassName.c_str());
-		ImGui::Text("Selected entity: %s", selectedEntity ? selectedEntity->Name().c_str() : "none");
+		ImGui::Text("Selected target: %s", selectedEntity ? selectedEntity->Name().c_str()
+			: (!selectedInstance.empty() ? selectedInstance.c_str() : "none"));
 		ImGui::TextWrapped("The editor will generate the new class, save the project, and then shut down so you can rebuild the game.");
 		ImGui::TextWrapped("Please rebuild after the editor closes to compile the new type into the project.");
 		const EngineGuiWidgets::DialogAction action = EngineGuiWidgets::ConfirmationButtons("Create and Exit");
 		if (action == EngineGuiWidgets::DialogAction::Confirm)
 		{
 			m_statusMessage = GameCodeMaintenance::CreateComponent(m_createAndBuildClassName).statusMessage;
-			SaveNewClassConfiguration(m_createAndBuildClassName, attach, selectedEntity ? selectedEntity->Name() : "");
+			SaveNewClassConfiguration(m_createAndBuildClassName, selectedEntity != nullptr,
+				selectedEntity ? selectedEntity->Name() : "", !selectedInstance.empty(), selectedInstance);
 			if (!projectManager.CurrentProjectPath().empty()) projectManager.SaveProject(projectManager.CurrentProjectPath(), Root::Current().Scenes());
 			if (window) glfwSetWindowShouldClose(window->GLFW(), GLFW_TRUE);
 			ImGui::CloseCurrentPopup();

@@ -8,12 +8,24 @@
 #include "Engine/Core/PhysicsWorld.h"
 
 #include <algorithm>
+#include <cctype>
 #include <fstream>
 #include <memory>
 #include <stdexcept>
+#include <unordered_set>
 
 namespace
 {
+	std::string PortableModelPath(std::string path)
+	{
+		std::replace(path.begin(), path.end(), '\\', '/');
+		std::transform(path.begin(), path.end(), path.begin(),
+			[](unsigned char character) { return static_cast<char>(std::tolower(character)); });
+		const std::size_t assetsPosition = path.find("assets/");
+		return assetsPosition == std::string::npos
+			? path : path.substr(assetsPosition + std::string("assets/").size());
+	}
+
 	void AppendOperand(std::string& contents, const EntityStateMachine::Operand& operand)
 	{
 		contents += ";" + std::to_string(static_cast<int>(operand.type)) + ";" + std::to_string(operand.constantValue);
@@ -47,8 +59,15 @@ namespace
 
 	void RecoverDefinitionFromEntity(InstanceDefinition& definition, const Entity& entity)
 	{
-		definition.name = entity.Name();
-		definition.modelPath = entity.SourcePath();
+	definition.name = entity.Name();
+	definition.modelPath = entity.SourcePath();
+	definition.blocksCollision = entity.BlocksCollision();
+	definition.ignoreCameraCollision = entity.IgnoreCameraCollision();
+	definition.blocksCameraView = entity.BlocksCameraView();
+	definition.showPhysicsBoundingBox = entity.ShowPhysicsBoundingBox();
+	definition.physicsColliderShape = static_cast<int>(entity.GetPhysicsColliderShape());
+	if (entity.Parent())
+		definition.attachToEntityName = entity.Parent()->Name();
 		for (const Component* component : entity.Components())
 		{
 			if (!component) continue;
@@ -83,6 +102,32 @@ const InstanceDefinition* SpawnManager::FindDefinition(const std::string& name) 
 	return found == m_definitions.end() ? nullptr : &found->second;
 }
 
+Entity* SpawnManager::FindActiveInstance(const Scene& scene, const std::string& definitionName) const
+{
+	if (definitionName.empty()) return nullptr;
+	for (Entity* entity : m_instances)
+	{
+		if (!entity || entity->Name() != definitionName)
+			continue;
+		for (const auto& object : scene.Objects())
+			if (object.get() == entity)
+				return entity;
+	}
+
+	// A scene can contain an instance loaded from project data before the
+	// runtime registry has seen it, or a restored replacement may have been
+	// created by another scene path. The name is the serialized instance
+	// identity, so accept a live scene object when it matches a known
+	// definition as well.
+	const InstanceDefinition* definition = FindDefinition(definitionName);
+	if (!definition) return nullptr;
+	for (const auto& object : scene.Objects())
+		if (object && (object->Name() == definitionName
+			|| PortableModelPath(object->SourcePath()) == PortableModelPath(definition->modelPath)))
+			return object.get();
+	return nullptr;
+}
+
 bool SpawnManager::DeleteInstance(const std::string& definitionName)
 {
 	return m_definitions.erase(definitionName) != 0;
@@ -96,6 +141,19 @@ void SpawnManager::ResetForProject()
 
 void SpawnManager::AppendProjectState(std::string& contents, const std::filesystem::path& projectPath, const SceneManager& scenes)
 {
+	std::unordered_set<Entity*> liveEntities;
+	for (const auto& scene : scenes.Levels())
+	{
+		if (!scene) continue;
+		for (const auto& entity : scene->Objects())
+			if (entity) liveEntities.insert(entity.get());
+	}
+	m_instances.erase(std::remove_if(m_instances.begin(), m_instances.end(),
+		[&liveEntities](Entity* entity)
+		{
+			return !entity || !liveEntities.contains(entity);
+		}), m_instances.end());
+
 	for (Entity* entity : m_instances)
 	{
 		if (!entity || m_definitions.find(entity->Name()) != m_definitions.end()) continue;
@@ -122,9 +180,10 @@ void SpawnManager::AppendProjectState(std::string& contents, const std::filesyst
 	for (const auto& entry : m_definitions)
 	{
 		const InstanceDefinition& definition = entry.second;
-		contents += "instance;" + ProjectStateSerializer::EscapeField(definition.name);
+	contents += "instance;" + ProjectStateSerializer::EscapeField(definition.name);
 		contents += ";" + ProjectStateSerializer::EscapeField(
 			ProjectStateSerializer::MakePortableSourcePath(projectPath, definition.modelPath).string());
+		contents += ";attach;" + ProjectStateSerializer::EscapeField(definition.attachToEntityName);
 		contents += ";" + std::to_string(definition.componentTypes.size());
 		for (const std::string& type : definition.componentTypes)
 			contents += ";" + ProjectStateSerializer::EscapeField(type);
@@ -144,6 +203,12 @@ void SpawnManager::AppendProjectState(std::string& contents, const std::filesyst
 					contents += ";" + ProjectStateSerializer::MakePortableSourcePath(projectPath, animation).string();
 			contents += ";waitforcompletion;" + std::to_string(state.waitForCompletion ? 1 : 0);
 			contents += ";loop;" + std::to_string(state.loop ? 1 : 0);
+			contents += ";transform2;" + std::to_string(state.useTransformAnimation ? 1 : 0);
+			for (const glm::vec3& value : { state.transformStartPosition, state.transformEndPosition, state.transformStartRotation, state.transformEndRotation, state.transformStartScale, state.transformEndScale })
+				contents += ";" + std::to_string(value.x) + ";" + std::to_string(value.y) + ";" + std::to_string(value.z);
+		contents += ";" + std::to_string(state.transformDuration);
+		contents += ";transformclip;" + ProjectStateSerializer::EscapeField(
+			ProjectStateSerializer::MakePortableSourcePath(projectPath, state.transformAnimationName).string());
 			contents += ";" + std::to_string(state.soundEvents.size());
 			for (const auto& event : state.soundEvents)
 			{
@@ -164,7 +229,11 @@ void SpawnManager::AppendProjectState(std::string& contents, const std::filesyst
 			contents += ";" + std::to_string(conditions.size());
 			for (const auto& condition : conditions) AppendCondition(contents, condition);
 		}
-		contents += "\n";
+		contents += ";physics;" + std::to_string(definition.blocksCollision ? 1 : 0);
+		contents += ";" + std::to_string(definition.ignoreCameraCollision ? 1 : 0);
+		contents += ";" + std::to_string(definition.blocksCameraView ? 1 : 0);
+		contents += ";" + std::to_string(definition.showPhysicsBoundingBox ? 1 : 0);
+		contents += ";" + std::to_string(definition.physicsColliderShape) + "\n";
 	}
 }
 
@@ -183,6 +252,13 @@ void SpawnManager::LoadProjectState(const std::filesystem::path& projectPath)
 			InstanceDefinition definition;
 			definition.name = ProjectStateSerializer::UnescapeField(fields.at(index++));
 			definition.modelPath = ProjectStateSerializer::ResolveSourcePath(projectPath, fields.at(index++)).string();
+			// The attach field is optional so projects written before attachment
+			// support remain loadable.
+			if (index < fields.size() && fields[index] == "attach")
+			{
+				++index;
+				definition.attachToEntityName = ProjectStateSerializer::UnescapeField(fields.at(index++));
+			}
 			const int componentCount = std::stoi(fields.at(index++));
 			for (int i = 0; i < componentCount; ++i)
 				definition.componentTypes.push_back(ProjectStateSerializer::UnescapeField(fields.at(index++)));
@@ -216,6 +292,19 @@ void SpawnManager::LoadProjectState(const std::filesystem::path& projectPath)
 					++index;
 					state.loop = std::stoi(fields.at(index++)) != 0;
 				}
+				if (index < fields.size() && fields[index] == "transform2")
+				{
+					++index;
+					state.useTransformAnimation = std::stoi(fields.at(index++)) != 0;
+					glm::vec3* values[] = { &state.transformStartPosition, &state.transformEndPosition, &state.transformStartRotation, &state.transformEndRotation, &state.transformStartScale, &state.transformEndScale };
+					for (glm::vec3* value : values) { value->x = std::stof(fields.at(index++)); value->y = std::stof(fields.at(index++)); value->z = std::stof(fields.at(index++)); }
+					state.transformDuration = std::stof(fields.at(index++));
+					if (index < fields.size() && fields[index] == "transformclip")
+					{
+						++index;
+						state.transformAnimationName = fields.at(index++);
+					}
+				}
 				const int soundCount = std::stoi(fields.at(index++));
 				for (int soundIndex = 0; soundIndex < soundCount; ++soundIndex)
 				{
@@ -246,6 +335,15 @@ void SpawnManager::LoadProjectState(const std::filesystem::path& projectPath)
 				if (!transition.conditions.empty()) transition.condition = transition.conditions.front();
 				definition.entityStateMachineTransitions.push_back(std::move(transition));
 			}
+			if (index < fields.size() && fields[index] == "physics")
+			{
+				++index;
+				definition.blocksCollision = std::stoi(fields.at(index++)) != 0;
+				definition.ignoreCameraCollision = std::stoi(fields.at(index++)) != 0;
+				definition.blocksCameraView = std::stoi(fields.at(index++)) != 0;
+				definition.showPhysicsBoundingBox = std::stoi(fields.at(index++)) != 0;
+				definition.physicsColliderShape = std::stoi(fields.at(index++));
+			}
 			if (!definition.name.empty() && !definition.modelPath.empty())
 				m_definitions[definition.name] = std::move(definition);
 		}
@@ -257,22 +355,40 @@ void SpawnManager::LoadProjectState(const std::filesystem::path& projectPath)
 }
 
 Entity* SpawnManager::SpawnInstance(Scene& scene, const std::string& definitionName,
-	const glm::vec3& position, const glm::vec3& rotation)
+	const glm::vec3& position, const glm::vec3& rotation, Entity* parent)
 {
 	const auto definition = m_definitions.find(definitionName);
 	if (definition == m_definitions.end()) return nullptr;
+	if (!parent && !definition->second.attachToEntityName.empty())
+		parent = scene.FindObjectByName(definition->second.attachToEntityName);
 
 	auto instance = std::make_unique<Entity>(definition->second.modelPath.c_str(), false);
 	if (!instance->GetMesh())
 		return nullptr;
 
 	instance->SetName(definition->second.name);
-	instance->Translate(position);
-	instance->SetRotation(rotation);
+	instance->SetBlocksCollision(definition->second.blocksCollision);
+	instance->SetIgnoreCameraCollision(definition->second.ignoreCameraCollision);
+	instance->SetBlocksCameraView(definition->second.blocksCameraView);
+	instance->SetShowPhysicsBoundingBox(definition->second.showPhysicsBoundingBox);
+	instance->SetPhysicsColliderShape(definition->second.physicsColliderShape == 1
+		? PhysicsColliderShape::Capsule
+		: definition->second.physicsColliderShape == 2 ? PhysicsColliderShape::Convex : PhysicsColliderShape::Box);
+	if (parent)
+	{
+		// When a parent is supplied, the spawn transform is local to that parent.
+		// Attach before physics registration so the initial collider uses the
+		// child's inherited world transform.
+		if (!instance->AttachTo(*parent, position, rotation))
+			return nullptr;
+	}
+	else
+	{
+		instance->Translate(position);
+		instance->SetRotation(rotation);
+	}
 	for (const std::string& componentType : definition->second.componentTypes)
 	{
-		if (componentType == "EntityStateMachine" && !instance->GetMesh()->Skinned())
-			continue;
 		if (instance->GetComponentByName(componentType))
 			continue;
 		if (std::unique_ptr<Component> component = ComponentFactory::Instance().Create(componentType, *instance))
@@ -307,6 +423,13 @@ Entity* SpawnManager::SpawnInstance(Scene& scene, const std::string& definitionN
 				if (!stateMachine->AddState(state.name, std::move(animationName), state.blocksMovement, state.blocksInput,
 					state.useAnimationSequence, std::move(animationSequence), waitForCompletion, state.loop))
 					continue;
+				if (!state.transformAnimationName.empty())
+					stateMachine->SetStateTransform(stateMachine->States().size() - 1, state.transformAnimationName);
+				else
+					stateMachine->SetStateTransform(stateMachine->States().size() - 1, state.useTransformAnimation,
+						state.transformStartPosition, state.transformEndPosition, state.transformStartRotation,
+						state.transformEndRotation, state.transformStartScale, state.transformEndScale,
+						state.transformDuration);
 				for (const EntityStateMachine::SoundEvent& event : state.soundEvents)
 					stateMachine->AddStateSoundEvent(state.name, event);
 			}

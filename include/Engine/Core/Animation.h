@@ -12,11 +12,13 @@ public:
 
 	// Clip timing
 	float Duration() const;
+	float StartTime() const;
 	float TicksPerSecond() const;
 	int FrameCount() const;
 
 	// Channel lookup
 	const aiNodeAnim* FindChannel(const std::string& name) const;
+	const aiNodeAnim* FirstChannel() const { return m_firstChannel; }
 
 	// Transform sampling
 	void CalcPosition(aiVector3D& out, float timeTicks, const aiNodeAnim* ch) const;
@@ -34,9 +36,11 @@ private:
 
 	// Clip timing
 	float m_duration;
+	float m_startTime;
 	float m_ticksPerSecond;
 
 	// Channel lookup cache
 	std::unordered_map<std::string, const aiNodeAnim*> m_channelMap;
+	const aiNodeAnim* m_firstChannel = nullptr;
 };
 

@@ -36,7 +36,7 @@ namespace {
 
 }
 
-ImportedModel ModelImporter::Import(const std::string& path, bool flipUvs) const
+ImportedModel ModelImporter::Import(const std::string& path, bool flipUvs, bool loadAnimations) const
 {
 	ImportedModel model;
 	model.importer = std::make_unique<Assimp::Importer>();
@@ -159,7 +159,7 @@ ImportedModel ModelImporter::Import(const std::string& path, bool flipUvs) const
 
 	const auto animDir = std::filesystem::path(path).parent_path() / "animations";
 	const std::string modelStem = ToLower(std::filesystem::path(path).stem().string());
-	if (model.skinned && std::filesystem::exists(animDir) && std::filesystem::is_directory(animDir))
+	if (loadAnimations && std::filesystem::exists(animDir) && std::filesystem::is_directory(animDir))
 	{
 		for (const auto& entry : std::filesystem::recursive_directory_iterator(animDir))
 		{

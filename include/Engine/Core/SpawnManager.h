@@ -19,7 +19,15 @@ struct InstanceDefinition
 {
 	std::string name;
 	std::string modelPath;
+	// Resolved against the destination scene when an instance is spawned.
+	// Names are used instead of pointers because definitions outlive scenes.
+	std::string attachToEntityName;
 	std::vector<std::string> componentTypes;
+	bool blocksCollision = true;
+	bool ignoreCameraCollision = false;
+	bool blocksCameraView = true;
+	bool showPhysicsBoundingBox = false;
+	int physicsColliderShape = 0;
 	bool hasEntityStateMachineConfiguration = false;
 	std::string entityStateMachineInitialState;
 	std::vector<EntityStateMachine::State> entityStateMachineStates;
@@ -35,7 +43,8 @@ public:
 	bool CreateInstance(InstanceDefinition definition);
 	bool DeleteInstance(const std::string& definitionName);
 	Entity* SpawnInstance(Scene& scene, const std::string& definitionName,
-		const glm::vec3& position, const glm::vec3& rotation);
+		const glm::vec3& position, const glm::vec3& rotation,
+		Entity* parent = nullptr);
 	bool Despawn(Scene& scene, Entity* entity);
 	void AppendProjectState(std::string& contents, const std::filesystem::path& projectPath, const SceneManager& scenes);
 	void LoadProjectState(const std::filesystem::path& projectPath);
@@ -43,6 +52,7 @@ public:
 	const std::unordered_map<std::string, InstanceDefinition>& Definitions() const { return m_definitions; }
 	InstanceDefinition* FindDefinition(const std::string& name);
 	const InstanceDefinition* FindDefinition(const std::string& name) const;
+	Entity* FindActiveInstance(const Scene& scene, const std::string& definitionName) const;
 	std::size_t ActiveInstanceCount() const { return m_instances.size(); }
 
 private:

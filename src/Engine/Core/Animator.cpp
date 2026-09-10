@@ -2,6 +2,9 @@
 #include <assimp/scene.h>
 #include <algorithm>
 #include <cmath>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/quaternion.hpp>
+#undef GLM_ENABLE_EXPERIMENTAL
 
 static aiMatrix4x4 MakeScaling(const aiVector3D& s)
 {
@@ -179,6 +182,37 @@ void Animator::EvaluateClipAt(int clipIndex, float seconds, bool loop)
 	Traverse(ticks, m_rootNode, aiMatrix4x4(), clip);
 }
 
+bool Animator::SampleClipRootTransform(int clipIndex, float seconds, bool loop,
+	glm::vec3& position, glm::vec3& rotation, glm::vec3& scale) const
+{
+	if (clipIndex < 0 || clipIndex >= static_cast<int>(m_clips.size())
+		|| !m_clips[clipIndex] || !m_rootNode)
+		return false;
+
+	Animation* clip = m_clips[clipIndex].get();
+	const float ticks = PlaybackTicks(seconds, clip, loop);
+	const aiNodeAnim* channel = clip->FindChannel(m_rootNode->mName.C_Str());
+	// Maya object-transform exports often animate the mesh node below Assimp's
+	// synthetic RootNode instead of the synthetic root itself.
+	if (!channel)
+		channel = clip->FirstChannel();
+	if (!channel)
+		return false;
+
+	aiVector3D sampledPosition;
+	aiQuaternion sampledRotation;
+	aiVector3D sampledScale;
+	clip->CalcPosition(sampledPosition, ticks, channel);
+	clip->CalcRotation(sampledRotation, ticks, channel);
+	clip->CalcScaling(sampledScale, ticks, channel);
+	position = glm::vec3(sampledPosition.x, sampledPosition.y, sampledPosition.z);
+	const glm::quat glmRotation(sampledRotation.w, sampledRotation.x,
+		sampledRotation.y, sampledRotation.z);
+	rotation = glm::eulerAngles(glmRotation);
+	scale = glm::vec3(sampledScale.x, sampledScale.y, sampledScale.z);
+	return true;
+}
+
 int Animator::ClipCount() const
 {
 	return static_cast<int>(m_clips.size());
@@ -196,6 +230,27 @@ float Animator::ClipDuration(int clipIndex) const
 	return ticksPerSecond > 0.0f ? clip.Duration() / ticksPerSecond : 0.0f;
 }
 
+float Animator::ClipDurationTicks(int clipIndex) const
+{
+	if (clipIndex < 0 || clipIndex >= static_cast<int>(m_clips.size()) || !m_clips[clipIndex])
+		return 0.0f;
+	return m_clips[clipIndex]->Duration();
+}
+
+float Animator::ClipStartTicks(int clipIndex) const
+{
+	if (clipIndex < 0 || clipIndex >= static_cast<int>(m_clips.size()) || !m_clips[clipIndex])
+		return 0.0f;
+	return m_clips[clipIndex]->StartTime();
+}
+
+float Animator::ClipTicksPerSecond(int clipIndex) const
+{
+	if (clipIndex < 0 || clipIndex >= static_cast<int>(m_clips.size()) || !m_clips[clipIndex])
+		return 0.0f;
+	return m_clips[clipIndex]->TicksPerSecond();
+}
+
 int Animator::CurrentClipIndex() const
 {
 	return m_currentClip;
@@ -208,6 +263,20 @@ float Animator::CurrentTimeTicks() const
 		return 0.0f;
 	}
 	return PlaybackTicks(m_currentTime, m_clips[m_currentClip].get(), m_looping);
+}
+
+float Animator::CurrentClipTicksPerSecond() const
+{
+	if (m_currentClip < 0 || m_currentClip >= static_cast<int>(m_clips.size()) || !m_clips[m_currentClip])
+		return 0.0f;
+	return m_clips[m_currentClip]->TicksPerSecond();
+}
+
+float Animator::CurrentClipStartTicks() const
+{
+	if (m_currentClip < 0 || m_currentClip >= static_cast<int>(m_clips.size()) || !m_clips[m_currentClip])
+		return 0.0f;
+	return m_clips[m_currentClip]->StartTime();
 }
 
 float Animator::CurrentClipDurationTicks() const

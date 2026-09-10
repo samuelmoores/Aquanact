@@ -56,6 +56,9 @@ public:
 	void Submit(const RenderCommand& command);
 	void Flush(const Camera& camera, unsigned int selectedEntityId = 0);
 	void Loop(FrontEndManager& frontEndManager, FileManager& fileManager, SceneManager& SceneManager, ProjectManager& projectManager, Debug& debug, Input& input, Window& window, EngineState& engineState);
+	// Used for startup frames that must be presented before normal scene work.
+	void BeginFrame();
+	void PresentFrame(Window& window);
 	void UpdateCameraPhase(const Input& input, const EngineState& engineState);
 	void ToggleCameraPoint(std::size_t pointIndex);
 	// Clear non-owning entity references before a scene destroys its entities.
@@ -84,8 +87,6 @@ private:
 	void DrawFrame(FrontEndManager& frontEndManager, FileManager& fileManager, SceneManager& SceneManager, ProjectManager& projectManager, Debug& debug, Input& input, EngineState& engineState);
 	bool ShouldPreviewMainMenu(const FrontEndManager& frontEndManager, EngineState& engineState) const;
 	void ApplyCameraMode(const EngineState& engineState);
-	void BeginFrame();
-	void PresentFrame(Window& window);
 
 	std::unique_ptr<EngineCamera> m_engineCamera;
 	std::unique_ptr<PathedCamera> m_gameCamera;

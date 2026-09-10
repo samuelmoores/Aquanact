@@ -52,21 +52,35 @@ void InstanceManager::SyncComponentPreview()
 	}
 
 	const std::filesystem::path& modelPath = m_models[static_cast<std::size_t>(m_selectedModel)];
-	bool rebuild = !m_componentPreview || !SamePath(m_componentPreview->SourcePath(), modelPath);
+	// SourcePath is set directly from modelPath when the preview entity is built.
+	// Avoid filesystem canonicalization on every UI frame; it can be expensive on
+	// large or network-backed asset trees.
+	bool rebuild = !m_componentPreview || m_componentPreview->SourcePath() != modelPath.string();
 	if (!rebuild)
 	{
 		std::vector<std::string> previewTypes;
 		for (Component* component : m_componentPreview->Components())
-			if (component && !dynamic_cast<EntityStateMachine*>(component)) previewTypes.push_back(component->Name());
+			if (component) previewTypes.push_back(component->Name());
 		std::vector<std::string> requestedTypes;
 		for (const std::string& componentType : m_componentTypes)
-			if (componentType != "EntityStateMachine") requestedTypes.push_back(componentType);
+			requestedTypes.push_back(componentType);
 		rebuild = previewTypes != requestedTypes;
 	}
 	if (!rebuild)
+	{
+		m_componentPreview->SetBlocksCollision(m_blocksCollision);
+		m_componentPreview->SetIgnoreCameraCollision(m_ignoreCameraCollision);
+		m_componentPreview->SetBlocksCameraView(m_blocksCameraView);
+		m_componentPreview->SetShowPhysicsBoundingBox(m_showPhysicsBoundingBox);
+		m_componentPreview->SetPhysicsColliderShape(m_physicsColliderShape == 1
+			? PhysicsColliderShape::Capsule
+			: m_physicsColliderShape == 2 ? PhysicsColliderShape::Convex : PhysicsColliderShape::Box);
 		return;
+	}
 
-	m_componentPreview = std::make_unique<Entity>(modelPath.string().c_str(), false);
+	// Component controls only need mesh/material data. Avoid importing every
+	// sibling animation FBX while the user is browsing the Instance Manager.
+	m_componentPreview = std::make_unique<Entity>(modelPath.string().c_str(), false, false);
 	if (!m_componentPreview->GetMesh())
 	{
 		m_componentPreview.reset();
@@ -75,10 +89,17 @@ void InstanceManager::SyncComponentPreview()
 	m_componentPreview->SetName(m_entityName);
 	for (const std::string& componentType : m_componentTypes)
 	{
-		if (componentType == "EntityStateMachine" || m_componentPreview->GetComponentByName(componentType)) continue;
+		if (m_componentPreview->GetComponentByName(componentType)) continue;
 		if (std::unique_ptr<Component> component = ComponentFactory::Instance().Create(componentType, *m_componentPreview))
 			m_componentPreview->AddComponent(std::move(component));
 	}
+	m_componentPreview->SetBlocksCollision(m_blocksCollision);
+	m_componentPreview->SetIgnoreCameraCollision(m_ignoreCameraCollision);
+	m_componentPreview->SetBlocksCameraView(m_blocksCameraView);
+	m_componentPreview->SetShowPhysicsBoundingBox(m_showPhysicsBoundingBox);
+	m_componentPreview->SetPhysicsColliderShape(m_physicsColliderShape == 1
+		? PhysicsColliderShape::Capsule
+		: m_physicsColliderShape == 2 ? PhysicsColliderShape::Convex : PhysicsColliderShape::Box);
 }
 
 void InstanceManager::DrawComponentPreview()
@@ -142,6 +163,13 @@ namespace
 			if (!machine.AddState(state.name, std::move(animationName), state.blocksMovement, state.blocksInput,
 				state.useAnimationSequence, std::move(animationSequence), waitForCompletion, state.loop))
 				continue;
+			if (!state.transformAnimationName.empty())
+				machine.SetStateTransform(machine.States().size() - 1, state.transformAnimationName);
+			else
+				machine.SetStateTransform(machine.States().size() - 1, state.useTransformAnimation,
+					state.transformStartPosition, state.transformEndPosition, state.transformStartRotation,
+					state.transformEndRotation, state.transformStartScale, state.transformEndScale,
+					state.transformDuration);
 			for (const EntityStateMachine::SoundEvent& event : state.soundEvents)
 				machine.AddStateSoundEvent(state.name, event);
 		}
@@ -158,7 +186,9 @@ namespace
 
 void InstanceManager::RefreshModels()
 {
+	m_modelsLoaded = true;
 	m_models.clear();
+	m_modelLabels.clear();
 	m_selectedModel = -1;
 	const std::filesystem::path modelRoot = Root::Current().Projects().ProjectAssetsDirectory() / "models";
 	std::error_code error;
@@ -171,6 +201,10 @@ void InstanceManager::RefreshModels()
 			m_models.push_back(entry.path());
 	}
 	std::sort(m_models.begin(), m_models.end());
+	const std::filesystem::path relativeRoot = Root::Current().Projects().ProjectAssetsDirectory() / "models";
+	m_modelLabels.reserve(m_models.size());
+	for (const std::filesystem::path& model : m_models)
+		m_modelLabels.push_back(model.lexically_relative(relativeRoot).generic_string());
 	if (!m_models.empty())
 		m_selectedModel = 0;
 }
@@ -181,12 +215,24 @@ void BeginInstanceEdit(
 	int& selectedModel,
 	char* entityName,
 	std::size_t entityNameSize,
+	std::string& attachToEntityName,
 	std::vector<std::string>& componentTypes,
+	bool& blocksCollision,
+	bool& ignoreCameraCollision,
+	bool& blocksCameraView,
+	bool& showPhysicsBoundingBox,
+	int& physicsColliderShape,
 	std::string& editingName)
 {
 	std::strncpy(entityName, definition.name.c_str(), entityNameSize - 1);
 	entityName[entityNameSize - 1] = '\0';
+	attachToEntityName = definition.attachToEntityName;
 	componentTypes = definition.componentTypes;
+	blocksCollision = definition.blocksCollision;
+	ignoreCameraCollision = definition.ignoreCameraCollision;
+	blocksCameraView = definition.blocksCameraView;
+	showPhysicsBoundingBox = definition.showPhysicsBoundingBox;
+	physicsColliderShape = definition.physicsColliderShape;
 	editingName = definition.name;
 	selectedModel = -1;
 	for (int index = 0; index < static_cast<int>(models.size()); ++index)
@@ -204,7 +250,7 @@ bool InstanceManager::OpenStateMachinePreview(const InstanceDefinition& definiti
 	if (definition.componentTypes.end() == std::find(definition.componentTypes.begin(), definition.componentTypes.end(), "EntityStateMachine"))
 		return false;
 	m_stateMachinePreview = std::make_unique<Entity>(definition.modelPath.c_str(), false);
-	if (!m_stateMachinePreview->GetMesh() || !m_stateMachinePreview->GetMesh()->Skinned())
+	if (!m_stateMachinePreview->GetMesh())
 	{
 		m_stateMachinePreview.reset();
 		return false;
@@ -247,7 +293,6 @@ EntityStateMachine* InstanceManager::StateMachinePreview() const
 InstanceManagerResult InstanceManager::Draw(SceneManager& scenes, bool& open)
 {
 	InstanceManagerResult result;
-	(void)scenes;
 	if (!open)
 	{
 		result.stateMachineToDraw = StateMachinePreview();
@@ -260,7 +305,7 @@ InstanceManagerResult InstanceManager::Draw(SceneManager& scenes, bool& open)
 		result.stateMachineToDraw = StateMachinePreview();
 		return result;
 	}
-	if (m_models.empty())
+	if (!m_modelsLoaded)
 		RefreshModels();
 	SyncComponentPreview();
 
@@ -268,21 +313,51 @@ InstanceManagerResult InstanceManager::Draw(SceneManager& scenes, bool& open)
 	ImGui::TextDisabled("Choose a model and configure the components on the instance.");
 	if (ImGui::SmallButton("Refresh Models"))
 		RefreshModels();
-	if (ImGui::BeginCombo("Model", m_selectedModel >= 0 ? m_models[m_selectedModel].filename().string().c_str() : "Select model"))
+		if (ImGui::BeginCombo("Model", m_selectedModel >= 0 ? m_models[m_selectedModel].filename().string().c_str() : "Select model"))
 	{
-		for (int index = 0; index < static_cast<int>(m_models.size()); ++index)
+		ImGuiListClipper clipper;
+		clipper.Begin(static_cast<int>(m_models.size()));
+		while (clipper.Step())
 		{
-			const bool selected = index == m_selectedModel;
-			const std::string label = m_models[index].lexically_relative(
-				Root::Current().Projects().ProjectAssetsDirectory() / "models").generic_string();
-			if (ImGui::Selectable(label.c_str(), selected))
-				m_selectedModel = index;
-			if (selected)
-				ImGui::SetItemDefaultFocus();
+			for (int index = clipper.DisplayStart; index < clipper.DisplayEnd; ++index)
+			{
+				const bool selected = index == m_selectedModel;
+				if (ImGui::Selectable(m_modelLabels[static_cast<std::size_t>(index)].c_str(), selected))
+					m_selectedModel = index;
+				if (selected) ImGui::SetItemDefaultFocus();
+			}
 		}
 		ImGui::EndCombo();
 	}
 	ImGui::InputText("Entity Name", m_entityName, sizeof(m_entityName));
+	Scene* activeScene = scenes.ActiveLevel();
+	if (activeScene)
+	{
+		std::string attachLabel = m_attachToEntityName.empty()
+			? "None" : m_attachToEntityName;
+		if (ImGui::BeginCombo("Attach To", attachLabel.c_str()))
+		{
+			if (ImGui::Selectable("None", m_attachToEntityName.empty()))
+				m_attachToEntityName.clear();
+			const auto& objects = activeScene->Objects();
+			ImGuiListClipper clipper;
+			clipper.Begin(static_cast<int>(objects.size()));
+			while (clipper.Step())
+			{
+				for (int index = clipper.DisplayStart; index < clipper.DisplayEnd; ++index)
+				{
+					const auto& entity = objects[static_cast<std::size_t>(index)];
+					if (!entity) continue;
+					const bool selected = m_attachToEntityName == entity->Name();
+					if (ImGui::Selectable(entity->Name().c_str(), selected))
+						m_attachToEntityName = entity->Name();
+					if (selected) ImGui::SetItemDefaultFocus();
+				}
+			}
+			ImGui::EndCombo();
+		}
+		ImGui::TextDisabled("Resolved by entity name when this definition spawns.");
+	}
 	if (!m_editingDefinitionName.empty())
 	{
 		ImGui::TextDisabled("Editing: %s", m_editingDefinitionName.c_str());
@@ -307,8 +382,7 @@ InstanceManagerResult InstanceManager::Draw(SceneManager& scenes, bool& open)
 			if (ImGui::Selectable(name.c_str(), false) && !alreadyAttached)
 			{
 				m_componentTypes.push_back(name);
-				if (m_componentPreview && (name != "EntityStateMachine")
-					&& !m_componentPreview->GetComponentByName(name))
+				if (m_componentPreview && !m_componentPreview->GetComponentByName(name))
 				{
 					if (std::unique_ptr<Component> component = ComponentFactory::Instance().Create(name, *m_componentPreview))
 						m_componentPreview->AddComponent(std::move(component));
@@ -324,6 +398,21 @@ InstanceManagerResult InstanceManager::Draw(SceneManager& scenes, bool& open)
 		ImGui::EndCombo();
 	}
 	DrawComponentPreview();
+	ImGui::Separator();
+	ImGui::TextUnformatted("Physics");
+	if (m_componentPreview)
+	{
+		m_entityWindow.DrawPhysics(*m_componentPreview);
+		m_blocksCollision = m_componentPreview->BlocksCollision();
+		m_ignoreCameraCollision = m_componentPreview->IgnoreCameraCollision();
+		m_blocksCameraView = m_componentPreview->BlocksCameraView();
+		m_showPhysicsBoundingBox = m_componentPreview->ShowPhysicsBoundingBox();
+		m_physicsColliderShape = static_cast<int>(m_componentPreview->GetPhysicsColliderShape());
+	}
+	else
+	{
+		ImGui::TextDisabled("Select a model to configure physics.");
+	}
 	if (ImGui::Button(m_editingDefinitionName.empty() ? "Create Instance" : "Update Instance"))
 	{
 		if (m_selectedModel < 0 || m_selectedModel >= static_cast<int>(m_models.size()))
@@ -335,7 +424,13 @@ InstanceManagerResult InstanceManager::Draw(SceneManager& scenes, bool& open)
 			InstanceDefinition definition;
 			definition.name = m_entityName;
 			definition.modelPath = m_models[m_selectedModel].string();
+			definition.attachToEntityName = m_attachToEntityName;
 			definition.componentTypes = m_componentTypes;
+			definition.blocksCollision = m_blocksCollision;
+			definition.ignoreCameraCollision = m_ignoreCameraCollision;
+			definition.blocksCameraView = m_blocksCameraView;
+			definition.showPhysicsBoundingBox = m_showPhysicsBoundingBox;
+			definition.physicsColliderShape = m_physicsColliderShape;
 			if (!m_editingDefinitionName.empty())
 			{
 				if (const InstanceDefinition* previous = Root::Current().Spawns().FindDefinition(m_editingDefinitionName))
@@ -378,7 +473,8 @@ InstanceManagerResult InstanceManager::Draw(SceneManager& scenes, bool& open)
 		}
 		if (ImGui::SmallButton("Edit"))
 			BeginInstanceEdit(entry.second, m_models, m_selectedModel, m_entityName, sizeof(m_entityName),
-				m_componentTypes, m_editingDefinitionName);
+				m_attachToEntityName, m_componentTypes, m_blocksCollision, m_ignoreCameraCollision,
+				m_blocksCameraView, m_showPhysicsBoundingBox, m_physicsColliderShape, m_editingDefinitionName);
 		ImGui::SameLine();
 		if (ImGui::SmallButton("Delete"))
 		{
