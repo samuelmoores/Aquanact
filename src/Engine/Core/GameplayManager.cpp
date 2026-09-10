@@ -10,9 +10,13 @@
 #include "Engine/Core/Scene.h"
 #include "Engine/Core/PathedCamera.h"
 #include "Engine/Core/Root.h"
+#include "Engine/Core/SpawnManager.h"
 #include "Engine/Core/FrameProfiler.h"
 #include "Engine/Core/Input.h"
+#include "Engine/Core/InputManager.h"
 #include "Engine/Core/PhysicsWorld.h"
+#include "Game/Health.h"
+#include "Game/PlayerController.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -40,6 +44,20 @@ namespace {
 		}
 
 		return nullptr;
+	}
+
+	void PlayCutsceneSoundEvents(const CutsceneTimeline& timeline, float previousTime, float currentTime)
+	{
+		for (const CutsceneSoundEvent& event : timeline.soundEvents)
+		{
+			if (event.soundPath.empty() || event.startTime < previousTime || event.startTime > currentTime)
+				continue;
+			const std::filesystem::path requestedPath(event.soundPath);
+			const std::string audioPath = requestedPath.is_absolute() || event.soundPath.rfind("assets/", 0) == 0
+				? event.soundPath : "assets/" + event.soundPath;
+			if (!Audio::IsSoundLoaded(audioPath)) Audio::LoadSound(audioPath, audioPath);
+			Audio::PlaySound(audioPath, event.volume);
+		}
 	}
 }
 
@@ -78,6 +96,9 @@ void GameplayManager::shutDown()
 	m_cutsceneActive = false;
 	m_cutsceneElapsed = 0.0f;
 	m_cutsceneNextLevel.clear();
+	m_levelElapsedSeconds = 0.0f;
+	m_levelTimeLimitSeconds = 30.0f;
+	m_levelWon = false;
 }
 
 void GameplayManager::BootMainMenu(FrontEndManager& frontEndManager, Debug& debug)
@@ -100,6 +121,8 @@ void GameplayManager::BootMainMenu(FrontEndManager& frontEndManager, Debug& debu
 		m_levelManager->startUp();
 		m_levelManager->CaptureActiveLevelEditorTransforms();
 		mainMenuLevel->FirstFrame();
+		if (!mainMenuLevel->MusicPath().empty())
+			Audio::PlayMusic("assets/" + mainMenuLevel->MusicPath(), true, mainMenuLevel->MusicVolume());
 	}
 	EnterMainMenu(frontEndManager, debug);
 }
@@ -120,6 +143,13 @@ bool GameplayManager::BootPlayableLevel(FrontEndManager& frontEndManager, Debug&
 
 	m_levelManager->SetActiveLevel(playableLevel->Name());
 	m_levelManager->SetStartupLevelName(playableLevel->Name());
+	m_levelElapsedSeconds = 0.0f;
+	m_levelTimeLimitSeconds = 30.0f;
+	m_levelWon = false;
+	// A retry reuses the already-loaded scene. Remove transient entities such as
+	// the attack sphere before Scene::startUp iterates its entity collection.
+	Root::Current().Spawns().DespawnRuntimeInstances(*playableLevel);
+	m_levelManager->RestoreActiveLevelEditorTransforms();
 	m_levelManager->startUp();
 	m_levelManager->CaptureActiveLevelEditorTransforms();
 	playableLevel->FirstFrame();
@@ -148,9 +178,14 @@ bool GameplayManager::StartCutscene(const std::string& cutsceneName, const std::
 	m_levelManager->startUp();
 	m_levelManager->CaptureActiveLevelEditorTransforms();
 	cutscene->FirstFrame();
+	if (!cutscene->MusicPath().empty())
+		Audio::PlayMusic("assets/" + cutscene->MusicPath(), true, cutscene->MusicVolume());
 	m_cutsceneActive = true;
 	m_cutsceneElapsed = 0.0f;
 	m_cutsceneNextLevel = levelName;
+	m_levelElapsedSeconds = 0.0f;
+	m_levelTimeLimitSeconds = 30.0f;
+	m_levelWon = false;
 	EnterGameplay(frontEndManager, debug);
 	debug.LogMessage("GameplayManager::StartCutscene() scene=" + cutsceneName + " next=" + levelName);
 	return true;
@@ -198,6 +233,9 @@ void GameplayManager::StartGameSession(FrontEndManager& frontEndManager, Debug& 
 
 	m_levelManager->startUp();
 	m_levelManager->CaptureActiveLevelEditorTransforms();
+	m_levelElapsedSeconds = 0.0f;
+	m_levelTimeLimitSeconds = 30.0f;
+	m_levelWon = false;
 	Scene* activeLevel = m_levelManager->ActiveLevel();
 	if (activeLevel)
 	{
@@ -304,7 +342,9 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 	{
 		PathedCamera& camera = activeLevel->CameraSystem();
 		const float cutsceneDuration = std::max(0.1f, activeLevel->Cutscene().duration);
+		const float previousCutsceneTime = m_cutsceneElapsed;
 		m_cutsceneElapsed += std::max(0.0f, dt);
+		PlayCutsceneSoundEvents(activeLevel->Cutscene(), previousCutsceneTime, m_cutsceneElapsed);
 		camera.SetPlayerProgress(CameraPathProgressAtTime(camera.Path(), m_cutsceneElapsed, cutsceneDuration));
 		// Cutscene playback must land on the authored curve for the current
 		// timeline time. The normal camera update intentionally smooths toward a
@@ -341,6 +381,9 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 			m_cutsceneActive = false;
 			m_cutsceneElapsed = 0.0f;
 			m_cutsceneNextLevel.clear();
+			m_levelElapsedSeconds = 0.0f;
+			m_levelTimeLimitSeconds = 30.0f;
+			m_levelWon = false;
 			if (m_levelManager->SetActiveLevel(nextLevel))
 			{
 				m_levelManager->startUp();
@@ -358,6 +401,45 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 		// Cutscene tracks own animation pose and movement while the timeline is
 		// active; gameplay state machines must not overwrite the authored pose.
 		return;
+	}
+
+	if (!m_levelWon)
+	{
+		if (Root::Current().InputActions().WasPressed("Attack"))
+			m_levelTimeLimitSeconds += 30.0f;
+		m_levelElapsedSeconds += std::max(0.0f, dt);
+		if (m_levelElapsedSeconds >= m_levelTimeLimitSeconds)
+		{
+			Entity* player = nullptr;
+			Entity* salvador = nullptr;
+			for (const auto& object : activeLevel->Objects())
+			{
+				if (!object)
+					continue;
+				if (object->GetComponent<PlayerController>())
+					player = object.get();
+				if (object->Name() == "DrSalvador" || object->Name() == "drsalvador.fbx")
+					salvador = object.get();
+			}
+
+			if (salvador)
+			{
+				if (Health* health = salvador->GetComponent<Health>())
+				{
+					if (!health->IsDead())
+					{
+						Entity& damageSource = player ? *player : *salvador;
+						health->ReceiveDamage(damageSource, health->CurrentHealth());
+					}
+					m_levelWon = health->IsDead();
+				}
+			}
+			if (m_levelWon && player)
+			{
+				if (PlayerController* playerController = player->GetComponent<PlayerController>())
+					playerController->SetMovementLocked(true);
+			}
+		}
 	}
 
 	// How can we move this to the debugger?

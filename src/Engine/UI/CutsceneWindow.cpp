@@ -9,8 +9,10 @@
 #include "Engine/Core/SceneManager.h"
 #include "Engine/Core/PathedCamera.h"
 #include "Engine/Core/Animator.h"
+#include "Engine/Core/Audio.h"
 #include "Engine/Core/Root.h"
 #include "Engine/Core/RenderManager.h"
+#include "Engine/UI/EngineGuiWidgets.h"
 
 #include <imgui.h>
 #include <algorithm>
@@ -42,6 +44,23 @@ namespace
 					object->AddComponent<CutsceneAnimator>(object->GetMesh());
 			}
 		}
+	}
+
+	void PlaySoundEvent(const CutsceneSoundEvent& event)
+	{
+		if (event.soundPath.empty()) return;
+		const std::filesystem::path requestedPath(event.soundPath);
+		const std::string audioPath = requestedPath.is_absolute() || event.soundPath.rfind("assets/", 0) == 0
+			? event.soundPath : "assets/" + event.soundPath;
+		if (!Audio::IsSoundLoaded(audioPath)) Audio::LoadSound(audioPath, audioPath);
+		Audio::PlaySound(audioPath, event.volume);
+	}
+
+	void PlaySoundEventsCrossed(const CutsceneTimeline& timeline, float previousTime, float currentTime)
+	{
+		if (previousTime < 0.0f || currentTime < previousTime) return;
+		for (const CutsceneSoundEvent& event : timeline.soundEvents)
+			if (event.startTime >= previousTime && event.startTime <= currentTime) PlaySoundEvent(event);
 	}
 
 	void EvaluateTimeline(Scene& scene, float time)
@@ -95,6 +114,7 @@ void CutsceneWindow::Draw(SceneManager& scenes, ProjectManager& projects, bool& 
 
 	if (m_time > scene->Cutscene().duration)
 		m_time = scene->Cutscene().duration;
+	const float previousTime = m_lastEvaluatedTime;
 	if (m_playing)
 	{
 		m_time += ImGui::GetIO().DeltaTime;
@@ -104,6 +124,11 @@ void CutsceneWindow::Draw(SceneManager& scenes, ProjectManager& projects, bool& 
 			m_playing = false;
 		}
 	}
+	if (m_time < previousTime)
+		m_lastEvaluatedTime = -1.0f;
+	else
+		PlaySoundEventsCrossed(scene->Cutscene(), previousTime, m_time);
+	m_lastEvaluatedTime = m_time;
 	EvaluateTimeline(*scene, m_time);
 
 	ImGui::Begin("Cutscene Timeline", &open);
@@ -129,6 +154,7 @@ void CutsceneWindow::Draw(SceneManager& scenes, ProjectManager& projects, bool& 
 	{
 		m_playing = false;
 		m_time = 0.0f;
+		m_lastEvaluatedTime = -1.0f;
 	}
 	ImGui::SameLine();
 	if (ImGui::SliderFloat("Time", &m_time, 0.0f, duration, "%.2f s"))
@@ -263,6 +289,42 @@ void CutsceneWindow::Draw(SceneManager& scenes, ProjectManager& projects, bool& 
 		{
 			scene->Cutscene().animationTracks.erase(scene->Cutscene().animationTracks.begin() + m_selectedTrack);
 			m_selectedTrack = -1;
+			changed = true;
+		}
+	}
+
+	ImGui::Separator();
+	if (ImGui::Button("Add Sound Effect"))
+	{
+		scene->Cutscene().soundEvents.push_back({});
+		m_selectedSoundEvent = static_cast<int>(scene->Cutscene().soundEvents.size()) - 1;
+		changed = true;
+	}
+	ImGui::SameLine();
+	ImGui::TextDisabled("Sound effects: %zu", scene->Cutscene().soundEvents.size());
+
+	for (std::size_t i = 0; i < scene->Cutscene().soundEvents.size(); ++i)
+	{
+		const CutsceneSoundEvent& event = scene->Cutscene().soundEvents[i];
+		const std::string label = "Sound " + std::to_string(i + 1) + " - " +
+			(event.soundPath.empty() ? "<Select sound>" : std::filesystem::path(event.soundPath).filename().string());
+		if (ImGui::Selectable(label.c_str(), m_selectedSoundEvent == static_cast<int>(i)))
+			m_selectedSoundEvent = static_cast<int>(i);
+	}
+
+	if (m_selectedSoundEvent >= 0 && m_selectedSoundEvent < static_cast<int>(scene->Cutscene().soundEvents.size()))
+	{
+		CutsceneSoundEvent& event = scene->Cutscene().soundEvents[static_cast<std::size_t>(m_selectedSoundEvent)];
+		const EngineGuiWidgets::AssetFilePickerOptions soundOptions{
+			projects.ProjectAssetsDirectory() / "audio/sfx", "audio/sfx/",
+			{ ".wav", ".mp3", ".ogg", ".flac" }, false, "<Select sound>" };
+		changed |= EngineGuiWidgets::AssetFileCombo("Sound", event.soundPath, soundOptions);
+		changed |= ImGui::DragFloat("Sound Time", &event.startTime, 0.05f, 0.0f, duration, "%.2f s");
+		changed |= ImGui::SliderFloat("Sound Volume", &event.volume, 0.0f, 100.0f);
+		if (ImGui::Button("Delete Sound Effect"))
+		{
+			scene->Cutscene().soundEvents.erase(scene->Cutscene().soundEvents.begin() + m_selectedSoundEvent);
+			m_selectedSoundEvent = -1;
 			changed = true;
 		}
 	}

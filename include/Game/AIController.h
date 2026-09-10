@@ -56,6 +56,7 @@ private:
 	enum class State { Idle, Chase, Attack };
 
 	void FindTarget();
+	void BeginHitLock(Entity& owner);
 	void SetState(State state);
 	void FaceMovement(Entity& owner, const glm::vec3& direction, float dt);
 	void SetAnimationState(const char* stateName);
@@ -71,4 +72,8 @@ private:
 	float m_targetDistance = 0.0f;
 	bool m_hitTrigger = false;
 	bool m_pendingHit = false;
+	float m_hitStopRemaining = 0.0f;
+	glm::vec3 m_hitLockedPosition{0.0f};
+	glm::vec3 m_hitLockedRotation{0.0f};
+	bool m_hitTransformLocked = false;
 };

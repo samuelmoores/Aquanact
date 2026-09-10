@@ -36,10 +36,20 @@ public:
 	// that should enumerate values the editor needs to see.
 
 private:
+	enum class TravelPhase
+	{
+		Outbound,
+		WaitingForHurt,
+		ReturningToPlayer,
+		AtPlayerHead
+	};
+
 	Entity* m_target = nullptr;
+	Entity* m_player = nullptr;
 	Scene* m_scene = nullptr;
 	std::string m_targetBoneName;
 	std::string m_targetInstanceName;
+	std::string m_playerBoneName = "mixamorig:Head";
 	glm::vec3 m_start{0.0f};
 	glm::vec3 m_controlStart{0.0f};
 	glm::vec3 m_controlEnd{0.0f};
@@ -47,6 +57,9 @@ private:
 	glm::vec3 m_startScale{1.0f};
 	float m_elapsed = 0.0f;
 	float m_duration = 0.0f;
+	float m_speed = 0.0f;
 	bool m_launched = false;
 	bool m_hitTarget = false;
+	bool m_observedHurtAnimation = false;
+	TravelPhase m_travelPhase = TravelPhase::Outbound;
 };

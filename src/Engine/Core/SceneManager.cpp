@@ -693,6 +693,21 @@ void SceneManager::ApplyProjectState(
 								{ event.soundName, event.frame, event.volume, event.randomSample });
 						}
 					}
+					const bool hasHurtState = std::any_of(
+						entityStateMachine->States().begin(), entityStateMachine->States().end(),
+						[](const EntityStateMachine::State& state) { return state.name == "hurt"; });
+					if (!hasHurtState)
+					{
+						for (const std::string& animationName : entityStateMachine->AnimationNames())
+						{
+							const std::string animationFileName = std::filesystem::path(animationName).filename().string();
+							if (animationFileName == "drsalvadore_hurt.fbx" || animationFileName == "drsalvador_hurt.fbx")
+							{
+								entityStateMachine->AddState("hurt", animationName, false, false, false, {}, false, false);
+								break;
+							}
+						}
+					}
 					entityStateMachine->SetInitialState(pendingComponent.initialState);
 
 					for (const ProjectStateData::PendingComponent::EntityStateTransitionData& transition : pendingComponent.entityStateTransitions)

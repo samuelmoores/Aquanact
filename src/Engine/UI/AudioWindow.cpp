@@ -22,7 +22,7 @@ void AudioWindow::Draw(SceneManager& sceneManager, ProjectManager& projectManage
 		{
 			ImGui::Text("Level Music");
 			const EngineGuiWidgets::AssetFilePickerOptions musicOptions{
-				EngineGuiWidgets::SourceAssetDirectory("assets/audio/music"),
+				projectManager.ProjectAssetsDirectory() / "audio/music",
 				"audio/music/",
 				{ ".wav", ".mp3", ".ogg", ".flac" },
 				false,

@@ -13,5 +13,7 @@ private:
 	bool m_playing = false;
 	bool m_engineCamera = true;
 	int m_selectedTrack = -1;
+	int m_selectedSoundEvent = -1;
 	int m_selectedCameraPoint = -1;
+	float m_lastEvaluatedTime = -1.0f;
 };

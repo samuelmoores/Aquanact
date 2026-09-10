@@ -352,6 +352,15 @@ void SpawnManager::LoadProjectState(const std::filesystem::path& projectPath)
 			// Optional instance records must not make an otherwise valid project unloadable.
 		}
 	}
+
+	const auto canonicalSalvador = m_definitions.find("DrSalvador");
+	const auto redundantSalvador = m_definitions.find("drsalvador.fbx");
+	if (canonicalSalvador != m_definitions.end() && redundantSalvador != m_definitions.end()
+		&& PortableModelPath(canonicalSalvador->second.modelPath)
+			== PortableModelPath(redundantSalvador->second.modelPath))
+	{
+		m_definitions.erase(redundantSalvador);
+	}
 }
 
 Entity* SpawnManager::SpawnInstance(Scene& scene, const std::string& definitionName,
@@ -467,4 +476,20 @@ bool SpawnManager::Despawn(Scene& scene, Entity* entity)
 		return false;
 	m_instances.erase(found);
 	return true;
+}
+
+void SpawnManager::DespawnRuntimeInstances(Scene& scene)
+{
+	for (auto iterator = m_instances.begin(); iterator != m_instances.end();)
+	{
+		Entity* entity = *iterator;
+		if (!entity || scene.RemoveObject(entity))
+		{
+			iterator = m_instances.erase(iterator);
+		}
+		else
+		{
+			++iterator;
+		}
+	}
 }

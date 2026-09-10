@@ -46,6 +46,7 @@ public:
 		const glm::vec3& position, const glm::vec3& rotation,
 		Entity* parent = nullptr);
 	bool Despawn(Scene& scene, Entity* entity);
+	void DespawnRuntimeInstances(Scene& scene);
 	void AppendProjectState(std::string& contents, const std::filesystem::path& projectPath, const SceneManager& scenes);
 	void LoadProjectState(const std::filesystem::path& projectPath);
 	void ResetForProject();

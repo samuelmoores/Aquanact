@@ -5,11 +5,14 @@
 #include "Engine/Core/EntityStateMachine.h"
 #include "Engine/Core/InputManager.h"
 #include "Engine/Core/PhysicsWorld.h"
+#include "Engine/Core/ProjectManager.h"
 #include "Engine/Core/Root.h"
 #include "Engine/Core/Scene.h"
 #include "Engine/Core/SceneManager.h"
 #include "Engine/Core/SpawnManager.h"
 
+#include <algorithm>
+#include <filesystem>
 #include <utility>
 
 namespace
@@ -27,6 +30,62 @@ namespace
 		const float launchTimeSeconds = static_cast<float>(attack.AttackLaunchFrame())
 			/ mayaFramesPerSecond;
 		return attackElapsed >= launchTimeSeconds;
+	}
+
+	void EnsureAttackInstanceDefinition(const std::string& definitionName)
+	{
+		if (definitionName.empty())
+			return;
+
+		SpawnManager& spawns = Root::Current().Spawns();
+		InstanceDefinition* definition = spawns.FindDefinition(definitionName);
+		if (!definition)
+		{
+			const std::filesystem::path modelPath = Root::Current().Projects().ProjectAssetsDirectory()
+				/ "models" / (definitionName + ".fbx");
+			if (!std::filesystem::is_regular_file(modelPath))
+				return;
+
+			InstanceDefinition recovered;
+			recovered.name = definitionName;
+			recovered.modelPath = modelPath.string();
+			spawns.CreateInstance(std::move(recovered));
+			definition = spawns.FindDefinition(definitionName);
+		}
+		if (!definition)
+			return;
+
+		definition->blocksCollision = false;
+		definition->ignoreCameraCollision = true;
+		definition->blocksCameraView = false;
+		if (std::find(definition->componentTypes.begin(), definition->componentTypes.end(), "EntityStateMachine")
+			== definition->componentTypes.end())
+		{
+			definition->componentTypes.push_back("EntityStateMachine");
+		}
+
+		auto conjureState = std::find_if(
+			definition->entityStateMachineStates.begin(), definition->entityStateMachineStates.end(),
+			[](const EntityStateMachine::State& state) { return state.name == "conjure"; });
+		if (conjureState == definition->entityStateMachineStates.end())
+		{
+			EntityStateMachine::State state;
+			state.name = "conjure";
+			state.animationName = "sphere_conjure.fbx";
+			state.loop = false;
+			state.useTransformAnimation = true;
+			state.transformAnimationName = "sphere_conjure.fbx";
+			definition->entityStateMachineStates.push_back(std::move(state));
+		}
+		else
+		{
+			conjureState->animationName = "sphere_conjure.fbx";
+			conjureState->loop = false;
+			conjureState->useTransformAnimation = true;
+			conjureState->transformAnimationName = "sphere_conjure.fbx";
+		}
+		definition->hasEntityStateMachineConfiguration = true;
+		definition->entityStateMachineInitialState = "conjure";
 	}
 
 }
@@ -57,8 +116,14 @@ void PlayerAttack::Update(Entity& owner, float dt)
 	bool spawnedAttackInstance = false;
 	if (m_attackTrigger > 0.5f)
 	{
+		// Keep the authored transition condition as a bindable diagnostic, but
+		// explicitly request the attack state so a one-frame key press cannot be
+		// missed by the state-machine update order.
+		if (EntityStateMachine* playerState = owner.GetEntityState())
+			playerState->SetDesiredState("attack");
 		if (!m_attackInstance && !m_attackInstanceName.empty() && Root::Current().Scenes().ActiveLevel())
 		{
+			EnsureAttackInstanceDefinition(m_attackInstanceName);
 			Scene* scene = Root::Current().Scenes().ActiveLevel();
 			m_attackInstance = Root::Current().Spawns().SpawnInstance(
 				*scene, m_attackInstanceName,
@@ -68,8 +133,16 @@ void PlayerAttack::Update(Entity& owner, float dt)
 				spawnedAttackInstance = true;
 				m_attackSequenceElapsed = 0.0f;
 				m_attackSequenceActive = true;
+				m_attackInstance->SetBlocksCollision(false);
+				m_attackInstance->SetIgnoreCameraCollision(true);
+				m_attackInstance->SetBlocksCameraView(false);
 				if (EntityStateMachine* sphereState = m_attackInstance->GetEntityState())
+				{
+					sphereState->SetTransformAnimationEnabled(true);
+					sphereState->SetTransformAnimationOffset(AttackInstanceSpawnPosition(owner));
+					sphereState->SetInitialState("conjure");
 					sphereState->SetCurrentStateLooping(false);
+				}
 			}
 		}
 	}

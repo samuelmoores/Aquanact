@@ -106,6 +106,7 @@ void PlayerController::startUp(Entity& owner)
 {
 	Controller::startUp(owner);
 	m_wantsToMove = false;
+	m_movementLocked = false;
 	m_inputActions = &Root::Current().InputActions();
 }
 
@@ -119,6 +120,25 @@ void PlayerController::OnTriggerEnter(Entity& triggerOwner)
 void PlayerController::FirstFrame(Entity& owner)
 {
 	m_entityState = owner.GetComponent<EntityStateMachine>();
+	if (!m_entityState || m_entityState->FindAnimationIndex("sam_die.fbx") < 0)
+		return;
+
+	const bool hasDeathState = std::any_of(
+		m_entityState->States().begin(), m_entityState->States().end(),
+		[](const EntityStateMachine::State& state) { return state.name == "death"; });
+	if (!hasDeathState)
+	{
+		const int deathClipIndex = m_entityState->FindAnimationIndex("sam_die.fbx");
+		m_entityState->AddState(
+			"death",
+			m_entityState->AnimationNames()[static_cast<std::size_t>(deathClipIndex)],
+			true,
+			true,
+			false,
+			{},
+			true,
+			false);
+	}
 }
 
 void PlayerController::Move(Entity& owner, const glm::vec2& move2D, float dt)
@@ -148,6 +168,14 @@ void PlayerController::Update(Entity& owner, float dt)
 	if (!m_wantsToMove)
 	{
 		m_hasCameraDirectionOverride = false;
+	}
+	if (m_movementLocked)
+	{
+		m_wantsToMove = false;
+		m_hasCameraDirectionOverride = false;
+		Controller::Update(owner, dt);
+		Move(owner, glm::vec2(0.0f), dt);
+		return;
 	}
 
 	if (m_entityState && m_entityState->CurrentStateBlocksMovement())

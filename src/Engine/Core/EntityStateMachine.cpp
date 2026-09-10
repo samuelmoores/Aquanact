@@ -6,6 +6,7 @@
 #include "Engine/Core/Audio.h"
 #include "Engine/Core/Debug.h"
 #include "Engine/Core/Root.h"
+#include "Engine/Core/ProjectManager.h"
 #include "Engine/Core/FileSystem.h"
 
 #include <algorithm>
@@ -211,16 +212,14 @@ void EntityStateMachine::PlaySoundEvent(const SoundEvent& event)
 {
 	const auto resolveAssetPath = [](const std::string& relativePath)
 	{
-		std::filesystem::path path = std::filesystem::path("assets") / relativePath;
-#ifdef AQUANACT_GAME
-		path = Root::Current().FileSystemRef().ExecutableDirectory() / path;
-#else
-#ifdef AQUANACT_SOURCE_ROOT
-		if (!std::filesystem::exists(path))
-			path = std::filesystem::path(AQUANACT_SOURCE_ROOT) / "projects" / "project" / "assets" / relativePath;
-#endif
-#endif
-		return path;
+		const std::string normalizedPath = relativePath.rfind("assets/", 0) == 0
+			? relativePath.substr(std::string("assets/").size()) : relativePath;
+		const std::filesystem::path requested(normalizedPath);
+		if (requested.is_absolute())
+			return requested;
+		if (Root::HasCurrent() && !Root::Current().Projects().CurrentProjectPath().empty())
+			return Root::Current().Projects().ProjectAssetsDirectory() / requested;
+		return std::filesystem::path("assets") / requested;
 	};
 
 	if (!event.randomSample)

@@ -85,6 +85,7 @@ private:
 	void PositionMenuPointer(MyGUI::Widget* button);
 	void ApplyTextHighlight(MyGUI::Button* button, bool highlighted);
 	void BindProgressBarFromDef(const GameGUIWidgetDef& def, MyGUI::ProgressBar* progress);
+	void UpdateDeathOverlay();
 	void RefreshVisibleControllerButtons();
 	void FocusFirstControllerButtonInPanel(const std::string& panelName);
 
@@ -125,5 +126,6 @@ private:
 	// Loaded asset and initialization flag
 	GameGUIAsset m_loadedAsset;
 	bool m_initialized = false;
+	bool m_deathOverlayVisible = false;
 };
 

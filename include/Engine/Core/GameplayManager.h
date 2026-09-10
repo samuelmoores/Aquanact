@@ -38,6 +38,7 @@ public:
 	void TogglePaused(FrontEndManager& frontEndManager, Debug& debug);
 	bool IsPaused() const;
 	GameState State() const;
+	bool LevelWon() const { return m_levelWon; }
 	std::size_t ControllerCount() const;
 
 private:
@@ -51,5 +52,8 @@ private:
 	bool m_cutsceneActive = false;
 	float m_cutsceneElapsed = 0.0f;
 	std::string m_cutsceneNextLevel;
+	float m_levelElapsedSeconds = 0.0f;
+	float m_levelTimeLimitSeconds = 30.0f;
+	bool m_levelWon = false;
 };
 

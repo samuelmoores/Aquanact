@@ -177,7 +177,8 @@ ImportedModel ModelImporter::Import(const std::string& path, bool flipUvs, bool 
 
 			const std::string animationStem = ToLower(entry.path().stem().string());
 			const std::string animationPrefix = modelStem + "_";
-			if (animationStem != modelStem && animationStem.rfind(animationPrefix, 0) != 0)
+			const bool isLegacySalvadoreHurt = modelStem == "drsalvador" && animationStem == "drsalvadore_hurt";
+			if (animationStem != modelStem && animationStem.rfind(animationPrefix, 0) != 0 && !isLegacySalvadoreHurt)
 			{
 				continue;
 			}

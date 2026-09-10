@@ -27,6 +27,8 @@ public:
 	float MaxSlopeAngle() const { return m_maxSlopeAngle; }
 	void SetMaxSlopeAngle(float angle) { m_maxSlopeAngle = std::clamp(angle, 0.0f, 89.0f); }
 	bool WantsToMove() const { return m_wantsToMove; }
+	bool MovementLocked() const { return m_movementLocked; }
+	void SetMovementLocked(bool locked) { m_movementLocked = locked; }
 
 	// Bindable player-controller settings shown in the editor.
 	// Keep this list limited to stable gameplay tuning values that are useful to inspect or edit.
@@ -63,6 +65,7 @@ private:
 	const InputManager* m_inputActions = nullptr;
 	EntityStateMachine* m_entityState = nullptr;
 	bool m_wantsToMove = false;
+	bool m_movementLocked = false;
 	glm::vec3 m_cameraDirectionOverride{0.0f};
 	bool m_hasCameraDirectionOverride = false;
 

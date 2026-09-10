@@ -33,6 +33,7 @@ struct EntityStateMachineUiState
 	bool transitionWaitForCurrentStateComplete = false;
 	bool addStatePopupInitialized = false;
 	bool editStatePopupRequested = false;
+	bool soundEventPopupRequested = false;
 	int editingStateIndex = -1;
 	char stateEditName[64] = "";
 	char stateEditAnimationName[64] = "";
@@ -85,7 +86,7 @@ public:
 		EntityStateMachineUiState& ui);
 	void DrawSoundEventOverview(
 		const std::vector<EntityStateMachine::State>& states,
-		const EntityStateMachineUiState& ui);
+		EntityStateMachineUiState& ui);
 	void DrawStateOverview(
 		EntityStateMachine& machine,
 		const std::vector<EntityStateMachine::State>& states,

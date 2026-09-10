@@ -19,6 +19,9 @@
 #include "Engine/Core/Scene.h"
 #include "Engine/Core/SceneManager.h"
 #include "Engine/Core/Audio.h"
+#include "Engine/Core/EntityStateMachine.h"
+#include "Game/Health.h"
+#include "Game/PlayerController.h"
 
 #include <MYGUI/MyGUI_Button.h>
 #include <MYGUI/MyGUI_Colour.h>
@@ -243,7 +246,9 @@ void GameGUI::SetButtonFocusState(MyGUI::Button* button, const GameGUIWidgetDef&
 	// Only visible buttons participate in controller focus navigation.
 	button->eventMouseSetFocus += MyGUI::newDelegate(this, &GameGUI::OnButtonMouseFocus);
 	button->eventMouseLostFocus += MyGUI::newDelegate(this, &GameGUI::OnButtonMouseLostFocus);
-	if (def.visible)
+	// The retry button is hidden until the death overlay is active, but it still
+	// needs to be registered so controller navigation can discover it when shown.
+	if (def.visible || def.name == "tryAgainButton" || def.name == "Try Again")
 	{
 		m_allControllerButtons.push_back(button);
 	}
@@ -465,6 +470,66 @@ void GameGUI::BindProgressBarFromDef(const GameGUIWidgetDef& def, MyGUI::Progres
 		applyNormalizedValue(healthValue);
 	});
 	Root::Current().Debugger().LogMessage("GameGUI bound normalized progress bar '" + def.name + "' to " + normalizedChannel);
+}
+
+void GameGUI::UpdateDeathOverlay()
+{
+	MyGUI::Widget* deathText = RuntimeWidget("deathText");
+	MyGUI::Widget* winText = RuntimeWidget("winText");
+	MyGUI::Widget* tryAgainButton = RuntimeWidget("tryAgainButton");
+	if (!tryAgainButton)
+	{
+		tryAgainButton = RuntimeWidget("Try Again");
+	}
+	if (!deathText && !winText && !tryAgainButton)
+	{
+		return;
+	}
+
+	bool playerDied = false;
+	if (Scene* activeLevel = Root::Current().Scenes().ActiveLevel())
+	{
+		for (const auto& entity : activeLevel->Entities())
+		{
+			if (!entity || !entity->GetComponent<PlayerController>())
+			{
+				continue;
+			}
+
+			const EntityStateMachine* stateMachine = entity->GetEntityState();
+			const Health* health = entity->GetComponent<Health>();
+			playerDied = (stateMachine && stateMachine->CurrentState() == "death") ||
+				(health && health->IsDead());
+			break;
+		}
+	}
+	const bool levelWon = Root::Current().Gameplay().LevelWon();
+
+	if (deathText)
+	{
+		deathText->setVisible(playerDied);
+	}
+	if (winText)
+	{
+		winText->setVisible(levelWon);
+	}
+	if (tryAgainButton)
+	{
+		tryAgainButton->setVisible(playerDied);
+	}
+
+	// Death is a UI interaction state. Release the captured level cursor once the
+	// overlay appears; restarting the level captures it again through EnterGameplay.
+	const bool overlayChanged = playerDied != m_deathOverlayVisible;
+	if (playerDied && overlayChanged)
+	{
+		Root::Current().InputRef().ReleaseCursorForUI();
+	}
+	if (overlayChanged)
+	{
+		RefreshVisibleControllerButtons();
+	}
+	m_deathOverlayVisible = playerDied;
 }
 
 MyGUI::Widget* GameGUI::CreatePanelWidget(const GameGUIWidgetDef& def, MyGUI::Widget* parent)
@@ -787,6 +852,8 @@ void GameGUI::Draw()
 		return;
 	}
 
+	UpdateDeathOverlay();
+
 	// MyGUI needs a per-frame tick so internal widget state and input-driven updates
 	// advance before the renderer submits the overlay.
 	m_gui->frameEvent(0.0f);
@@ -942,6 +1009,7 @@ void GameGUI::LoadUIAsset(const GameGUIAsset& asset)
 
 void GameGUI::ClearUI()
 {
+	m_deathOverlayVisible = false;
 	for (const auto& [name, widget] : m_runtimeWidgetLookup)
 	{
 		(void)name;

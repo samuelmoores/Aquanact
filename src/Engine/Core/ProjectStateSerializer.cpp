@@ -524,6 +524,16 @@ namespace ProjectStateSerializer {
 					std::to_string(track.speed) + ";" + std::to_string(track.blendIn) + ";" +
 					std::to_string(track.blendOut) + ";" + (track.loop ? "1" : "0") + "\n";
 			}
+			for (const CutsceneSoundEvent& event : scene->Cutscene().soundEvents)
+			{
+				if (event.soundPath.empty())
+					continue;
+				const std::filesystem::path portableSoundPath =
+					ProjectStateFormat::MakePortableSourcePath(projectPath, event.soundPath);
+				contents += "cutscenesound;" + ProjectStateFormat::EscapeField(scene->Name()) + ";" +
+					ProjectStateFormat::EscapeField(portableSoundPath.string()) + ";" +
+					std::to_string(event.startTime) + ";" + std::to_string(event.volume) + "\n";
+			}
 			for (const auto& object : scene->Objects())
 			{
 				if (object)
@@ -919,6 +929,23 @@ namespace ProjectStateSerializer {
 				track.blendOut = std::max(0.0f, std::stof(fields[8]));
 				track.loop = fields[9] == "1" || fields[9] == "true";
 				pendingLevel.cutscene.animationTracks.push_back(std::move(track));
+				break;
+			}
+			continue;
+		}
+
+		if (fields.size() >= 5 && fields[0] == "cutscenesound")
+		{
+			const std::string sceneName = ProjectStateFormat::UnescapeField(fields[1]);
+			for (auto& pendingLevel : pendingLevels)
+			{
+				if (pendingLevel.name != sceneName)
+					continue;
+				CutsceneSoundEvent event;
+				event.soundPath = ProjectStateFormat::ResolveSourcePath(projectPath, fields[2]).string();
+				event.startTime = std::max(0.0f, std::stof(fields[3]));
+				event.volume = std::clamp(std::stof(fields[4]), 0.0f, 100.0f);
+				pendingLevel.cutscene.soundEvents.push_back(std::move(event));
 				break;
 			}
 			continue;

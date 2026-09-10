@@ -15,8 +15,16 @@ struct CutsceneAnimationTrack
 	bool loop = false;
 };
 
+struct CutsceneSoundEvent
+{
+	std::string soundPath;
+	float startTime = 0.0f;
+	float volume = 100.0f;
+};
+
 struct CutsceneTimeline
 {
 	float duration = 5.0f;
 	std::vector<CutsceneAnimationTrack> animationTracks;
+	std::vector<CutsceneSoundEvent> soundEvents;
 };

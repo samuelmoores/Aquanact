@@ -4,6 +4,7 @@
 #include "Engine/Core/EntityStateMachine.h"
 #include "Engine/Core/EventManager.h"
 #include "Engine/Core/MathUtils.h"
+#include "Engine/Core/PhysicsWorld.h"
 #include "Engine/Core/Root.h"
 #include "Engine/Core/Scene.h"
 #include "Engine/Core/SceneManager.h"
@@ -12,6 +13,11 @@
 
 #include <algorithm>
 #include <cmath>
+
+namespace
+{
+	constexpr float hitStopDuration = 0.75f;
+}
 
 void AIController::startUp(Entity& owner)
 {
@@ -25,6 +31,10 @@ void AIController::startUp(Entity& owner)
 	m_attackCooldownRemaining = 0.0f;
 	m_hitTrigger = false;
 	m_pendingHit = false;
+	m_hitStopRemaining = 0.0f;
+	m_hitLockedPosition = owner.Position();
+	m_hitLockedRotation = owner.Rotation();
+	m_hitTransformLocked = false;
 }
 
 void AIController::FirstFrame(Entity& owner)
@@ -32,13 +42,22 @@ void AIController::FirstFrame(Entity& owner)
 	m_entityState = owner.GetComponent<EntityStateMachine>();
 	if (Health* health = owner.GetComponent<Health>())
 	{
+		Entity* hitOwner = &owner;
 		Root::Current().Events().GetEvent(health->BindableEventChannel("DamageTaken"))
-			.Subscribe(this, [this]()
+			.Subscribe(this, [this, hitOwner]()
 			{
-				m_pendingHit = true;
+				BeginHitLock(*hitOwner);
 			});
 	}
 	FindTarget();
+}
+
+void AIController::BeginHitLock(Entity& owner)
+{
+	m_pendingHit = true;
+	m_hitLockedPosition = owner.Position();
+	m_hitLockedRotation = owner.Rotation();
+	m_hitTransformLocked = true;
 }
 
 void AIController::FindTarget()
@@ -91,9 +110,42 @@ void AIController::Update(Entity& owner, float dt)
 	m_hitTrigger = m_pendingHit;
 	m_pendingHit = false;
 
-	Controller::Update(owner, dt);
 	if (dt <= 0.0f)
 		return;
+
+	if (m_hitTrigger)
+	{
+		m_hitStopRemaining = hitStopDuration;
+		if (!m_hitTransformLocked)
+		{
+			m_hitLockedPosition = owner.Position();
+			m_hitLockedRotation = owner.Rotation();
+			m_hitTransformLocked = true;
+		}
+		SetAnimationState("hurt");
+	}
+	const Health* health = owner.GetComponent<Health>();
+	const bool lockAfterLethalHit = health && health->IsDead();
+	if (m_hitTransformLocked && (m_hitStopRemaining > 0.0f || lockAfterLethalHit))
+	{
+		owner.Translate(m_hitLockedPosition - owner.Position());
+		owner.SetRotation(m_hitLockedRotation);
+		m_movementDirection = glm::vec3(0.0f);
+		m_pendingMovement = glm::vec3(0.0f);
+		m_velocity = glm::vec3(0.0f);
+		m_isMoving = false;
+		SetDiagnosticInput(glm::vec3(0.0f));
+		PhysicsWorld::Instance().Update(owner);
+		if (!lockAfterLethalHit)
+		{
+			m_hitStopRemaining = std::max(0.0f, m_hitStopRemaining - dt);
+			if (m_hitStopRemaining <= 0.0f)
+				m_hitTransformLocked = false;
+		}
+		return;
+	}
+	m_hitTransformLocked = false;
+	Controller::Update(owner, dt);
 
 	if (!m_target)
 		FindTarget();

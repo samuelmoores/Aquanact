@@ -119,29 +119,37 @@ void EntityStateMachineWindow::Draw(EntityStateMachine& machine)
 	if (ImGui::Button("Add Sound Event"))
 	{
 		ui.selectedSoundEventIndex = -1;
-		for (std::size_t stateIndex = 0; stateIndex < states.size(); ++stateIndex)
-		{
-			const auto visibleState = ui.visibleStateTransitions.find(states[stateIndex].name);
-			if (visibleState != ui.visibleStateTransitions.end() && visibleState->second)
-			{
-				ui.selectedSoundStateIndex = static_cast<int>(stateIndex);
-				break;
-			}
-		}
+		ui.selectedSoundStateIndex = states.empty() ? -1 : 0;
 		ImGui::OpenPopup("Add Sound Event##AquanactEntityStateMachine");
 	}
+	if (ui.soundEventPopupRequested)
+	{
+		ImGui::OpenPopup("Add Sound Event##AquanactEntityStateMachine");
+		ui.soundEventPopupRequested = false;
+	}
 
-	const bool canAddSoundEvent = ui.selectedSoundStateIndex >= 0
-		&& ui.selectedSoundStateIndex < static_cast<int>(states.size())
-		&& !ui.soundEventSoundPath.empty();
 	if (ImGui::BeginPopupModal("Add Sound Event##AquanactEntityStateMachine", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 	{
+		const char* selectedStateName = ui.selectedSoundStateIndex >= 0
+			&& ui.selectedSoundStateIndex < static_cast<int>(states.size())
+			? states[static_cast<std::size_t>(ui.selectedSoundStateIndex)].name.c_str() : "<Select state>";
+		if (ImGui::BeginCombo("State", selectedStateName))
+		{
+			for (std::size_t stateIndex = 0; stateIndex < states.size(); ++stateIndex)
+			{
+				const bool selected = ui.selectedSoundStateIndex == static_cast<int>(stateIndex);
+				if (ImGui::Selectable(states[stateIndex].name.c_str(), selected))
+					ui.selectedSoundStateIndex = static_cast<int>(stateIndex);
+				if (selected) ImGui::SetItemDefaultFocus();
+			}
+			ImGui::EndCombo();
+		}
 		ImGui::SetNextItemWidth(90.0f);
 		ImGui::InputInt("Frame", &ui.soundEventFrame);
 		ui.soundEventFrame = std::max(0, ui.soundEventFrame);
 		ImGui::Checkbox("Random Sample", &ui.soundEventRandomSample);
 		const EngineGuiWidgets::AssetFilePickerOptions soundOptions{
-			EngineGuiWidgets::SourceAssetDirectory("assets/audio/sfx"),
+			Root::Current().Projects().ProjectAssetsDirectory() / "audio/sfx",
 			"audio/sfx/",
 			ui.soundEventRandomSample ? std::vector<std::string>{} : std::vector<std::string>{ ".wav", ".mp3", ".ogg", ".flac" },
 			ui.soundEventRandomSample,
@@ -149,6 +157,9 @@ void EntityStateMachineWindow::Draw(EntityStateMachine& machine)
 		EngineGuiWidgets::AssetFileCombo("Sound", ui.soundEventSoundPath, soundOptions);
 		ImGui::SetNextItemWidth(120.0f);
 		ImGui::SliderFloat("Volume", &ui.soundEventVolume, 0.0f, 100.0f);
+		const bool canAddSoundEvent = ui.selectedSoundStateIndex >= 0
+			&& ui.selectedSoundStateIndex < static_cast<int>(states.size())
+			&& !ui.soundEventSoundPath.empty();
 		if (ImGui::Button("Create") && canAddSoundEvent)
 		{
 			const auto& soundState = states[static_cast<std::size_t>(ui.selectedSoundStateIndex)];
@@ -394,11 +405,12 @@ void EntityStateMachineWindow::DrawTransitionOverview(
 
 void EntityStateMachineWindow::DrawSoundEventOverview(
 	const std::vector<EntityStateMachine::State>& states,
-	const EntityStateMachineUiState& ui)
+	EntityStateMachineUiState& ui)
 {
 	ImGui::SeparatorText("Sound Events");
-	for (const auto& state : states)
+	for (std::size_t stateIndex = 0; stateIndex < states.size(); ++stateIndex)
 	{
+		const auto& state = states[stateIndex];
 		const auto visible = ui.visibleStateTransitions.find(state.name);
 		if (visible == ui.visibleStateTransitions.end() || !visible->second)
 			continue;
@@ -412,10 +424,23 @@ void EntityStateMachineWindow::DrawSoundEventOverview(
 		for (std::size_t i = 0; i < state.soundEvents.size(); ++i)
 		{
 			const auto& event = state.soundEvents[i];
+			ImGui::PushID(static_cast<int>(stateIndex));
 			ImGui::PushID(static_cast<int>(i));
 			const std::string name = std::filesystem::path(event.soundName).filename().string();
 			ImGui::BulletText("Frame %.0f: %s (Volume %.0f)%s", event.frame, name.c_str(),
 				event.volume, event.randomSample ? " [Random]" : "");
+			ImGui::SameLine();
+			if (ImGui::SmallButton("Edit"))
+			{
+				ui.selectedSoundStateIndex = static_cast<int>(stateIndex);
+				ui.selectedSoundEventIndex = static_cast<int>(i);
+				ui.soundEventFrame = static_cast<int>(event.frame);
+				ui.soundEventVolume = event.volume;
+				ui.soundEventSoundPath = event.soundName;
+				ui.soundEventRandomSample = event.randomSample;
+				ui.soundEventPopupRequested = true;
+			}
+			ImGui::PopID();
 			ImGui::PopID();
 		}
 	}

@@ -7,6 +7,7 @@
 #include "Engine/Core/Root.h"
 #include "Engine/Core/Scene.h"
 #include "Engine/Core/SpawnManager.h"
+#include "Game/PlayerController.h"
 
 #include <glm/common.hpp>
 #include <glm/geometric.hpp>
@@ -14,6 +15,8 @@
 
 namespace
 {
+	constexpr float finalScaleMultiplier = 4.0f;
+
 	glm::vec3 CubicBezier(const glm::vec3& start, const glm::vec3& controlStart,
 		const glm::vec3& controlEnd, const glm::vec3& end, float progress)
 	{
@@ -23,6 +26,15 @@ namespace
 			+ 3.0f * inverse * progress * progress * controlEnd
 			+ progress * progress * progress * end;
 	}
+
+	glm::vec3 BoneWorldPosition(Entity& entity, const std::string& boneName)
+	{
+		if (boneName.empty() || !entity.GetMesh())
+			return entity.WorldPosition();
+		return glm::vec3(entity.BuildModelMatrix() * glm::vec4(
+			entity.GetMesh()->BonePosition(boneName), 1.0f));
+	}
+
 }
 
 void AttackSphere::startUp(Entity&)
@@ -87,12 +99,16 @@ bool AttackSphere::Launch(Scene& scene, Entity* ignoredEntity, float speed,
 	m_controlEnd = m_end - direction * (distance * 0.33f) + up * arcHeight;
 	m_elapsed = 0.0f;
 	m_duration = distance / glm::max(speed, 0.001f);
+	m_speed = glm::max(speed, 0.001f);
 	m_target = closest;
+	m_player = ignoredEntity;
 	m_scene = &scene;
 	m_targetBoneName = targetBoneName;
 	m_targetInstanceName = targetInstanceName;
 	m_launched = true;
 	m_hitTarget = false;
+	m_observedHurtAnimation = false;
+	m_travelPhase = TravelPhase::Outbound;
 	return true;
 }
 
@@ -101,14 +117,94 @@ void AttackSphere::Update(Entity& entity, float dt)
 	if (!m_launched)
 		return;
 
-	if (!m_targetInstanceName.empty())
-		m_target = Root::Current().Spawns().FindActiveInstance(*m_scene, m_targetInstanceName);
-	if (m_target)
+	if (m_travelPhase == TravelPhase::AtPlayerHead)
 	{
-		m_end = !m_targetBoneName.empty() && m_target->GetMesh()
-			? glm::vec3(m_target->BuildModelMatrix() * glm::vec4(
-				m_target->GetMesh()->BonePosition(m_targetBoneName), 1.0f))
-			: m_target->WorldPosition();
+		if (m_player)
+			entity.Translate(BoneWorldPosition(*m_player, m_playerBoneName) - entity.WorldPosition());
+		entity.SetScale(m_startScale * finalScaleMultiplier);
+		PhysicsWorld::Instance().Update(entity);
+		return;
+	}
+
+	if (m_travelPhase == TravelPhase::WaitingForHurt)
+	{
+		if (m_target)
+			entity.Translate(BoneWorldPosition(*m_target, m_targetBoneName) - entity.WorldPosition());
+		entity.SetScale(m_startScale * finalScaleMultiplier);
+		bool hurtAnimationComplete = false;
+		if (m_target)
+		{
+			if (EntityStateMachine* targetState = m_target->GetEntityState())
+			{
+				const bool playingHurt = targetState->CurrentState() == "hurt"
+					|| targetState->CurrentState() == "Hurt";
+				if (playingHurt)
+				{
+					m_observedHurtAnimation = true;
+					int hurtClipIndex = -1;
+					for (const EntityStateMachine::State& state : targetState->States())
+					{
+						if (state.name == targetState->CurrentState())
+						{
+							hurtClipIndex = targetState->FindAnimationIndex(state.animationName);
+							break;
+						}
+					}
+					const Animator* animator = targetState->GetAnimator();
+					const bool hurtClipActive = !animator || hurtClipIndex < 0
+						|| animator->CurrentClipIndex() == hurtClipIndex;
+					if (hurtClipActive)
+					{
+						const float duration = animator && hurtClipIndex >= 0
+							? animator->ClipDuration(hurtClipIndex)
+							: targetState->CurrentStateClipDurationSeconds();
+						hurtAnimationComplete = duration <= 0.0f
+							|| targetState->CurrentStateElapsedSeconds() >= duration;
+					}
+				}
+				else if (m_observedHurtAnimation)
+				{
+					// A transition away from hurt also means its authored reaction has ended.
+					hurtAnimationComplete = true;
+				}
+			}
+			else
+			{
+				hurtAnimationComplete = true;
+			}
+		}
+		if (hurtAnimationComplete && m_player)
+		{
+			m_start = entity.WorldPosition();
+			m_end = BoneWorldPosition(*m_player, m_playerBoneName);
+			const glm::vec3 delta = m_end - m_start;
+			const float distance = glm::length(delta);
+			const glm::vec3 direction = distance > 0.0001f
+				? delta / distance : glm::vec3(0.0f, 0.0f, 1.0f);
+			const float arcHeight = glm::clamp(distance * 0.25f, 2.0f, 100.0f);
+			const glm::vec3 up(0.0f, 1.0f, 0.0f);
+			m_controlStart = m_start + direction * (distance * 0.33f) + up * arcHeight;
+			m_controlEnd = m_end - direction * (distance * 0.33f) + up * arcHeight;
+			m_elapsed = 0.0f;
+			m_duration = distance / m_speed;
+			m_travelPhase = TravelPhase::ReturningToPlayer;
+		}
+		PhysicsWorld::Instance().Update(entity);
+		return;
+	}
+
+	Entity* travelTarget = m_travelPhase == TravelPhase::ReturningToPlayer
+		? m_player : m_target;
+	const std::string& travelBoneName = m_travelPhase == TravelPhase::ReturningToPlayer
+		? m_playerBoneName : m_targetBoneName;
+	if (m_travelPhase == TravelPhase::Outbound && !m_targetInstanceName.empty())
+	{
+		m_target = Root::Current().Spawns().FindActiveInstance(*m_scene, m_targetInstanceName);
+		travelTarget = m_target;
+	}
+	if (travelTarget)
+	{
+		m_end = BoneWorldPosition(*travelTarget, travelBoneName);
 
 		// Re-read the target bone every frame and home from the sphere's current
 		// world position. Rebuilding the original launch curve only changes its
@@ -131,26 +227,42 @@ void AttackSphere::Update(Entity& entity, float dt)
 	const glm::vec3 desiredPosition = CubicBezier(
 		m_start, m_controlStart, m_controlEnd, m_end, progress);
 	entity.Translate(desiredPosition - entity.WorldPosition());
-	entity.SetScale(glm::mix(m_startScale, m_startScale * 3.0f, progress));
+	entity.SetScale(m_travelPhase == TravelPhase::Outbound
+		? glm::mix(m_startScale, m_startScale * finalScaleMultiplier, progress)
+		: m_startScale * finalScaleMultiplier);
 	PhysicsWorld::Instance().Update(entity);
-
-	// Damage only the configured homing target. World bounds are refreshed after
-	// movement and scaling above, so contact follows the sphere's visible size.
-	if (!m_hitTarget && m_target)
+	if (m_travelPhase == TravelPhase::ReturningToPlayer && progress >= 1.0f)
 	{
-		glm::vec3 sphereMin;
-		glm::vec3 sphereMax;
-		glm::vec3 targetMin;
-		glm::vec3 targetMax;
-		if (entity.WorldAABB(sphereMin, sphereMax)
-			&& m_target->WorldAABB(targetMin, targetMax)
-			&& sphereMin.x <= targetMax.x && sphereMax.x >= targetMin.x
-			&& sphereMin.y <= targetMax.y && sphereMax.y >= targetMin.y
-			&& sphereMin.z <= targetMax.z && sphereMax.z >= targetMin.z)
+		if (m_player)
 		{
+			if (PlayerController* playerController = m_player->GetComponent<PlayerController>())
+			{
+				playerController->SetMovementLocked(true);
+				if (EntityStateMachine* playerState = m_player->GetEntityState())
+					playerState->SetDesiredState("death");
+			}
+		}
+		m_travelPhase = TravelPhase::AtPlayerHead;
+		return;
+	}
+	// Damage only after the interpolation has reached the configured target bone.
+	// The sphere is intentionally large, so an AABB overlap would trigger early
+	// and make the projectile appear to stop short before snapping into place.
+	if (m_travelPhase == TravelPhase::Outbound && !m_hitTarget && m_target)
+	{
+		const glm::vec3 targetPosition = BoneWorldPosition(*m_target, m_targetBoneName);
+		const float targetDistance = glm::length(targetPosition - entity.WorldPosition());
+		if (progress >= 1.0f && targetDistance <= 1.0f)
+		{
+			// Remove any accumulated floating-point error before beginning the hurt
+			// pause. This is now an imperceptible correction at the destination.
+			entity.Translate(targetPosition - entity.WorldPosition());
 			if (Health* health = m_target->GetComponent<Health>())
 				health->ReceiveDamage(entity, health->CurrentHealth());
+			entity.SetScale(m_startScale * finalScaleMultiplier);
 			m_hitTarget = true;
+			m_observedHurtAnimation = false;
+			m_travelPhase = TravelPhase::WaitingForHurt;
 		}
 	}
 }
