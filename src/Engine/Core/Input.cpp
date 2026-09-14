@@ -246,6 +246,22 @@ void Input::CaptureCursorForLevel()
 	double y = 0.0;
 	glfwGetCursorPos(m_window->GLFW(), &x, &y);
 	m_lastCursorPos = glm::vec2(static_cast<float>(x), static_cast<float>(y));
+	// Hide explicitly before disabling the cursor. GLFW's disabled mode also
+	// hides it, but keeping both operations here makes the gameplay handoff
+	// unambiguous for every launch path, including New Game.
+	HideMouseCursor();
+	CaptureMouseCursor();
+}
+
+void Input::EnsureGameplayCursorCaptured()
+{
+	if (!m_window || !m_gameplayFocusActive)
+	{
+		return;
+	}
+
+	// Reapply the native mode without resetting the camera baseline. This also
+	// corrects external cursor-mode changes that do not update m_cursorMode.
 	CaptureMouseCursor();
 }
 

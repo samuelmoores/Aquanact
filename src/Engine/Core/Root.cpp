@@ -24,6 +24,10 @@
 #include <filesystem>
 #include <thread>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 Root* Root::s_current = nullptr;
 
 namespace
@@ -182,8 +186,29 @@ void Root::startUp(int argc, char** argv)
 
 void Root::run()
 {
+	#ifdef __EMSCRIPTEN__
+		emscripten_set_main_loop_arg([](void* userData)
+		{
+			static_cast<Root*>(userData)->RunFrame();
+		}, this, 0, true);
+	#else
 	while (!m_window->ShouldClose())
 	{
+		RunFrame();
+	}
+	#endif
+}
+
+void Root::RunFrame()
+{
+	if (m_window->ShouldClose())
+	{
+		#ifdef __EMSCRIPTEN__
+			emscripten_cancel_main_loop();
+		#endif
+		return;
+	}
+
 		const auto frameStart = std::chrono::steady_clock::now();
 		m_profiler->BeginFrame();
 
@@ -218,6 +243,17 @@ void Root::run()
 			m_inputManager->SetCaptureMask(inputRoute.captureMask);
 			m_inputManager->Update();
 
+			// A New Game button can change the gameplay state while MyGUI is
+			// processing this frame's click. Re-apply gameplay cursor capture after
+			// UI processing so the menu cannot leave the mouse visible for a frame.
+			if (m_engineState.IsGameMode() &&
+				m_gameplayManager->State() == GameplayManager::GameState::Playing &&
+				m_input->ActiveDevice() == Input::ActiveInputDevice::MouseKeyboard &&
+				!m_frontEndManager->RuntimeGUI().ShowRuntimeDebugWindow())
+			{
+				m_input->EnsureGameplayCursorCaptured();
+			}
+
 			const bool debugWindowsToggleDown = m_input->KeyDown(GLFW_KEY_F1);
 			if (m_engineState.IsGameMode() && debugWindowsToggleDown && !m_previousDebugWindowsToggle)
 			{
@@ -240,17 +276,7 @@ void Root::run()
 		{
 			FrameProfiler::Scope scope(*m_profiler, "Gameplay");
 
-			// The Pause input is a toggle. Evaluate it before the gameplay update so
-			// the transition takes effect for this frame in either Playing or Paused.
-			if (m_inputManager->WasPressed("Pause"))
-			{
-				m_gameplayManager->ExecuteCommand(
-					GameplayCommand::TogglePause,
-					*m_frontEndManager,
-					*m_debug);
-			}
-
-			// main menu, HUD or pause menu
+			// main menu or HUD
 			m_gameplayManager->SyncRuntimeUI(*m_frontEndManager);
 
 			// are we playing?
@@ -287,7 +313,6 @@ void Root::run()
 			}
 		}
 		m_profiler->EndFrame();
-	}
 }
 
 void Root::shutDown()

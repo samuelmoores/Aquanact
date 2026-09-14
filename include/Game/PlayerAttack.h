@@ -57,4 +57,5 @@ private:
 	std::string m_attackTargetBoneName;
 	float m_attackSequenceElapsed = 0.0f;
 	bool m_attackSequenceActive = false;
+	bool m_attackUsed = false;
 };

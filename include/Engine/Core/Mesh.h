@@ -72,6 +72,7 @@ class Mesh {
 		bool HasColorTexture(int index) const;
 		bool HasSpecularTexture(int index) const;
 		bool HasNormalTexture(int index) const;
+		bool HasRoughnessTexture(int index) const;
 		uint32_t FacesOffset(int index) const;
 		const glm::vec3& SubMeshMinBounds(int index) const;
 		const glm::vec3& SubMeshMaxBounds(int index) const;
@@ -93,7 +94,8 @@ class Mesh {
 		enum class TextureSlot {
 			Diffuse,
 			Specular,
-			Normal
+			Normal,
+			Roughness
 		};
 
 		void AdoptImportedModel(ImportedModel&& importedModel);
@@ -101,6 +103,7 @@ class Mesh {
 		void LoadTextureFile(TextureSlot slot, const std::filesystem::path& texturePath);
 		void LoadTextureMemory(TextureSlot slot, aiTexture* texture);
 		TextureSlot SlotForTextureType(aiTextureType textureType) const;
+		const char* TextureSlotName(TextureSlot slot) const;
 		aiReturn GetMaterialTexturePath(aiMaterial* mat, aiTextureType textureType, aiString& texturePath) const;
 		std::vector<uint32_t>& TexturesForSlot(TextureSlot slot);
 		std::vector<Vertex3D> m_vertices;
@@ -109,6 +112,7 @@ class Mesh {
 		std::vector<uint32_t> m_textureColor;
 		std::vector<uint32_t> m_textureSpecular;
 		std::vector<uint32_t> m_textureNormal;
+		std::vector<uint32_t> m_textureRoughness;
 		int m_currVao;
 		int m_currTextureColor;
 		glm::vec3 m_minBounds;

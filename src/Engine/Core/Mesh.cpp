@@ -418,6 +418,13 @@ bool Mesh::HasSpecularTexture(int index) const
 		m_textureSpecular[index] != 0;
 }
 
+bool Mesh::HasRoughnessTexture(int index) const
+{
+	return index >= 0 &&
+		index < static_cast<int>(m_textureRoughness.size()) &&
+		m_textureRoughness[index] != 0;
+}
+
 uint32_t Mesh::FacesOffset(int index) const
 {
 	if (index < 0 || index >= static_cast<int>(m_faceOffsets.size()))
@@ -519,15 +526,49 @@ std::vector<uint32_t>& Mesh::TexturesForSlot(TextureSlot slot)
 		return m_textureSpecular;
 	case TextureSlot::Normal:
 		return m_textureNormal;
+	case TextureSlot::Roughness:
+		return m_textureRoughness;
 	}
 	return m_textureColor;
 }
 
+const char* Mesh::TextureSlotName(TextureSlot slot) const
+{
+	switch (slot)
+	{
+	case TextureSlot::Diffuse:
+		return "base color";
+	case TextureSlot::Specular:
+		return "specular";
+	case TextureSlot::Normal:
+		return "normal";
+	case TextureSlot::Roughness:
+		return "roughness";
+	}
+	return "unknown";
+}
+
 void Mesh::LoadTextureFile(TextureSlot slot, const std::filesystem::path& texturePath)
 {
-	StbImage image;
-	image.loadFromFile(texturePath.string().c_str());
-	TexturesForSlot(slot).push_back(CreateTextureFromPixels(image.getWidth(), image.getHeight(), image.getData(), true));
+	try
+	{
+		StbImage image;
+		image.loadFromFile(texturePath.string().c_str());
+		TexturesForSlot(slot).push_back(CreateTextureFromPixels(image.getWidth(), image.getHeight(), image.getData(), true));
+		Root::Current().Debugger().LogTagged(
+			"MaterialTexture",
+			std::string("Loaded ") + TextureSlotName(slot) + " map: " + texturePath.string() +
+			" (" + std::to_string(image.getWidth()) + "x" + std::to_string(image.getHeight()) + ")");
+	}
+	catch (const std::exception& exception)
+	{
+		TexturesForSlot(slot).push_back(0);
+		Root::Current().Debugger().LogTagged(
+			Debug::Severity::Warning,
+			"MaterialTexture",
+			std::string("Could not load ") + TextureSlotName(slot) + " map: " + texturePath.string() +
+			" (" + exception.what() + ")");
+	}
 }
 
 void Mesh::LoadTextureMemory(TextureSlot slot, aiTexture* texture)
@@ -541,8 +582,10 @@ Mesh::TextureSlot Mesh::SlotForTextureType(aiTextureType textureType) const
 {
 	if (textureType == aiTextureType_SPECULAR)
 		return TextureSlot::Specular;
-	if (textureType == aiTextureType_NORMALS)
+	if (textureType == aiTextureType_NORMALS || textureType == aiTextureType_NORMAL_CAMERA)
 		return TextureSlot::Normal;
+	if (textureType == aiTextureType_DIFFUSE_ROUGHNESS || textureType == aiTextureType_UNKNOWN)
+		return TextureSlot::Roughness;
 	return TextureSlot::Diffuse;
 }
 
@@ -552,7 +595,16 @@ aiReturn Mesh::GetMaterialTexturePath(aiMaterial* mat, aiTextureType textureType
 	if (result != AI_SUCCESS && textureType == aiTextureType_DIFFUSE)
 		result = mat->GetTexture(aiTextureType_BASE_COLOR, 0, &texturePath);
 	if (result != AI_SUCCESS && textureType == aiTextureType_NORMALS)
+		result = mat->GetTexture(aiTextureType_NORMAL_CAMERA, 0, &texturePath);
+	if (result != AI_SUCCESS && textureType == aiTextureType_NORMALS)
 		result = mat->GetTexture(aiTextureType_HEIGHT, 0, &texturePath);
+	// glTF stores metallic and roughness together in an UNKNOWN texture slot.
+	if (result != AI_SUCCESS && textureType == aiTextureType_DIFFUSE_ROUGHNESS)
+		result = mat->GetTexture(aiTextureType_UNKNOWN, 0, &texturePath);
+	// Some FBX material translators expose Maya's roughness connection as a
+	// shininess texture rather than the PBR diffuse-roughness type.
+	if (result != AI_SUCCESS && textureType == aiTextureType_DIFFUSE_ROUGHNESS)
+		result = mat->GetTexture(aiTextureType_SHININESS, 0, &texturePath);
 	return result;
 }
 
@@ -561,6 +613,7 @@ void Mesh::LoadMaterialTextures(aiMaterial* mat)
 	LoadTexture(mat, aiTextureType_DIFFUSE); // Fallback to BASE_COLOR.
 	LoadTexture(mat, aiTextureType_SPECULAR);
 	LoadTexture(mat, aiTextureType_NORMALS); // Fallback to HEIGHT/bump maps.
+	LoadTexture(mat, aiTextureType_DIFFUSE_ROUGHNESS);
 }
 
 void Mesh::LoadTexture(aiMaterial* mat, aiTextureType textureType)
@@ -572,17 +625,42 @@ void Mesh::LoadTexture(aiMaterial* mat, aiTextureType textureType)
 	if (result != AI_SUCCESS || texturePath.length == 0)
 	{
 		TexturesForSlot(slot).push_back(0);
+		Root::Current().Debugger().LogTagged(
+			"MaterialTexture", std::string("No ") + TextureSlotName(slot) + " map referenced");
 		return;
 	}
 
 	const aiTexture* embeddedTexture = m_scene ? m_scene->GetEmbeddedTexture(texturePath.C_Str()) : nullptr;
-	if (!embeddedTexture || !embeddedTexture->pcData || embeddedTexture->mHeight != 0)
+	if (embeddedTexture && embeddedTexture->pcData && embeddedTexture->mHeight == 0)
 	{
-		TexturesForSlot(slot).push_back(0);
+		LoadTextureMemory(slot, const_cast<aiTexture*>(embeddedTexture));
+		Root::Current().Debugger().LogTagged(
+			"MaterialTexture",
+			std::string("Loaded embedded ") + TextureSlotName(slot) + " map: " + texturePath.C_Str());
 		return;
 	}
 
-	LoadTextureMemory(slot, const_cast<aiTexture*>(embeddedTexture));
+	if (texturePath.C_Str()[0] == '*')
+	{
+		TexturesForSlot(slot).push_back(0);
+		Root::Current().Debugger().LogTagged(
+			"MaterialTexture",
+			std::string("Could not load embedded ") + TextureSlotName(slot) + " map: " + texturePath.C_Str());
+		return;
+	}
+
+	const std::filesystem::path modelDirectory = std::filesystem::path(m_sourcePath).parent_path();
+	const std::filesystem::path resolvedPath = modelDirectory / std::filesystem::path(texturePath.C_Str());
+	if (!std::filesystem::exists(resolvedPath))
+	{
+		TexturesForSlot(slot).push_back(0);
+		Root::Current().Debugger().LogTagged(
+			"MaterialTexture",
+			std::string("Missing ") + TextureSlotName(slot) + " map: " + resolvedPath.string());
+		return;
+	}
+
+	LoadTextureFile(slot, resolvedPath);
 }
 
 SubMeshMaterial Mesh::s_defaultMaterial = {
@@ -606,12 +684,18 @@ void Mesh::Bind(int index)
 	glActiveTexture(GL_TEXTURE2);
 	if (index < static_cast<int>(m_textureNormal.size()) && m_textureNormal[index] != 0)
 		glBindTexture(GL_TEXTURE_2D, m_textureNormal[index]);
+
+	glActiveTexture(GL_TEXTURE3);
+	if (index < static_cast<int>(m_textureRoughness.size()) && m_textureRoughness[index] != 0)
+		glBindTexture(GL_TEXTURE_2D, m_textureRoughness[index]);
 }
 
 void Mesh::UnBind()
 {
 	glBindVertexArray(0);
 	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glActiveTexture(GL_TEXTURE3);
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, 0);

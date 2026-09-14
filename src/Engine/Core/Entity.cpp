@@ -66,8 +66,32 @@ Entity::Entity(const char* modelFile, bool addDefaultComponents, bool loadAnimat
 	// Imported models are converted into entities with a mesh, shader, and any
 	// default components required by the asset type.
 	m_id = g_nextEntityId++;
+	m_position = glm::vec3(0);
+	m_rotation = glm::vec3(0);
+	m_scale = glm::vec3(1);
+	m_initialWorldCenter = glm::vec3(0.0f);
+	m_sourcePath = modelFile ? modelFile : "";
+	m_name = m_sourcePath;
+	size_t lastSlash = m_name.find_last_of("/\\");
+	if (lastSlash != std::string::npos)
+	{
+		m_name = m_name.substr(lastSlash + 1);
+	}
 	Root::Current().Debugger().LogTagged("MeshLoad", std::string("Importing model: ") + modelFile);
 	auto model = ModelImporter().Import(modelFile, true, loadAnimations);
+	if (!model.scene)
+	{
+		Root::Current().Debugger().LogTagged(
+			Debug::Severity::Warning,
+			"MeshLoad",
+			"Model is unavailable; keeping meshless scene entity: " + m_sourcePath);
+		if (addDefaultComponents)
+		{
+			AddComponent<EntityStateMachine>(nullptr);
+		}
+		m_shader.load("shaders/phong.vert", "shaders/phong.frag");
+		return;
+	}
 	m_mesh = new Mesh(std::move(model));
 	m_skinned = m_mesh->Skinned();
 	if (addDefaultComponents)
@@ -75,17 +99,6 @@ Entity::Entity(const char* modelFile, bool addDefaultComponents, bool loadAnimat
 		AddComponent<EntityStateMachine>(m_mesh);
 	}
 	m_shader.load("shaders/phong.vert", "shaders/phong.frag");
-	m_position = glm::vec3(0);
-	m_rotation = glm::vec3(0);
-	m_scale = glm::vec3(1);
-	m_initialWorldCenter = glm::vec3(0.0f);
-	m_sourcePath = modelFile;
-	m_name = m_sourcePath;
-	size_t lastSlash = m_name.find_last_of("/\\");
-	if (lastSlash != std::string::npos)
-	{
-		m_name = m_name.substr(lastSlash + 1);
-	}
 	if (m_mesh)
 	{
 		m_initialWorldCenter = glm::vec3(BuildModelMatrix() * glm::vec4(m_mesh->centerAABB(), 1.0f));

@@ -1474,6 +1474,10 @@ void GameGUI::OnWidgetClicked(MyGUI::Widget* sender)
 			Root::Current().Debugger().LogMessage("GameGUI NewGame failed: no project is currently loaded.");
 			break;
 		}
+		// Capture before resolving or reloading the destination. Those operations
+		// can be synchronous, so the cursor must already be hidden while the game
+		// launch is in progress.
+		Root::Current().InputRef().CaptureCursorForLevel();
 		Root::Current().FrontEnd().RuntimeGUI().HideAll();
 		Scene* targetScene = FindNamedLevel(Root::Current().Scenes(), launchLevel);
 		if (!targetScene && !launchLevel.empty())

@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <limits>
 #include <sstream>
 
 GameplayManager::~GameplayManager() = default;
@@ -98,6 +99,7 @@ void GameplayManager::shutDown()
 	m_cutsceneNextLevel.clear();
 	m_levelElapsedSeconds = 0.0f;
 	m_levelTimeLimitSeconds = 30.0f;
+	m_levelTimerDisabled = false;
 	m_levelWon = false;
 }
 
@@ -145,6 +147,7 @@ bool GameplayManager::BootPlayableLevel(FrontEndManager& frontEndManager, Debug&
 	m_levelManager->SetStartupLevelName(playableLevel->Name());
 	m_levelElapsedSeconds = 0.0f;
 	m_levelTimeLimitSeconds = 30.0f;
+	m_levelTimerDisabled = false;
 	m_levelWon = false;
 	// A retry reuses the already-loaded scene. Remove transient entities such as
 	// the attack sphere before Scene::startUp iterates its entity collection.
@@ -185,6 +188,7 @@ bool GameplayManager::StartCutscene(const std::string& cutsceneName, const std::
 	m_cutsceneNextLevel = levelName;
 	m_levelElapsedSeconds = 0.0f;
 	m_levelTimeLimitSeconds = 30.0f;
+	m_levelTimerDisabled = false;
 	m_levelWon = false;
 	EnterGameplay(frontEndManager, debug);
 	debug.LogMessage("GameplayManager::StartCutscene() scene=" + cutsceneName + " next=" + levelName);
@@ -235,6 +239,7 @@ void GameplayManager::StartGameSession(FrontEndManager& frontEndManager, Debug& 
 	m_levelManager->CaptureActiveLevelEditorTransforms();
 	m_levelElapsedSeconds = 0.0f;
 	m_levelTimeLimitSeconds = 30.0f;
+	m_levelTimerDisabled = false;
 	m_levelWon = false;
 	Scene* activeLevel = m_levelManager->ActiveLevel();
 	if (activeLevel)
@@ -281,10 +286,15 @@ void GameplayManager::LeavePauseMenu(FrontEndManager& frontEndManager, Debug& de
 	EnterGameplay(frontEndManager, debug);
 }
 
-void GameplayManager::SyncRuntimeUI(FrontEndManager& frontEndManager) const
+void GameplayManager::SyncRuntimeUI(FrontEndManager& frontEndManager)
 {
 	if (!frontEndManager.RuntimeGUI().HasRuntime())
 	{
+		return;
+	}
+	if (m_cutsceneActive)
+	{
+		frontEndManager.RuntimeGUI().HideAll();
 		return;
 	}
 
@@ -383,6 +393,7 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 			m_cutsceneNextLevel.clear();
 			m_levelElapsedSeconds = 0.0f;
 			m_levelTimeLimitSeconds = 30.0f;
+			m_levelTimerDisabled = false;
 			m_levelWon = false;
 			if (m_levelManager->SetActiveLevel(nextLevel))
 			{
@@ -406,21 +417,26 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 	if (!m_levelWon)
 	{
 		if (Root::Current().InputActions().WasPressed("Attack"))
-			m_levelTimeLimitSeconds += 30.0f;
-		m_levelElapsedSeconds += std::max(0.0f, dt);
-		if (m_levelElapsedSeconds >= m_levelTimeLimitSeconds)
 		{
-			Entity* player = nullptr;
-			Entity* salvador = nullptr;
-			for (const auto& object : activeLevel->Objects())
+			m_levelTimerDisabled = true;
+			m_levelTimeLimitSeconds = std::numeric_limits<float>::infinity();
+		}
+		if (!m_levelTimerDisabled)
+		{
+			m_levelElapsedSeconds += std::max(0.0f, dt);
+			if (m_levelElapsedSeconds >= m_levelTimeLimitSeconds)
 			{
-				if (!object)
-					continue;
-				if (object->GetComponent<PlayerController>())
-					player = object.get();
-				if (object->Name() == "DrSalvador" || object->Name() == "drsalvador.fbx")
-					salvador = object.get();
-			}
+				Entity* player = nullptr;
+				Entity* salvador = nullptr;
+				for (const auto& object : activeLevel->Objects())
+				{
+					if (!object)
+						continue;
+					if (object->GetComponent<PlayerController>())
+						player = object.get();
+					if (object->Name() == "DrSalvador" || object->Name() == "drsalvador.fbx")
+						salvador = object.get();
+				}
 
 			if (salvador)
 			{
@@ -431,6 +447,18 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 						Entity& damageSource = player ? *player : *salvador;
 						health->ReceiveDamage(damageSource, health->CurrentHealth());
 					}
+					if (EntityStateMachine* stateMachine = salvador->GetEntityState())
+					{
+						const bool hasDieState = std::any_of(
+							stateMachine->States().begin(), stateMachine->States().end(),
+							[](const EntityStateMachine::State& state) { return state.name == "die"; });
+						if (!hasDieState)
+						{
+							stateMachine->AddState("die", "drsalvador_die.fbx", true, true,
+								false, {}, true, false);
+						}
+						stateMachine->SetDesiredState("die");
+					}
 					m_levelWon = health->IsDead();
 				}
 			}
@@ -440,6 +468,7 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 					playerController->SetMovementLocked(true);
 			}
 		}
+	}
 	}
 
 	// How can we move this to the debugger?

@@ -30,7 +30,7 @@ public:
 	bool BootPlayableLevel(FrontEndManager& frontEndManager, Debug& debug);
 	bool StartCutscene(const std::string& cutsceneName, const std::string& levelName, FrontEndManager& frontEndManager, Debug& debug);
 	void StartGameSession(FrontEndManager& frontEndManager, Debug& debug, EngineState& engineState);
-	void SyncRuntimeUI(FrontEndManager& frontEndManager) const;
+	void SyncRuntimeUI(FrontEndManager& frontEndManager);
 
 	void Update(float dt, FrontEndManager& frontEndManager, Debug& debug, EngineState& engineState);
 	void ExecuteCommand(GameplayCommand command, FrontEndManager& frontEndManager, Debug& debug);
@@ -54,6 +54,7 @@ private:
 	std::string m_cutsceneNextLevel;
 	float m_levelElapsedSeconds = 0.0f;
 	float m_levelTimeLimitSeconds = 30.0f;
+	bool m_levelTimerDisabled = false;
 	bool m_levelWon = false;
 };
 

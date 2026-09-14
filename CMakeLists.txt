@@ -142,7 +142,11 @@ target_compile_definitions(AquanactEngine PRIVATE AQUANACT_MYGUI_OPENGL_LIBRARY=
 target_compile_definitions(AquanactEngine PRIVATE AQUANACT_FREETYPE_LIBRARY="freetype")
 target_compile_features(AquanactEngine PRIVATE cxx_std_20)
 
-add_executable (AquanactGame WIN32 ${SOURCES} ${GAME_SOURCES} "include/Engine/Core/LightingManager.h" "src/Engine/Core/LightingManager.cpp" "src/Engine/UI/GameGUICreator_DetailsProgressBar.cpp")
+if (EMSCRIPTEN)
+    add_executable (AquanactGame ${SOURCES} ${GAME_SOURCES} "include/Engine/Core/LightingManager.h" "src/Engine/Core/LightingManager.cpp" "src/Engine/UI/GameGUICreator_DetailsProgressBar.cpp")
+else()
+    add_executable (AquanactGame WIN32 ${SOURCES} ${GAME_SOURCES} "include/Engine/Core/LightingManager.h" "src/Engine/Core/LightingManager.cpp" "src/Engine/UI/GameGUICreator_DetailsProgressBar.cpp")
+endif()
 target_compile_definitions(AquanactGame PRIVATE AQUANACT_GAME)
 target_compile_definitions(AquanactGame PRIVATE AQUANACT_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
 target_compile_definitions(AquanactGame PRIVATE MYGUI_STATIC)
@@ -151,6 +155,30 @@ target_compile_definitions(AquanactGame PRIVATE AQUANACT_MYGUI_ENGINE_LIBRARY="$
 target_compile_definitions(AquanactGame PRIVATE AQUANACT_MYGUI_OPENGL_LIBRARY="${MYGUI_OPENGL_LIBRARY_DEBUG}")
 target_compile_definitions(AquanactGame PRIVATE AQUANACT_FREETYPE_LIBRARY="freetype")
 target_compile_features(AquanactGame PRIVATE cxx_std_20)
+
+# Keep the packaged runtime executable in the same configuration as the
+# editor. Build Game packages the executable beside AquanactEngine, so the
+# editor target must refresh AquanactGame whenever it is rebuilt.
+add_dependencies(AquanactEngine AquanactGame)
+
+if (EMSCRIPTEN)
+    target_compile_definitions(AquanactGame PRIVATE AQUANACT_WEB)
+    if (NOT AQUANACT_WEB_ASSET_ROOT)
+        set(AQUANACT_WEB_ASSET_ROOT "${CMAKE_SOURCE_DIR}/projects/project/assets")
+    endif()
+    if (NOT AQUANACT_WEB_PROJECT_FILE)
+        set(AQUANACT_WEB_PROJECT_FILE "${CMAKE_SOURCE_DIR}/projects/project/project.aqua")
+    endif()
+    target_link_options(AquanactGame PRIVATE
+        "-sUSE_GLFW=3"
+        "-sMAX_WEBGL_VERSION=2"
+        "-sALLOW_MEMORY_GROWTH=1"
+		"--preload-file=${CMAKE_SOURCE_DIR}/resources@/resources"
+		"--preload-file=${AQUANACT_WEB_PROJECT_FILE}@/project.aqua"
+        "--preload-file=${AQUANACT_WEB_ASSET_ROOT}@/assets"
+    )
+    set_target_properties(AquanactGame PROPERTIES SUFFIX ".html")
+endif()
 
 add_executable (AquanactBuildTool
     "src/Engine/Core/BuildToolMain.cpp"
@@ -181,9 +209,11 @@ endif()
 target_link_libraries(AquanactEngine PRIVATE Psapi)
 target_link_libraries(AquanactGame PRIVATE Psapi)
 
-find_package(glfw3 CONFIG REQUIRED)
-target_link_libraries(AquanactEngine PRIVATE glfw)
-target_link_libraries(AquanactGame PRIVATE glfw)
+if (NOT EMSCRIPTEN)
+    find_package(glfw3 CONFIG REQUIRED)
+    target_link_libraries(AquanactEngine PRIVATE glfw)
+    target_link_libraries(AquanactGame PRIVATE glfw)
+endif()
 
 find_package(assimp CONFIG REQUIRED)
 target_link_libraries(AquanactEngine PRIVATE assimp::assimp)

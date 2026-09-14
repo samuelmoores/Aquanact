@@ -57,6 +57,7 @@ public:
 	void TransitionToContext(InputContext context);
 	InputContext Context() const { return m_context; }
 	void CaptureCursorForLevel();
+	void EnsureGameplayCursorCaptured();
 	void ReleaseCursorForUI();
 	void RevealCursorForFrame();
 	void SetRuntimeOverlayOpen(bool open) { m_runtimeOverlayOpen = open; }

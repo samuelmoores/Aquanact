@@ -11,6 +11,7 @@
 #include <imgui.h>
 
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 
 namespace
@@ -44,6 +45,11 @@ void BuildGameWindow::Draw(bool& popupRequested)
 		m_requestedBuild = true;
 	}
 	ImGui::SameLine();
+	if (ImGui::Button("Package for Web"))
+	{
+		m_requestedWebBuild = true;
+	}
+	ImGui::SameLine();
 	EngineGuiWidgets::CloseButton();
 
 	if (m_requestedBuild)
@@ -65,6 +71,37 @@ void BuildGameWindow::Draw(bool& popupRequested)
 			const AquanactBuildSystem::Result result = buildSystem.Build(
 				sourceRoot, outputRoot, projectFile, executablePath);
 			m_statusMessage = result.message;
+		}
+	}
+
+	if (m_requestedWebBuild)
+	{
+		m_requestedWebBuild = false;
+		const std::filesystem::path sourceRoot = std::filesystem::absolute(SourceRoot());
+		const std::filesystem::path outputRoot =
+			std::filesystem::absolute(std::filesystem::path(m_buildPath)) / "web";
+		const std::filesystem::path projectFile = Root::Current().Projects().CurrentProjectPath();
+		const std::filesystem::path scriptPath = sourceRoot / "scripts" / "package_web.ps1";
+		Root::Current().FrontEnd().Creator().SaveAllRoleGUIs();
+		if (!std::filesystem::exists(scriptPath))
+		{
+			m_statusMessage = "Web package failed: scripts/package_web.ps1 is missing.";
+		}
+		else if (projectFile.empty() || !Root::Current().Projects().SaveProject(projectFile, Root::Current().Scenes()))
+		{
+			m_statusMessage = "Web package failed: could not save project.";
+		}
+		else
+		{
+			const std::string command = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"" +
+				scriptPath.string() + "\" -SourceRoot \"" + sourceRoot.string() +
+				"\" -ProjectFile \"" + projectFile.string() + "\" -OutputRoot \"" +
+				outputRoot.string() + "\"";
+			const int exitCode = std::system(command.c_str());
+			m_statusMessage = exitCode == 0
+				? "Web package created: " + outputRoot.string() +
+					" (ZIP: " + outputRoot.parent_path().append("aquanact-web.zip").string() + ")"
+				: "Web package failed. Check the Emscripten output above.";
 		}
 	}
 

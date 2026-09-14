@@ -67,6 +67,7 @@ public:
 
 private:
 	void InitializeOwnedSystems();
+	void RunFrame();
 
 	std::unique_ptr<Window> m_window;
 	std::unique_ptr<RenderManager> m_renderManager;

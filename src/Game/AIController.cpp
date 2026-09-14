@@ -113,6 +113,7 @@ void AIController::Update(Entity& owner, float dt)
 	if (dt <= 0.0f)
 		return;
 
+	const Health* health = owner.GetComponent<Health>();
 	if (m_hitTrigger)
 	{
 		m_hitStopRemaining = hitStopDuration;
@@ -122,11 +123,13 @@ void AIController::Update(Entity& owner, float dt)
 			m_hitLockedRotation = owner.Rotation();
 			m_hitTransformLocked = true;
 		}
-		SetAnimationState("hurt");
+		SetAnimationState(health && health->IsDead() ? "die" : "hurt");
 	}
-	const Health* health = owner.GetComponent<Health>();
 	const bool lockAfterLethalHit = health && health->IsDead();
-	if (m_hitTransformLocked && (m_hitStopRemaining > 0.0f || lockAfterLethalHit))
+	const bool playingHurtAnimation = m_entityState &&
+		(m_entityState->CurrentState() == "hurt" || m_entityState->CurrentState() == "Hurt");
+	if (m_hitTransformLocked &&
+		(m_hitStopRemaining > 0.0f || lockAfterLethalHit || playingHurtAnimation))
 	{
 		owner.Translate(m_hitLockedPosition - owner.Position());
 		owner.SetRotation(m_hitLockedRotation);
@@ -136,7 +139,7 @@ void AIController::Update(Entity& owner, float dt)
 		m_isMoving = false;
 		SetDiagnosticInput(glm::vec3(0.0f));
 		PhysicsWorld::Instance().Update(owner);
-		if (!lockAfterLethalHit)
+		if (!lockAfterLethalHit && !playingHurtAnimation)
 		{
 			m_hitStopRemaining = std::max(0.0f, m_hitStopRemaining - dt);
 			if (m_hitStopRemaining <= 0.0f)

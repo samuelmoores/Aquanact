@@ -51,7 +51,7 @@ ImportedModel ModelImporter::Import(const std::string& path, bool flipUvs, bool 
 	if (!model.scene)
 	{
 		Root::Current().Debugger().LogMessage(std::string("ASSIMP ERROR: ") + model.importer->GetErrorString());
-		throw std::runtime_error(model.importer->GetErrorString());
+		return model;
 	}
 
 	std::vector<Vertex3D> vertices;

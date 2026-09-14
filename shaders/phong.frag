@@ -35,9 +35,12 @@ in vec4 FragPosLightSpace;
 uniform sampler2D baseTexture;
 uniform sampler2D specularTexture;
 uniform sampler2D normalTexture;
+uniform sampler2D roughnessTexture;
+uniform vec4 material;
 uniform bool hasBaseTexture;
 uniform bool hasSpecularTexture;
 uniform bool hasNormalTexture;
+uniform bool hasRoughnessTexture;
 uniform DirectionalLight sunLight;
 uniform int pointLightCount;
 uniform PointLight pointLights[8];
@@ -152,13 +155,13 @@ float CalculatePointShadow(int lightIndex, PointLight light, vec3 geometricNorma
 	return shadow / 20.0;
 }
 
-vec3 CalculateDirectionalLight(vec3 baseColor, vec3 specularStrength, vec3 vertexNormal, vec3 geometricNormal, vec3 viewDirection)
+vec3 CalculateDirectionalLight(vec3 baseColor, vec3 specularStrength, float shininess, vec3 vertexNormal, vec3 geometricNormal, vec3 viewDirection)
 {
 	vec3 lightDir = normalize(-sunLight.direction);
 	float shadow = CalculateShadow(geometricNormal, lightDir);
 	float diffuseStrength = max(dot(vertexNormal, lightDir), 0.0);
 	vec3 reflectDirection = reflect(-lightDir, vertexNormal);
-	float spec = pow(max(dot(viewDirection, reflectDirection), 0.0), 32.0);
+	float spec = pow(max(dot(viewDirection, reflectDirection), 0.0), shininess);
 
 	vec3 ambient = baseColor * sunLight.color * sunLight.ambient;
 	vec3 diffuse = baseColor * sunLight.color * diffuseStrength;
@@ -166,7 +169,7 @@ vec3 CalculateDirectionalLight(vec3 baseColor, vec3 specularStrength, vec3 verte
 	return (ambient + (1.0 - shadow) * (diffuse + specular)) * sunLight.intensity;
 }
 
-vec3 CalculatePointLight(int lightIndex, PointLight light, vec3 baseColor, vec3 specularStrength, vec3 vertexNormal, vec3 geometricNormal, vec3 viewDirection)
+vec3 CalculatePointLight(int lightIndex, PointLight light, vec3 baseColor, vec3 specularStrength, float shininess, vec3 vertexNormal, vec3 geometricNormal, vec3 viewDirection)
 {
 	vec3 lightOffset = light.position - FragWorldPos;
 	float lightDistance = length(lightOffset);
@@ -182,7 +185,7 @@ vec3 CalculatePointLight(int lightIndex, PointLight light, vec3 baseColor, vec3 
 	float attenuation = 1.0 / (light.constant + light.linear * lightDistance + light.quadratic * lightDistance * lightDistance);
 	float diffuseStrength = max(dot(vertexNormal, lightDir), 0.0);
 	vec3 reflectDirection = reflect(-lightDir, vertexNormal);
-	float spec = pow(max(dot(viewDirection, reflectDirection), 0.0), 32.0);
+	float spec = pow(max(dot(viewDirection, reflectDirection), 0.0), shininess);
 
 	vec3 ambient = baseColor * light.color * light.ambient;
 	vec3 diffuse = baseColor * light.color * diffuseStrength;
@@ -202,13 +205,20 @@ void main()
 
 	vec3 viewDirection = normalize(ViewPos - FragWorldPos);
 	vec3 baseColor = hasBaseTexture ? texture(baseTexture, TexCoord).rgb : vec3(0.20);
-	vec3 specularStrength = hasSpecularTexture ? texture(specularTexture, TexCoord).rgb : vec3(0.0);
+	vec3 specularStrength = hasSpecularTexture ? texture(specularTexture, TexCoord).rgb : vec3(material.z);
+	float roughness = hasRoughnessTexture ? texture(roughnessTexture, TexCoord).g : 0.0;
+	// Roughness maps use the conventional [0, 1] range. Convert to the
+	// existing Phong exponent so roughness can be used without a full shader
+	// model rewrite: 0 is a tight highlight and 1 is a broad highlight.
+	float shininess = hasRoughnessTexture
+		? mix(128.0, 2.0, roughness * roughness)
+		: max(material.w, 1.0);
 
-	vec3 litColor = CalculateDirectionalLight(baseColor, specularStrength, vertexNormal, geometricNormal, viewDirection);
+	vec3 litColor = CalculateDirectionalLight(baseColor, specularStrength, shininess, vertexNormal, geometricNormal, viewDirection);
 	
 	for (int i = 0; i < pointLightCount; ++i)
 	{
-		litColor += CalculatePointLight(i, pointLights[i], baseColor, specularStrength, vertexNormal, geometricNormal, viewDirection);
+		litColor += CalculatePointLight(i, pointLights[i], baseColor, specularStrength, shininess, vertexNormal, geometricNormal, viewDirection);
 	}
 	
 	const float outputColorStep = 1.0 / 255.0;

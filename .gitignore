@@ -438,3 +438,6 @@ out/
 
 #claude 
 .claude
+
+# vcpkg generated installation and build artifacts
+/vcpkg_installed/

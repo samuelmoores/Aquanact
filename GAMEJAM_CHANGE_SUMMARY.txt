@@ -1,0 +1,209 @@
+Aquanact Changes Since Gamejam Project Creation
+================================================
+
+Review range
+------------
+
+This summary covers the committed changes from commit 8e9f0d0 ("project
+folders", which introduced the project layout) through the current HEAD
+commit, 2170ff0 ("pre web packaging"). It also notes the major categories
+represented by the current uncommitted worktree changes.
+
+The range contains approximately 7,500 added lines across the engine, editor,
+project serialization, gameplay framework, build tooling, and project assets.
+
+
+1. Project and asset organization
+---------------------------------
+
+- Introduced project-specific directories under projects/.
+- Moved the original project and its assets into projects/project/.
+- Added the gamejam project under projects/gamejam/.
+- Added per-project models, animations, textures, GUI layouts, music, and
+  sound effects.
+- Added project-aware asset path resolution so project files can use portable
+  paths instead of machine-specific absolute paths.
+- Added project startup-level and scene-kind metadata.
+- Added support for level scenes, cutscene scenes, and a main-menu scene.
+
+
+2. Scene and project management
+-------------------------------
+
+- Expanded Scene to own camera-path and cutscene data.
+- Added scene-level lighting and level-collider persistence.
+- Added SceneManager support for creating, finding, switching, and classifying
+  levels and cutscenes.
+- Added active-scene handling and startup-scene restoration.
+- Added project reload/reset behavior for scenes, runtime GUI state, spawn
+  definitions, and editor state.
+- Added stable entity IDs for restoring serialized references after reloads.
+- Added editor transform snapshots so gameplay previews can restore authored
+  positions and rotations.
+- Added handling for generated component configuration during editor startup.
+
+
+3. Project serialization
+------------------------
+
+- Extended the text project format with scene metadata, object IDs, object
+  physics settings, level colliders, scene lighting, camera paths, startup
+  levels, input bindings, GUI state, and cutscene data.
+- Added escaping/unescaping for semicolon-delimited fields.
+- Added portable source-path generation and path recovery for older projects.
+- Added compatibility handling for older object, lighting, camera, input,
+  and state-machine records.
+- Added serialization for state-machine states, transitions, conditions,
+  animation sequences, transform animation, and sound events.
+- Added project-level persistence for runtime GUI assets and navigation mode.
+- Added defensive parsing for malformed optional records.
+
+
+4. Entity and component framework
+---------------------------------
+
+- Added component execution ordering.
+- Added separate controller and non-controller update entry points.
+- Added first-frame component initialization.
+- Added component ownership tracking and automatic event unsubscription when
+  components are destroyed.
+- Added bindable component values, getter functions, and events for editor and
+  runtime UI integration.
+- Added component factory registrations for the newer engine/game component
+  types.
+- Improved entity parenting, detaching, cycle prevention, and world-transform
+  preservation.
+- Added support for dynamic component creation and removal from the editor.
+
+
+5. Animation and state machines
+-------------------------------
+
+- Expanded Animator to support multiple clips, looping, restarting, blending,
+  explicit clip evaluation, root-transform sampling, and animation events.
+- Added animation source-path normalization and compatibility matching.
+- Added EntityStateMachine support for named states, desired-state requests,
+  transition cooldowns, transition conditions, multiple conditions, wait-for-
+  completion behavior, animation sequences, transform animation, and sound
+  events.
+- Added cutscene-specific animation playback through CutsceneAnimator.
+- Added state-machine diagnostics for transition results, resolved clips,
+  blocked transitions, and current animation state.
+- Added editor tools for creating and editing states, transitions, conditions,
+  animation sequences, and cutscene tracks.
+
+
+6. Camera and cutscene systems
+------------------------------
+
+- Added reusable camera-path data and validation.
+- Added linear, hold, and spline-like camera-path interpolation.
+- Added authored camera timing and camera progress evaluation.
+- Added closest-point projection from a world position onto a camera path.
+- Added camera following, smoothing, snapping, target facing, and path
+  overrides.
+- Added camera island/trigger behavior for switching or toggling path points.
+- Added cutscene timelines with animation tracks and sound events.
+- Added cutscene camera preview and editor timeline controls.
+- Added transition handling from cutscenes into playable scenes.
+
+
+7. Physics and collision infrastructure
+---------------------------------------
+
+- Added PhysicsWorld as a cached collision representation for the active scene.
+- Added collider registration, update, removal, and scene-wide clearing.
+- Added support for box, capsule, convex, and sphere-related collision data.
+- Added broadphase AABB caching for moving entities and camera queries.
+- Added camera collision sweeps, overlap checks, line-of-sight checks, and
+  ignored-entity filtering.
+- Added level-collider registration and persistence.
+- Added runtime collision registration for dynamically spawned entities.
+- Added debug visualization for physics bounds and camera collision behavior.
+
+
+8. Rendering and lighting
+-------------------------
+
+- Added per-scene sun and point-light state.
+- Added persistence and restoration of scene lighting settings.
+- Expanded shadow configuration and shadow-related shader behavior.
+- Added camera collision-aware rendering/camera positioning.
+- Added render diagnostics for camera state, animation state, and vcpkg target
+  triplet information.
+- Added additional OpenGL state handling for the web/Emscripten path.
+
+
+9. Audio
+--------
+
+- Added miniaudio-backed engine initialization and shutdown handling.
+- Added named sound loading, playback, stopping, and path resolution.
+- Added music playback with looping and volume control.
+- Added pooled UI sound voices so overlapping UI sounds can play independently.
+- Added project-aware audio asset lookup and error reporting.
+- Connected state-machine and cutscene sound events to the audio system.
+
+
+10. Editor and UI infrastructure
+--------------------------------
+
+- Added cutscene editing windows and timeline controls.
+- Added spawn/instance management windows and editor persistence.
+- Added entity state-machine editing and diagnostics UI.
+- Added camera-path and camera settings editors.
+- Added scene, lighting, input-map, entity, and project-management updates.
+- Expanded runtime GameGUI loading, navigation, event binding, diagnostics,
+  and project persistence.
+- Added UI input routing between ImGui, MyGUI, menus, gameplay, and runtime
+  debug overlays.
+- Added editor support for creating new component/gameplay source files and
+  handing off build configuration.
+- Added UI asset parsing, editing, preview, and persistence helpers.
+
+
+11. Build and platform support
+------------------------------
+
+- Added generated game-source inclusion through generated/GameSources.cmake.
+- Added ImGuizmo and MyGUI integration changes.
+- Added vcpkg manifest dependencies for Assimp, GLM, GLFW, glad, MyGUI, and
+  ImGui.
+- Added Emscripten/WebGL target configuration.
+- Added web packaging script support, including project and asset preloading.
+- Added packaged-game boot image handling.
+- Added generated vcpkg installation/build output locally; vcpkg_installed/ is
+  now ignored because it is reproducible generated state and should not be
+  committed.
+
+
+12. Current worktree changes
+----------------------------
+
+The current uncommitted changes continue the same broad work, including
+additional input, mesh, root, gameplay-manager, UI, rendering, shader,
+project-file, dependency, and web-packaging updates. They also include new
+external source trees, scripts, project content, and converted audio content.
+
+The generated vcpkg installation is intentionally excluded from source
+control by .gitignore.
+
+
+Overall direction
+-----------------
+
+The changes move Aquanact from a single-project editor/runtime toward a
+project-aware engine with:
+
+- Multiple independent scenes and projects.
+- Serialized editor-authored runtime state.
+- Reusable animation, camera, physics, audio, and component systems.
+- Runtime GUI and editor tooling.
+- Cutscene authoring and playback.
+- Dynamic entities and component configuration.
+- Desktop and Emscripten/web packaging paths.
+
+The main technical cleanup opportunities are reducing duplicated parsing and
+UI logic, separating engine code from game-specific component knowledge,
+simplifying ownership/lifetime rules, and making build configuration less
+machine-specific.

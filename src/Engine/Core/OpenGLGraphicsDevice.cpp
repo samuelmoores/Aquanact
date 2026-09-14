@@ -524,6 +524,7 @@ void OpenGLGraphicsDevice::DrawInternal(const RenderCommand& command, const Came
 	command.shader->setUniform("baseTexture", 0);
 	command.shader->setUniform("specularTexture", 1);
 	command.shader->setUniform("normalTexture", 2);
+	command.shader->setUniform("roughnessTexture", 3);
 	command.shader->setUniform("shadowMap", DirectionalShadowTextureUnit);
 
 	command.shader->setUniform("model", command.modelMatrix);
@@ -574,6 +575,7 @@ void OpenGLGraphicsDevice::DrawInternal(const RenderCommand& command, const Came
 		command.shader->setUniform("hasBaseTexture", command.mesh->HasColorTexture(j));
 		command.shader->setUniform("hasSpecularTexture", command.mesh->HasSpecularTexture(j));
 		command.shader->setUniform("hasNormalTexture", command.mesh->HasNormalTexture(j));
+		command.shader->setUniform("hasRoughnessTexture", command.mesh->HasRoughnessTexture(j));
 		command.mesh->Bind(j);
 
 		glDrawElements(GL_TRIANGLES, command.mesh->FacesSize(j), GL_UNSIGNED_INT, reinterpret_cast<void*>(static_cast<uintptr_t>(command.mesh->FacesOffset(j) * sizeof(uint32_t))));

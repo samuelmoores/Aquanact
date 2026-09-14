@@ -173,6 +173,15 @@ void AttackSphere::Update(Entity& entity, float dt)
 				hurtAnimationComplete = true;
 			}
 		}
+		if (hurtAnimationComplete && m_target)
+		{
+			if (EntityStateMachine* targetState = m_target->GetEntityState())
+			{
+				// End the reaction explicitly before sending the sphere back so
+				// Dr. Salvador resumes his authored idle state immediately.
+				targetState->SetDesiredState("idle");
+			}
+		}
 		if (hurtAnimationComplete && m_player)
 		{
 			m_start = entity.WorldPosition();
@@ -258,7 +267,13 @@ void AttackSphere::Update(Entity& entity, float dt)
 			// pause. This is now an imperceptible correction at the destination.
 			entity.Translate(targetPosition - entity.WorldPosition());
 			if (Health* health = m_target->GetComponent<Health>())
-				health->ReceiveDamage(entity, health->CurrentHealth());
+			{
+				// The sphere is a hit reaction, not a lethal attack. Keep at least
+				// one health so Dr. Salvador transitions to hurt rather than die.
+				const float damage = glm::min(25.0f,
+					glm::max(0.0f, health->CurrentHealth() - 1.0f));
+				health->ReceiveDamage(entity, damage);
+			}
 			entity.SetScale(m_startScale * finalScaleMultiplier);
 			m_hitTarget = true;
 			m_observedHurtAnimation = false;

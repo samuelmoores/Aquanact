@@ -6,7 +6,10 @@
     "assimp",
     "glm",
 
-    "glfw3",
+    {
+      "name": "glfw3",
+      "platform": "!wasm32"
+    },
     "glad",
     {
       "name": "mygui",

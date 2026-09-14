@@ -104,6 +104,7 @@ void PlayerAttack::startUp(Entity& owner)
 	m_attackInstance = nullptr;
 	m_attackSequenceElapsed = 0.0f;
 	m_attackSequenceActive = false;
+	m_attackUsed = false;
 }
 
 void PlayerAttack::Update(Entity& owner, float dt)
@@ -112,10 +113,11 @@ void PlayerAttack::Update(Entity& owner, float dt)
 	{
 		m_inputActions = &Root::Current().InputActions();
 	}
-	m_attackTrigger = m_inputActions->WasPressed("Attack") ? 1.0f : 0.0f;
+	m_attackTrigger = m_inputActions->WasPressed("Attack") && !m_attackUsed ? 1.0f : 0.0f;
 	bool spawnedAttackInstance = false;
 	if (m_attackTrigger > 0.5f)
 	{
+		m_attackUsed = true;
 		// Keep the authored transition condition as a bindable diagnostic, but
 		// explicitly request the attack state so a one-frame key press cannot be
 		// missed by the state-machine update order.
