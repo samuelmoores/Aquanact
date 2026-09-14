@@ -12,6 +12,7 @@ class Window;
 
 struct EngineMenuBarResult
 {
+	bool openProjectExplorer = false;
 	std::optional<bool> showFileExplorer;
 	std::optional<bool> showSceneWindow;
 	std::optional<bool> showEntityWindow;
@@ -36,7 +37,7 @@ private:
 		bool& showGrid,
 		EngineGuiWindowState& windowState) const;
 	void DrawLightingMenu() const;
-	void DrawAquanactMenu(Window* window, bool& showInputMap, bool& buildGameRequested) const;
+	void DrawAquanactMenu(Window* window, bool& showInputMap, bool& buildGameRequested, bool& openProjectExplorer) const;
 	bool DrawNewProjectDialog(SceneManager& sceneManager, ProjectManager& projectManager) const;
 	void DrawLoadProjectDialog(SceneManager& sceneManager, ProjectManager& projectManager) const;
 	void DrawFileMenu(SceneManager& sceneManager, ProjectManager& projectManager) const;

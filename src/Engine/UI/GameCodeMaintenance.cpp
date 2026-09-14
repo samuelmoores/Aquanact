@@ -1,6 +1,7 @@
 #include "Engine/UI/GameCodeMaintenance.h"
 
 #include "Engine/Core/FileSystem.h"
+#include "Engine/Core/ProjectManager.h"
 #include "Engine/Core/Root.h"
 
 #include <algorithm>
@@ -34,24 +35,37 @@ std::filesystem::path GameCodeMaintenance::SourceRoot()
 #endif
 }
 
+std::filesystem::path GameCodeMaintenance::ProjectRoot()
+{
+	if (Root::HasCurrent())
+	{
+		const std::filesystem::path projectFile = Root::Current().Projects().CurrentProjectPath();
+		if (!projectFile.empty())
+		{
+			return projectFile.parent_path();
+		}
+	}
+	return SourceRoot();
+}
+
 std::filesystem::path GameCodeMaintenance::GameIncludeRoot()
 {
-	return SourceRoot() / "include" / "Game";
+	return ProjectRoot() / "include" / "Game";
 }
 
 std::filesystem::path GameCodeMaintenance::GameSourceRoot()
 {
-	return SourceRoot() / "src" / "Game";
+	return ProjectRoot() / "src" / "Game";
 }
 
 std::filesystem::path GameCodeMaintenance::GeneratedRoot()
 {
-	return SourceRoot() / "generated";
+	return ProjectRoot() / "generated";
 }
 
 std::filesystem::path GameCodeMaintenance::GameRegistryPath()
 {
-	return SourceRoot() / "src" / "Engine" / "Core" / "ComponentRegistry.cpp";
+	return GameSourceRoot() / "ComponentRegistry.cpp";
 }
 
 std::string GameCodeMaintenance::MakeHeaderTemplate(const std::string& className)
@@ -99,12 +113,18 @@ std::string GameCodeMaintenance::MakeSourceTemplate(const std::string& className
 
 std::string GameCodeMaintenance::MakeGameSourcesList()
 {
-	std::string result = "set(GAME_SOURCES\n";
+	std::string result =
+		"if(NOT AQUANACT_PROJECT_ROOT)\n"
+		"    set(AQUANACT_GAME_CODE_ROOT \"${CMAKE_SOURCE_DIR}\")\n"
+		"else()\n"
+		"    set(AQUANACT_GAME_CODE_ROOT \"${AQUANACT_PROJECT_ROOT}\")\n"
+		"endif()\n\n"
+		"set(GAME_SOURCES\n";
 	for (const auto& path : CollectGameSourceFiles(GameSourceRoot()))
 	{
-		result += "    \"${CMAKE_SOURCE_DIR}/src/Game/" + path.filename().string() + "\"\n";
+		result += "    \"${AQUANACT_GAME_CODE_ROOT}/src/Game/" + path.filename().string() + "\"\n";
 	}
-	result += "    \"${CMAKE_SOURCE_DIR}/src/Engine/Core/ComponentRegistry.cpp\"\n)\n";
+	result += "    \"${AQUANACT_GAME_CODE_ROOT}/src/Game/ComponentRegistry.cpp\"\n)\n";
 	return result;
 }
 

@@ -17,6 +17,7 @@ public:
 	static bool RegenerateBuildFiles();
 
 private:
+	static std::filesystem::path ProjectRoot();
 	static std::filesystem::path SourceRoot();
 	static std::filesystem::path GameIncludeRoot();
 	static std::filesystem::path GameSourceRoot();

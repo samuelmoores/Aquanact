@@ -12,6 +12,11 @@ endif()
 
 project ("AquanactEngine")
 
+# Aquanact does not use C++20 modules. Disable compiler module scanning so
+# Ninja does not generate unnecessary dyndep graphs for ordinary translation
+# units (which can fail in older bundled Ninja versions).
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+
 enable_testing()
 
 set(CMAKE_CXX_STANDARD 20)
@@ -27,7 +32,18 @@ endif()
 # Record the vcpkg triplet so the build can log which package target it was compiled against.
 set(AQUANACT_VCPKG_TARGET_TRIPLET "${VCPKG_TARGET_TRIPLET}")
 
-include("${CMAKE_SOURCE_DIR}/generated/GameSources.cmake")
+if (AQUANACT_PROJECT_ROOT STREQUAL "${CMAKE_SOURCE_DIR}/projects/project")
+    # Projects are external to the engine. Clear the old in-tree default left
+    # by earlier configurations, while preserving an explicitly selected path.
+    set(AQUANACT_PROJECT_ROOT "" CACHE PATH "External project directory containing src/Game and include/Game" FORCE)
+else()
+    set(AQUANACT_PROJECT_ROOT "${AQUANACT_PROJECT_ROOT}" CACHE PATH "External project directory containing src/Game and include/Game")
+endif()
+if (AQUANACT_PROJECT_ROOT AND EXISTS "${AQUANACT_PROJECT_ROOT}/generated/GameSources.cmake")
+    include("${AQUANACT_PROJECT_ROOT}/generated/GameSources.cmake")
+else()
+    include("${CMAKE_SOURCE_DIR}/generated/GameSources.cmake")
+endif()
 
 set(SOURCES
     "src/Engine/Core/main.cpp"
@@ -311,6 +327,10 @@ target_include_directories(AquanactEngine PUBLIC "./include")
 target_include_directories(AquanactEngine PRIVATE "${CMAKE_SOURCE_DIR}/external/imguizmo/src")
 target_include_directories(AquanactGame PUBLIC "./include")
 target_include_directories(AquanactBuildTool PUBLIC "./include")
+if (AQUANACT_PROJECT_ROOT)
+    target_include_directories(AquanactEngine PRIVATE "${AQUANACT_PROJECT_ROOT}/include")
+    target_include_directories(AquanactGame PRIVATE "${AQUANACT_PROJECT_ROOT}/include")
+endif()
 target_include_directories(AquanactEngine PRIVATE "${CMAKE_SOURCE_DIR}/external/miniaudio")
 target_include_directories(AquanactGame PRIVATE "${CMAKE_SOURCE_DIR}/external/miniaudio")
 target_compile_features(AquanactBuildTool PRIVATE cxx_std_20)
@@ -330,11 +350,9 @@ add_custom_target(copyshaders
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 add_custom_target(copymodels
-        COMMAND ${CMAKE_COMMAND} -E rm -rf ${CMAKE_BINARY_DIR}/projects
-        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/projects ${CMAKE_BINARY_DIR}/projects
         COMMAND ${CMAKE_COMMAND} -E rm -rf ${CMAKE_BINARY_DIR}/resources
         COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/resources ${CMAKE_BINARY_DIR}/resources
-        COMMENT "syncing project directories and engine resources"
+        COMMENT "syncing engine resources"
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 add_custom_target(copymygui

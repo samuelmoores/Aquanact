@@ -73,6 +73,7 @@ private:
 	int m_bootTextureWidth = 0;
 	int m_bootTextureHeight = 0;
 	bool m_waitingForStartupProject = true;
+	bool m_forceProjectExplorer = false;
 	float m_bootImageTimeRemaining = 0.0f;
 	std::filesystem::path m_startupProjectToOpen;
 	EngineGuiSelection m_selection;

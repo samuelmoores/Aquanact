@@ -206,7 +206,7 @@ void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManage
 
 	if (m_waitingForStartupProject)
 	{
-		if (!projectManager.CurrentProjectPath().empty())
+		if (!m_forceProjectExplorer && !projectManager.CurrentProjectPath().empty())
 		{
 			m_waitingForStartupProject = false;
 			m_bootImageTimeRemaining = 0.65f;
@@ -223,7 +223,7 @@ void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManage
 				// frame as the click. Loading is deferred until the next frame.
 				DrawBootImage();
 			}
-			else if (!projectManager.CurrentProjectPath().empty())
+			else if (!m_forceProjectExplorer && !projectManager.CurrentProjectPath().empty())
 			{
 				// New Project creates its project immediately through the existing
 				// modal; use the same boot transition once creation succeeds.
@@ -243,11 +243,13 @@ void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManage
 			m_startupProjectToOpen.clear();
 			if (!projectManager.LoadProject(projectToOpen, SceneManager))
 			{
+				m_forceProjectExplorer = true;
 				m_waitingForStartupProject = true;
 				m_bootImageTimeRemaining = 0.0f;
 				(void)m_menuBar.DrawStartupProjectWindow(context);
 				return;
 			}
+			m_forceProjectExplorer = false;
 			SceneManager.startUp();
 		}
 
@@ -282,6 +284,14 @@ void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManage
 
 	const EngineMenuBarResult viewResult =
 		m_menuBar.Draw(context, m_showAxis, m_showGrid, m_windowState, m_popupRequests);
+	if (viewResult.openProjectExplorer)
+	{
+		m_forceProjectExplorer = true;
+		m_waitingForStartupProject = true;
+		m_startupProjectToOpen.clear();
+		m_bootImageTimeRemaining = 0.0f;
+		return;
+	}
 
 	m_buildGameWindow.Draw(m_popupRequests.buildGame);
 	m_codeCreationWindow.Draw(m_window, m_popupRequests.addCodeFile, projectManager);

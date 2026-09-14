@@ -430,6 +430,17 @@ bool ProjectManager::CreateNewProject(const std::filesystem::path& path, SceneMa
 			return false;
 		}
 	}
+	for (const std::filesystem::path& projectDirectory : {
+		path.parent_path() / "src" / "Game",
+		path.parent_path() / "include" / "Game",
+		path.parent_path() / "generated" })
+	{
+		std::filesystem::create_directories(projectDirectory, directoryError);
+		if (directoryError)
+		{
+			return false;
+		}
+	}
 
 	// Switch the asset context before resetting project-owned UI. Otherwise a
 	// project created from the startup selector can inherit GUI data discovered
