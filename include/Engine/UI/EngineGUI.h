@@ -18,6 +18,7 @@
 #include "Engine/UI/EditorSceneInteraction.h"
 #include "Engine/UI/InstanceManager.h"
 #include "Engine/UI/SpawnManagerWindow.h"
+#include "Engine/UI/ParticleSystemWindow.h"
 
 #include <filesystem>
 
@@ -105,6 +106,7 @@ private:
 	CameraWindow m_cameraWindow;
 	InstanceManager m_instanceManager;
 	SpawnManagerWindow m_spawnManagerWindow;
+	ParticleSystemWindow m_particleSystemWindow;
 	LightingWindow m_lightingWindow;
 	CutsceneWindow m_cutsceneWindow;
 	FileExplorerWindow m_fileExplorerWindow;

@@ -12,6 +12,7 @@
 #include "Engine/Core/Input.h"
 #include "Engine/Core/Scene.h"
 #include "Engine/Core/SceneManager.h"
+#include "Engine/Core/ParticleSystem.h"
 #include "Engine/Core/ProjectStateData.h"
 #include "Engine/Core/FrameProfiler.h"
 #include "Engine/Core/Frustum.h"
@@ -43,6 +44,20 @@ namespace
 			if (glm::dot(triggerDelta, triggerDelta) > 1e-8f) return false;
 		}
 		return true;
+	}
+
+	void TransformAabb(const glm::vec3& localMin, const glm::vec3& localMax,
+		const glm::mat4& model, glm::vec3& worldMin, glm::vec3& worldMax)
+	{
+		const glm::vec3 localCenter = (localMin + localMax) * 0.5f;
+		const glm::vec3 localExtent = (localMax - localMin) * 0.5f;
+		const glm::vec3 worldCenter = glm::vec3(model * glm::vec4(localCenter, 1.0f));
+		const glm::vec3 worldExtent =
+			glm::abs(glm::vec3(model[0])) * localExtent.x +
+			glm::abs(glm::vec3(model[1])) * localExtent.y +
+			glm::abs(glm::vec3(model[2])) * localExtent.z;
+		worldMin = worldCenter - worldExtent;
+		worldMax = worldCenter + worldExtent;
 	}
 }
 #include <filesystem>
@@ -233,6 +248,7 @@ void RenderManager::shutDown()
 	m_commandCapacity = 0;
 	m_commandCount = 0;
 	m_frameAllocator.Reset();
+	m_particleCommands.clear();
 }
 
 void RenderManager::ApplyProjectState(const ProjectStateData::RenderStateData& renderState)
@@ -552,6 +568,9 @@ void RenderManager::ResetFrameState()
 	m_lastFrameSkippedObjects = 0;
 	m_lastFrameFrustumCulledObjects = 0;
 	m_lastFrameDrawCallsSaved = 0;
+	// Particle commands borrow simulation-owned vectors, so they must never
+	// survive the frame in which they were submitted.
+	m_particleCommands.clear();
 	m_frameAllocator.Reset();
 	m_commands = nullptr;
 	if (m_commandCapacity > 0)
@@ -583,20 +602,65 @@ void RenderManager::BuildRenderCommands(FrontEndManager& frontEndManager, SceneM
 	const Scene* activeLevel = SceneManager.ActiveLevel();
 	static const std::vector<std::unique_ptr<Entity>> emptyObjects;
 	const auto& objects = activeLevel ? activeLevel->Objects() : emptyObjects;
+	if (activeLevel)
+	{
+		const WeatherSystem& weather = activeLevel->Weather();
+		glm::vec3 worldBoundsMin(0.0f);
+		glm::vec3 worldBoundsMax(0.0f);
+		if (!weather.Particles().empty() && weather.WorldBounds(worldBoundsMin, worldBoundsMax))
+		{
+			m_particleCommands.push_back(ParticleRenderCommand{
+				&weather.Particles(), glm::mat4(1.0f), worldBoundsMin, worldBoundsMax, true,
+				ParticleBlendMode::Alpha, weather.VisualShape() });
+		}
+	}
 	for (const auto& object : objects)
 	{
-		if (!object || !object->GetMesh() || !object->GetShader())
+		if (!object)
 		{
-			++m_lastFrameSkippedObjects;
 			continue;
 		}
 
-		glm::vec3 worldBoundsMin(0.0f);
-		glm::vec3 worldBoundsMax(0.0f);
-		const bool hasWorldBounds = object->WorldAABB(worldBoundsMin, worldBoundsMax);
-		Submit(RenderCommand{ object->GetMesh(), object->GetShader(),
-			object->BuildModelMatrix(), object->skinned(), object->Id(),
-			worldBoundsMin, worldBoundsMax, hasWorldBounds, -1 });
+		ParticleSystem* particles = object->GetComponent<ParticleSystem>();
+		Mesh* mesh = object->GetMesh();
+		ShaderProgram* shader = object->GetShader();
+		const bool hasMesh = mesh && shader;
+		const bool hasParticles = particles && !particles->Particles().empty();
+		glm::mat4 modelMatrix(1.0f);
+		const bool localParticles = hasParticles &&
+			particles->SimulationSpace() == ParticleSimulationSpace::Local;
+		if (hasMesh || localParticles)
+			modelMatrix = object->BuildModelMatrix();
+
+		if (!hasMesh)
+		{
+			if (!particles) ++m_lastFrameSkippedObjects;
+		}
+		else
+		{
+			glm::vec3 worldBoundsMin(0.0f);
+			glm::vec3 worldBoundsMax(0.0f);
+			const bool hasWorldBounds = object->WorldAABB(worldBoundsMin, worldBoundsMax);
+			Submit(RenderCommand{ mesh, shader,
+				modelMatrix, object->skinned(), object->Id(),
+				worldBoundsMin, worldBoundsMax, hasWorldBounds, -1 });
+		}
+
+		if (hasParticles)
+		{
+			const glm::mat4 particleModelMatrix = localParticles ? modelMatrix : glm::mat4(1.0f);
+			glm::vec3 localBoundsMin(0.0f);
+			glm::vec3 localBoundsMax(0.0f);
+			if (particles->SimulationBounds(localBoundsMin, localBoundsMax))
+			{
+				glm::vec3 worldBoundsMin(0.0f);
+				glm::vec3 worldBoundsMax(0.0f);
+				TransformAabb(localBoundsMin, localBoundsMax, particleModelMatrix, worldBoundsMin, worldBoundsMax);
+				m_particleCommands.push_back(ParticleRenderCommand{
+					&particles->Particles(), particleModelMatrix, worldBoundsMin, worldBoundsMax, true,
+					particles->BlendMode(), particles->VisualShape() });
+			}
+		}
 
 	}
 }
@@ -772,6 +836,45 @@ void RenderManager::Flush(const Camera& camera, unsigned int /*selectedEntityId*
 		}
 	}
 
+	// Reject whole emitters using their simulation bounds. Individual points are
+	// submitted directly from simulation-owned storage and clipped by the GPU,
+	// avoiding a second particle walk, per-emitter allocation, and particle copy.
+	std::size_t culledParticleEmitters = 0;
+	std::size_t visibleParticleEmitterCount = 0;
+	for (std::size_t commandIndex = 0; commandIndex < m_particleCommands.size(); ++commandIndex)
+	{
+		const ParticleRenderCommand& command = m_particleCommands[commandIndex];
+		if (command.hasWorldBounds &&
+			!frustum.IntersectsAabb(command.worldBoundsMin, command.worldBoundsMax))
+		{
+			++culledParticleEmitters;
+			continue;
+		}
+
+		if (visibleParticleEmitterCount != commandIndex)
+			m_particleCommands[visibleParticleEmitterCount] = command;
+		++visibleParticleEmitterCount;
+	}
+	m_particleCommands.resize(visibleParticleEmitterCount);
+	const glm::vec3 cameraPosition = camera.GetPosition();
+	std::stable_sort(m_particleCommands.begin(), m_particleCommands.end(),
+		[&cameraPosition](const ParticleRenderCommand& left, const ParticleRenderCommand& right)
+		{
+			if (left.blendMode != right.blendMode)
+				return static_cast<int>(left.blendMode) < static_cast<int>(right.blendMode);
+			if (left.blendMode != ParticleBlendMode::Alpha)
+				return false;
+			const glm::vec3 leftCenter = (left.worldBoundsMin + left.worldBoundsMax) * 0.5f;
+			const glm::vec3 rightCenter = (right.worldBoundsMin + right.worldBoundsMax) * 0.5f;
+			const glm::vec3 leftOffset = leftCenter - cameraPosition;
+			const glm::vec3 rightOffset = rightCenter - cameraPosition;
+			return glm::dot(leftOffset, leftOffset) > glm::dot(rightOffset, rightOffset);
+		});
+	m_lastFrameFrustumCulledObjects += culledParticleEmitters;
+	m_lastFrameDrawCallsSaved += culledParticleEmitters;
+	m_lastFrameCommandCount += m_particleCommands.size();
+	m_device.DrawParticles(m_particleCommands.data(), m_particleCommands.size(), camera);
+
 	m_commandCount = 0;
 	const auto flushEnd = std::chrono::high_resolution_clock::now();
 	m_lastFrameFlushTime = flushEnd - flushStart;
@@ -795,6 +898,11 @@ void RenderManager::Loop(FrontEndManager& frontEndManager, FileManager& fileMana
 			{
 				if (object)
 				{
+					// Gameplay components remain disabled in the editor, but particle
+					// emitters are visual authoring aids and should preview in place.
+					if (ParticleSystem* particles = object->GetComponent<ParticleSystem>())
+						particles->Update(*object, input.Frame().deltaTime);
+
 					if (EntityStateMachine* stateMachine = object->GetEntityState())
 					{
 						if (animationDiagnosticsPublished || stateMachine->States().empty() || stateMachine->CurrentState().empty())
@@ -831,16 +939,21 @@ void RenderManager::Loop(FrontEndManager& frontEndManager, FileManager& fileMana
 		}
 	}
 	{
+		FrameProfiler::Scope scope(Root::Current().Profiler(), "Camera");
+		UpdateCameraPhase(input, engineState);
+	}
+	if (!ShouldPreviewMainMenu(frontEndManager, engineState))
+	{
+		if (Scene* activeLevel = SceneManager.ActiveLevel())
+			activeLevel->Weather().Update(input.Frame().deltaTime, ActiveCamera());
+	}
+	{
 		FrameProfiler::Scope scope(Root::Current().Profiler(), "RenderCommands");
 		BuildRenderCommands(frontEndManager, SceneManager, engineState);
 	}
 	const auto buildEnd = std::chrono::high_resolution_clock::now();
 	m_lastFrameBuildTime = buildEnd - buildStart;
 
-	{
-		FrameProfiler::Scope scope(Root::Current().Profiler(), "Camera");
-		UpdateCameraPhase(input, engineState);
-	}
 	if (engineState.IsEditorMode() && !ShouldPreviewMainMenu(frontEndManager, engineState))
 		debug.DrawPlayerAttackSpawnPreviews(ActiveCamera());
 	{

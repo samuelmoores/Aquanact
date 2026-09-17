@@ -1,0 +1,131 @@
+Particle System Future Optimizations
+====================================
+
+Current status
+--------------
+
+- Completed: remove per-particle CPU frustum culling and temporary visible-particle copies.
+- Completed: retain emitter-level frustum culling and compact visible commands in place.
+- Completed: replace entity-backed weather and particle rebasing with one scene-owned, world-space fixed pool replenished around the camera frustum.
+
+The remaining work below is ordered by expected value and implementation risk. Measure each step before moving to the next one so later changes are driven by an observed bottleneck.
+
+
+1. Add particle-specific profiling
+----------------------------------
+
+Track these values independently from the existing aggregate frame timings:
+
+- CPU simulation time and live-particle count.
+- Weather simulation time, live-particle count, and pool resize count.
+- Emitter culling time and number of rejected emitters.
+- Particle upload bytes and upload time.
+- Particle draw-call count.
+- GPU time around the complete particle pass, using timer queries when available.
+
+Expose the counters in the existing profiler or Particle System window. Test at least the default rain preset, maximum weather density, many small coordinate emitters, and a mixture of additive and alpha emitters.
+
+Success criteria: the engine can identify whether a particle-heavy frame is simulation-bound, upload-bound, draw-call-bound, or fragment-bound.
+
+
+2. Replace per-emitter GPU uploads with one mapped upload
+---------------------------------------------------------
+
+OpenGLGraphicsDevice currently orphans the particle VBO and calls glBufferSubData once per emitter. Replace that path with a single mapped write:
+
+- Track the allocated particle VBO capacity.
+- Grow the buffer geometrically when the required byte count exceeds capacity.
+- Map once per frame with glMapBufferRange and invalidation flags supported by OpenGL 3.3.
+- Copy each emitter's particle range into the mapped destination while recording its first vertex and count.
+- Unmap once, then issue the draws.
+- Keep a safe fallback if mapping fails.
+
+Do not use persistent mapping without raising the required OpenGL version or checking extension support.
+
+Success criteria: one buffer map/unmap pair per particle pass and no glBufferSubData call per emitter.
+
+
+3. Introduce a compact GPU particle structure
+----------------------------------------------
+
+ParticleInstance is simulation data and currently includes velocity in every GPU upload even though the shader does not consume it. Add a separate ParticleGpuInstance used only for rendering.
+
+Initial fields should include only:
+
+- Position.
+- Color.
+- Size.
+- Normalized age or age and lifetime.
+- Shape variation.
+
+Populate this structure directly into the mapped VBO from step 2. Add explicit layout/static assertions where practical so CPU attribute offsets cannot silently diverge from the vertex layout.
+
+As a follow-up, pass start color, end color, start size, and end size as per-emitter uniforms and calculate color/size over life in the vertex shader. This can remove color and size from each GPU instance, but preserve current behavior when settings are edited while particles are alive.
+
+Success criteria: lower upload bytes per particle with visually equivalent effects.
+
+
+4. Coalesce compatible draw ranges
+----------------------------------
+
+Combine consecutive emitter ranges when all render state is compatible:
+
+- Same blend mode.
+- Same visual shape.
+- Same model matrix, especially identity for world-space emitters.
+- Compatible alpha ordering.
+
+Additive world-space emitters can be grouped freely by visual shape. Alpha emitters must retain their back-to-front emitter order; only adjacent compatible ranges should be merged unless a stronger sorting scheme is introduced.
+
+Success criteria: particle draw calls scale with compatible state groups rather than total emitter count.
+
+
+5. Remove particle-pass OpenGL state queries
+---------------------------------------------
+
+The particle pass currently queries depth-write and blend state before drawing. Establish a documented scene-render baseline or add state tracking in OpenGLGraphicsDevice, then set and restore known values without glGetBooleanv/glIsEnabled calls in the hot path.
+
+Also restore the blend function explicitly if later scene passes can execute after particles. Keep GUI state setup independent.
+
+Success criteria: no synchronous OpenGL state queries in DrawParticles and no rendering regressions in editor overlays or runtime GUI.
+
+
+6. Optimize spawning only if profiling justifies it
+---------------------------------------------------
+
+Potential changes:
+
+- Replace std::mt19937 and repeated uniform_real_distribution construction with a small, well-tested generator and direct float conversion.
+- Cache immutable emitter transform data for bursts that spawn many particles in one call.
+- Generate random values in batches if large bursts are common.
+
+Preserve deterministic behavior when a fixed seed is used.
+
+Success criteria: measurable reduction in burst/emission CPU time without visible distribution bias.
+
+
+7. Consider GPU simulation only for substantially larger effects
+---------------------------------------------------------------
+
+Point sprites already submit one vertex per particle, so conventional quad instancing is unlikely to be a useful optimization by itself. GPU simulation is the relevant future step for particle counts that remain CPU-bound after the earlier work.
+
+The current OpenGL 3.3 context does not provide core compute shaders. The available choices are:
+
+- Implement transform-feedback simulation while retaining OpenGL 3.3 compatibility.
+- Raise the graphics requirement to OpenGL 4.3 or newer and use compute shaders/SSBOs.
+
+This step should include GPU-side spawning, lifetime compaction or dead-particle reuse, bounds strategy, and a CPU fallback. Do not introduce it until profiling demonstrates that CPU simulation is a material frame cost.
+
+
+Verification checklist for every optimization
+---------------------------------------------
+
+- Compare live-particle counts and emission timing before and after the change.
+- Check point, sphere, and box emission shapes.
+- Check local-space and world-space emitters.
+- Check additive and alpha blend modes.
+- Check rain and snow while translating and rotating the camera.
+- Check bursts, restart, density changes, particle-limit reductions, and editor preview.
+- Check emitter-level frustum rejection at every edge of the camera view.
+- Run static checks and git diff --check.
+- Build or run performance captures only when explicitly requested under the workspace instructions.

@@ -171,6 +171,33 @@ void OpenGLGraphicsDevice::startUp()
 	}
 	m_platform->startUp(*m_window);
 	InitializeShadowMap();
+	m_particleShader = std::make_unique<ShaderProgram>();
+	m_particleShader->load("shaders/particle.vert", "shaders/particle.frag");
+	glGenVertexArrays(1, &m_particleVao);
+	glGenBuffers(1, &m_particleVbo);
+	glBindVertexArray(m_particleVao);
+	glBindBuffer(GL_ARRAY_BUFFER, m_particleVbo);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(ParticleInstance), reinterpret_cast<void*>(offsetof(ParticleInstance, position)));
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(ParticleInstance), reinterpret_cast<void*>(offsetof(ParticleInstance, color)));
+	glEnableVertexAttribArray(2);
+	glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(ParticleInstance), reinterpret_cast<void*>(offsetof(ParticleInstance, size)));
+	glEnableVertexAttribArray(3);
+	glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(ParticleInstance), reinterpret_cast<void*>(offsetof(ParticleInstance, age)));
+	glEnableVertexAttribArray(4);
+	glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, sizeof(ParticleInstance), reinterpret_cast<void*>(offsetof(ParticleInstance, lifetime)));
+	glEnableVertexAttribArray(5);
+	glVertexAttribPointer(5, 1, GL_FLOAT, GL_FALSE, sizeof(ParticleInstance), reinterpret_cast<void*>(offsetof(ParticleInstance, shapeVariation)));
+	glBindVertexArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	const uint32_t particleProgram = m_particleShader->GetID();
+	m_particleModelUniform = glGetUniformLocation(particleProgram, "model");
+	m_particleViewUniform = glGetUniformLocation(particleProgram, "view");
+	m_particleProjectionUniform = glGetUniformLocation(particleProgram, "projection");
+	m_particleViewportSizeUniform = glGetUniformLocation(particleProgram, "viewportSize");
+	m_particleVisualShapeUniform = glGetUniformLocation(particleProgram, "particleVisualShape");
 	m_initialized = true;
 }
 
@@ -273,6 +300,16 @@ void OpenGLGraphicsDevice::ReleaseShadowMap()
 	m_shadowShader.reset();
 	m_pointShadowShader.reset();
 	m_selectionOutlineShader.reset();
+	m_particleShader.reset();
+	if (m_particleVbo != 0) glDeleteBuffers(1, &m_particleVbo);
+	if (m_particleVao != 0) glDeleteVertexArrays(1, &m_particleVao);
+	m_particleVbo = 0;
+	m_particleVao = 0;
+	m_particleModelUniform = -1;
+	m_particleViewUniform = -1;
+	m_particleProjectionUniform = -1;
+	m_particleViewportSizeUniform = -1;
+	m_particleVisualShapeUniform = -1;
 	m_shadowMapReady = false;
 	m_pointShadowMapsReady.fill(false);
 	m_pointShadowFarPlanes.fill(1.0f);
@@ -470,6 +507,83 @@ void OpenGLGraphicsDevice::RenderShadowMaps(const RenderCommand* commands, std::
 void OpenGLGraphicsDevice::Draw(const RenderCommand& command, const Camera& camera, const LightingManager& lightingManager)
 {
 	DrawInternal(command, camera, lightingManager, nullptr, nullptr, nullptr);
+}
+
+void OpenGLGraphicsDevice::DrawParticles(const ParticleRenderCommand* commands, std::size_t commandCount, const Camera& camera)
+{
+	if (!m_particleShader || !commands || commandCount == 0) return;
+
+	std::size_t totalParticleCount = 0;
+	for (std::size_t commandIndex = 0; commandIndex < commandCount; ++commandIndex)
+	{
+		if (commands[commandIndex].particles)
+			totalParticleCount += commands[commandIndex].particles->size();
+	}
+	if (totalParticleCount == 0) return;
+
+	m_particleShader->activate();
+	const glm::mat4 view = camera.GetViewMatrix();
+	const glm::mat4 projection = camera.GetProjectionMatrix();
+	if (m_particleViewUniform >= 0)
+		glUniformMatrix4fv(m_particleViewUniform, 1, GL_FALSE, &view[0][0]);
+	if (m_particleProjectionUniform >= 0)
+		glUniformMatrix4fv(m_particleProjectionUniform, 1, GL_FALSE, &projection[0][0]);
+	if (m_particleViewportSizeUniform >= 0)
+		glUniform2f(m_particleViewportSizeUniform,
+			static_cast<float>(m_platform ? m_platform->ViewportWidth() : 1),
+			static_cast<float>(m_platform ? m_platform->ViewportHeight() : 1));
+
+	glBindVertexArray(m_particleVao);
+	glBindBuffer(GL_ARRAY_BUFFER, m_particleVbo);
+	glBufferData(GL_ARRAY_BUFFER,
+		static_cast<GLsizeiptr>(totalParticleCount * sizeof(ParticleInstance)),
+		nullptr, GL_STREAM_DRAW);
+
+	std::size_t particleOffset = 0;
+	for (std::size_t commandIndex = 0; commandIndex < commandCount; ++commandIndex)
+	{
+		const ParticleRenderCommand& command = commands[commandIndex];
+		if (!command.particles || command.particles->empty()) continue;
+		const std::size_t uploadSize = command.particles->size() * sizeof(ParticleInstance);
+		glBufferSubData(GL_ARRAY_BUFFER,
+			static_cast<GLintptr>(particleOffset * sizeof(ParticleInstance)),
+			static_cast<GLsizeiptr>(uploadSize), command.particles->data());
+		particleOffset += command.particles->size();
+	}
+
+	const GLboolean depthMaskWasEnabled = [] { GLboolean value = GL_TRUE; glGetBooleanv(GL_DEPTH_WRITEMASK, &value); return value; }();
+	const GLboolean blendWasEnabled = glIsEnabled(GL_BLEND);
+	glEnable(GL_BLEND);
+	glDepthMask(GL_FALSE);
+	glEnable(GL_PROGRAM_POINT_SIZE);
+	glEnable(GL_POINT_SPRITE);
+	particleOffset = 0;
+	ParticleBlendMode activeBlendMode = static_cast<ParticleBlendMode>(-1);
+	for (std::size_t commandIndex = 0; commandIndex < commandCount; ++commandIndex)
+	{
+		const ParticleRenderCommand& command = commands[commandIndex];
+		if (!command.particles || command.particles->empty()) continue;
+		if (activeBlendMode != command.blendMode)
+		{
+			activeBlendMode = command.blendMode;
+			if (activeBlendMode == ParticleBlendMode::Alpha)
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			else
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+		}
+		if (m_particleModelUniform >= 0)
+			glUniformMatrix4fv(m_particleModelUniform, 1, GL_FALSE, &command.modelMatrix[0][0]);
+		if (m_particleVisualShapeUniform >= 0)
+			glUniform1i(m_particleVisualShapeUniform, static_cast<int>(command.visualShape));
+		glDrawArrays(GL_POINTS, static_cast<GLint>(particleOffset), static_cast<GLsizei>(command.particles->size()));
+		particleOffset += command.particles->size();
+		++m_frameStats.mainDrawCalls;
+	}
+	glDisable(GL_POINT_SPRITE);
+	glDisable(GL_PROGRAM_POINT_SIZE);
+	glDepthMask(depthMaskWasEnabled);
+	if (!blendWasEnabled) glDisable(GL_BLEND);
+	glBindVertexArray(0);
 }
 
 void OpenGLGraphicsDevice::DrawCulled(const RenderCommand& command, const Camera& camera,

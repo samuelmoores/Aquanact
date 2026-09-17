@@ -4,6 +4,7 @@
 #include "Engine/Core/Controller.h"
 #include "Engine/Core/Entity.h"
 #include "Engine/Core/EntityStateMachine.h"
+#include "Engine/Core/ParticleSystem.h"
 #include "Game/AIController.h"
 #include "Game/AttackSphere.h"
 #include "Game/Health.h"
@@ -19,6 +20,10 @@ void RegisterGameComponents()
 	ComponentFactory::Instance().Register("EntityStateMachine", [](Entity& owner) -> std::unique_ptr<Component>
 	{
 		return std::make_unique<EntityStateMachine>(owner.GetMesh());
+	});
+	ComponentFactory::Instance().Register("ParticleSystem", [](Entity&) -> std::unique_ptr<Component>
+	{
+		return std::make_unique<ParticleSystem>();
 	});
 	ComponentFactory::Instance().Register("Controller", [](Entity&) -> std::unique_ptr<Component>
 	{

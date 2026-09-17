@@ -17,6 +17,7 @@
 #include "Game/PlayerAttack.h"
 #include "Engine/Core/RenderManager.h"
 #include "Game/AIController.h"
+#include "Engine/Core/ParticleSystem.h"
 
 #include <glm/glm.hpp>
 #include <algorithm>
@@ -368,6 +369,28 @@ namespace ProjectStateSerializer {
 						contents += ";targetinstance;" + ProjectStateFormat::EscapeField(attack->AttackTargetInstanceName());
 						contents += ";" + ProjectStateFormat::EscapeField(attack->AttackTargetBoneName()) + "\n";
 					}
+					else if (const ParticleSystem* particles = dynamic_cast<const ParticleSystem*>(component))
+					{
+						AppendComponentLine(contents, projectPath, object, "gamecomponent");
+						contents += ";ParticleSystem;" + std::to_string(particles->EmissionRate());
+						contents += ";" + std::to_string(particles->MaxParticles()) + ";" + std::to_string(particles->Lifetime());
+						contents += ";" + std::to_string(particles->ParticleSize());
+						for (const glm::vec3& value : { particles->InitialVelocity(), particles->Gravity() })
+							contents += ";" + std::to_string(value.x) + ";" + std::to_string(value.y) + ";" + std::to_string(value.z);
+						for (const glm::vec4& value : { particles->StartColor(), particles->EndColor() })
+							contents += ";" + std::to_string(value.r) + ";" + std::to_string(value.g) + ";" + std::to_string(value.b) + ";" + std::to_string(value.a);
+						contents += ";" + std::to_string(particles->Looping() ? 1 : 0);
+						contents += ";" + std::to_string(particles->EndParticleSize());
+						contents += ";" + std::to_string(particles->VelocitySpread());
+						contents += ";" + std::to_string(particles->RadialSpeed());
+						contents += ";" + std::to_string(static_cast<int>(particles->EmissionShape()));
+						contents += ";" + std::to_string(particles->EmissionRadius());
+						const glm::vec3 boxExtents = particles->EmissionBoxExtents();
+						contents += ";" + std::to_string(boxExtents.x) + ";" + std::to_string(boxExtents.y) + ";" + std::to_string(boxExtents.z);
+						contents += ";" + std::to_string(static_cast<int>(particles->BlendMode()));
+						contents += ";" + std::to_string(static_cast<int>(particles->SimulationSpace()));
+						contents += ";" + std::to_string(static_cast<int>(particles->Preset())) + "\n";
+					}
 					else if (const Controller* controller = dynamic_cast<const Controller*>(component))
 					{
 						AppendComponentLine(contents, projectPath, object, "controller");
@@ -493,6 +516,22 @@ namespace ProjectStateSerializer {
 				continue;
 			}
 			contents += "scenecontext;" + ProjectStateFormat::EscapeField(scene->Name()) + "\n";
+			const WeatherSettings& weather = scene->Weather().Settings();
+			contents += "sceneweather;" + ProjectStateFormat::EscapeField(scene->Name());
+			contents += ";" + std::to_string(weather.enabled ? 1 : 0);
+			contents += ";" + std::to_string(static_cast<int>(weather.type));
+			contents += ";" + std::to_string(weather.density);
+			contents += ";" + std::to_string(weather.fallSpeed);
+			contents += ";" + std::to_string(weather.windVelocity.x) + ";" + std::to_string(weather.windVelocity.y);
+			contents += ";" + std::to_string(weather.velocitySpread);
+			contents += ";" + std::to_string(weather.gravity.x) + ";" + std::to_string(weather.gravity.y) + ";" + std::to_string(weather.gravity.z);
+			contents += ";" + std::to_string(weather.spawnHeightAboveCamera);
+			contents += ";" + std::to_string(weather.fallDistanceBelowCamera);
+			contents += ";" + std::to_string(weather.coverageDepth);
+			contents += ";" + std::to_string(weather.minimumNearWidth);
+			contents += ";" + std::to_string(weather.startSize) + ";" + std::to_string(weather.endSize);
+			contents += ";" + std::to_string(weather.startColor.r) + ";" + std::to_string(weather.startColor.g) + ";" + std::to_string(weather.startColor.b) + ";" + std::to_string(weather.startColor.a);
+			contents += ";" + std::to_string(weather.endColor.r) + ";" + std::to_string(weather.endColor.g) + ";" + std::to_string(weather.endColor.b) + ";" + std::to_string(weather.endColor.a) + "\n";
 			const LightingManager& lighting = scene->Lights();
 			const DirectionalLight& sunLight = lighting.SunLight();
 			contents += "scenesunlight;" + ProjectStateFormat::EscapeField(scene->Name()) + ";";
@@ -934,6 +973,34 @@ namespace ProjectStateSerializer {
 			continue;
 		}
 
+		if (fields.size() == 26 && fields[0] == "sceneweather")
+		{
+			const std::string sceneName = ProjectStateFormat::UnescapeField(fields[1]);
+			for (PendingLevel& pendingLevel : pendingLevels)
+			{
+				if (pendingLevel.name != sceneName) continue;
+				WeatherSettings& weather = pendingLevel.weather;
+				weather.enabled = fields[2] == "1";
+				weather.type = static_cast<WeatherType>(std::clamp(
+					std::stoi(fields[3]), 0, static_cast<int>(WeatherType::Count) - 1));
+				weather.density = std::stof(fields[4]);
+				weather.fallSpeed = std::stof(fields[5]);
+				weather.windVelocity = {std::stof(fields[6]), std::stof(fields[7])};
+				weather.velocitySpread = std::stof(fields[8]);
+				weather.gravity = {std::stof(fields[9]), std::stof(fields[10]), std::stof(fields[11])};
+				weather.spawnHeightAboveCamera = std::stof(fields[12]);
+				weather.fallDistanceBelowCamera = std::stof(fields[13]);
+				weather.coverageDepth = std::stof(fields[14]);
+				weather.minimumNearWidth = std::stof(fields[15]);
+				weather.startSize = std::stof(fields[16]);
+				weather.endSize = std::stof(fields[17]);
+				weather.startColor = {std::stof(fields[18]), std::stof(fields[19]), std::stof(fields[20]), std::stof(fields[21])};
+				weather.endColor = {std::stof(fields[22]), std::stof(fields[23]), std::stof(fields[24]), std::stof(fields[25])};
+				break;
+			}
+			continue;
+		}
+
 		if (fields.size() >= 5 && fields[0] == "cutscenesound")
 		{
 			const std::string sceneName = ProjectStateFormat::UnescapeField(fields[1]);
@@ -1109,6 +1176,30 @@ namespace ProjectStateSerializer {
 									component.attackTargetBoneName = ProjectStateFormat::UnescapeField(fields[componentLayout.dataIndex + 12]);
 							}
 						}
+						else if (component.componentClassName == "ParticleSystem")
+						{
+							const std::size_t index = componentLayout.dataIndex + 1;
+							if (fields.size() > index) component.particleEmissionRate = std::stof(fields[index]);
+							if (fields.size() > index + 1) component.particleMaxParticles = std::stoi(fields[index + 1]);
+							if (fields.size() > index + 2) component.particleLifetime = std::stof(fields[index + 2]);
+							if (fields.size() > index + 3) component.particleSize = std::stof(fields[index + 3]);
+							if (fields.size() > index + 6) component.particleInitialVelocity = glm::vec3(std::stof(fields[index + 4]), std::stof(fields[index + 5]), std::stof(fields[index + 6]));
+							if (fields.size() > index + 9) component.particleGravity = glm::vec3(std::stof(fields[index + 7]), std::stof(fields[index + 8]), std::stof(fields[index + 9]));
+							if (fields.size() > index + 13) component.particleStartColor = glm::vec4(std::stof(fields[index + 10]), std::stof(fields[index + 11]), std::stof(fields[index + 12]), std::stof(fields[index + 13]));
+							if (fields.size() > index + 17) component.particleEndColor = glm::vec4(std::stof(fields[index + 14]), std::stof(fields[index + 15]), std::stof(fields[index + 16]), std::stof(fields[index + 17]));
+							if (fields.size() > index + 18) component.particleLooping = fields[index + 18] == "1";
+							component.particleEndSize = component.particleSize;
+							if (fields.size() > index + 19) component.particleEndSize = std::stof(fields[index + 19]);
+							if (fields.size() > index + 20) component.particleVelocitySpread = std::stof(fields[index + 20]);
+							if (fields.size() > index + 21) component.particleRadialSpeed = std::stof(fields[index + 21]);
+							if (fields.size() > index + 22) component.particleEmissionShape = std::clamp(std::stoi(fields[index + 22]), 0, 2);
+							if (fields.size() > index + 23) component.particleEmissionRadius = std::stof(fields[index + 23]);
+							if (fields.size() > index + 26) component.particleEmissionBoxExtents = glm::vec3(std::stof(fields[index + 24]), std::stof(fields[index + 25]), std::stof(fields[index + 26]));
+							if (fields.size() > index + 27) component.particleBlendMode = std::clamp(std::stoi(fields[index + 27]), 0, 1);
+							if (fields.size() > index + 28) component.particleSimulationSpace = std::clamp(std::stoi(fields[index + 28]), 0, 1);
+							if (fields.size() > index + 29) component.particlePreset = std::clamp(
+								std::stoi(fields[index + 29]), 0, static_cast<int>(ParticlePreset::Count) - 1);
+						}
 						if (component.componentClassName.empty())
 						{
 							return false;
@@ -1169,7 +1260,7 @@ namespace ProjectStateSerializer {
 					continue;
 				}
 
-				if (((fields.size() < 11 || fields.size() > 17) || fields[0] != "object"))
+				if (((fields.size() < 11 || fields.size() > 18) || fields[0] != "object"))
 				{
 					continue;
 				}
@@ -1181,6 +1272,8 @@ namespace ProjectStateSerializer {
 
 				PendingLevel::PendingObject object;
 				object.sourcePath = ProjectStateFormat::ResolveSourcePath(projectPath, fields[1]);
+				if (fields.size() >= 18)
+					object.name = ProjectStateFormat::UnescapeField(fields[17]);
 				object.position = glm::vec3(std::stof(fields[2]), std::stof(fields[3]), std::stof(fields[4]));
 				object.rotation = glm::vec3(std::stof(fields[5]), std::stof(fields[6]), std::stof(fields[7]));
 				object.scale = glm::vec3(std::stof(fields[8]), std::stof(fields[9]), std::stof(fields[10]));

@@ -135,6 +135,7 @@ std::string GameCodeMaintenance::MakeComponentRegistryTemplate()
 		"#include \"Engine/Core/ComponentFactory.h\"\n"
 		"#include \"Engine/Core/Controller.h\"\n"
 		"#include \"Engine/Core/Entity.h\"\n";
+	result += "#include \"Engine/Core/ParticleSystem.h\"\n";
 	std::vector<std::string> names;
 	for (const auto& path : CollectGameSourceFiles(GameSourceRoot()))
 	{
@@ -143,6 +144,7 @@ std::string GameCodeMaintenance::MakeComponentRegistryTemplate()
 	for (const std::string& name : names) result += "#include \"Game/" + name + ".h\"\n";
 	result += "\n#include <memory>\n\nvoid RegisterGameComponents()\n{\n";
 	result += "\tComponentFactory::Instance().Register(\"Controller\", [](Entity&) -> std::unique_ptr<Component>\n\t{\n\t\treturn std::make_unique<Controller>();\n\t});\n";
+	result += "\tComponentFactory::Instance().Register(\"ParticleSystem\", [](Entity&) -> std::unique_ptr<Component>\n\t{\n\t\treturn std::make_unique<ParticleSystem>();\n\t});\n";
 	for (const std::string& name : names)
 		result += "\tComponentFactory::Instance().Register(\"" + name + "\", [](Entity&) -> std::unique_ptr<Component>\n\t{\n\t\treturn std::make_unique<" + name + ">();\n\t});\n";
 	return result + "}\n";

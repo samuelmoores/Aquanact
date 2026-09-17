@@ -6,6 +6,7 @@
 #include <vector>
 #include "Engine/Core/CameraPathData.h"
 #include "Engine/Core/CutsceneTimeline.h"
+#include "Engine/Core/WeatherSystem.h"
 
 namespace ProjectStateData {
 	struct DirectionalLightData {
@@ -67,6 +68,24 @@ namespace ProjectStateData {
 		bool attackDrawInstance = false;
 		std::string attackTargetInstanceName;
 		std::string attackTargetBoneName;
+		float particleEmissionRate = 12.0f;
+		int particleMaxParticles = 128;
+		float particleLifetime = 1.0f;
+		float particleSize = 12.5f;
+		glm::vec3 particleInitialVelocity{0.0f, 1.0f, 0.0f};
+		glm::vec3 particleGravity{0.0f, -1.5f, 0.0f};
+		glm::vec4 particleStartColor{1.0f, 0.55f, 0.1f, 1.0f};
+		glm::vec4 particleEndColor{1.0f, 0.05f, 0.0f, 0.0f};
+		bool particleLooping = true;
+		float particleEndSize = 12.5f;
+		float particleVelocitySpread = 0.35f;
+		float particleRadialSpeed = 0.0f;
+		int particleEmissionShape = 0;
+		float particleEmissionRadius = 1.0f;
+		glm::vec3 particleEmissionBoxExtents{1.0f};
+		int particleBlendMode = 0;
+		int particleSimulationSpace = 0;
+		int particlePreset = 0;
 		std::string initialState;
 		struct EntityStateData {
 			struct SoundEventData {
@@ -136,12 +155,14 @@ namespace ProjectStateData {
 		bool isMainMenu = false;
 		std::string musicPath;
 		float musicVolume = 50.0f;
+		WeatherSettings weather;
 		CutsceneTimeline cutscene;
 		bool hasSunLight = false;
 		DirectionalLightData sunLight;
 		std::vector<PointLightData> pointLights;
 		struct PendingObject {
 			std::filesystem::path sourcePath;
+			std::string name;
 			glm::vec3 position{ 0.0f };
 			glm::vec3 rotation{ 0.0f };
 			glm::vec3 scale{ 1.0f };

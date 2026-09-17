@@ -33,6 +33,7 @@ struct EngineGuiWindowState
 	bool showCutsceneWindow = true;
 	bool showInstanceManagerWindow = false;
 	bool showSpawnManagerWindow = false;
+	bool showParticleSystemWindow = false;
 };
 
 // One-frame requests emitted by the menu and consumed by popup owners.

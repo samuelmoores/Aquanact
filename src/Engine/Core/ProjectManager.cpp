@@ -124,7 +124,21 @@ namespace {
 				Root::Current().Debugger().LogTagged("ProjectLoad", "Creating object from source: " + pendingObject.sourcePath.string() + " in scene: " + pendingLevel.name);
 				// Project component records are authoritative. Imported models still receive
 				// their default components through Entity's default constructor behavior.
-				auto object = std::make_unique<Entity>(pendingObject.sourcePath.string().c_str(), false);
+				std::unique_ptr<Entity> object;
+				if (pendingObject.sourcePath.empty())
+				{
+					object = std::make_unique<Entity>(
+						pendingObject.name.empty() ? std::string("Entity") : pendingObject.name,
+						false);
+				}
+				else
+				{
+					object = std::make_unique<Entity>(pendingObject.sourcePath.string().c_str(), false);
+				}
+				if (!pendingObject.name.empty() && !pendingObject.sourcePath.empty())
+				{
+					object->SetName(pendingObject.name);
+				}
 				if (pendingObject.id != 0)
 				{
 					object->SetId(pendingObject.id);

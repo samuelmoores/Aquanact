@@ -2,6 +2,7 @@
 #include <glm/glm.hpp>
 #include "Engine/Core/Mesh.h"
 #include "Engine/Core/ShaderProgram.h"
+#include "Engine/Core/ParticleSystem.h"
 
 struct RenderCommand {
 	Mesh* mesh;
@@ -14,6 +15,17 @@ struct RenderCommand {
 	bool hasWorldBounds = false;
 	// -1 draws every imported submesh; otherwise only this buffer is submitted.
 	int subMeshIndex = -1;
+};
+
+struct ParticleRenderCommand
+{
+	const std::vector<ParticleInstance>* particles = nullptr;
+	glm::mat4 modelMatrix{1.0f};
+	glm::vec3 worldBoundsMin{0.0f};
+	glm::vec3 worldBoundsMax{0.0f};
+	bool hasWorldBounds = false;
+	ParticleBlendMode blendMode = ParticleBlendMode::Additive;
+	ParticleVisualShape visualShape = ParticleVisualShape::SoftCircle;
 };
 
 

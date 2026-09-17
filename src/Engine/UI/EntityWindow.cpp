@@ -13,6 +13,7 @@
 #include "Engine/Core/SpawnManager.h"
 #include "Engine/Core/EntityStateMachine.h"
 #include "Engine/Core/PhysicsWorld.h"
+#include "Engine/Core/ParticleSystem.h"
 #include "Engine/UI/EngineGuiWidgets.h"
 #include "Game/AIController.h"
 #include "Game/Health.h"
@@ -216,7 +217,123 @@ bool EntityWindow::DrawStateMachineButton() const
 
 void EntityWindow::DrawComponentControls(Component& component) const
 {
-	if (PlayerAttack* attack = dynamic_cast<PlayerAttack*>(&component))
+	if (ParticleSystem* particles = dynamic_cast<ParticleSystem*>(&component))
+	{
+		const ParticlePreset presets[] = {
+			ParticlePreset::Custom,
+			ParticlePreset::TorchFlame,
+			ParticlePreset::Embers,
+			ParticlePreset::BlueMagic,
+			ParticlePreset::HealingMotes,
+			ParticlePreset::PoisonGlow,
+			ParticlePreset::ElectricalSparks,
+			ParticlePreset::FireFountain,
+			ParticlePreset::Smoke,
+			ParticlePreset::Explosion,
+			ParticlePreset::Trail
+		};
+		const char* presetNames[] = {
+			"Custom",
+			"Torch Flame",
+			"Embers",
+			"Magic Orb",
+			"Healing Motes",
+			"Poison Glow",
+			"Electrical Sparks",
+			"Fire Fountain",
+			"Smoke",
+			"Explosion",
+			"Trail"
+		};
+		static_assert(IM_ARRAYSIZE(presets) == IM_ARRAYSIZE(presetNames));
+
+		int presetIndex = 0;
+		for (int index = 0; index < IM_ARRAYSIZE(presets); ++index)
+		{
+			if (presets[index] == particles->Preset())
+			{
+				presetIndex = index;
+				break;
+			}
+		}
+		if (ImGui::BeginCombo("Preset", presetNames[presetIndex]))
+		{
+			for (int index = 0; index < IM_ARRAYSIZE(presets); ++index)
+			{
+				const bool selected = index == presetIndex;
+				if (ImGui::Selectable(presetNames[index], selected))
+					particles->ApplyPreset(presets[index]);
+				if (selected) ImGui::SetItemDefaultFocus();
+			}
+			ImGui::EndCombo();
+		}
+		if (ImGui::SmallButton("< Previous Preset"))
+		{
+			presetIndex = presetIndex == 0 ? IM_ARRAYSIZE(presets) - 1 : presetIndex - 1;
+			particles->ApplyPreset(presets[presetIndex]);
+		}
+		ImGui::SameLine();
+		if (ImGui::SmallButton("Next Preset >"))
+		{
+			presetIndex = (presetIndex + 1) % IM_ARRAYSIZE(presets);
+			particles->ApplyPreset(presets[presetIndex]);
+		}
+
+		float emissionRate = particles->EmissionRate();
+		if (ImGui::DragFloat("Emission Rate", &emissionRate, 0.1f, 0.0f, 10000.0f)) particles->SetEmissionRate(emissionRate);
+		int maxParticles = particles->MaxParticles();
+		if (ImGui::InputInt("Max Particles", &maxParticles)) particles->SetMaxParticles(maxParticles);
+		float lifetime = particles->Lifetime();
+		if (ImGui::DragFloat("Lifetime", &lifetime, 0.01f, 0.01f, 60.0f)) particles->SetLifetime(lifetime);
+		float size = particles->ParticleSize();
+		if (ImGui::DragFloat("Start Size", &size, 0.01f, 0.001f, 100.0f)) particles->SetParticleSize(size);
+		float endSize = particles->EndParticleSize();
+		if (ImGui::DragFloat("End Size", &endSize, 0.01f, 0.0f, 100.0f)) particles->SetEndParticleSize(endSize);
+
+		int emissionShape = static_cast<int>(particles->EmissionShape());
+		const char* emissionShapes[] = {"Point", "Sphere", "Box"};
+		if (ImGui::Combo("Emission Shape", &emissionShape, emissionShapes, IM_ARRAYSIZE(emissionShapes)))
+			particles->SetEmissionShape(static_cast<ParticleEmissionShape>(emissionShape));
+		if (particles->EmissionShape() == ParticleEmissionShape::Sphere)
+		{
+			float radius = particles->EmissionRadius();
+			if (ImGui::DragFloat("Emission Radius", &radius, 0.05f, 0.0f, 1000.0f)) particles->SetEmissionRadius(radius);
+		}
+		else if (particles->EmissionShape() == ParticleEmissionShape::Box)
+		{
+			glm::vec3 extents = particles->EmissionBoxExtents();
+			if (EngineGuiWidgets::Vector3Editor("Emission Extents", extents, 0.1f)) particles->SetEmissionBoxExtents(extents);
+		}
+		glm::vec3 velocity = particles->InitialVelocity();
+		if (EngineGuiWidgets::Vector3Editor("Initial Velocity", velocity, 0.05f)) particles->SetInitialVelocity(velocity);
+		float velocitySpread = particles->VelocitySpread();
+		if (ImGui::DragFloat("Velocity Spread", &velocitySpread, 0.01f, 0.0f, 1000.0f)) particles->SetVelocitySpread(velocitySpread);
+		float radialSpeed = particles->RadialSpeed();
+		if (ImGui::DragFloat("Radial Speed", &radialSpeed, 0.05f, 0.0f, 1000.0f)) particles->SetRadialSpeed(radialSpeed);
+		glm::vec3 gravity = particles->Gravity();
+		if (EngineGuiWidgets::Vector3Editor("Gravity", gravity, 0.05f)) particles->SetGravity(gravity);
+		glm::vec4 startColor = particles->StartColor();
+		if (ImGui::ColorEdit4("Start Color", &startColor[0])) particles->SetStartColor(startColor);
+		glm::vec4 endColor = particles->EndColor();
+		if (ImGui::ColorEdit4("End Color", &endColor[0])) particles->SetEndColor(endColor);
+
+		int blendMode = static_cast<int>(particles->BlendMode());
+		const char* blendModes[] = {"Additive", "Alpha"};
+		if (ImGui::Combo("Blend Mode", &blendMode, blendModes, IM_ARRAYSIZE(blendModes)))
+			particles->SetBlendMode(static_cast<ParticleBlendMode>(blendMode));
+		int simulationSpace = static_cast<int>(particles->SimulationSpace());
+		const char* simulationSpaces[] = {"Local", "World"};
+		if (ImGui::Combo("Simulation Space", &simulationSpace, simulationSpaces, IM_ARRAYSIZE(simulationSpaces)))
+			particles->SetSimulationSpace(static_cast<ParticleSimulationSpace>(simulationSpace));
+		bool looping = particles->Looping();
+		if (ImGui::Checkbox("Looping", &looping)) particles->SetLooping(looping);
+		if (ImGui::Button("Burst 20")) particles->Burst(20);
+		ImGui::SameLine();
+		if (ImGui::Button("Burst 64")) particles->Burst(64);
+		ImGui::SameLine();
+		if (ImGui::Button("Restart")) particles->Restart();
+	}
+	else if (PlayerAttack* attack = dynamic_cast<PlayerAttack*>(&component))
 	{
 		const auto& definitions = Root::Current().Spawns().Definitions();
 		const std::string& currentName = attack->AttackInstanceName();

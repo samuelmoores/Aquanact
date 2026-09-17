@@ -88,6 +88,7 @@ void Scene::Clear()
 		Root::Current().Render().ClearPathedCameraTarget();
 	}
 	m_entities.clear();
+	m_weather.Clear();
 	Root::Current().Events().Clear();
 	m_firstFramePending = false;
 }

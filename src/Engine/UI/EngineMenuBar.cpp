@@ -6,6 +6,8 @@
 #include "Engine/Core/LightingManager.h"
 #include "Engine/Core/ProjectManager.h"
 #include "Engine/Core/SceneManager.h"
+#include "Engine/Core/Scene.h"
+#include "Engine/Core/Entity.h"
 #include "Engine/Core/Window.h"
 #include "Engine/Core/FrontEndManager.h"
 #include "Engine/Core/GameplayManager.h"
@@ -33,6 +35,23 @@ namespace
 	std::filesystem::path g_projectExplorerSelectedDirectory;
 	bool g_startupProjectPreferenceApplied = false;
 	bool IsValidProjectPath(const std::filesystem::path& path);
+
+	std::string UniqueEmptyEntityName(const Scene& scene)
+	{
+		const std::string baseName = "Empty Entity";
+		if (!scene.FindObjectByName(baseName))
+		{
+			return baseName;
+		}
+		for (std::size_t suffix = 2;; ++suffix)
+		{
+			const std::string candidate = baseName + " " + std::to_string(suffix);
+			if (!scene.FindObjectByName(candidate))
+			{
+				return candidate;
+			}
+		}
+	}
 
 	std::filesystem::path ProjectPreferencePath()
 	{
@@ -288,9 +307,8 @@ EngineMenuBarResult EngineMenuBar::Draw(
 	DrawFileMenu(sceneManager, projectManager);
 	result = DrawViewMenu(showAxis, showGrid, windowState);
 	result.openProjectExplorer = openProjectExplorer;
-	DrawLightingMenu();
 	DrawGameMenu(projectManager, sceneManager);
-	DrawSceneMenu(sceneManager, popupRequests.newScene);
+	DrawSceneMenu(context, windowState, popupRequests.newScene);
 	DrawCodeMenu(popupRequests.addCodeFile, popupRequests.deleteComponent);
 	DrawUiMenu();
 
@@ -509,6 +527,7 @@ EngineMenuBarResult EngineMenuBar::DrawViewMenu(
 	EngineGuiWidgets::ToggleMenuItem("Camera Window", windowState.showCameraWindow);
 	EngineGuiWidgets::ToggleMenuItem("Instance Manager", windowState.showInstanceManagerWindow);
 	EngineGuiWidgets::ToggleMenuItem("SpawnManager", windowState.showSpawnManagerWindow);
+	EngineGuiWidgets::ToggleMenuItem("Particle System", windowState.showParticleSystemWindow);
 	bool showEntityWindow = windowState.showEntityWindow;
 	if (EngineGuiWidgets::ToggleMenuItem("Entity Window", showEntityWindow))
 	{
@@ -545,22 +564,6 @@ EngineMenuBarResult EngineMenuBar::DrawViewMenu(
 
 	ImGui::EndMenu();
 	return result;
-}
-
-void EngineMenuBar::DrawLightingMenu() const
-{
-	if (!ImGui::BeginMenu("Lighting"))
-	{
-		return;
-	}
-
-	const bool canAddPointLight =
-		Root::Current().Render().Lights().PointLights().size() < LightingManager::MaxPointLights;
-	if (ImGui::MenuItem("Add Point Light", nullptr, false, canAddPointLight))
-	{
-		Root::Current().Render().Lights().AddPointLight();
-	}
-	ImGui::EndMenu();
 }
 
 void EngineMenuBar::DrawAquanactMenu(Window* window, bool& showInputMap, bool& buildGameRequested, bool& openProjectExplorer) const
@@ -616,12 +619,36 @@ void EngineMenuBar::DrawFileMenu(
 	}
 }
 
-void EngineMenuBar::DrawSceneMenu(SceneManager& sceneManager, bool& newLevelRequested) const
+void EngineMenuBar::DrawSceneMenu(
+	const EngineGuiFrameContext& context,
+	EngineGuiWindowState& windowState,
+	bool& newLevelRequested) const
 {
 	if (!ImGui::BeginMenu("Scene"))
 	{
 		return;
 	}
+	SceneManager& sceneManager = *context.sceneManager;
+	Scene* activeScene = sceneManager.ActiveLevel();
+	const bool canAddPointLight = activeScene &&
+		activeScene->Lights().PointLights().size() < LightingManager::MaxPointLights;
+	if (ImGui::MenuItem("Add Point Light", nullptr, false, canAddPointLight))
+	{
+		activeScene->Lights().AddPointLight();
+	}
+	if (ImGui::MenuItem("Add Entity", nullptr, false, activeScene != nullptr))
+	{
+		auto entity = std::make_unique<Entity>(UniqueEmptyEntityName(*activeScene), false);
+		Entity* addedEntity = activeScene->AddObject(std::move(entity));
+		if (addedEntity && context.selection)
+		{
+			context.selection->entityId = addedEntity->Id();
+			context.selection->pointLightIndex = -1;
+			context.selection->levelColliderIndex = -1;
+			windowState.showEntityWindow = true;
+		}
+	}
+	ImGui::Separator();
 
 	if (ImGui::BeginMenu("Levels"))
 	{

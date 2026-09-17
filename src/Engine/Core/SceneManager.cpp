@@ -10,6 +10,7 @@
 #include "Game/PlayerController.h"
 #include "Engine/Core/ProjectStateData.h"
 #include "Engine/Core/PhysicsWorld.h"
+#include "Engine/Core/ParticleSystem.h"
 #include "Engine/Core/Root.h"
 #include "Engine/Core/FrontEndManager.h"
 #include "Engine/Core/RenderManager.h"
@@ -640,6 +641,27 @@ void SceneManager::ApplyProjectState(
 							attack->SetAttackTargetInstanceName(pendingComponent.attackTargetInstanceName);
 							attack->SetAttackTargetBoneName(pendingComponent.attackTargetBoneName);
 						}
+						if (auto* particles = dynamic_cast<ParticleSystem*>(component.get()))
+						{
+							particles->SetEmissionRate(pendingComponent.particleEmissionRate);
+							particles->SetMaxParticles(pendingComponent.particleMaxParticles);
+							particles->SetLifetime(pendingComponent.particleLifetime);
+							particles->SetParticleSize(pendingComponent.particleSize);
+							particles->SetInitialVelocity(pendingComponent.particleInitialVelocity);
+							particles->SetGravity(pendingComponent.particleGravity);
+							particles->SetStartColor(pendingComponent.particleStartColor);
+							particles->SetEndColor(pendingComponent.particleEndColor);
+							particles->SetLooping(pendingComponent.particleLooping);
+							particles->SetEndParticleSize(pendingComponent.particleEndSize);
+							particles->SetVelocitySpread(pendingComponent.particleVelocitySpread);
+							particles->SetRadialSpeed(pendingComponent.particleRadialSpeed);
+							particles->SetEmissionShape(static_cast<ParticleEmissionShape>(pendingComponent.particleEmissionShape));
+							particles->SetEmissionRadius(pendingComponent.particleEmissionRadius);
+							particles->SetEmissionBoxExtents(pendingComponent.particleEmissionBoxExtents);
+							particles->SetBlendMode(static_cast<ParticleBlendMode>(pendingComponent.particleBlendMode));
+							particles->SetSimulationSpace(static_cast<ParticleSimulationSpace>(pendingComponent.particleSimulationSpace));
+							particles->RestorePreset(static_cast<ParticlePreset>(pendingComponent.particlePreset));
+						}
 						object->AddComponent(std::move(component));
 					}
 				}
@@ -800,6 +822,7 @@ void SceneManager::ApplyProjectState(
 			{
 				level->SetMusicPath(pendingLevel.musicPath);
 				level->SetMusicVolume(pendingLevel.musicVolume);
+				level->Weather().SetSettings(pendingLevel.weather);
 			}
 			SetSceneKind(pendingLevel.name, pendingLevel.isCutscene ? SceneKind::Cutscene : SceneKind::Level);
 		}

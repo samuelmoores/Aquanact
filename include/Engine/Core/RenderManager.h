@@ -101,6 +101,7 @@ private:
 	glm::vec3 m_cameraIslandPosition{0.0f};
 	glm::vec3 m_cameraPreviousPosition{0.0f};
 	std::vector<bool> m_cameraIslandTriggerInside;
+	std::vector<ParticleRenderCommand> m_particleCommands;
 	CameraManager m_cameraManager;
 	CameraMode m_cameraMode = CameraMode::ThirdPerson;
 	bool m_cutscenePreviewCamera = false;

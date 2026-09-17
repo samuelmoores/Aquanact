@@ -28,7 +28,7 @@ public:
 	// Entities own their components and drive their lifecycle in a fixed order.
 	Entity(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces);
 	Entity(const char* modelFile, bool addDefaultComponents = true, bool loadAnimations = true);
-	explicit Entity(std::string name = "Entity");
+	explicit Entity(std::string name = "Entity", bool addDefaultComponents = true);
 	virtual ~Entity();
 
 	const std::string& Name() const { return m_name; }

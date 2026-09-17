@@ -13,6 +13,7 @@
 class Window;
 class LightingManager;
 class Frustum;
+struct ParticleRenderCommand;
 
 class OpenGLGraphicsDevice final : public GraphicsDevice {
 public:
@@ -42,6 +43,7 @@ public:
 	void RenderShadowMaps(const RenderCommand* commands, std::size_t commandCount, const LightingManager& lightingManager);
 
 	void Draw(const RenderCommand& command, const Camera& camera, const LightingManager& lightingManager) override;
+	void DrawParticles(const ParticleRenderCommand* commands, std::size_t commandCount, const Camera& camera);
 	void DrawCulled(const RenderCommand& command, const Camera& camera,
 		const LightingManager& lightingManager, const Frustum& frustum,
 		std::size_t& visibleSubMeshes, std::size_t& culledSubMeshes);
@@ -60,6 +62,7 @@ private:
 	std::unique_ptr<class ShaderProgram> m_shadowShader;
 	std::unique_ptr<class ShaderProgram> m_pointShadowShader;
 	std::unique_ptr<class ShaderProgram> m_selectionOutlineShader;
+	std::unique_ptr<class ShaderProgram> m_particleShader;
 	Window* m_window = nullptr;
 	uint32_t m_shadowFramebuffer = 0;
 	uint32_t m_shadowDepthTexture = 0;
@@ -70,6 +73,13 @@ private:
 	glm::mat4 m_lightSpaceMatrix{ 1.0f };
 	bool m_shadowMapReady = false;
 	bool m_initialized = false;
+	uint32_t m_particleVao = 0;
+	uint32_t m_particleVbo = 0;
+	int32_t m_particleModelUniform = -1;
+	int32_t m_particleViewUniform = -1;
+	int32_t m_particleProjectionUniform = -1;
+	int32_t m_particleViewportSizeUniform = -1;
+	int32_t m_particleVisualShapeUniform = -1;
 	FrameStats m_frameStats;
 };
 

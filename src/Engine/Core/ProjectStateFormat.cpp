@@ -129,6 +129,7 @@ namespace ProjectStateFormat {
 
 	std::filesystem::path MakePortableSourcePath(const std::filesystem::path& projectPath, const std::filesystem::path& sourcePath)
 	{
+		if (sourcePath.empty()) return {};
 		if (!Root::Current().FileSystemRef().Exists(sourcePath)) return sourcePath;
 		const std::filesystem::path projectDir = projectPath.parent_path();
 		std::error_code ec;
@@ -141,6 +142,7 @@ namespace ProjectStateFormat {
 
 	std::filesystem::path ResolveSourcePath(const std::filesystem::path& projectPath, const std::filesystem::path& sourcePath)
 	{
+		if (sourcePath.empty()) return {};
 		if (Root::Current().FileSystemRef().Exists(sourcePath)) return sourcePath;
 		// Projects created by older builds may contain an absolute development
 		// path such as C:/dev/Aquanact/assets/models/foo.fbx.  Preserve the
@@ -216,7 +218,8 @@ namespace ProjectStateFormat {
 				const int colliderShape = object->GetPhysicsColliderShape() == PhysicsColliderShape::Capsule ? 1
 					: object->GetPhysicsColliderShape() == PhysicsColliderShape::Convex ? 2 : 0;
 				contents += std::to_string(colliderShape) + ";";
-				contents += object->BlocksCameraView() ? "1\n" : "0\n";
+				contents += object->BlocksCameraView() ? "1;" : "0;";
+				contents += EscapeField(object->Name()) + "\n";
 			}
 			for (const auto& collider : Scene->LevelColliders())
 			{

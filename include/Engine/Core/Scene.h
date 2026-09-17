@@ -4,6 +4,7 @@
 #include "Engine/Core/LevelCollider.h"
 #include "Engine/Core/LightingManager.h"
 #include "Engine/Core/CutsceneTimeline.h"
+#include "Engine/Core/WeatherSystem.h"
 
 #include <memory>
 #include <string>
@@ -46,6 +47,8 @@ public:
 	const CutsceneTimeline& Cutscene() const;
 	LightingManager& Lights() { return m_lighting; }
 	const LightingManager& Lights() const { return m_lighting; }
+	WeatherSystem& Weather() { return m_weather; }
+	const WeatherSystem& Weather() const { return m_weather; }
 
 private:
 	std::string m_name;
@@ -58,6 +61,7 @@ private:
 	bool m_firstFramePending = false;
 	CutsceneTimeline m_cutscene;
 	LightingManager m_lighting;
+	WeatherSystem m_weather;
 };
 
 

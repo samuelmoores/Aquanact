@@ -34,13 +34,16 @@ namespace
 	}
 }
 
-Entity::Entity(std::string name)
+Entity::Entity(std::string name, bool addDefaultComponents)
 	: m_name(std::move(name))
 {
 	// Each entity gets a monotonically increasing id so runtime systems can
 	// distinguish instances even when the display name changes.
 	m_id = g_nextEntityId++;
-	AddComponent<EntityStateMachine>(m_mesh);
+	if (addDefaultComponents)
+	{
+		AddComponent<EntityStateMachine>(m_mesh);
+	}
 }
 
 Entity::Entity(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
