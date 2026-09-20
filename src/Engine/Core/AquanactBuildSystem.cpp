@@ -92,6 +92,8 @@ AquanactBuildSystem::Result AquanactBuildSystem::Build(
 		std::filesystem::create_directories(stagingRoot);
 
 		CopyDirectory(source / "shaders", stagingRoot / "shaders");
+		if (std::filesystem::is_directory(source / "spritesheets"))
+			CopyDirectory(source / "spritesheets", stagingRoot / "spritesheets");
 		CopyDirectory(source / "resources", stagingRoot / "resources");
 		// Overlay the selected project's assets on top of engine runtime assets.
 		// Project-relative references therefore resolve inside the packaged game.

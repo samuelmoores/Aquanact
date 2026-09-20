@@ -138,9 +138,20 @@ ImportedModel ModelImporter::Import(const std::string& path, bool flipUvs, bool 
 		aiColor4D ambient(0.2f, 0.2f, 0.2f, 1.0f);
 		aiColor4D specular(0.5f, 0.5f, 0.5f, 1.0f);
 		float shininess = 32.0f;
+		float roughness = 0.0f;
 		mat->Get(AI_MATKEY_COLOR_AMBIENT, ambient);
 		mat->Get(AI_MATKEY_COLOR_SPECULAR, specular);
-		mat->Get(AI_MATKEY_SHININESS, shininess);
+		if (mat->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughness) == AI_SUCCESS)
+		{
+			// Keep the fallback path consistent with phong.frag when an FBX
+			// material has a PBR roughness factor but no usable texture.
+			roughness = std::clamp(roughness, 0.0f, 1.0f);
+			shininess = 128.0f - 126.0f * roughness * roughness;
+		}
+		else
+		{
+			mat->Get(AI_MATKEY_SHININESS, shininess);
+		}
 
 		float specStrength = glm::length(glm::vec3(specular.r, specular.g, specular.b)) / glm::sqrt(3.0f);
 		SubMeshMaterial submeshMat;

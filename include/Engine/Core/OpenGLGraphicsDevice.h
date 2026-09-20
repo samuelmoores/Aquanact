@@ -9,11 +9,13 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <string>
 
 class Window;
 class LightingManager;
 class Frustum;
 struct ParticleRenderCommand;
+class ShaderProgram;
 
 class OpenGLGraphicsDevice final : public GraphicsDevice {
 public:
@@ -40,10 +42,14 @@ public:
 	void ConfigureDefaultState();
 	// Called immediately before GUI submission so overlays do not inherit scene GL state.
 	void ConfigureGuiState();
+	void DrawMainMenuBackground();
+	bool SetSplashTexture(const std::string& path);
+	ShaderProgram* MainMenuShader() const { return m_balatroShader.get(); }
 	void RenderShadowMaps(const RenderCommand* commands, std::size_t commandCount, const LightingManager& lightingManager);
 
 	void Draw(const RenderCommand& command, const Camera& camera, const LightingManager& lightingManager) override;
-	void DrawParticles(const ParticleRenderCommand* commands, std::size_t commandCount, const Camera& camera);
+	void DrawParticles(const ParticleRenderCommand* commands, std::size_t commandCount,
+		const Camera& camera, const LightingManager& lightingManager);
 	void DrawCulled(const RenderCommand& command, const Camera& camera,
 		const LightingManager& lightingManager, const Frustum& frustum,
 		std::size_t& visibleSubMeshes, std::size_t& culledSubMeshes);
@@ -63,6 +69,7 @@ private:
 	std::unique_ptr<class ShaderProgram> m_pointShadowShader;
 	std::unique_ptr<class ShaderProgram> m_selectionOutlineShader;
 	std::unique_ptr<class ShaderProgram> m_particleShader;
+	std::unique_ptr<class ShaderProgram> m_balatroShader;
 	Window* m_window = nullptr;
 	uint32_t m_shadowFramebuffer = 0;
 	uint32_t m_shadowDepthTexture = 0;
@@ -80,6 +87,11 @@ private:
 	int32_t m_particleProjectionUniform = -1;
 	int32_t m_particleViewportSizeUniform = -1;
 	int32_t m_particleVisualShapeUniform = -1;
+	int32_t m_particleSplashTextureUniform = -1;
+	int32_t m_particleSplashBrightnessUniform = -1;
+	int32_t m_particleSplashOpacityUniform = -1;
+	uint32_t m_particleSplashTexture = 0;
+	uint32_t m_balatroVao = 0;
 	FrameStats m_frameStats;
 };
 

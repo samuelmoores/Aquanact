@@ -107,6 +107,7 @@ void RenderManager::startUp(Window& window)
 
 	//Graphics Device
 	m_device.startUp(window);
+	m_activeSplashTexturePath = std::filesystem::path("spritesheets/rain splash.png").generic_string();
 
 	//Lighting
 	if (!m_lightingManager)
@@ -114,6 +115,14 @@ void RenderManager::startUp(Window& window)
 		m_lightingManager = std::make_unique<LightingManager>();
 	}
 	m_lightingManager->startUp();
+}
+
+bool RenderManager::SetSplashTexture(const std::string& path)
+{
+	if (!m_device.SetSplashTexture(path))
+		return false;
+	m_activeSplashTexturePath = std::filesystem::path(path).lexically_normal().generic_string();
+	return true;
 }
 
 EngineCamera& RenderManager::GetEngineCamera()
@@ -231,6 +240,7 @@ void RenderManager::shutDown()
 
 	//Graphics
 	m_device.shutDown();
+	m_activeSplashTexturePath.clear();
 
 	//Camera
 	if (m_engineCamera)
@@ -605,6 +615,11 @@ void RenderManager::BuildRenderCommands(FrontEndManager& frontEndManager, SceneM
 	if (activeLevel)
 	{
 		const WeatherSystem& weather = activeLevel->Weather();
+		const std::string splashTexturePath =
+			(std::filesystem::path("spritesheets") / weather.Settings().splashTexturePath)
+			.lexically_normal().generic_string();
+		if (splashTexturePath != m_activeSplashTexturePath)
+			SetSplashTexture(splashTexturePath);
 		glm::vec3 worldBoundsMin(0.0f);
 		glm::vec3 worldBoundsMax(0.0f);
 		if (!weather.Particles().empty() && weather.WorldBounds(worldBoundsMin, worldBoundsMax))
@@ -612,6 +627,13 @@ void RenderManager::BuildRenderCommands(FrontEndManager& frontEndManager, SceneM
 			m_particleCommands.push_back(ParticleRenderCommand{
 				&weather.Particles(), glm::mat4(1.0f), worldBoundsMin, worldBoundsMax, true,
 				ParticleBlendMode::Alpha, weather.VisualShape() });
+		}
+		if (!weather.SplashParticles().empty() && weather.WorldBounds(worldBoundsMin, worldBoundsMax))
+		{
+			m_particleCommands.push_back(ParticleRenderCommand{
+				&weather.SplashParticles(), glm::mat4(1.0f), worldBoundsMin, worldBoundsMax, true,
+				ParticleBlendMode::Alpha, ParticleVisualShape::SplashSpriteSheet,
+				weather.Settings().splashBrightness, weather.Settings().splashOpacity });
 		}
 	}
 	for (const auto& object : objects)
@@ -873,7 +895,7 @@ void RenderManager::Flush(const Camera& camera, unsigned int /*selectedEntityId*
 	m_lastFrameFrustumCulledObjects += culledParticleEmitters;
 	m_lastFrameDrawCallsSaved += culledParticleEmitters;
 	m_lastFrameCommandCount += m_particleCommands.size();
-	m_device.DrawParticles(m_particleCommands.data(), m_particleCommands.size(), camera);
+	m_device.DrawParticles(m_particleCommands.data(), m_particleCommands.size(), camera, lighting);
 
 	m_commandCount = 0;
 	const auto flushEnd = std::chrono::high_resolution_clock::now();
@@ -945,7 +967,7 @@ void RenderManager::Loop(FrontEndManager& frontEndManager, FileManager& fileMana
 	if (!ShouldPreviewMainMenu(frontEndManager, engineState))
 	{
 		if (Scene* activeLevel = SceneManager.ActiveLevel())
-			activeLevel->Weather().Update(input.Frame().deltaTime, ActiveCamera());
+			activeLevel->Weather().Update(input.Frame().deltaTime, ActiveCamera(), *activeLevel);
 	}
 	{
 		FrameProfiler::Scope scope(Root::Current().Profiler(), "RenderCommands");
@@ -961,8 +983,14 @@ void RenderManager::Loop(FrontEndManager& frontEndManager, FileManager& fileMana
 	unsigned int selectedEntityId = 0;
 	if (engineState.IsEditorMode() && frontEndManager.FrontEndModeValue() == FrontEndMode::EngineEditor)
 		selectedEntityId = frontEndManager.SelectedEditorEntityId();
-	Flush(ActiveCamera(), selectedEntityId);
+		Flush(ActiveCamera(), selectedEntityId);
 	}
+	const bool showingMainMenu =
+		ShouldPreviewMainMenu(frontEndManager, engineState) ||
+		(SceneManager.ActiveLevel() && SceneManager.IsMainMenuScene(SceneManager.ActiveLevel()->Name())) ||
+		(!engineState.IsEditorMode() && Root::Current().Gameplay().State() == GameplayManager::GameState::MainMenu);
+	if (showingMainMenu)
+		m_device.DrawMainMenuBackground();
 
 	{
 		FrameProfiler::Scope scope(Root::Current().Profiler(), "Frontend");

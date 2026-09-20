@@ -17,9 +17,10 @@ void Window::startUp()
     glfwWindowHint(GLFW_STENCIL_BITS, 8);
     glfwWindowHint(GLFW_SAMPLES, 4);
 
-    /* Create a windowed mode window and its OpenGL context */
-    m_glfwWindow = glfwCreateWindow(1280, 720, "Aquanact Engine", NULL, NULL);
-
+    /* Create a normal window first. It is changed to borderless fullscreen
+       after the context exists, avoiding exclusive display mode switching. */
+    m_glfwWindow = glfwCreateWindow(m_windowedWidth, m_windowedHeight,
+        "Aquanact Engine", NULL, NULL);
     if (!m_glfwWindow)
     {
         glfwTerminate();
@@ -74,6 +75,33 @@ void Window::Focus()
 	if (m_glfwWindow)
 	{
 		glfwFocusWindow(m_glfwWindow);
+	}
+}
+
+void Window::ToggleFullscreen()
+{
+	if (!m_glfwWindow) return;
+
+	if (!m_fullscreen)
+	{
+		glfwGetWindowPos(m_glfwWindow, &m_windowedX, &m_windowedY);
+		glfwGetWindowSize(m_glfwWindow, &m_windowedWidth, &m_windowedHeight);
+		GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+		const GLFWvidmode* mode = monitor ? glfwGetVideoMode(monitor) : nullptr;
+		if (!mode) return;
+		int monitorX = 0;
+		int monitorY = 0;
+		glfwGetMonitorPos(monitor, &monitorX, &monitorY);
+		glfwSetWindowAttrib(m_glfwWindow, GLFW_DECORATED, GLFW_FALSE);
+		glfwSetWindowMonitor(m_glfwWindow, nullptr, monitorX, monitorY, mode->width, mode->height, 0);
+		m_fullscreen = true;
+	}
+	else
+	{
+		glfwSetWindowAttrib(m_glfwWindow, GLFW_DECORATED, GLFW_TRUE);
+		glfwSetWindowMonitor(m_glfwWindow, nullptr, m_windowedX, m_windowedY,
+			m_windowedWidth, m_windowedHeight, 0);
+		m_fullscreen = false;
 	}
 }
 

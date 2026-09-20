@@ -19,6 +19,7 @@
 #include "Engine/UI/InstanceManager.h"
 #include "Engine/UI/SpawnManagerWindow.h"
 #include "Engine/UI/ParticleSystemWindow.h"
+#include "Engine/UI/ShaderWindow.h"
 
 #include <filesystem>
 
@@ -107,6 +108,7 @@ private:
 	InstanceManager m_instanceManager;
 	SpawnManagerWindow m_spawnManagerWindow;
 	ParticleSystemWindow m_particleSystemWindow;
+	ShaderWindow m_shaderWindow;
 	LightingWindow m_lightingWindow;
 	CutsceneWindow m_cutsceneWindow;
 	FileExplorerWindow m_fileExplorerWindow;

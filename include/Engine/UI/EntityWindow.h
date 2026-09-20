@@ -24,6 +24,7 @@ class EntityWindow
 public:
 	EntityWindowResult Draw(const EngineGuiFrameContext& context, bool& open) const;
 	void DrawTransform(Entity& entity) const;
+	void DrawMaterials(Entity& entity) const;
 	void DrawPhysics(Entity& entity) const;
 	bool DrawStateMachineButton() const;
 	void DrawComponentControls(Component& component) const;

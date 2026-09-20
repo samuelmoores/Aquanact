@@ -8,6 +8,9 @@
 #include "Engine/Core/ShaderProgram.h"
 #include "Engine/Core/GLHeaders.h"
 #include "Engine/Core/Frustum.h"
+#include "Engine/Core/StbImage.h"
+#include "Engine/Core/Root.h"
+#include "Engine/Core/Debug.h"
 
 #include <algorithm>
 #include <chrono>
@@ -25,7 +28,7 @@ namespace {
 	constexpr int PointShadowMapResolution = 512;
 	constexpr int DirectionalShadowTextureUnit = 3;
 	constexpr int FirstPointShadowTextureUnit = 4;
-
+	constexpr int SplashTextureUnit = 5;
 	int FirstBuffer(const RenderCommand& command)
 	{
 		return command.subMeshIndex >= 0 ? command.subMeshIndex : 0;
@@ -173,6 +176,32 @@ void OpenGLGraphicsDevice::startUp()
 	InitializeShadowMap();
 	m_particleShader = std::make_unique<ShaderProgram>();
 	m_particleShader->load("shaders/particle.vert", "shaders/particle.frag");
+	m_balatroShader = std::make_unique<ShaderProgram>();
+	m_balatroShader->load("shaders/balatro.vert", "shaders/balatro.frag");
+	glGenVertexArrays(1, &m_balatroVao);
+	try
+	{
+		StbImage splashImage;
+		splashImage.loadFromFile("spritesheets/rain splash.png");
+		if (splashImage.getWidth() != 80 || splashImage.getHeight() != 16)
+			throw std::runtime_error("expected an 80x16 sheet with five 16x16 frames");
+		glGenTextures(1, &m_particleSplashTexture);
+		glBindTexture(GL_TEXTURE_2D, m_particleSplashTexture);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, splashImage.getWidth(), splashImage.getHeight(),
+			0, GL_RGBA, GL_UNSIGNED_BYTE, splashImage.getData());
+		glBindTexture(GL_TEXTURE_2D, 0);
+	}
+	catch (const std::exception& exception)
+	{
+		m_particleSplashTexture = 0;
+		Root::Current().Debugger().LogTagged(
+			Debug::Severity::Warning, "ParticleTexture",
+			std::string("Could not load splash sprite sheet: ") + exception.what());
+	}
 	glGenVertexArrays(1, &m_particleVao);
 	glGenBuffers(1, &m_particleVbo);
 	glBindVertexArray(m_particleVao);
@@ -198,7 +227,107 @@ void OpenGLGraphicsDevice::startUp()
 	m_particleProjectionUniform = glGetUniformLocation(particleProgram, "projection");
 	m_particleViewportSizeUniform = glGetUniformLocation(particleProgram, "viewportSize");
 	m_particleVisualShapeUniform = glGetUniformLocation(particleProgram, "particleVisualShape");
+	m_particleSplashTextureUniform = glGetUniformLocation(particleProgram, "splashTexture");
+	m_particleSplashBrightnessUniform = glGetUniformLocation(particleProgram, "splashBrightness");
+	m_particleSplashOpacityUniform = glGetUniformLocation(particleProgram, "splashOpacity");
+	if (m_particleSplashTextureUniform >= 0)
+	{
+		glUseProgram(particleProgram);
+		glUniform1i(m_particleSplashTextureUniform, SplashTextureUnit);
+		glUseProgram(0);
+	}
 	m_initialized = true;
+}
+
+void OpenGLGraphicsDevice::DrawMainMenuBackground()
+{
+	if (!m_balatroShader || !m_platform || m_platform->ViewportWidth() <= 0 || m_platform->ViewportHeight() <= 0)
+		return;
+
+	const GLboolean depthTestWasEnabled = glIsEnabled(GL_DEPTH_TEST);
+	const GLboolean cullFaceWasEnabled = glIsEnabled(GL_CULL_FACE);
+	const GLboolean blendWasEnabled = glIsEnabled(GL_BLEND);
+	const GLboolean scissorWasEnabled = glIsEnabled(GL_SCISSOR_TEST);
+	GLboolean depthMask = GL_TRUE;
+	glGetBooleanv(GL_DEPTH_WRITEMASK, &depthMask);
+
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_CULL_FACE);
+	glDisable(GL_BLEND);
+	glDisable(GL_SCISSOR_TEST);
+	glDepthMask(GL_FALSE);
+	m_balatroShader->activate();
+	static const auto startTime = std::chrono::steady_clock::now();
+	const float elapsed = std::chrono::duration<float>(std::chrono::steady_clock::now() - startTime).count();
+	m_balatroShader->setUniform("SPIN_ROTATION", -2.0f);
+	m_balatroShader->setUniform("SPIN_SPEED", 7.0f);
+	m_balatroShader->setUniform("OFFSET", glm::vec2(0.0f));
+	m_balatroShader->setUniform("COLOUR_1", glm::vec4(0.871f, 0.267f, 0.231f, 1.0f));
+	m_balatroShader->setUniform("COLOUR_2", glm::vec4(0.0f, 0.42f, 0.706f, 1.0f));
+	m_balatroShader->setUniform("COLOUR_3", glm::vec4(0.086f, 0.137f, 0.145f, 1.0f));
+	m_balatroShader->setUniform("CONTRAST", 3.5f);
+	m_balatroShader->setUniform("LIGTHING", 0.4f);
+	m_balatroShader->setUniform("SPIN_AMOUNT", 0.25f);
+	m_balatroShader->setUniform("PIXEL_FILTER", 745.0f);
+	m_balatroShader->setUniform("SPIN_EASE", 1.0f);
+	m_balatroShader->setUniform("IS_ROTATE", false);
+	m_balatroShader->setUniform("SHAPE_SCALE", 30.0f);
+	m_balatroShader->setUniform("RADIAL_TWIST", 20.0f);
+	m_balatroShader->setUniform("WARP_STRENGTH", 0.5f);
+	m_balatroShader->setUniform("WARP_FREQUENCY", 1.0f);
+	m_balatroShader->setUniform("WARP_ITERATIONS", 5);
+	m_balatroShader->setUniform("BAND_WIDTH", 5.0f);
+	m_balatroShader->setUniform("LIGHTING_THRESHOLD", 4.0f);
+	m_balatroShader->setUniform("BACKGROUND_BLEND", 0.3f);
+	m_balatroShader->setUniform("LOOP_TIME", 0.0f);
+	m_balatroShader->ApplyEditorUniforms();
+	// Engine-owned inputs must always be current and cannot be overridden by
+	// editor controls or stale values from an earlier shader inspection.
+	m_balatroShader->setUniform("iResolution", glm::vec3(
+		static_cast<float>(m_platform->ViewportWidth()),
+		static_cast<float>(m_platform->ViewportHeight()),
+		1.0f));
+	m_balatroShader->setUniform("iTime", elapsed);
+	glBindVertexArray(m_balatroVao);
+	glDrawArrays(GL_TRIANGLES, 0, 3);
+	glBindVertexArray(0);
+	glUseProgram(0);
+
+	glDepthMask(depthMask);
+	if (depthTestWasEnabled) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
+	if (cullFaceWasEnabled) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE);
+	if (blendWasEnabled) glEnable(GL_BLEND); else glDisable(GL_BLEND);
+	if (scissorWasEnabled) glEnable(GL_SCISSOR_TEST); else glDisable(GL_SCISSOR_TEST);
+}
+
+bool OpenGLGraphicsDevice::SetSplashTexture(const std::string& path)
+{
+	try
+	{
+		StbImage image;
+		image.loadFromFile(path);
+		if (image.getWidth() != 80 || image.getHeight() != 16)
+			return false;
+
+		uint32_t texture = 0;
+		glGenTextures(1, &texture);
+		glBindTexture(GL_TEXTURE_2D, texture);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, image.getWidth(), image.getHeight(),
+			0, GL_RGBA, GL_UNSIGNED_BYTE, image.getData());
+		glBindTexture(GL_TEXTURE_2D, 0);
+		if (m_particleSplashTexture != 0)
+			glDeleteTextures(1, &m_particleSplashTexture);
+		m_particleSplashTexture = texture;
+		return true;
+	}
+	catch (const std::exception&)
+	{
+		return false;
+	}
 }
 
 void OpenGLGraphicsDevice::InitializeShadowMap()
@@ -301,6 +430,7 @@ void OpenGLGraphicsDevice::ReleaseShadowMap()
 	m_pointShadowShader.reset();
 	m_selectionOutlineShader.reset();
 	m_particleShader.reset();
+	m_balatroShader.reset();
 	if (m_particleVbo != 0) glDeleteBuffers(1, &m_particleVbo);
 	if (m_particleVao != 0) glDeleteVertexArrays(1, &m_particleVao);
 	m_particleVbo = 0;
@@ -310,6 +440,13 @@ void OpenGLGraphicsDevice::ReleaseShadowMap()
 	m_particleProjectionUniform = -1;
 	m_particleViewportSizeUniform = -1;
 	m_particleVisualShapeUniform = -1;
+	m_particleSplashTextureUniform = -1;
+	m_particleSplashBrightnessUniform = -1;
+	m_particleSplashOpacityUniform = -1;
+	if (m_particleSplashTexture != 0) glDeleteTextures(1, &m_particleSplashTexture);
+	m_particleSplashTexture = 0;
+	if (m_balatroVao != 0) glDeleteVertexArrays(1, &m_balatroVao);
+	m_balatroVao = 0;
 	m_shadowMapReady = false;
 	m_pointShadowMapsReady.fill(false);
 	m_pointShadowFarPlanes.fill(1.0f);
@@ -509,7 +646,8 @@ void OpenGLGraphicsDevice::Draw(const RenderCommand& command, const Camera& came
 	DrawInternal(command, camera, lightingManager, nullptr, nullptr, nullptr);
 }
 
-void OpenGLGraphicsDevice::DrawParticles(const ParticleRenderCommand* commands, std::size_t commandCount, const Camera& camera)
+void OpenGLGraphicsDevice::DrawParticles(const ParticleRenderCommand* commands, std::size_t commandCount,
+	const Camera& camera, const LightingManager& lightingManager)
 {
 	if (!m_particleShader || !commands || commandCount == 0) return;
 
@@ -532,6 +670,27 @@ void OpenGLGraphicsDevice::DrawParticles(const ParticleRenderCommand* commands, 
 		glUniform2f(m_particleViewportSizeUniform,
 			static_cast<float>(m_platform ? m_platform->ViewportWidth() : 1),
 			static_cast<float>(m_platform ? m_platform->ViewportHeight() : 1));
+	const DirectionalLight& sun = lightingManager.SunLight();
+	m_particleShader->setUniform("sunLight.direction", sun.direction);
+	m_particleShader->setUniform("sunLight.color", sun.color);
+	m_particleShader->setUniform("sunLight.intensity", sun.intensity);
+	m_particleShader->setUniform("sunLight.ambient", sun.ambient);
+	const int pointLightCount = static_cast<int>(std::min<std::size_t>(
+		lightingManager.PointLights().size(), LightingManager::MaxPointLights));
+	m_particleShader->setUniform("pointLightCount", pointLightCount);
+	for (int lightIndex = 0; lightIndex < pointLightCount; ++lightIndex)
+	{
+		const PointLight& pointLight = lightingManager.PointLights()[static_cast<std::size_t>(lightIndex)];
+		const std::string prefix = "pointLights[" + std::to_string(lightIndex) + "].";
+		m_particleShader->setUniform(prefix + "position", pointLight.position);
+		m_particleShader->setUniform(prefix + "color", pointLight.color);
+		m_particleShader->setUniform(prefix + "intensity", pointLight.intensity);
+		m_particleShader->setUniform(prefix + "radius", pointLight.radius);
+		m_particleShader->setUniform(prefix + "radiusFade", pointLight.radiusFade);
+		m_particleShader->setUniform(prefix + "constant", pointLight.constant);
+		m_particleShader->setUniform(prefix + "linear", pointLight.linear);
+		m_particleShader->setUniform(prefix + "quadratic", pointLight.quadratic);
+	}
 
 	glBindVertexArray(m_particleVao);
 	glBindBuffer(GL_ARRAY_BUFFER, m_particleVbo);
@@ -573,8 +732,24 @@ void OpenGLGraphicsDevice::DrawParticles(const ParticleRenderCommand* commands, 
 		}
 		if (m_particleModelUniform >= 0)
 			glUniformMatrix4fv(m_particleModelUniform, 1, GL_FALSE, &command.modelMatrix[0][0]);
+		if (m_particleSplashBrightnessUniform >= 0)
+			glUniform1f(m_particleSplashBrightnessUniform, command.splashBrightness);
+		if (m_particleSplashOpacityUniform >= 0)
+			glUniform1f(m_particleSplashOpacityUniform, command.splashOpacity);
 		if (m_particleVisualShapeUniform >= 0)
-			glUniform1i(m_particleVisualShapeUniform, static_cast<int>(command.visualShape));
+		{
+			const bool useSplashSprite = command.visualShape == ParticleVisualShape::SplashSpriteSheet &&
+				m_particleSplashTexture != 0;
+			glUniform1i(m_particleVisualShapeUniform, useSplashSprite
+				? static_cast<int>(command.visualShape)
+				: static_cast<int>(command.visualShape == ParticleVisualShape::SplashSpriteSheet
+					? ParticleVisualShape::SoftCircle : command.visualShape));
+			if (useSplashSprite)
+			{
+				glActiveTexture(GL_TEXTURE0 + SplashTextureUnit);
+				glBindTexture(GL_TEXTURE_2D, m_particleSplashTexture);
+			}
+		}
 		glDrawArrays(GL_POINTS, static_cast<GLint>(particleOffset), static_cast<GLsizei>(command.particles->size()));
 		particleOffset += command.particles->size();
 		++m_frameStats.mainDrawCalls;
@@ -583,6 +758,8 @@ void OpenGLGraphicsDevice::DrawParticles(const ParticleRenderCommand* commands, 
 	glDisable(GL_PROGRAM_POINT_SIZE);
 	glDepthMask(depthMaskWasEnabled);
 	if (!blendWasEnabled) glDisable(GL_BLEND);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, 0);
 	glBindVertexArray(0);
 }
 
@@ -634,6 +811,7 @@ void OpenGLGraphicsDevice::DrawInternal(const RenderCommand& command, const Came
 		: Frustum{};
 
 	command.shader->activate();
+	command.shader->ApplyEditorUniforms();
 
 	command.shader->setUniform("baseTexture", 0);
 	command.shader->setUniform("specularTexture", 1);
@@ -686,10 +864,14 @@ void OpenGLGraphicsDevice::DrawInternal(const RenderCommand& command, const Came
 		const SubMeshMaterial& mat = command.mesh->GetMaterial(j);
 		command.shader->setUniform("material", mat.phong);
 		command.shader->setUniform("ambientColor", mat.ambientColor);
-		command.shader->setUniform("hasBaseTexture", command.mesh->HasColorTexture(j));
-		command.shader->setUniform("hasSpecularTexture", command.mesh->HasSpecularTexture(j));
-		command.shader->setUniform("hasNormalTexture", command.mesh->HasNormalTexture(j));
-		command.shader->setUniform("hasRoughnessTexture", command.mesh->HasRoughnessTexture(j));
+		command.shader->setUniform("hasBaseTexture",
+			command.mesh->HasColorTexture(j) && command.mesh->ColorTextureEnabled(j));
+		command.shader->setUniform("hasSpecularTexture",
+			command.mesh->HasSpecularTexture(j) && command.mesh->SpecularTextureEnabled(j));
+		command.shader->setUniform("hasNormalTexture",
+			command.mesh->HasNormalTexture(j) && command.mesh->NormalTextureEnabled(j));
+		command.shader->setUniform("hasRoughnessTexture",
+			command.mesh->HasRoughnessTexture(j) && command.mesh->RoughnessTextureEnabled(j));
 		command.mesh->Bind(j);
 
 		glDrawElements(GL_TRIANGLES, command.mesh->FacesSize(j), GL_UNSIGNED_INT, reinterpret_cast<void*>(static_cast<uintptr_t>(command.mesh->FacesOffset(j) * sizeof(uint32_t))));

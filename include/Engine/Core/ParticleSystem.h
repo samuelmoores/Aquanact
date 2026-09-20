@@ -26,7 +26,8 @@ enum class ParticleBlendMode
 enum class ParticleVisualShape
 {
 	SoftCircle = 0,
-	RainStreak = 1
+	RainStreak = 1,
+	SplashSpriteSheet = 2
 };
 
 enum class ParticleSimulationSpace

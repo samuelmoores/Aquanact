@@ -530,8 +530,20 @@ namespace ProjectStateSerializer {
 			contents += ";" + std::to_string(weather.coverageDepth);
 			contents += ";" + std::to_string(weather.minimumNearWidth);
 			contents += ";" + std::to_string(weather.startSize) + ";" + std::to_string(weather.endSize);
+			contents += ";" + std::to_string(weather.splashesEnabled ? 1 : 0);
+			contents += ";" + std::to_string(weather.groundHeight);
+			contents += ";" + std::to_string(weather.splashSize);
+			contents += ";" + std::to_string(weather.splashDensity);
 			contents += ";" + std::to_string(weather.startColor.r) + ";" + std::to_string(weather.startColor.g) + ";" + std::to_string(weather.startColor.b) + ";" + std::to_string(weather.startColor.a);
-			contents += ";" + std::to_string(weather.endColor.r) + ";" + std::to_string(weather.endColor.g) + ";" + std::to_string(weather.endColor.b) + ";" + std::to_string(weather.endColor.a) + "\n";
+			contents += ";" + std::to_string(weather.endColor.r) + ";" + std::to_string(weather.endColor.g) + ";" + std::to_string(weather.endColor.b) + ";" + std::to_string(weather.endColor.a);
+			contents += ";" + std::to_string(weather.splashBrightness);
+			contents += ";" + std::to_string(weather.splashOpacity);
+			contents += ";" + std::to_string(weather.splashFrameDuration);
+			contents += ";" + ProjectStateFormat::EscapeField(weather.splashTexturePath) + "\n";
+			contents += "sceneweatherground;" + ProjectStateFormat::EscapeField(scene->Name());
+			for (const unsigned int entityId : weather.groundEntityIds)
+				contents += ";" + std::to_string(entityId);
+			contents += "\n";
 			const LightingManager& lighting = scene->Lights();
 			const DirectionalLight& sunLight = lighting.SunLight();
 			contents += "scenesunlight;" + ProjectStateFormat::EscapeField(scene->Name()) + ";";
@@ -973,7 +985,7 @@ namespace ProjectStateSerializer {
 			continue;
 		}
 
-		if (fields.size() == 26 && fields[0] == "sceneweather")
+		if (fields.size() >= 26 && fields[0] == "sceneweather")
 		{
 			const std::string sceneName = ProjectStateFormat::UnescapeField(fields[1]);
 			for (PendingLevel& pendingLevel : pendingLevels)
@@ -994,8 +1006,42 @@ namespace ProjectStateSerializer {
 				weather.minimumNearWidth = std::stof(fields[15]);
 				weather.startSize = std::stof(fields[16]);
 				weather.endSize = std::stof(fields[17]);
-				weather.startColor = {std::stof(fields[18]), std::stof(fields[19]), std::stof(fields[20]), std::stof(fields[21])};
-				weather.endColor = {std::stof(fields[22]), std::stof(fields[23]), std::stof(fields[24]), std::stof(fields[25])};
+				const std::size_t colorOffset = fields.size() >= 30 ? 4u : (fields.size() >= 29 ? 3u : 0u);
+				if (colorOffset != 0u)
+				{
+					weather.splashesEnabled = fields[18] == "1";
+					weather.groundHeight = std::stof(fields[19]);
+					weather.splashSize = std::stof(fields[20]);
+					if (colorOffset == 4u)
+						weather.splashDensity = std::stof(fields[21]);
+				}
+				weather.startColor = {std::stof(fields[18 + colorOffset]), std::stof(fields[19 + colorOffset]), std::stof(fields[20 + colorOffset]), std::stof(fields[21 + colorOffset])};
+				weather.endColor = {std::stof(fields[22 + colorOffset]), std::stof(fields[23 + colorOffset]), std::stof(fields[24 + colorOffset]), std::stof(fields[25 + colorOffset])};
+				if (fields.size() >= 32)
+				{
+					weather.splashBrightness = std::stof(fields[30]);
+					weather.splashOpacity = std::stof(fields[31]);
+				}
+				else if (fields.size() >= 31)
+					weather.splashOpacity = std::stof(fields[30]);
+				if (fields.size() >= 33)
+					weather.splashFrameDuration = std::stof(fields[32]);
+				if (fields.size() >= 34)
+					weather.splashTexturePath = ProjectStateFormat::UnescapeField(fields[33]);
+				break;
+			}
+			continue;
+		}
+
+		if (fields.size() >= 2 && fields[0] == "sceneweatherground")
+		{
+			const std::string sceneName = ProjectStateFormat::UnescapeField(fields[1]);
+			for (PendingLevel& pendingLevel : pendingLevels)
+			{
+				if (pendingLevel.name != sceneName) continue;
+				pendingLevel.weather.groundEntityIds.clear();
+				for (std::size_t index = 2; index < fields.size(); ++index)
+					pendingLevel.weather.groundEntityIds.push_back(static_cast<unsigned int>(std::stoul(fields[index])));
 				break;
 			}
 			continue;

@@ -351,6 +351,102 @@ PhysicsWorld& PhysicsWorld::Instance()
 	return world;
 }
 
+bool PhysicsWorld::FindConvexSurfacePoint(
+	const Entity& entity, const glm::vec2& horizontal, glm::vec3& point) const
+{
+	if (entity.GetPhysicsColliderShape() != PhysicsColliderShape::Convex)
+		return false;
+
+	// BuildConvexPlanes uses the current mesh transform, so this remains valid
+	// even when the entity has moved since the scene was registered.
+	PhysicsCollider collider;
+	collider.owner = const_cast<Entity*>(&entity);
+	const std::vector<Physics::ConvexPlane> planes = BuildConvexPlanes(collider);
+
+	float highest = -std::numeric_limits<float>::max();
+	bool found = false;
+
+	// Prefer the authored upward-facing mesh surface. This preserves every
+	// staircase tread instead of allowing the highest convex support plane to
+	// cover the complete AABB footprint.
+	Entity* object = const_cast<Entity*>(&entity);
+	const Mesh* mesh = object->GetMesh();
+	if (mesh)
+	{
+		const auto& vertices = mesh->Vertices();
+		const auto& faces = mesh->Faces();
+		const glm::mat4 model = object->BuildModelMatrix();
+		for (std::size_t face = 0; face + 2 < faces.size(); face += 3)
+		{
+			if (faces[face] >= vertices.size() || faces[face + 1] >= vertices.size() ||
+				faces[face + 2] >= vertices.size())
+				continue;
+
+			const glm::vec3 a = glm::vec3(model * glm::vec4(vertices[faces[face]].position, 1.0f));
+			const glm::vec3 b = glm::vec3(model * glm::vec4(vertices[faces[face + 1]].position, 1.0f));
+			const glm::vec3 c = glm::vec3(model * glm::vec4(vertices[faces[face + 2]].position, 1.0f));
+			const glm::vec3 normal = glm::cross(b - a, c - a);
+			if (std::abs(normal.y) <= 1e-5f)
+				continue;
+
+			const glm::vec2 edge0(b.x - a.x, b.z - a.z);
+			const glm::vec2 edge1(c.x - a.x, c.z - a.z);
+			const glm::vec2 offset(horizontal.x - a.x, horizontal.y - a.z);
+			const float denominator = edge0.x * edge1.y - edge1.x * edge0.y;
+			if (std::abs(denominator) <= 1e-6f)
+				continue;
+
+			const float first = (offset.x * edge1.y - edge1.x * offset.y) / denominator;
+			const float second = (edge0.x * offset.y - offset.x * edge0.y) / denominator;
+			const float third = 1.0f - first - second;
+			if (first < -1e-4f || second < -1e-4f || third < -1e-4f)
+				continue;
+
+			const float height = a.y * third + b.y * first + c.y * second;
+			if (!found || height > highest)
+			{
+				highest = height;
+				point = glm::vec3(horizontal.x, height, horizontal.y);
+				found = true;
+			}
+		}
+	}
+	if (found)
+		return true;
+
+	for (const Physics::ConvexPlane& plane : planes)
+	{
+		// A downward rain ray can meet only an upward-facing boundary plane.
+		if (plane.normal.y <= 1e-5f)
+			continue;
+
+		const float height = (plane.distance -
+			plane.normal.x * horizontal.x - plane.normal.z * horizontal.y) /
+			plane.normal.y;
+		const glm::vec3 candidate(horizontal.x, height, horizontal.y);
+		bool inside = true;
+		for (const Physics::ConvexPlane& boundary : planes)
+		{
+			if (glm::dot(boundary.normal, candidate) > boundary.distance + 1e-3f)
+			{
+				inside = false;
+				break;
+			}
+		}
+
+		if (inside && (!found || height > highest))
+		{
+			highest = height;
+			point = candidate;
+			found = true;
+		}
+	}
+
+	// If the mesh does not provide a surface at this coordinate, use the
+	// mathematical convex hull as a fallback.
+	return found;
+}
+
 void PhysicsWorld::RegisterScene(const Scene& scene)
 {
 	// The world represents one active scene, so discard records belonging to

@@ -528,6 +528,7 @@ EngineMenuBarResult EngineMenuBar::DrawViewMenu(
 	EngineGuiWidgets::ToggleMenuItem("Instance Manager", windowState.showInstanceManagerWindow);
 	EngineGuiWidgets::ToggleMenuItem("SpawnManager", windowState.showSpawnManagerWindow);
 	EngineGuiWidgets::ToggleMenuItem("Particle System", windowState.showParticleSystemWindow);
+	EngineGuiWidgets::ToggleMenuItem("Shader Window", windowState.showShaderWindow);
 	bool showEntityWindow = windowState.showEntityWindow;
 	if (EngineGuiWidgets::ToggleMenuItem("Entity Window", showEntityWindow))
 	{
@@ -744,6 +745,11 @@ void EngineMenuBar::DrawGameMenu(
 	{
 		return;
 	}
+
+	bool fullscreen = Root::Current().WindowRef().IsFullscreen();
+	if (ImGui::MenuItem("Fullscreen", nullptr, fullscreen))
+		Root::Current().WindowRef().ToggleFullscreen();
+	ImGui::Separator();
 
 	if (ImGui::MenuItem("Play Game"))
 	{

@@ -2,11 +2,17 @@
 #include <glm/ext.hpp>
 #include <string>
 #include <vector>
+#include <unordered_map>
 #include <assimp/matrix4x4.h>
 
 
 class ShaderProgram {
+	struct EditorUniform {
+		enum class Type { Float, Int, Bool, Vec2, Vec3, Vec4 } type = Type::Float;
+		glm::vec4 value{0.0f};
+	};
 	uint32_t m_programId;
+	std::unordered_map<std::string, EditorUniform> m_editorUniforms;
 
 public:
 	ShaderProgram();
@@ -28,4 +34,12 @@ public:
 	void setUniform(const std::string& uniformName, const glm::mat3& value) const;
 	void setUniform(const std::string& uniformName, const glm::mat4& value) const;
 	void setUniform(const std::string& uniformName, const std::vector<glm::mat4>& values) const;
+	void SetEditorUniformFloat(const std::string& name, float value);
+	void SetEditorUniformInt(const std::string& name, int32_t value);
+	void SetEditorUniformBool(const std::string& name, bool value);
+	void SetEditorUniformVec2(const std::string& name, const glm::vec2& value);
+	void SetEditorUniformVec3(const std::string& name, const glm::vec3& value);
+	void SetEditorUniformVec4(const std::string& name, const glm::vec4& value);
+	void ClearEditorUniforms();
+	void ApplyEditorUniforms() const;
 };

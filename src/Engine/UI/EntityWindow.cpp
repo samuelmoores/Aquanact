@@ -80,6 +80,7 @@ EntityWindowResult EntityWindow::Draw(const EngineGuiFrameContext& context, bool
 			else
 			{
 				DrawTransform(object);
+				DrawMaterials(object);
 				ImGui::Separator();
 				if (!cutscene)
 				{
@@ -119,6 +120,46 @@ EntityWindowResult EntityWindow::Draw(const EngineGuiFrameContext& context, bool
 	}
 	ImGui::End();
 	return result;
+}
+
+void EntityWindow::DrawMaterials(Entity& entity) const
+{
+		Mesh* mesh = entity.GetMesh();
+		if (!mesh || !ImGui::CollapsingHeader("Materials", ImGuiTreeNodeFlags_DefaultOpen))
+			return;
+
+		ImGui::Text("Model: %s", entity.SourcePath().empty() ? "Generated mesh" : entity.SourcePath().c_str());
+		for (int index = 0; index < mesh->NumBuffers(); ++index)
+		{
+			ImGui::PushID(index);
+			const SubMeshMaterial& material = mesh->GetMaterial(index);
+			const std::string submeshLabel = "Submesh " + std::to_string(index);
+			if (ImGui::TreeNode(submeshLabel.c_str()))
+			{
+				ImGui::Text("Specular: %.2f", material.phong.z);
+				ImGui::Text("Shininess: %.2f", material.phong.w);
+				ImGui::TextUnformatted("Textures");
+
+				const auto drawTextureToggle = [&](const char* label, bool enabled,
+					auto setEnabled)
+				{
+					bool value = enabled;
+					if (ImGui::Checkbox(label, &value))
+						setEnabled(value);
+				};
+
+				drawTextureToggle("Color",
+					mesh->ColorTextureEnabled(index), [&](bool value) { mesh->SetColorTextureEnabled(index, value); });
+				ImGui::SameLine();
+				drawTextureToggle("Roughness",
+					mesh->RoughnessTextureEnabled(index), [&](bool value) { mesh->SetRoughnessTextureEnabled(index, value); });
+				ImGui::SameLine();
+				drawTextureToggle("Normal",
+					mesh->NormalTextureEnabled(index), [&](bool value) { mesh->SetNormalTextureEnabled(index, value); });
+				ImGui::TreePop();
+			}
+			ImGui::PopID();
+		}
 }
 
 void EntityWindow::DrawTransform(Entity& entity) const

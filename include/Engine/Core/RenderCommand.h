@@ -26,6 +26,8 @@ struct ParticleRenderCommand
 	bool hasWorldBounds = false;
 	ParticleBlendMode blendMode = ParticleBlendMode::Additive;
 	ParticleVisualShape visualShape = ParticleVisualShape::SoftCircle;
+	float splashBrightness = 1.0f;
+	float splashOpacity = 1.0f;
 };
 
 

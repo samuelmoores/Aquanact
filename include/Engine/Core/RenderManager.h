@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <chrono>
 #include <memory>
+#include <string>
 #include "Engine/Core/GLHeaders.h"
 
 #include "Engine/Core/FrameAllocator.h"
@@ -22,6 +23,7 @@ class ProjectManager;
 class Debug;
 class Input;
 class EngineState;
+class ShaderProgram;
 
 class RenderManager {
 public:
@@ -78,6 +80,8 @@ public:
 	std::size_t FrameAllocatorUsedBytes() const;
 	std::size_t FrameAllocatorPeakBytes() const;
 	const OpenGLGraphicsDevice::FrameStats& LastFrameGraphicsStats() const { return m_device.Stats(); }
+	ShaderProgram* MainMenuShader() const { return m_device.MainMenuShader(); }
+	bool SetSplashTexture(const std::string& path);
 
 private:
 	void ResetFrameState();
@@ -102,6 +106,7 @@ private:
 	glm::vec3 m_cameraPreviousPosition{0.0f};
 	std::vector<bool> m_cameraIslandTriggerInside;
 	std::vector<ParticleRenderCommand> m_particleCommands;
+	std::string m_activeSplashTexturePath;
 	CameraManager m_cameraManager;
 	CameraMode m_cameraMode = CameraMode::ThirdPerson;
 	bool m_cutscenePreviewCamera = false;

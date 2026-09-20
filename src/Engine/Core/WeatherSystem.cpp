@@ -1,12 +1,16 @@
 #include "Engine/Core/WeatherSystem.h"
 
 #include "Engine/Core/Camera.h"
+#include "Engine/Core/PhysicsWorld.h"
+#include "Engine/Core/Scene.h"
 
 #include <algorithm>
 #include <cmath>
 
 namespace
 {
+	constexpr std::size_t MaximumSplashCount = 512u;
+	constexpr float SplashFrameCount = 5.0f;
 	std::size_t BaseParticleCount(WeatherType type)
 	{
 		return type == WeatherType::Snow ? 500u : 3000u;
@@ -74,6 +78,11 @@ void WeatherSystem::SetSettings(const WeatherSettings& settings)
 		sanitized.fallDistanceBelowCamera != m_settings.fallDistanceBelowCamera ||
 		sanitized.coverageDepth != m_settings.coverageDepth ||
 		sanitized.minimumNearWidth != m_settings.minimumNearWidth;
+	sanitized.splashSize = std::max(0.001f, sanitized.splashSize);
+	sanitized.splashDensity = std::max(0.0f, sanitized.splashDensity);
+	sanitized.splashFrameDuration = std::max(0.01f, sanitized.splashFrameDuration);
+	sanitized.splashBrightness = std::max(0.0f, sanitized.splashBrightness);
+	sanitized.splashOpacity = std::clamp(sanitized.splashOpacity, 0.0f, 1.0f);
 	m_settings = sanitized;
 	m_poolDirty = m_poolDirty || distributionChanged;
 }
@@ -81,17 +90,21 @@ void WeatherSystem::SetSettings(const WeatherSettings& settings)
 void WeatherSystem::Restart()
 {
 	m_poolDirty = true;
+	m_splashes.clear();
+	m_splashEmissionAccumulator = 0.0f;
 }
 
 void WeatherSystem::Clear()
 {
 	m_particles.clear();
+	m_splashes.clear();
+	m_splashEmissionAccumulator = 0.0f;
 	ApplyPreset(WeatherType::Rain);
 	m_settings.enabled = false;
 	m_poolDirty = true;
 }
 
-void WeatherSystem::Update(float dt, const Camera& camera)
+void WeatherSystem::Update(float dt, const Camera& camera, const Scene& scene)
 {
 	UpdateCameraFrame(camera);
 	RecalculateWorldVolume();
@@ -99,6 +112,30 @@ void WeatherSystem::Update(float dt, const Camera& camera)
 		return;
 
 	SynchronizePool();
+	for (std::size_t splashIndex = 0; splashIndex < m_splashes.size();)
+	{
+		ParticleInstance& splash = m_splashes[splashIndex];
+		splash.age += std::max(dt, 0.0f);
+		if (splash.age >= splash.lifetime)
+		{
+			m_splashes[splashIndex] = m_splashes.back();
+			m_splashes.pop_back();
+			continue;
+		}
+		++splashIndex;
+	}
+
+	if (m_settings.type == WeatherType::Rain && m_settings.splashesEnabled && dt > 0.0f)
+	{
+		// Splashes are intentionally decoupled from individual drops. This keeps
+		// splash cost stable and distributes impacts across the visible ground.
+		m_splashEmissionAccumulator += dt * m_settings.splashDensity;
+		const std::size_t splashCount = static_cast<std::size_t>(m_splashEmissionAccumulator);
+		m_splashEmissionAccumulator -= static_cast<float>(splashCount);
+		for (std::size_t index = 0; index < splashCount; ++index)
+			SpawnRandomSplash(scene);
+	}
+
 	for (ParticleInstance& particle : m_particles)
 	{
 		if (dt > 0.0f)
@@ -217,6 +254,101 @@ void WeatherSystem::ResetParticle(ParticleInstance& particle, bool prewarm)
 	particle.lifetime = 1.0f;
 	particle.color = glm::mix(m_settings.startColor, m_settings.endColor, progress);
 	particle.size = glm::mix(m_settings.startSize, m_settings.endSize, progress);
+}
+
+void WeatherSystem::SpawnSplash(const glm::vec3& position)
+{
+	ParticleInstance splash;
+	splash.position = position;
+	splash.color = {
+		m_settings.startColor.r, m_settings.startColor.g, m_settings.startColor.b,
+		1.0f};
+	splash.size = m_settings.splashSize;
+	splash.age = 0.0f;
+	splash.lifetime = SplashFrameCount * std::max(m_settings.splashFrameDuration, 0.01f);
+	splash.shapeVariation = 0.5f;
+
+	// Do not replace an active splash when the pool is full. Replacing one
+	// would repeatedly reset older animations to frame zero at high density or
+	// with long frame durations, making the later sheet frames hard to see.
+	if (m_splashes.size() < MaximumSplashCount)
+		m_splashes.push_back(splash);
+}
+
+void WeatherSystem::SpawnRandomSplash(const Scene& scene)
+{
+	struct Surface
+	{
+		Entity* object;
+		glm::vec3 minimum;
+		glm::vec3 maximum;
+		float weight;
+	};
+
+	std::vector<Surface> surfaces;
+	float totalWeight = 0.0f;
+	for (const auto& object : scene.Objects())
+	{
+		if (!object || !object->GetMesh() ||
+			std::find(m_settings.groundEntityIds.begin(), m_settings.groundEntityIds.end(), object->Id()) ==
+				m_settings.groundEntityIds.end())
+			continue;
+
+		glm::vec3 minimum(0.0f);
+		glm::vec3 maximum(0.0f);
+		if (!object->WorldAABB(minimum, maximum))
+			continue;
+
+		const glm::vec2 extent(maximum.x - minimum.x, maximum.z - minimum.z);
+		const float area = extent.x * extent.y;
+		if (area <= 0.0001f)
+			continue;
+
+		surfaces.push_back({object.get(), minimum, maximum, area});
+		totalWeight += area;
+	}
+
+	if (surfaces.empty() || totalWeight <= 0.0f)
+		return;
+
+	std::uniform_real_distribution<float> selection(0.0f, totalWeight);
+	float target = selection(m_random);
+	for (const Surface& surface : surfaces)
+	{
+		if (target > surface.weight)
+		{
+			target -= surface.weight;
+			continue;
+		}
+
+		std::uniform_real_distribution<float> xDistribution(
+			surface.minimum.x, surface.maximum.x);
+		std::uniform_real_distribution<float> zDistribution(
+			surface.minimum.z, surface.maximum.z);
+
+		if (surface.object->GetPhysicsColliderShape() == PhysicsColliderShape::Convex)
+		{
+			// The AABB is only used to choose a candidate location. Resolve its
+			// height against the actual convex collider so ramps and staircases do
+			// not receive splashes on the collider's box ceiling.
+			constexpr int SurfaceSamples = 12;
+			for (int sample = 0; sample < SurfaceSamples; ++sample)
+			{
+				const glm::vec2 horizontal(xDistribution(m_random), zDistribution(m_random));
+				glm::vec3 surfacePoint;
+				if (PhysicsWorld::Instance().FindConvexSurfacePoint(
+					*surface.object, horizontal, surfacePoint))
+				{
+					SpawnSplash(surfacePoint + glm::vec3(0.0f, 0.01f, 0.0f));
+					return;
+				}
+			}
+			return;
+		}
+
+		SpawnSplash({xDistribution(m_random), surface.maximum.y + 0.01f, zDistribution(m_random)});
+		return;
+	}
 }
 
 void WeatherSystem::UpdateCameraFrame(const Camera& camera)

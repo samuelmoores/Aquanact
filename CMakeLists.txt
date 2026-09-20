@@ -86,6 +86,7 @@ set(SOURCES
     "include/Engine/UI/InstanceManager.h" "src/Engine/UI/InstanceManager.cpp"
     "include/Engine/UI/SpawnManagerWindow.h" "src/Engine/UI/SpawnManagerWindow.cpp"
     "include/Engine/UI/ParticleSystemWindow.h" "src/Engine/UI/ParticleSystemWindow.cpp"
+    "include/Engine/UI/ShaderWindow.h" "src/Engine/UI/ShaderWindow.cpp"
     "include/Engine/UI/LightingWindow.h" "src/Engine/UI/LightingWindow.cpp"
     "include/Engine/UI/FileExplorerWindow.h" "src/Engine/UI/FileExplorerWindow.cpp"
     "include/Engine/UI/EntityStateMachineWindow.h"
@@ -358,6 +359,12 @@ add_custom_target(copymodels
         COMMENT "syncing engine resources"
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
+add_custom_target(copyspritesheets
+        COMMAND ${CMAKE_COMMAND} -E rm -rf ${CMAKE_BINARY_DIR}/spritesheets
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/spritesheets ${CMAKE_BINARY_DIR}/spritesheets
+        COMMENT "syncing particle sprite sheets"
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
 add_custom_target(copymygui
         # Keep media beside the editor executable and under resources/ for the
         # packaged-game layout. Both targets share this copy step.
@@ -368,9 +375,9 @@ add_custom_target(copymygui
         COMMENT "syncing MyGUI media to ${CMAKE_BINARY_DIR}"
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
-add_dependencies(AquanactEngine copyshaders copymodels)
+add_dependencies(AquanactEngine copyshaders copymodels copyspritesheets)
 add_dependencies(AquanactEngine copymygui)
-add_dependencies(AquanactGame copyshaders copymodels copymygui)
+add_dependencies(AquanactGame copyshaders copymodels copymygui copyspritesheets)
 
 
 

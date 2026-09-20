@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cassert>
+#include <cctype>
 #include <cfloat>
 #include <cmath>
 #include <iomanip>
@@ -20,6 +21,22 @@
 
 namespace {
 	const int VERTICES_PER_FACE = 3;
+
+	aiReturn GetRawFbxRoughnessPath(aiMaterial* material, aiString& path)
+	{
+		static const char* const keys[] = {
+			"$raw.Maya|specular_roughness|file",
+			"$raw.Maya|specularRoughness|file",
+			"$raw.specular_roughness|file",
+			"$raw.specularRoughness|file"
+		};
+		for (const char* key : keys)
+		{
+			if (material->Get(key, aiTextureType_UNKNOWN, 0, path) == AI_SUCCESS)
+				return AI_SUCCESS;
+		}
+		return AI_FAILURE;
+	}
 
 	uint32_t CreateTextureFromPixels(int width, int height, const unsigned char* pixels, bool mipmapped)
 	{
@@ -165,8 +182,12 @@ void Mesh::AdoptImportedModel(ImportedModel&& importedModel)
 		for (unsigned int i = 0; i < m_scene->mNumMeshes; ++i)
 		{
 			aiMaterial* mat = m_scene->mMaterials[m_scene->mMeshes[i]->mMaterialIndex];
-			LoadMaterialTextures(mat);
+			LoadMaterialTextures(mat, static_cast<int>(i));
 		}
+		m_colorTextureEnabled.assign(m_textureColor.size(), true);
+		m_specularTextureEnabled.assign(m_textureSpecular.size(), true);
+		m_normalTextureEnabled.assign(m_textureNormal.size(), true);
+		m_roughnessTextureEnabled.assign(m_textureRoughness.size(), true);
 	}
 
 	if (!m_vertices.empty() && !m_faces.empty())
@@ -425,6 +446,29 @@ bool Mesh::HasRoughnessTexture(int index) const
 		m_textureRoughness[index] != 0;
 }
 
+namespace
+{
+	bool TextureEnabled(const std::vector<bool>& enabled, int index)
+	{
+		return index < 0 || index >= static_cast<int>(enabled.size()) || enabled[index];
+	}
+
+	void SetTextureEnabled(std::vector<bool>& enabled, int index, bool value)
+	{
+		if (index >= 0 && index < static_cast<int>(enabled.size()))
+			enabled[index] = value;
+	}
+}
+
+bool Mesh::ColorTextureEnabled(int index) const { return TextureEnabled(m_colorTextureEnabled, index); }
+bool Mesh::SpecularTextureEnabled(int index) const { return TextureEnabled(m_specularTextureEnabled, index); }
+bool Mesh::NormalTextureEnabled(int index) const { return TextureEnabled(m_normalTextureEnabled, index); }
+bool Mesh::RoughnessTextureEnabled(int index) const { return TextureEnabled(m_roughnessTextureEnabled, index); }
+void Mesh::SetColorTextureEnabled(int index, bool enabled) { SetTextureEnabled(m_colorTextureEnabled, index, enabled); }
+void Mesh::SetSpecularTextureEnabled(int index, bool enabled) { SetTextureEnabled(m_specularTextureEnabled, index, enabled); }
+void Mesh::SetNormalTextureEnabled(int index, bool enabled) { SetTextureEnabled(m_normalTextureEnabled, index, enabled); }
+void Mesh::SetRoughnessTextureEnabled(int index, bool enabled) { SetTextureEnabled(m_roughnessTextureEnabled, index, enabled); }
+
 uint32_t Mesh::FacesOffset(int index) const
 {
 	if (index < 0 || index >= static_cast<int>(m_faceOffsets.size()))
@@ -548,6 +592,14 @@ const char* Mesh::TextureSlotName(TextureSlot slot) const
 	return "unknown";
 }
 
+bool Mesh::IsFbxSource() const
+{
+	std::string extension = std::filesystem::path(m_sourcePath).extension().string();
+	std::transform(extension.begin(), extension.end(), extension.begin(),
+		[](unsigned char character) { return static_cast<char>(std::tolower(character)); });
+	return extension == ".fbx";
+}
+
 void Mesh::LoadTextureFile(TextureSlot slot, const std::filesystem::path& texturePath)
 {
 	try
@@ -605,15 +657,67 @@ aiReturn Mesh::GetMaterialTexturePath(aiMaterial* mat, aiTextureType textureType
 	// shininess texture rather than the PBR diffuse-roughness type.
 	if (result != AI_SUCCESS && textureType == aiTextureType_DIFFUSE_ROUGHNESS)
 		result = mat->GetTexture(aiTextureType_SHININESS, 0, &texturePath);
+	// Some FBX exporters put a single roughness map in the specular slot.
+	// The material importer below moves that slot to roughness when no explicit
+	// roughness/shininess texture exists.
+	if (result != AI_SUCCESS && textureType == aiTextureType_DIFFUSE_ROUGHNESS && IsFbxSource())
+		result = mat->GetTexture(aiTextureType_SPECULAR, 0, &texturePath);
+	if (result != AI_SUCCESS && textureType == aiTextureType_DIFFUSE_ROUGHNESS && IsFbxSource())
+		result = GetRawFbxRoughnessPath(mat, texturePath);
 	return result;
 }
 
-void Mesh::LoadMaterialTextures(aiMaterial* mat)
+void Mesh::LoadMaterialTextures(aiMaterial* mat, int subMeshIndex)
 {
+	const auto texturePath = [mat](aiTextureType type)
+	{
+		aiString path;
+		return mat->GetTexture(type, 0, &path) == AI_SUCCESS
+			? std::string(path.C_Str()) : std::string("<none>");
+	};
+	aiString materialName;
+	mat->Get(AI_MATKEY_NAME, materialName);
+	aiString rawRoughness;
+	const std::string rawRoughnessPath = IsFbxSource() &&
+		GetRawFbxRoughnessPath(mat, rawRoughness) == AI_SUCCESS
+		? std::string(rawRoughness.C_Str()) : std::string("<none>");
+	const std::string source = m_sourcePath.empty() ? "<generated>" : m_sourcePath;
+	Root::Current().Debugger().LogTagged(
+		"MaterialTexture",
+		"Inspect " + source + " submesh=" + std::to_string(subMeshIndex) +
+		" material=\"" + std::string(materialName.C_Str()) +
+		"\" diffuse=\"" + texturePath(aiTextureType_DIFFUSE) +
+		"\" specular=\"" + texturePath(aiTextureType_SPECULAR) +
+		"\" roughness=\"" + texturePath(aiTextureType_DIFFUSE_ROUGHNESS) +
+		"\" unknown=\"" + texturePath(aiTextureType_UNKNOWN) +
+		"\" shininess=\"" + texturePath(aiTextureType_SHININESS) +
+		"\" normal=\"" + texturePath(aiTextureType_NORMALS) +
+		"\" rawSpecularRoughness=\"" + rawRoughnessPath);
+
 	LoadTexture(mat, aiTextureType_DIFFUSE); // Fallback to BASE_COLOR.
-	LoadTexture(mat, aiTextureType_SPECULAR);
+
+	aiString specularPath;
+	const bool hasSpecular = mat->GetTexture(aiTextureType_SPECULAR, 0, &specularPath) == AI_SUCCESS;
+	aiString roughnessPath;
+	const bool hasExplicitRoughness =
+		mat->GetTexture(aiTextureType_DIFFUSE_ROUGHNESS, 0, &roughnessPath) == AI_SUCCESS ||
+		mat->GetTexture(aiTextureType_UNKNOWN, 0, &roughnessPath) == AI_SUCCESS ||
+		mat->GetTexture(aiTextureType_SHININESS, 0, &roughnessPath) == AI_SUCCESS ||
+		(IsFbxSource() && GetRawFbxRoughnessPath(mat, roughnessPath) == AI_SUCCESS);
+	const bool specularSlotIsRoughness = IsFbxSource() && hasSpecular && !hasExplicitRoughness;
+	if (!specularSlotIsRoughness)
+		LoadTexture(mat, aiTextureType_SPECULAR);
 	LoadTexture(mat, aiTextureType_NORMALS); // Fallback to HEIGHT/bump maps.
 	LoadTexture(mat, aiTextureType_DIFFUSE_ROUGHNESS);
+
+	Root::Current().Debugger().LogTagged(
+		"MaterialTexture",
+		"Result " + source + " submesh=" + std::to_string(subMeshIndex) +
+		" specularSlotIsRoughness=" + (specularSlotIsRoughness ? "true" : "false") +
+		" loaded(color=" + (HasColorTexture(subMeshIndex) ? "true" : "false") +
+		",specular=" + (HasSpecularTexture(subMeshIndex) ? "true" : "false") +
+		",normal=" + (HasNormalTexture(subMeshIndex) ? "true" : "false") +
+		",roughness=" + (HasRoughnessTexture(subMeshIndex) ? "true" : "false") + ")");
 }
 
 void Mesh::LoadTexture(aiMaterial* mat, aiTextureType textureType)
@@ -674,19 +778,19 @@ void Mesh::Bind(int index)
 {
 	glBindVertexArray(m_vao[0]);
 	glActiveTexture(GL_TEXTURE0);
-	if (index < static_cast<int>(m_textureColor.size()) && m_textureColor[index] != 0)
+	if (index < static_cast<int>(m_textureColor.size()) && m_textureColor[index] != 0 && ColorTextureEnabled(index))
 		glBindTexture(GL_TEXTURE_2D, m_textureColor[index]);
 
 	glActiveTexture(GL_TEXTURE1);
-	if (index < static_cast<int>(m_textureSpecular.size()) && m_textureSpecular[index] != 0)
+	if (index < static_cast<int>(m_textureSpecular.size()) && m_textureSpecular[index] != 0 && SpecularTextureEnabled(index))
 		glBindTexture(GL_TEXTURE_2D, m_textureSpecular[index]);
 
 	glActiveTexture(GL_TEXTURE2);
-	if (index < static_cast<int>(m_textureNormal.size()) && m_textureNormal[index] != 0)
+	if (index < static_cast<int>(m_textureNormal.size()) && m_textureNormal[index] != 0 && NormalTextureEnabled(index))
 		glBindTexture(GL_TEXTURE_2D, m_textureNormal[index]);
 
 	glActiveTexture(GL_TEXTURE3);
-	if (index < static_cast<int>(m_textureRoughness.size()) && m_textureRoughness[index] != 0)
+	if (index < static_cast<int>(m_textureRoughness.size()) && m_textureRoughness[index] != 0 && RoughnessTextureEnabled(index))
 		glBindTexture(GL_TEXTURE_2D, m_textureRoughness[index]);
 }
 

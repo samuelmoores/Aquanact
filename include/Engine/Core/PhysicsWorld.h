@@ -20,6 +20,10 @@ public:
 
 	// Finds the active collider record associated with an entity.
 	ColliderHandle Find(const Entity& entity) const;
+	// Finds the highest point on a convex entity's authored surface below the
+	// supplied horizontal coordinate, with convex physics planes as fallback.
+	bool FindConvexSurfacePoint(const Entity& entity, const glm::vec2& horizontal,
+		glm::vec3& point) const;
 
 	// Sweeps a moving collider through the cached world representation and
 	// returns the earliest collision found against enabled collider records.

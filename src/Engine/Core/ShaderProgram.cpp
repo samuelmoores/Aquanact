@@ -224,4 +224,55 @@ void ShaderProgram::setUniform(const std::string& uniformName, const std::vector
     glUniformMatrix4fv(boneUniformLocation, values.size(), GL_FALSE, glm::value_ptr(values[0]));
 }
 
+void ShaderProgram::SetEditorUniformFloat(const std::string& name, float value)
+{
+	m_editorUniforms[name] = { EditorUniform::Type::Float, glm::vec4(value, 0.0f, 0.0f, 0.0f) };
+}
+
+void ShaderProgram::SetEditorUniformInt(const std::string& name, int32_t value)
+{
+	m_editorUniforms[name] = { EditorUniform::Type::Int, glm::vec4(static_cast<float>(value), 0.0f, 0.0f, 0.0f) };
+}
+
+void ShaderProgram::SetEditorUniformBool(const std::string& name, bool value)
+{
+	m_editorUniforms[name] = { EditorUniform::Type::Bool, glm::vec4(value ? 1.0f : 0.0f, 0.0f, 0.0f, 0.0f) };
+}
+
+void ShaderProgram::SetEditorUniformVec2(const std::string& name, const glm::vec2& value)
+{
+	m_editorUniforms[name] = { EditorUniform::Type::Vec2, glm::vec4(value, 0.0f, 0.0f) };
+}
+
+void ShaderProgram::SetEditorUniformVec3(const std::string& name, const glm::vec3& value)
+{
+	m_editorUniforms[name] = { EditorUniform::Type::Vec3, glm::vec4(value, 0.0f) };
+}
+
+void ShaderProgram::SetEditorUniformVec4(const std::string& name, const glm::vec4& value)
+{
+	m_editorUniforms[name] = { EditorUniform::Type::Vec4, value };
+}
+
+void ShaderProgram::ClearEditorUniforms()
+{
+	m_editorUniforms.clear();
+}
+
+void ShaderProgram::ApplyEditorUniforms() const
+{
+	for (const auto& [name, uniform] : m_editorUniforms)
+	{
+		switch (uniform.type)
+		{
+		case EditorUniform::Type::Float: setUniform(name, uniform.value.x); break;
+		case EditorUniform::Type::Int: setUniform(name, static_cast<int32_t>(uniform.value.x)); break;
+		case EditorUniform::Type::Bool: setUniform(name, uniform.value.x != 0.0f); break;
+		case EditorUniform::Type::Vec2: setUniform(name, glm::vec2(uniform.value)); break;
+		case EditorUniform::Type::Vec3: setUniform(name, glm::vec3(uniform.value)); break;
+		case EditorUniform::Type::Vec4: setUniform(name, uniform.value); break;
+		}
+	}
+}
+
 

@@ -5,10 +5,16 @@
 #include "Engine/Core/Scene.h"
 #include "Engine/Core/SceneManager.h"
 #include "Engine/Core/WeatherSystem.h"
+#include "Engine/Core/Root.h"
+#include "Engine/Core/RenderManager.h"
 
 #include <imgui.h>
 
 #include <cstddef>
+#include <algorithm>
+#include <filesystem>
+#include <string>
+#include <vector>
 
 void ParticleSystemWindow::Draw(SceneManager& sceneManager, unsigned int selectedEntityId, bool& open) const
 {
@@ -73,11 +79,120 @@ void ParticleSystemWindow::Draw(SceneManager& sceneManager, unsigned int selecte
 		"Start Size", &settings.startSize, 0.01f, 0.001f, 100.0f);
 	settingsChanged |= ImGui::DragFloat(
 		"End Size", &settings.endSize, 0.01f, 0.0f, 100.0f);
+	ImGui::SeparatorText("Random Rain Splashes");
+	settingsChanged |= ImGui::Checkbox("Enable Splashes", &settings.splashesEnabled);
+	settingsChanged |= ImGui::DragFloat(
+		"Splash Size", &settings.splashSize, 0.01f, 0.001f, 10.0f, "%.2f units");
+	settingsChanged |= ImGui::DragFloat(
+		"Splash Density", &settings.splashDensity, 0.5f, 0.0f, 1000.0f, "%.1f splashes/sec");
+	settingsChanged |= ImGui::DragFloat(
+		"Splash Brightness", &settings.splashBrightness, 0.01f, 0.0f, 5.0f, "%.2fx");
+	settingsChanged |= ImGui::SliderFloat(
+		"Splash Opacity", &settings.splashOpacity, 0.0f, 1.0f, "%.2f");
+	const float previousSplashFrameDuration = settings.splashFrameDuration;
+	settingsChanged |= ImGui::DragFloat(
+		"Splash Frame Duration", &settings.splashFrameDuration, 0.05f, 0.05f, 10.0f, "%.2f sec/frame");
+	const bool splashFrameDurationChanged = settings.splashFrameDuration != previousSplashFrameDuration;
+	std::vector<std::string> splashFiles;
+	std::error_code fileError;
+	for (const auto& entry : std::filesystem::directory_iterator("spritesheets", fileError))
+	{
+		if (!entry.is_regular_file(fileError)) continue;
+		const auto extension = entry.path().extension().string();
+		if (extension == ".png" || extension == ".jpg" || extension == ".jpeg")
+			splashFiles.push_back(entry.path().filename().string());
+	}
+	std::sort(splashFiles.begin(), splashFiles.end());
+	if (!splashFiles.empty())
+	{
+		if (std::find(splashFiles.begin(), splashFiles.end(), settings.splashTexturePath) == splashFiles.end())
+			settings.splashTexturePath = splashFiles.front();
+		if (ImGui::BeginCombo("Splash Sprite Sheet", settings.splashTexturePath.c_str()))
+		{
+			for (const std::string& file : splashFiles)
+			{
+				const bool selected = file == settings.splashTexturePath;
+				if (ImGui::Selectable(file.c_str(), selected))
+				{
+					if (Root::Current().Render().SetSplashTexture((std::filesystem::path("spritesheets") / file).string()))
+					{
+						settings.splashTexturePath = file;
+						settingsChanged = true;
+						weather.Restart();
+					}
+				}
+				if (selected) ImGui::SetItemDefaultFocus();
+			}
+			ImGui::EndCombo();
+		}
+	}
+	else
+	{
+		ImGui::TextDisabled("No sprite sheets found in spritesheets.");
+	}
+
+	if (settings.type == WeatherType::Rain)
+	{
+		static unsigned int selectedGroundEntityId = 0;
+		const char* selectedGroundEntityName = "Select entity...";
+		for (const auto& object : activeLevel->Objects())
+		{
+			if (object && object->Id() == selectedGroundEntityId)
+			{
+				selectedGroundEntityName = object->Name().c_str();
+				break;
+			}
+		}
+
+		if (ImGui::BeginCombo("Ground Entity", selectedGroundEntityName))
+		{
+			for (const auto& object : activeLevel->Objects())
+			{
+				if (!object || !object->GetMesh()) continue;
+				const bool selected = object->Id() == selectedGroundEntityId;
+				if (ImGui::Selectable(object->Name().c_str(), selected))
+					selectedGroundEntityId = object->Id();
+				if (selected) ImGui::SetItemDefaultFocus();
+			}
+			ImGui::EndCombo();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Add Ground Entity") && selectedGroundEntityId != 0 &&
+			std::find(settings.groundEntityIds.begin(), settings.groundEntityIds.end(), selectedGroundEntityId) ==
+				settings.groundEntityIds.end())
+		{
+			settings.groundEntityIds.push_back(selectedGroundEntityId);
+			settingsChanged = true;
+		}
+
+		for (std::size_t index = 0; index < settings.groundEntityIds.size(); ++index)
+		{
+			const unsigned int entityId = settings.groundEntityIds[index];
+			const Entity* groundEntity = nullptr;
+			for (const auto& object : activeLevel->Objects())
+				if (object && object->Id() == entityId) { groundEntity = object.get(); break; }
+			if (!groundEntity) continue;
+			ImGui::PushID(static_cast<int>(entityId));
+			ImGui::BulletText("%s", groundEntity->Name().c_str());
+			ImGui::SameLine();
+			if (ImGui::SmallButton("Remove"))
+			{
+				settings.groundEntityIds.erase(settings.groundEntityIds.begin() + static_cast<std::ptrdiff_t>(index));
+				settingsChanged = true;
+				ImGui::PopID();
+				break;
+			}
+			ImGui::PopID();
+		}
+		ImGui::TextDisabled("Splashes spawn on the selected entities' world-space top surfaces.");
+	}
 	settingsChanged |= ImGui::ColorEdit4("Start Color", &settings.startColor[0]);
 	settingsChanged |= ImGui::ColorEdit4("End Color", &settings.endColor[0]);
 
 	if (settingsChanged)
 		weather.SetSettings(settings);
+	if (splashFrameDurationChanged)
+		weather.Restart();
 	if (ImGui::Button("Restart Weather"))
 		weather.Restart();
 	ImGui::SameLine();

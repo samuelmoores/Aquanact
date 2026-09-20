@@ -313,6 +313,7 @@ void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManage
 	}
 	m_spawnManagerWindow.Draw(SceneManager, m_windowState.showSpawnManagerWindow);
 	m_particleSystemWindow.Draw(SceneManager, m_selection.entityId, m_windowState.showParticleSystemWindow);
+	m_shaderWindow.Draw(SceneManager, m_selection.entityId, m_windowState.showShaderWindow);
 	m_audioWindow.Draw(SceneManager, projectManager, m_windowState.showAudioWindow);
 	m_cutsceneWindow.Draw(SceneManager, projectManager, m_windowState.showCutsceneWindow);
 	m_componentDeletionWindow.Draw(SceneManager, m_popupRequests.deleteComponent);

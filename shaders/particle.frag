@@ -5,9 +5,29 @@ in float particleAge;
 in float particleShapeVariation;
 in vec2 rainScreenDirection;
 in float rainProjectionScale;
+in float particleLightBrightness;
 out vec4 FragColor;
 
 uniform int particleVisualShape;
+uniform sampler2D splashTexture;
+uniform float splashBrightness;
+uniform float splashOpacity;
+
+vec4 splashSpriteColor()
+{
+    const int frameCount = 5;
+    float normalizedAge = clamp(particleAge, 0.0, 0.999999);
+    int frame = int(floor(normalizedAge * float(frameCount)));
+
+    // Preserve the placement authored inside each 16x16 cell. Later splash
+    // frames intentionally occupy the top of the cell so they rise above the
+    // impact point. StbImage stores the PNG's top row first and point-sprite
+    // coordinates also begin at the top, so the Y coordinate is used directly.
+    vec2 frameUv = vec2(
+        (gl_PointCoord.x + float(frame)) / float(frameCount),
+        gl_PointCoord.y);
+    return texture(splashTexture, frameUv);
+}
 
 float softCircleAlpha(vec2 pointCoordinate)
 {
@@ -40,6 +60,18 @@ float rainStreakAlpha(vec2 pointCoordinate)
 
 void main()
 {
+    if (particleVisualShape == 2)
+    {
+        vec4 sprite = splashSpriteColor();
+        // Splash opacity is independent of the weather color alpha. At 1.0,
+        // the sprite uses its authored alpha unchanged; at 0.0 it is invisible.
+        float alpha = sprite.a * splashOpacity;
+        if (alpha <= 0.001) discard;
+        FragColor = vec4(sprite.rgb * particleColor.rgb * particleLightBrightness * splashBrightness,
+                         alpha);
+        return;
+    }
+
     float alpha = particleVisualShape == 1
         ? rainStreakAlpha(gl_PointCoord)
         : softCircleAlpha(gl_PointCoord);

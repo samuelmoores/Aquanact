@@ -5,9 +5,11 @@
 #include <glm/glm.hpp>
 #include <cstddef>
 #include <random>
+#include <string>
 #include <vector>
 
 class Camera;
+class Scene;
 
 enum class WeatherType
 {
@@ -31,6 +33,15 @@ struct WeatherSettings
 	float minimumNearWidth = 160.0f;
 	float startSize = 1.0f;
 	float endSize = 1.0f;
+	bool splashesEnabled = true;
+	float groundHeight = 0.0f;
+	float splashSize = 0.18f;
+	float splashDensity = 18.0f;
+	float splashFrameDuration = 1.0f;
+	float splashBrightness = 1.0f;
+	float splashOpacity = 1.0f;
+	std::string splashTexturePath = "rain splash.png";
+	std::vector<unsigned int> groundEntityIds;
 	glm::vec4 startColor{0.55f, 0.75f, 1.0f, 0.45f};
 	glm::vec4 endColor{0.35f, 0.55f, 1.0f, 0.0f};
 };
@@ -42,7 +53,7 @@ public:
 
 	WeatherSystem();
 
-	void Update(float dt, const Camera& camera);
+	void Update(float dt, const Camera& camera, const Scene& scene);
 	void ApplyPreset(WeatherType type);
 	void SetSettings(const WeatherSettings& settings);
 	void Restart();
@@ -50,6 +61,7 @@ public:
 
 	const WeatherSettings& Settings() const { return m_settings; }
 	const std::vector<ParticleInstance>& Particles() const { return m_particles; }
+	const std::vector<ParticleInstance>& SplashParticles() const { return m_splashes; }
 	ParticleVisualShape VisualShape() const;
 	bool WorldBounds(glm::vec3& minimum, glm::vec3& maximum) const;
 
@@ -57,12 +69,16 @@ private:
 	std::size_t TargetParticleCount() const;
 	void SynchronizePool();
 	void ResetParticle(ParticleInstance& particle, bool prewarm);
+	void SpawnSplash(const glm::vec3& position);
+	void SpawnRandomSplash(const Scene& scene);
 	void UpdateCameraFrame(const Camera& camera);
 	void RecalculateWorldVolume();
 	float EdgePadding() const;
 
 	WeatherSettings m_settings;
 	std::vector<ParticleInstance> m_particles;
+	std::vector<ParticleInstance> m_splashes;
+	float m_splashEmissionAccumulator = 0.0f;
 	glm::vec3 m_boundsMin{0.0f};
 	glm::vec3 m_boundsMax{0.0f};
 	glm::vec3 m_volumeMin{0.0f};

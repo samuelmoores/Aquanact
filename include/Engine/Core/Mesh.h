@@ -73,6 +73,14 @@ class Mesh {
 		bool HasSpecularTexture(int index) const;
 		bool HasNormalTexture(int index) const;
 		bool HasRoughnessTexture(int index) const;
+		bool ColorTextureEnabled(int index) const;
+		bool SpecularTextureEnabled(int index) const;
+		bool NormalTextureEnabled(int index) const;
+		bool RoughnessTextureEnabled(int index) const;
+		void SetColorTextureEnabled(int index, bool enabled);
+		void SetSpecularTextureEnabled(int index, bool enabled);
+		void SetNormalTextureEnabled(int index, bool enabled);
+		void SetRoughnessTextureEnabled(int index, bool enabled);
 		uint32_t FacesOffset(int index) const;
 		const glm::vec3& SubMeshMinBounds(int index) const;
 		const glm::vec3& SubMeshMaxBounds(int index) const;
@@ -99,11 +107,12 @@ class Mesh {
 		};
 
 		void AdoptImportedModel(ImportedModel&& importedModel);
-		void LoadMaterialTextures(aiMaterial* mat);
+		void LoadMaterialTextures(aiMaterial* mat, int subMeshIndex);
 		void LoadTextureFile(TextureSlot slot, const std::filesystem::path& texturePath);
 		void LoadTextureMemory(TextureSlot slot, aiTexture* texture);
 		TextureSlot SlotForTextureType(aiTextureType textureType) const;
 		const char* TextureSlotName(TextureSlot slot) const;
+		bool IsFbxSource() const;
 		aiReturn GetMaterialTexturePath(aiMaterial* mat, aiTextureType textureType, aiString& texturePath) const;
 		std::vector<uint32_t>& TexturesForSlot(TextureSlot slot);
 		std::vector<Vertex3D> m_vertices;
@@ -113,6 +122,10 @@ class Mesh {
 		std::vector<uint32_t> m_textureSpecular;
 		std::vector<uint32_t> m_textureNormal;
 		std::vector<uint32_t> m_textureRoughness;
+		std::vector<bool> m_colorTextureEnabled;
+		std::vector<bool> m_specularTextureEnabled;
+		std::vector<bool> m_normalTextureEnabled;
+		std::vector<bool> m_roughnessTextureEnabled;
 		int m_currVao;
 		int m_currTextureColor;
 		glm::vec3 m_minBounds;
