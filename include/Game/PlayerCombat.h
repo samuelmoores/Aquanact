@@ -2,6 +2,9 @@
 
 #include "Engine/Core/Component.h"
 
+#include <glm/glm.hpp>
+#include <string>
+
 class Entity;
 class EntityStateMachine;
 class Input;
@@ -44,9 +47,23 @@ public:
 	void startUp(Entity&) override;
 	void FirstFrame(Entity&) override;
 	void Update(Entity&, float) override;
+	const std::string& ProjectileName() const { return m_projectileName; }
+	void SetProjectileName(std::string name) { m_projectileName = std::move(name); }
+	const std::string& SpawnBoneName() const { return m_spawnBoneName; }
+	void SetSpawnBoneName(std::string name) { m_spawnBoneName = std::move(name); }
+	int ProjectileSpawnFrame() const { return m_projectileSpawnFrame; }
+	void SetProjectileSpawnFrame(int frame) { m_projectileSpawnFrame = frame < 0 ? 0 : frame; }
+	const glm::vec3& LaunchDirection() const { return m_launchDirection; }
+	void SetLaunchDirection(const glm::vec3& direction) { m_launchDirection = direction; }
 
 	//members
 	bool m_attackRequested = false;
+	std::string m_projectileName;
+	std::string m_spawnBoneName;
+	int m_projectileSpawnFrame = 0;
+	glm::vec3 m_launchDirection{0.0f};
+	float m_attackElapsed = 0.0f;
+	bool m_projectileSpawnPending = false;
 
 	// External input sources.
 	const Input* m_inputDevice = nullptr;

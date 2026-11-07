@@ -8,6 +8,7 @@
 #include "Engine/Core/Component.h"
 #include "Engine/Core/ComponentFactory.h"
 #include "Engine/Core/ProjectManager.h"
+#include "Engine/Core/TriggerSphere.h"
 #include "Engine/UI/EngineGuiWidgets.h"
 
 #include <imgui.h>
@@ -45,6 +46,31 @@ InstanceManager::~InstanceManager() = default;
 
 void InstanceManager::SyncComponentPreview()
 {
+	if (m_triggerVolume)
+	{
+		bool rebuild = !m_componentPreview || m_componentPreview->GetMesh() != nullptr;
+		if (!rebuild)
+		{
+			std::vector<std::string> previewTypes;
+			for (Component* component : m_componentPreview->Components())
+				if (component) previewTypes.push_back(component->Name());
+			rebuild = previewTypes != m_componentTypes;
+		}
+		if (rebuild)
+		{
+			m_componentPreview = std::make_unique<Entity>(std::string(m_entityName), false);
+			for (const std::string& componentType : m_componentTypes)
+				if (std::unique_ptr<Component> component = ComponentFactory::Instance().Create(componentType, *m_componentPreview))
+					m_componentPreview->AddComponent(std::move(component));
+		}
+		m_componentPreview->SetName(m_entityName);
+		if (TriggerSphere* trigger = m_componentPreview->GetComponent<TriggerSphere>())
+		{
+			trigger->SetRadius(m_triggerRadius);
+			trigger->SetPositionOffset(m_triggerPositionOffset);
+		}
+		return;
+	}
 	if (m_selectedModel < 0 || m_selectedModel >= static_cast<int>(m_models.size()))
 	{
 		m_componentPreview.reset();
@@ -72,9 +98,15 @@ void InstanceManager::SyncComponentPreview()
 		m_componentPreview->SetIgnoreCameraCollision(m_ignoreCameraCollision);
 		m_componentPreview->SetBlocksCameraView(m_blocksCameraView);
 		m_componentPreview->SetShowPhysicsBoundingBox(m_showPhysicsBoundingBox);
+		m_componentPreview->SetRigidBody(m_rigidBody);
 		m_componentPreview->SetPhysicsColliderShape(m_physicsColliderShape == 1
 			? PhysicsColliderShape::Capsule
 			: m_physicsColliderShape == 2 ? PhysicsColliderShape::Convex : PhysicsColliderShape::Box);
+		if (TriggerSphere* trigger = m_componentPreview->GetComponent<TriggerSphere>())
+		{
+			trigger->SetRadius(m_triggerRadius);
+			trigger->SetPositionOffset(m_triggerPositionOffset);
+		}
 		return;
 	}
 
@@ -97,9 +129,15 @@ void InstanceManager::SyncComponentPreview()
 	m_componentPreview->SetIgnoreCameraCollision(m_ignoreCameraCollision);
 	m_componentPreview->SetBlocksCameraView(m_blocksCameraView);
 	m_componentPreview->SetShowPhysicsBoundingBox(m_showPhysicsBoundingBox);
+	m_componentPreview->SetRigidBody(m_rigidBody);
 	m_componentPreview->SetPhysicsColliderShape(m_physicsColliderShape == 1
 		? PhysicsColliderShape::Capsule
 		: m_physicsColliderShape == 2 ? PhysicsColliderShape::Convex : PhysicsColliderShape::Box);
+	if (TriggerSphere* trigger = m_componentPreview->GetComponent<TriggerSphere>())
+	{
+		trigger->SetRadius(m_triggerRadius);
+		trigger->SetPositionOffset(m_triggerPositionOffset);
+	}
 }
 
 void InstanceManager::DrawComponentPreview()
@@ -186,6 +224,9 @@ namespace
 
 void InstanceManager::RefreshModels()
 {
+	const std::filesystem::path previouslySelectedModel =
+		m_selectedModel >= 0 && m_selectedModel < static_cast<int>(m_models.size())
+		? m_models[static_cast<std::size_t>(m_selectedModel)] : std::filesystem::path{};
 	m_modelsLoaded = true;
 	m_models.clear();
 	m_modelLabels.clear();
@@ -205,7 +246,10 @@ void InstanceManager::RefreshModels()
 	m_modelLabels.reserve(m_models.size());
 	for (const std::filesystem::path& model : m_models)
 		m_modelLabels.push_back(model.lexically_relative(relativeRoot).generic_string());
-	if (!m_models.empty())
+	const auto previousSelection = std::find(m_models.begin(), m_models.end(), previouslySelectedModel);
+	if (!previouslySelectedModel.empty() && previousSelection != m_models.end())
+		m_selectedModel = static_cast<int>(std::distance(m_models.begin(), previousSelection));
+	else if (!m_models.empty())
 		m_selectedModel = 0;
 }
 
@@ -221,7 +265,11 @@ void BeginInstanceEdit(
 	bool& ignoreCameraCollision,
 	bool& blocksCameraView,
 	bool& showPhysicsBoundingBox,
+	bool& rigidBody,
 	int& physicsColliderShape,
+	bool& triggerVolume,
+	float& triggerRadius,
+	glm::vec3& triggerPositionOffset,
 	std::string& editingName)
 {
 	std::strncpy(entityName, definition.name.c_str(), entityNameSize - 1);
@@ -232,7 +280,11 @@ void BeginInstanceEdit(
 	ignoreCameraCollision = definition.ignoreCameraCollision;
 	blocksCameraView = definition.blocksCameraView;
 	showPhysicsBoundingBox = definition.showPhysicsBoundingBox;
+	rigidBody = definition.rigidBody;
 	physicsColliderShape = definition.physicsColliderShape;
+	triggerVolume = definition.triggerVolume;
+	triggerRadius = definition.triggerRadius;
+	triggerPositionOffset = definition.triggerPositionOffset;
 	editingName = definition.name;
 	selectedModel = -1;
 	for (int index = 0; index < static_cast<int>(models.size()); ++index)
@@ -243,6 +295,8 @@ void BeginInstanceEdit(
 			break;
 		}
 	}
+	if (triggerVolume)
+		selectedModel = -1;
 }
 
 bool InstanceManager::OpenStateMachinePreview(const InstanceDefinition& definition)
@@ -295,8 +349,14 @@ InstanceManagerResult InstanceManager::Draw(SceneManager& scenes, bool& open)
 	InstanceManagerResult result;
 	if (!open)
 	{
+		m_wasOpen = false;
 		result.stateMachineToDraw = StateMachinePreview();
 		return result;
+	}
+	if (!m_wasOpen)
+	{
+		RefreshModels();
+		m_wasOpen = true;
 	}
 
 	if (!ImGui::Begin("Instance Manager", &open))
@@ -310,10 +370,24 @@ InstanceManagerResult InstanceManager::Draw(SceneManager& scenes, bool& open)
 	SyncComponentPreview();
 
 	ImGui::TextUnformatted("Create Entity Instance");
-	ImGui::TextDisabled("Choose a model and configure the components on the instance.");
+	const char* instanceTypes[] = { "Model", "Trigger Volume" };
+	int instanceType = m_triggerVolume ? 1 : 0;
+	if (ImGui::Combo("Instance Type", &instanceType, instanceTypes, IM_ARRAYSIZE(instanceTypes)))
+	{
+		m_triggerVolume = instanceType == 1;
+		if (m_triggerVolume)
+		{
+			m_componentTypes = { "TriggerSphere" };
+			m_physicsColliderShape = 0;
+			m_rigidBody = false;
+		}
+	}
+	ImGui::TextDisabled(m_triggerVolume
+		? "Creates an invisible sphere volume that fires gameplay trigger callbacks."
+		: "Choose a model and configure the components on the instance.");
 	if (ImGui::SmallButton("Refresh Models"))
 		RefreshModels();
-		if (ImGui::BeginCombo("Model", m_selectedModel >= 0 ? m_models[m_selectedModel].filename().string().c_str() : "Select model"))
+	if (!m_triggerVolume && ImGui::BeginCombo("Model", m_selectedModel >= 0 ? m_models[m_selectedModel].filename().string().c_str() : "Select model"))
 	{
 		ImGuiListClipper clipper;
 		clipper.Begin(static_cast<int>(m_models.size()));
@@ -328,6 +402,10 @@ InstanceManagerResult InstanceManager::Draw(SceneManager& scenes, bool& open)
 			}
 		}
 		ImGui::EndCombo();
+	}
+	if (m_triggerVolume)
+	{
+		ImGui::Text("Trigger Radius: %.1f", m_triggerRadius);
 	}
 	ImGui::InputText("Entity Name", m_entityName, sizeof(m_entityName));
 	Scene* activeScene = scenes.ActiveLevel();
@@ -372,7 +450,7 @@ InstanceManagerResult InstanceManager::Draw(SceneManager& scenes, bool& open)
 	ImGui::Separator();
 	ImGui::TextUnformatted("Components");
 	ImGui::SetNextItemWidth(160.0f);
-	if (ImGui::BeginCombo("##AddInstanceComponent", "Add Component"))
+	if (!m_triggerVolume && ImGui::BeginCombo("##AddInstanceComponent", "Add Component"))
 	{
 		const std::vector<std::string> names = ComponentFactory::Instance().Names();
 		for (const std::string& name : names)
@@ -398,6 +476,12 @@ InstanceManagerResult InstanceManager::Draw(SceneManager& scenes, bool& open)
 		ImGui::EndCombo();
 	}
 	DrawComponentPreview();
+	if (m_componentPreview)
+		if (const TriggerSphere* trigger = m_componentPreview->GetComponent<TriggerSphere>())
+		{
+			m_triggerRadius = trigger->Radius();
+			m_triggerPositionOffset = trigger->PositionOffset();
+		}
 	ImGui::Separator();
 	ImGui::TextUnformatted("Physics");
 	if (m_componentPreview)
@@ -407,6 +491,7 @@ InstanceManagerResult InstanceManager::Draw(SceneManager& scenes, bool& open)
 		m_ignoreCameraCollision = m_componentPreview->IgnoreCameraCollision();
 		m_blocksCameraView = m_componentPreview->BlocksCameraView();
 		m_showPhysicsBoundingBox = m_componentPreview->ShowPhysicsBoundingBox();
+		m_rigidBody = m_componentPreview->IsRigidBody();
 		m_physicsColliderShape = static_cast<int>(m_componentPreview->GetPhysicsColliderShape());
 	}
 	else
@@ -415,7 +500,7 @@ InstanceManagerResult InstanceManager::Draw(SceneManager& scenes, bool& open)
 	}
 	if (ImGui::Button(m_editingDefinitionName.empty() ? "Create Instance" : "Update Instance"))
 	{
-		if (m_selectedModel < 0 || m_selectedModel >= static_cast<int>(m_models.size()))
+		if (!m_triggerVolume && (m_selectedModel < 0 || m_selectedModel >= static_cast<int>(m_models.size())))
 			std::snprintf(m_statusMessage, sizeof(m_statusMessage), "Select a model.");
 		else if (!std::string(m_entityName).size())
 			std::snprintf(m_statusMessage, sizeof(m_statusMessage), "Enter an entity name.");
@@ -423,13 +508,20 @@ InstanceManagerResult InstanceManager::Draw(SceneManager& scenes, bool& open)
 		{
 			InstanceDefinition definition;
 			definition.name = m_entityName;
-			definition.modelPath = m_models[m_selectedModel].string();
+			definition.triggerVolume = m_triggerVolume;
+			definition.triggerRadius = m_triggerRadius;
+			definition.triggerPositionOffset = m_triggerPositionOffset;
+			if (!m_triggerVolume)
+				definition.modelPath = m_models[m_selectedModel].string();
 			definition.attachToEntityName = m_attachToEntityName;
 			definition.componentTypes = m_componentTypes;
+			if (m_triggerVolume)
+				definition.componentTypes = { "TriggerSphere" };
 			definition.blocksCollision = m_blocksCollision;
 			definition.ignoreCameraCollision = m_ignoreCameraCollision;
 			definition.blocksCameraView = m_blocksCameraView;
 			definition.showPhysicsBoundingBox = m_showPhysicsBoundingBox;
+			definition.rigidBody = m_rigidBody;
 			definition.physicsColliderShape = m_physicsColliderShape;
 			if (!m_editingDefinitionName.empty())
 			{
@@ -439,6 +531,8 @@ InstanceManagerResult InstanceManager::Draw(SceneManager& scenes, bool& open)
 					definition.entityStateMachineInitialState = previous->entityStateMachineInitialState;
 					definition.entityStateMachineStates = previous->entityStateMachineStates;
 					definition.entityStateMachineTransitions = previous->entityStateMachineTransitions;
+					definition.triggerRadius = m_triggerRadius;
+					definition.triggerPositionOffset = m_triggerPositionOffset;
 				}
 			}
 			const std::string previousName = m_editingDefinitionName;
@@ -463,7 +557,8 @@ InstanceManagerResult InstanceManager::Draw(SceneManager& scenes, bool& open)
 	for (const auto& entry : Root::Current().Spawns().Definitions())
 	{
 		ImGui::PushID(entry.first.c_str());
-		ImGui::Text("%s  (%zu components)", entry.first.c_str(), entry.second.componentTypes.size());
+		ImGui::Text("%s  (%s, %zu components)", entry.first.c_str(),
+			entry.second.triggerVolume ? "trigger volume" : "model", entry.second.componentTypes.size());
 		ImGui::SameLine();
 		if (std::find(entry.second.componentTypes.begin(), entry.second.componentTypes.end(), "EntityStateMachine") != entry.second.componentTypes.end())
 		{
@@ -474,7 +569,9 @@ InstanceManagerResult InstanceManager::Draw(SceneManager& scenes, bool& open)
 		if (ImGui::SmallButton("Edit"))
 			BeginInstanceEdit(entry.second, m_models, m_selectedModel, m_entityName, sizeof(m_entityName),
 				m_attachToEntityName, m_componentTypes, m_blocksCollision, m_ignoreCameraCollision,
-				m_blocksCameraView, m_showPhysicsBoundingBox, m_physicsColliderShape, m_editingDefinitionName);
+				m_blocksCameraView, m_showPhysicsBoundingBox, m_rigidBody,
+				m_physicsColliderShape, m_triggerVolume, m_triggerRadius,
+				m_triggerPositionOffset, m_editingDefinitionName);
 		ImGui::SameLine();
 		if (ImGui::SmallButton("Delete"))
 		{

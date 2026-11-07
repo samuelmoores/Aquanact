@@ -16,4 +16,5 @@ private:
 	int m_selectedSoundEvent = -1;
 	int m_selectedCameraPoint = -1;
 	float m_lastEvaluatedTime = -1.0f;
+	bool m_wasOpen = false;
 };

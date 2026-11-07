@@ -176,9 +176,6 @@ void OpenGLGraphicsDevice::startUp()
 	InitializeShadowMap();
 	m_particleShader = std::make_unique<ShaderProgram>();
 	m_particleShader->load("shaders/particle.vert", "shaders/particle.frag");
-	m_balatroShader = std::make_unique<ShaderProgram>();
-	m_balatroShader->load("shaders/balatro.vert", "shaders/balatro.frag");
-	glGenVertexArrays(1, &m_balatroVao);
 	try
 	{
 		StbImage splashImage;
@@ -237,67 +234,6 @@ void OpenGLGraphicsDevice::startUp()
 		glUseProgram(0);
 	}
 	m_initialized = true;
-}
-
-void OpenGLGraphicsDevice::DrawMainMenuBackground()
-{
-	if (!m_balatroShader || !m_platform || m_platform->ViewportWidth() <= 0 || m_platform->ViewportHeight() <= 0)
-		return;
-
-	const GLboolean depthTestWasEnabled = glIsEnabled(GL_DEPTH_TEST);
-	const GLboolean cullFaceWasEnabled = glIsEnabled(GL_CULL_FACE);
-	const GLboolean blendWasEnabled = glIsEnabled(GL_BLEND);
-	const GLboolean scissorWasEnabled = glIsEnabled(GL_SCISSOR_TEST);
-	GLboolean depthMask = GL_TRUE;
-	glGetBooleanv(GL_DEPTH_WRITEMASK, &depthMask);
-
-	glDisable(GL_DEPTH_TEST);
-	glDisable(GL_CULL_FACE);
-	glDisable(GL_BLEND);
-	glDisable(GL_SCISSOR_TEST);
-	glDepthMask(GL_FALSE);
-	m_balatroShader->activate();
-	static const auto startTime = std::chrono::steady_clock::now();
-	const float elapsed = std::chrono::duration<float>(std::chrono::steady_clock::now() - startTime).count();
-	m_balatroShader->setUniform("SPIN_ROTATION", -2.0f);
-	m_balatroShader->setUniform("SPIN_SPEED", 7.0f);
-	m_balatroShader->setUniform("OFFSET", glm::vec2(0.0f));
-	m_balatroShader->setUniform("COLOUR_1", glm::vec4(0.871f, 0.267f, 0.231f, 1.0f));
-	m_balatroShader->setUniform("COLOUR_2", glm::vec4(0.0f, 0.42f, 0.706f, 1.0f));
-	m_balatroShader->setUniform("COLOUR_3", glm::vec4(0.086f, 0.137f, 0.145f, 1.0f));
-	m_balatroShader->setUniform("CONTRAST", 3.5f);
-	m_balatroShader->setUniform("LIGTHING", 0.4f);
-	m_balatroShader->setUniform("SPIN_AMOUNT", 0.25f);
-	m_balatroShader->setUniform("PIXEL_FILTER", 745.0f);
-	m_balatroShader->setUniform("SPIN_EASE", 1.0f);
-	m_balatroShader->setUniform("IS_ROTATE", false);
-	m_balatroShader->setUniform("SHAPE_SCALE", 30.0f);
-	m_balatroShader->setUniform("RADIAL_TWIST", 20.0f);
-	m_balatroShader->setUniform("WARP_STRENGTH", 0.5f);
-	m_balatroShader->setUniform("WARP_FREQUENCY", 1.0f);
-	m_balatroShader->setUniform("WARP_ITERATIONS", 5);
-	m_balatroShader->setUniform("BAND_WIDTH", 5.0f);
-	m_balatroShader->setUniform("LIGHTING_THRESHOLD", 4.0f);
-	m_balatroShader->setUniform("BACKGROUND_BLEND", 0.3f);
-	m_balatroShader->setUniform("LOOP_TIME", 0.0f);
-	m_balatroShader->ApplyEditorUniforms();
-	// Engine-owned inputs must always be current and cannot be overridden by
-	// editor controls or stale values from an earlier shader inspection.
-	m_balatroShader->setUniform("iResolution", glm::vec3(
-		static_cast<float>(m_platform->ViewportWidth()),
-		static_cast<float>(m_platform->ViewportHeight()),
-		1.0f));
-	m_balatroShader->setUniform("iTime", elapsed);
-	glBindVertexArray(m_balatroVao);
-	glDrawArrays(GL_TRIANGLES, 0, 3);
-	glBindVertexArray(0);
-	glUseProgram(0);
-
-	glDepthMask(depthMask);
-	if (depthTestWasEnabled) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
-	if (cullFaceWasEnabled) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE);
-	if (blendWasEnabled) glEnable(GL_BLEND); else glDisable(GL_BLEND);
-	if (scissorWasEnabled) glEnable(GL_SCISSOR_TEST); else glDisable(GL_SCISSOR_TEST);
 }
 
 bool OpenGLGraphicsDevice::SetSplashTexture(const std::string& path)
@@ -430,7 +366,6 @@ void OpenGLGraphicsDevice::ReleaseShadowMap()
 	m_pointShadowShader.reset();
 	m_selectionOutlineShader.reset();
 	m_particleShader.reset();
-	m_balatroShader.reset();
 	if (m_particleVbo != 0) glDeleteBuffers(1, &m_particleVbo);
 	if (m_particleVao != 0) glDeleteVertexArrays(1, &m_particleVao);
 	m_particleVbo = 0;
@@ -445,8 +380,6 @@ void OpenGLGraphicsDevice::ReleaseShadowMap()
 	m_particleSplashOpacityUniform = -1;
 	if (m_particleSplashTexture != 0) glDeleteTextures(1, &m_particleSplashTexture);
 	m_particleSplashTexture = 0;
-	if (m_balatroVao != 0) glDeleteVertexArrays(1, &m_balatroVao);
-	m_balatroVao = 0;
 	m_shadowMapReady = false;
 	m_pointShadowMapsReady.fill(false);
 	m_pointShadowFarPlanes.fill(1.0f);

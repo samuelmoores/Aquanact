@@ -19,6 +19,7 @@
 #include "Engine/Core/SpawnManager.h"
 #include "Game/AIController.h"
 #include "Game/PlayerAttack.h"
+#include "Game/PlayerCombat.h"
 
 #include <fstream>
 #include <algorithm>
@@ -615,6 +616,7 @@ void SceneManager::ApplyProjectState(
 						{
 							if (pendingComponent.triggerRadius >= 0.0f) trigger->SetRadius(pendingComponent.triggerRadius);
 							trigger->SetEnabled(pendingComponent.triggerEnabled);
+							trigger->SetPositionOffset(pendingComponent.triggerPositionOffset);
 						}
 						if (auto* hitbox = dynamic_cast<Hitbox*>(component.get()))
 						{
@@ -640,6 +642,13 @@ void SceneManager::ApplyProjectState(
 							attack->SetDrawAttackInstance(pendingComponent.attackDrawInstance);
 							attack->SetAttackTargetInstanceName(pendingComponent.attackTargetInstanceName);
 							attack->SetAttackTargetBoneName(pendingComponent.attackTargetBoneName);
+						}
+						if (auto* combat = dynamic_cast<PlayerCombat*>(component.get()))
+						{
+							combat->SetProjectileName(pendingComponent.combatProjectileName);
+							combat->SetSpawnBoneName(pendingComponent.combatSpawnBoneName);
+							combat->SetProjectileSpawnFrame(pendingComponent.combatProjectileSpawnFrame);
+							combat->SetLaunchDirection(pendingComponent.combatLaunchDirection);
 						}
 						if (auto* particles = dynamic_cast<ParticleSystem*>(component.get()))
 						{

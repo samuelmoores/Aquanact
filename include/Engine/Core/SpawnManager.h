@@ -19,6 +19,9 @@ struct InstanceDefinition
 {
 	std::string name;
 	std::string modelPath;
+	bool triggerVolume = false;
+	float triggerRadius = 90.0f;
+	glm::vec3 triggerPositionOffset{0.0f};
 	// Resolved against the destination scene when an instance is spawned.
 	// Names are used instead of pointers because definitions outlive scenes.
 	std::string attachToEntityName;
@@ -27,6 +30,7 @@ struct InstanceDefinition
 	bool ignoreCameraCollision = false;
 	bool blocksCameraView = true;
 	bool showPhysicsBoundingBox = false;
+	bool rigidBody = false;
 	int physicsColliderShape = 0;
 	bool hasEntityStateMachineConfiguration = false;
 	std::string entityStateMachineInitialState;

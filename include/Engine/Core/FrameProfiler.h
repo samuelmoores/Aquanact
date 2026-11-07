@@ -27,6 +27,9 @@ public:
 		FrameProfiler* m_profiler = nullptr;
 		const char* m_name = nullptr;
 		std::chrono::steady_clock::time_point m_start;
+		Scope* m_parent = nullptr;
+		double m_childMilliseconds = 0.0;
+		static thread_local Scope* s_currentScope;
 	};
 
 	void BeginFrame();

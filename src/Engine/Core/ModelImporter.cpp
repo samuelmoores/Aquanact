@@ -168,50 +168,12 @@ ImportedModel ModelImporter::Import(const std::string& path, bool flipUvs, bool 
 	model.vertices = std::move(vertices);
 	model.faces = std::move(faces);
 
-	const auto animDir = std::filesystem::path(path).parent_path() / "animations";
-	const std::string modelStem = ToLower(std::filesystem::path(path).stem().string());
-	if (loadAnimations && std::filesystem::exists(animDir) && std::filesystem::is_directory(animDir))
+	if (loadAnimations)
 	{
-		for (const auto& entry : std::filesystem::recursive_directory_iterator(animDir))
-		{
-			if (!entry.is_regular_file())
-			{
-				continue;
-			}
-
-			std::string ext = ToLower(entry.path().extension().string());
-			static const std::vector<std::string> modelExts = { ".fbx", ".obj", ".gltf", ".glb", ".dae" };
-			if (std::find(modelExts.begin(), modelExts.end(), ext) == modelExts.end())
-			{
-				continue;
-			}
-
-			const std::string animationStem = ToLower(entry.path().stem().string());
-			const std::string animationPrefix = modelStem + "_";
-			const bool isLegacySalvadoreHurt = modelStem == "drsalvador" && animationStem == "drsalvadore_hurt";
-			if (animationStem != modelStem && animationStem.rfind(animationPrefix, 0) != 0 && !isLegacySalvadoreHurt)
-			{
-				continue;
-			}
-
-			std::string animPath = entry.path().string();
-			auto animImporter = std::make_unique<Assimp::Importer>();
-			const aiScene* animScene = animImporter->ReadFile(animPath, aiProcess_Triangulate);
-			if (!animScene)
-			{
-				continue;
-			}
-
-			for (unsigned int i = 0; i < animScene->mNumAnimations; ++i)
-			{
-				model.animations.push_back(animScene->mAnimations[i]);
-				// Use the imported file name as the stable animation identity. The
-				// state-machine editor should show the authored clip file, not an
-				// embedded FBX animation name or an absolute source path.
-				model.animationSources.push_back(entry.path().filename().string());
-			}
-			model.animImporters.push_back(std::move(animImporter));
-		}
+		ImportedAnimationSet animationSet = ImportAnimations(path);
+		model.animImporters = std::move(animationSet.importers);
+		model.animations = std::move(animationSet.animations);
+		model.animationSources = std::move(animationSet.sources);
 	}
 
 	const glm::vec3 minInit{ FLT_MAX };
@@ -231,5 +193,52 @@ ImportedModel ModelImporter::Import(const std::string& path, bool flipUvs, bool 
 	model.meshMaxBounds = model.maxBounds;
 	model.sourcePath = path;
 	return model;
+}
+
+ImportedAnimationSet ModelImporter::ImportAnimations(const std::string& modelPath) const
+{
+	ImportedAnimationSet result;
+	const std::filesystem::path animationDirectory =
+		std::filesystem::path(modelPath).parent_path() / "animations";
+	if (!std::filesystem::exists(animationDirectory) || !std::filesystem::is_directory(animationDirectory))
+		return result;
+
+	const std::string modelStem = ToLower(std::filesystem::path(modelPath).stem().string());
+	static const std::vector<std::string> modelExtensions = { ".fbx", ".obj", ".gltf", ".glb", ".dae" };
+	std::vector<std::filesystem::path> animationFiles;
+	for (const auto& entry : std::filesystem::recursive_directory_iterator(animationDirectory))
+	{
+		if (!entry.is_regular_file())
+			continue;
+
+		const std::string extension = ToLower(entry.path().extension().string());
+		if (std::find(modelExtensions.begin(), modelExtensions.end(), extension) == modelExtensions.end())
+			continue;
+
+		const std::string animationStem = ToLower(entry.path().stem().string());
+		const std::string animationPrefix = modelStem + "_";
+		const bool isLegacySalvadoreHurt = modelStem == "drsalvador" && animationStem == "drsalvadore_hurt";
+		if (animationStem != modelStem && animationStem.rfind(animationPrefix, 0) != 0 && !isLegacySalvadoreHurt)
+			continue;
+		animationFiles.push_back(entry.path());
+	}
+	std::sort(animationFiles.begin(), animationFiles.end());
+
+	for (const std::filesystem::path& animationFile : animationFiles)
+	{
+		auto animationImporter = std::make_unique<Assimp::Importer>();
+		const aiScene* animationScene = animationImporter->ReadFile(animationFile.string(), aiProcess_Triangulate);
+		if (!animationScene)
+			continue;
+
+		for (unsigned int index = 0; index < animationScene->mNumAnimations; ++index)
+		{
+			result.animations.push_back(animationScene->mAnimations[index]);
+			// Use the authored file name as the stable identity shown in the editor.
+			result.sources.push_back(animationFile.filename().string());
+		}
+		result.importers.push_back(std::move(animationImporter));
+	}
+	return result;
 }
 

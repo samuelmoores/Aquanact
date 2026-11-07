@@ -5,9 +5,11 @@
 #include "Engine/Core/Entity.h"
 #include "Engine/Core/EntityStateMachine.h"
 #include "Engine/Core/ParticleSystem.h"
+#include "Engine/Core/TriggerSphere.h"
 #include "Game/AIController.h"
 #include "Game/AttackSphere.h"
 #include "Game/Health.h"
+#include "Game/GameManager.h"
 #include "Game/PlayerAttack.h"
 #include "Game/PlayerCombat.h"
 #include "Game/PlayerController.h"
@@ -25,6 +27,10 @@ void RegisterGameComponents()
 	{
 		return std::make_unique<ParticleSystem>();
 	});
+	ComponentFactory::Instance().Register("TriggerSphere", [](Entity&) -> std::unique_ptr<Component>
+	{
+		return std::make_unique<TriggerSphere>();
+	});
 	ComponentFactory::Instance().Register("Controller", [](Entity&) -> std::unique_ptr<Component>
 	{
 		return std::make_unique<Controller>();
@@ -40,6 +46,10 @@ void RegisterGameComponents()
 	ComponentFactory::Instance().Register("Health", [](Entity&) -> std::unique_ptr<Component>
 	{
 		return std::make_unique<Health>();
+	});
+	ComponentFactory::Instance().Register("GameManager", [](Entity&) -> std::unique_ptr<Component>
+	{
+		return std::make_unique<GameManager>();
 	});
 	ComponentFactory::Instance().Register("PlayerAttack", [](Entity&) -> std::unique_ptr<Component>
 	{

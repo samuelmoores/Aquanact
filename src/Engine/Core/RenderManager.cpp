@@ -985,13 +985,6 @@ void RenderManager::Loop(FrontEndManager& frontEndManager, FileManager& fileMana
 		selectedEntityId = frontEndManager.SelectedEditorEntityId();
 		Flush(ActiveCamera(), selectedEntityId);
 	}
-	const bool showingMainMenu =
-		ShouldPreviewMainMenu(frontEndManager, engineState) ||
-		(SceneManager.ActiveLevel() && SceneManager.IsMainMenuScene(SceneManager.ActiveLevel()->Name())) ||
-		(!engineState.IsEditorMode() && Root::Current().Gameplay().State() == GameplayManager::GameState::MainMenu);
-	if (showingMainMenu)
-		m_device.DrawMainMenuBackground();
-
 	{
 		FrameProfiler::Scope scope(Root::Current().Profiler(), "Frontend");
 		DrawFrame(frontEndManager, fileManager, SceneManager, projectManager, debug, input, engineState);

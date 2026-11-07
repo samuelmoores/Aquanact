@@ -219,7 +219,8 @@ namespace ProjectStateFormat {
 					: object->GetPhysicsColliderShape() == PhysicsColliderShape::Convex ? 2 : 0;
 				contents += std::to_string(colliderShape) + ";";
 				contents += object->BlocksCameraView() ? "1;" : "0;";
-				contents += EscapeField(object->Name()) + "\n";
+				contents += EscapeField(object->Name()) + ";";
+				contents += object->IsRigidBody() ? "1\n" : "0\n";
 			}
 			for (const auto& collider : Scene->LevelColliders())
 			{

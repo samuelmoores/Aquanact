@@ -25,6 +25,7 @@ struct EngineGuiWindowState
 	bool showSceneWindow = true;
 	bool showLevelColliderWindow = false;
 	bool showEntityWindow = false;
+	bool showGameManagerWindow = false;
 	bool showLightingWindow = false;
 	bool showFileExplorer = false;
 	bool showInputMapWindow = false;

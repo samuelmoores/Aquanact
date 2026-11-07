@@ -82,7 +82,8 @@ void SceneWindow::DrawNewLevelPopup(SceneManager& sceneManager, bool& requested)
 void SceneWindow::Draw(
 	const EngineGuiFrameContext& context,
 	bool& open,
-	bool& entityWindowOpen) const
+	bool& entityWindowOpen,
+	bool& gameManagerWindowOpen) const
 {
 	if (!context.sceneManager || !context.selection)
 		return;
@@ -95,9 +96,28 @@ void SceneWindow::Draw(
 		if (activeScene)
 		{
 			const std::vector<std::unique_ptr<Entity>>& objects = activeScene->Objects();
+			Entity* gameManagerEntity = nullptr;
+			for (const auto& object : objects)
+				if (object && object->GetComponentByName("GameManager"))
+				{
+					gameManagerEntity = object.get();
+					break;
+				}
+			if (gameManagerEntity && ImGui::Selectable("GameManager##SceneManagerEntry", gameManagerWindowOpen))
+			{
+				gameManagerWindowOpen = true;
+				entityWindowOpen = false;
+				selectedEntityId = 0;
+				context.selection->pointLightIndex = -1;
+				context.selection->levelColliderIndex = -1;
+			}
+			ImGui::Separator();
+			bool hasSceneObject = false;
 			for (std::size_t i = 0; i < objects.size(); ++i)
 			{
 				const std::unique_ptr<Entity>& object = objects[i];
+				if (object && object->GetComponentByName("GameManager")) continue;
+				hasSceneObject = true;
 				const std::string label = object ? object->Name() : "<null>";
 				const std::string visibleLabel = label.empty() ? "<unnamed>" : label;
 				const std::string selectableId = visibleLabel + "##LevelObject" + std::to_string(i);
@@ -105,10 +125,12 @@ void SceneWindow::Draw(
 				{
 					selectedEntityId = object ? object->Id() : 0;
 					context.selection->levelColliderIndex = -1;
+					gameManagerWindowOpen = false;
+					context.selection->pointLightIndex = -1;
 					entityWindowOpen = true;
 				}
 			}
-			if (objects.empty())
+			if (!hasSceneObject)
 			{
 				ImGui::TextUnformatted("No entities in this Scene.");
 			}

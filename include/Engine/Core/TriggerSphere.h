@@ -2,6 +2,7 @@
 
 #include "Engine/Core/Component.h"
 
+#include <glm/glm.hpp>
 #include <unordered_set>
 
 class Entity;
@@ -14,6 +15,9 @@ public:
 
 	void SetRadius(float radius);
 	float Radius() const { return m_radius; }
+	const glm::vec3& PositionOffset() const { return m_positionOffset; }
+	void SetPositionOffset(const glm::vec3& offset) { m_positionOffset = offset; }
+	glm::vec3 WorldPosition(Entity& owner) const;
 
 	void SetEnabled(bool enabled) { m_enabled = enabled; }
 	bool Enabled() const { return m_enabled; }
@@ -26,6 +30,7 @@ public:
 
 private:
 	float m_radius = 90.0f;
+	glm::vec3 m_positionOffset{0.0f};
 	bool m_enabled = true;
 	std::unordered_set<Entity*> m_overlapping;
 };

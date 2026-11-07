@@ -605,7 +605,7 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 					m_triggerSpheres.emplace(object.get(), new Line(MakeWireSphereVertices(glm::vec3(1.0f, 0.45f, 0.1f))));
 				Line* sphere = m_triggerSpheres[object.get()];
 				sphere->UpdateProjection(camera.GetProjectionMatrix());
-				sphere->draw(camera.GetViewMatrix(), glm::translate(glm::mat4(1.0f), object->WorldCenterPosition()) * glm::scale(glm::mat4(1.0f), glm::vec3(trigger->Radius())));
+				sphere->draw(camera.GetViewMatrix(), glm::translate(glm::mat4(1.0f), trigger->WorldPosition(*object)) * glm::scale(glm::mat4(1.0f), glm::vec3(trigger->Radius())));
 			}
 		}
 	}

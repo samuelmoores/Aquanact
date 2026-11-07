@@ -92,6 +92,7 @@ class Mesh {
 		int NumAnimations() const;
 		aiAnimation* GetAnimation(int i) const;
 		const std::string& GetAnimationSource(int i) const;
+		bool RefreshAnimationsFromDisk();
 	const aiNode* GetRootNode() const;
 	std::vector<std::string> BoneNames() const;
 	glm::vec3 BonePosition(const std::string& boneName) const;
@@ -135,6 +136,7 @@ class Mesh {
 		Skeleton m_skeleton;
 		std::unique_ptr<Assimp::Importer> m_importer;
 		std::vector<std::unique_ptr<Assimp::Importer>> m_animImporters;
+		std::vector<std::vector<std::unique_ptr<Assimp::Importer>>> m_retiredAnimImporters;
 		const aiScene* m_scene;
 		bool m_skinned;
 		std::vector<int> m_facesSize;

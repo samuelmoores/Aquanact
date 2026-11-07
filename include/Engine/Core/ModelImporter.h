@@ -32,11 +32,18 @@ struct ImportedModel {
 	std::string sourcePath;
 };
 
+struct ImportedAnimationSet {
+	std::vector<std::unique_ptr<Assimp::Importer>> importers;
+	std::vector<aiAnimation*> animations;
+	std::vector<std::string> sources;
+};
+
 class ModelImporter {
 public:
 	ModelImporter() = default;
 
 	ImportedModel Import(const std::string& path, bool flipUvs = true, bool loadAnimations = true) const;
+	ImportedAnimationSet ImportAnimations(const std::string& modelPath) const;
 };
 
 

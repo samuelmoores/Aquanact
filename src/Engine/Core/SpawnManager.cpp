@@ -6,6 +6,7 @@
 #include "Engine/Core/SceneManager.h"
 #include "Engine/Core/ProjectStateSerializer.h"
 #include "Engine/Core/PhysicsWorld.h"
+#include "Engine/Core/TriggerSphere.h"
 
 #include <algorithm>
 #include <cctype>
@@ -61,10 +62,12 @@ namespace
 	{
 	definition.name = entity.Name();
 	definition.modelPath = entity.SourcePath();
+	definition.triggerVolume = entity.SourcePath().empty();
 	definition.blocksCollision = entity.BlocksCollision();
 	definition.ignoreCameraCollision = entity.IgnoreCameraCollision();
 	definition.blocksCameraView = entity.BlocksCameraView();
 	definition.showPhysicsBoundingBox = entity.ShowPhysicsBoundingBox();
+	definition.rigidBody = entity.IsRigidBody();
 	definition.physicsColliderShape = static_cast<int>(entity.GetPhysicsColliderShape());
 	if (entity.Parent())
 		definition.attachToEntityName = entity.Parent()->Name();
@@ -72,6 +75,11 @@ namespace
 		{
 			if (!component) continue;
 			definition.componentTypes.push_back(component->Name());
+			if (const auto* trigger = dynamic_cast<const TriggerSphere*>(component))
+			{
+				definition.triggerRadius = trigger->Radius();
+				definition.triggerPositionOffset = trigger->PositionOffset();
+			}
 			if (const auto* machine = dynamic_cast<const EntityStateMachine*>(component))
 			{
 				definition.hasEntityStateMachineConfiguration = true;
@@ -85,7 +93,7 @@ namespace
 
 bool SpawnManager::CreateInstance(InstanceDefinition definition)
 {
-	if (definition.name.empty() || definition.modelPath.empty()) return false;
+	if (definition.name.empty() || (definition.modelPath.empty() && !definition.triggerVolume)) return false;
 	m_definitions[definition.name] = std::move(definition);
 	return true;
 }
@@ -159,7 +167,7 @@ void SpawnManager::AppendProjectState(std::string& contents, const std::filesyst
 		if (!entity || m_definitions.find(entity->Name()) != m_definitions.end()) continue;
 		InstanceDefinition recovered;
 		RecoverDefinitionFromEntity(recovered, *entity);
-		if (!recovered.name.empty() && !recovered.modelPath.empty())
+		if (!recovered.name.empty() && (!recovered.modelPath.empty() || recovered.triggerVolume))
 			m_definitions[recovered.name] = std::move(recovered);
 	}
 	for (const auto& scene : scenes.Levels())
@@ -172,7 +180,7 @@ void SpawnManager::AppendProjectState(std::string& contents, const std::filesyst
 				continue;
 			InstanceDefinition recovered;
 			RecoverDefinitionFromEntity(recovered, *entity);
-			if (!recovered.name.empty() && !recovered.modelPath.empty())
+			if (!recovered.name.empty() && (!recovered.modelPath.empty() || recovered.triggerVolume))
 				m_definitions[recovered.name] = std::move(recovered);
 		}
 	}
@@ -181,8 +189,8 @@ void SpawnManager::AppendProjectState(std::string& contents, const std::filesyst
 	{
 		const InstanceDefinition& definition = entry.second;
 	contents += "instance;" + ProjectStateSerializer::EscapeField(definition.name);
-		contents += ";" + ProjectStateSerializer::EscapeField(
-			ProjectStateSerializer::MakePortableSourcePath(projectPath, definition.modelPath).string());
+		contents += ";" + ProjectStateSerializer::EscapeField(definition.modelPath.empty() ? std::string{}
+			: ProjectStateSerializer::MakePortableSourcePath(projectPath, definition.modelPath).string());
 		contents += ";attach;" + ProjectStateSerializer::EscapeField(definition.attachToEntityName);
 		contents += ";" + std::to_string(definition.componentTypes.size());
 		for (const std::string& type : definition.componentTypes)
@@ -233,7 +241,24 @@ void SpawnManager::AppendProjectState(std::string& contents, const std::filesyst
 		contents += ";" + std::to_string(definition.ignoreCameraCollision ? 1 : 0);
 		contents += ";" + std::to_string(definition.blocksCameraView ? 1 : 0);
 		contents += ";" + std::to_string(definition.showPhysicsBoundingBox ? 1 : 0);
-		contents += ";" + std::to_string(definition.physicsColliderShape) + "\n";
+		contents += ";" + std::to_string(definition.physicsColliderShape);
+		contents += ";" + std::to_string(definition.rigidBody ? 1 : 0);
+		if (definition.triggerVolume)
+		{
+			contents += ";volume;sphere;" + std::to_string(definition.triggerRadius);
+			contents += ";offset;" + std::to_string(definition.triggerPositionOffset.x);
+			contents += ";" + std::to_string(definition.triggerPositionOffset.y);
+			contents += ";" + std::to_string(definition.triggerPositionOffset.z);
+		}
+		if (std::find(definition.componentTypes.begin(), definition.componentTypes.end(), "TriggerSphere")
+			!= definition.componentTypes.end())
+		{
+			contents += ";triggerconfig;" + std::to_string(definition.triggerRadius);
+			contents += ";" + std::to_string(definition.triggerPositionOffset.x);
+			contents += ";" + std::to_string(definition.triggerPositionOffset.y);
+			contents += ";" + std::to_string(definition.triggerPositionOffset.z);
+		}
+		contents += "\n";
 	}
 }
 
@@ -251,7 +276,9 @@ void SpawnManager::LoadProjectState(const std::filesystem::path& projectPath)
 			std::size_t index = 1;
 			InstanceDefinition definition;
 			definition.name = ProjectStateSerializer::UnescapeField(fields.at(index++));
-			definition.modelPath = ProjectStateSerializer::ResolveSourcePath(projectPath, fields.at(index++)).string();
+			const std::string serializedModelPath = ProjectStateSerializer::UnescapeField(fields.at(index++));
+			definition.modelPath = serializedModelPath.empty() ? std::string{}
+				: ProjectStateSerializer::ResolveSourcePath(projectPath, serializedModelPath).string();
 			// The attach field is optional so projects written before attachment
 			// support remain loadable.
 			if (index < fields.size() && fields[index] == "attach")
@@ -343,8 +370,32 @@ void SpawnManager::LoadProjectState(const std::filesystem::path& projectPath)
 				definition.blocksCameraView = std::stoi(fields.at(index++)) != 0;
 				definition.showPhysicsBoundingBox = std::stoi(fields.at(index++)) != 0;
 				definition.physicsColliderShape = std::stoi(fields.at(index++));
+				if (index < fields.size())
+					definition.rigidBody = std::stoi(fields.at(index++)) != 0;
 			}
-			if (!definition.name.empty() && !definition.modelPath.empty())
+			if (index < fields.size() && fields[index] == "volume")
+			{
+				++index;
+				definition.triggerVolume = true;
+				if (index < fields.size() && fields[index] == "sphere") ++index;
+				if (index < fields.size()) definition.triggerRadius = std::stof(fields.at(index++));
+				if (index < fields.size() && fields[index] == "offset")
+				{
+					++index;
+					definition.triggerPositionOffset.x = std::stof(fields.at(index++));
+					definition.triggerPositionOffset.y = std::stof(fields.at(index++));
+					definition.triggerPositionOffset.z = std::stof(fields.at(index++));
+				}
+			}
+			if (index < fields.size() && fields[index] == "triggerconfig")
+			{
+				++index;
+				definition.triggerRadius = std::stof(fields.at(index++));
+				definition.triggerPositionOffset.x = std::stof(fields.at(index++));
+				definition.triggerPositionOffset.y = std::stof(fields.at(index++));
+				definition.triggerPositionOffset.z = std::stof(fields.at(index++));
+			}
+			if (!definition.name.empty() && (!definition.modelPath.empty() || definition.triggerVolume))
 				m_definitions[definition.name] = std::move(definition);
 		}
 		catch (...)
@@ -371,8 +422,10 @@ Entity* SpawnManager::SpawnInstance(Scene& scene, const std::string& definitionN
 	if (!parent && !definition->second.attachToEntityName.empty())
 		parent = scene.FindObjectByName(definition->second.attachToEntityName);
 
-	auto instance = std::make_unique<Entity>(definition->second.modelPath.c_str(), false);
-	if (!instance->GetMesh())
+	auto instance = definition->second.modelPath.empty()
+		? std::make_unique<Entity>(definition->second.name, false)
+		: std::make_unique<Entity>(definition->second.modelPath.c_str(), false);
+	if (!definition->second.modelPath.empty() && !instance->GetMesh())
 		return nullptr;
 
 	instance->SetName(definition->second.name);
@@ -380,6 +433,7 @@ Entity* SpawnManager::SpawnInstance(Scene& scene, const std::string& definitionN
 	instance->SetIgnoreCameraCollision(definition->second.ignoreCameraCollision);
 	instance->SetBlocksCameraView(definition->second.blocksCameraView);
 	instance->SetShowPhysicsBoundingBox(definition->second.showPhysicsBoundingBox);
+	instance->SetRigidBody(definition->second.rigidBody);
 	instance->SetPhysicsColliderShape(definition->second.physicsColliderShape == 1
 		? PhysicsColliderShape::Capsule
 		: definition->second.physicsColliderShape == 2 ? PhysicsColliderShape::Convex : PhysicsColliderShape::Box);
@@ -402,6 +456,13 @@ Entity* SpawnManager::SpawnInstance(Scene& scene, const std::string& definitionN
 			continue;
 		if (std::unique_ptr<Component> component = ComponentFactory::Instance().Create(componentType, *instance))
 			instance->AddComponent(std::move(component));
+	}
+	if (definition->second.triggerVolume && !instance->GetComponent<TriggerSphere>())
+		instance->AddComponent<TriggerSphere>();
+	if (TriggerSphere* trigger = instance->GetComponent<TriggerSphere>())
+	{
+		trigger->SetRadius(definition->second.triggerRadius);
+		trigger->SetPositionOffset(definition->second.triggerPositionOffset);
 	}
 	if (EntityStateMachine* stateMachine = instance->GetEntityState())
 	{

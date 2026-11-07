@@ -80,7 +80,6 @@ public:
 	std::size_t FrameAllocatorUsedBytes() const;
 	std::size_t FrameAllocatorPeakBytes() const;
 	const OpenGLGraphicsDevice::FrameStats& LastFrameGraphicsStats() const { return m_device.Stats(); }
-	ShaderProgram* MainMenuShader() const { return m_device.MainMenuShader(); }
 	bool SetSplashTexture(const std::string& path);
 
 private:

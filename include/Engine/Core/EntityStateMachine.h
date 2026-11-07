@@ -95,6 +95,7 @@ public:
 
 	// Construction and lifecycle.
 	EntityStateMachine(Mesh* mesh);
+	void ReloadAnimations(Mesh* mesh);
 
 	const char* Name() const override;
 	void startUp(Entity& owner) override;

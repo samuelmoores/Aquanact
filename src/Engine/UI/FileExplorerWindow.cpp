@@ -10,7 +10,16 @@
 
 void FileExplorerWindow::Draw(FileManager& fileManager, bool& open)
 {
-	if (!open) return;
+	if (!open)
+	{
+		m_wasOpen = false;
+		return;
+	}
+	if (!m_wasOpen)
+	{
+		fileManager.Refresh();
+		m_wasOpen = true;
+	}
 
 	EngineGuiWidgets::WindowScope window(
 		"File Explorer",

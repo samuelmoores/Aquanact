@@ -12,6 +12,8 @@
 #include "Engine/Core/FrameProfiler.h"
 #include "Engine/Core/RenderManager.h"
 #include "Engine/Core/InputManager.h"
+#include "Game/GameManager.h"
+#include <algorithm>
 #include <fstream>
 #include <imgui.h>
 #include <sstream>
@@ -124,17 +126,25 @@ namespace {
 				Root::Current().Debugger().LogTagged("ProjectLoad", "Creating object from source: " + pendingObject.sourcePath.string() + " in scene: " + pendingLevel.name);
 				// Project component records are authoritative. Imported models still receive
 				// their default components through Entity's default constructor behavior.
-				std::unique_ptr<Entity> object;
-				if (pendingObject.sourcePath.empty())
+				Entity* object = nullptr;
+				if (pendingObject.sourcePath.empty() && pendingObject.name == "GameManager")
 				{
-					object = std::make_unique<Entity>(
+					Entity* existingManager = Scene->FindObjectByName("GameManager");
+					if (existingManager && existingManager->GetComponent<GameManager>())
+						object = existingManager;
+				}
+				std::unique_ptr<Entity> newObject;
+				if (!object && pendingObject.sourcePath.empty())
+				{
+					newObject = std::make_unique<Entity>(
 						pendingObject.name.empty() ? std::string("Entity") : pendingObject.name,
 						false);
 				}
-				else
+				else if (!object)
 				{
-					object = std::make_unique<Entity>(pendingObject.sourcePath.string().c_str(), false);
+					newObject = std::make_unique<Entity>(pendingObject.sourcePath.string().c_str(), false);
 				}
+				if (!object) object = newObject.get();
 				if (!pendingObject.name.empty() && !pendingObject.sourcePath.empty())
 				{
 					object->SetName(pendingObject.name);
@@ -150,12 +160,14 @@ namespace {
 				object->SetIgnoreCameraCollision(pendingObject.ignoreCameraCollision);
 				object->SetBlocksCameraView(pendingObject.blocksCameraView);
 				object->SetShowPhysicsBoundingBox(pendingObject.showPhysicsBoundingBox);
+				object->SetRigidBody(pendingObject.rigidBody);
 				object->SetPhysicsColliderShape(pendingObject.physicsColliderShape == 1
 					? PhysicsColliderShape::Capsule
 					: pendingObject.physicsColliderShape == 2 ? PhysicsColliderShape::Convex : PhysicsColliderShape::Box);
 				object->SetDefaultPosition(object->Position());
 				object->SetDefaultRotation(object->Rotation());
-				Scene->AddObject(std::move(object));
+				if (newObject)
+					Scene->AddObject(std::move(newObject));
 			}
 			for (const auto& pendingCollider : pendingLevel.levelColliders)
 			{
@@ -172,6 +184,34 @@ namespace {
 				collider->SetDebugVisible(pendingCollider.debugVisible);
 				Scene->AddLevelCollider(std::move(collider));
 			}
+		}
+
+		// Manager entities created for older projects may collide with an entity
+		// ID from the saved project. Preserve valid saved manager IDs, changing only
+		// an actual collision so pending component records still resolve correctly.
+		unsigned int highestEntityId = 0;
+		std::vector<unsigned int> nonManagerIds;
+		for (const auto& scene : SceneManager.Levels())
+		{
+			if (!scene) continue;
+			for (const auto& object : scene->Objects())
+				if (object)
+				{
+					highestEntityId = std::max(highestEntityId, object->Id());
+					if (!object->GetComponent<GameManager>())
+						nonManagerIds.push_back(object->Id());
+				}
+		}
+		for (const auto& scene : SceneManager.Levels())
+		{
+			if (!scene) continue;
+			for (const auto& object : scene->Objects())
+				if (object && object->GetComponent<GameManager>())
+				{
+					if (std::find(nonManagerIds.begin(), nonManagerIds.end(), object->Id()) != nonManagerIds.end())
+						object->SetId(++highestEntityId);
+					nonManagerIds.push_back(object->Id());
+				}
 		}
 	}
 

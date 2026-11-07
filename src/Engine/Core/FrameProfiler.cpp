@@ -2,11 +2,20 @@
 
 #include <algorithm>
 
+thread_local FrameProfiler::Scope* FrameProfiler::Scope::s_currentScope = nullptr;
+
 FrameProfiler::Scope::Scope(FrameProfiler& profiler, const char* name)
 	: m_profiler(profiler.IsEnabled() ? &profiler : nullptr)
 	, m_name(name ? name : "Unnamed")
 	, m_start(std::chrono::steady_clock::now())
 {
+	if (m_profiler)
+	{
+		m_parent = s_currentScope;
+		if (m_parent && m_parent->m_profiler != m_profiler)
+			m_parent = nullptr;
+		s_currentScope = this;
+	}
 }
 
 FrameProfiler::Scope::~Scope()
@@ -17,7 +26,12 @@ FrameProfiler::Scope::~Scope()
 	}
 
 	const auto elapsed = std::chrono::steady_clock::now() - m_start;
-	m_profiler->Record(m_name, std::chrono::duration<double, std::milli>(elapsed).count());
+	const double inclusiveMilliseconds = std::chrono::duration<double, std::milli>(elapsed).count();
+	const double exclusiveMilliseconds = std::max(0.0, inclusiveMilliseconds - m_childMilliseconds);
+	m_profiler->Record(m_name, exclusiveMilliseconds);
+	if (m_parent)
+		m_parent->m_childMilliseconds += inclusiveMilliseconds;
+	s_currentScope = m_parent;
 }
 
 void FrameProfiler::BeginFrame()

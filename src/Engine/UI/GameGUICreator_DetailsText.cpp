@@ -1,4 +1,7 @@
 #include "Engine/UI/GameGUICreator.h"
+#include "Engine/UI/GameGUICreatorHelpers.h"
+#include "Engine/Core/Root.h"
+#include "Engine/Core/SceneManager.h"
 
 #include <imgui.h>
 #include <cstdio>
@@ -27,6 +30,17 @@ void GameGUICreator::DrawTextWidgetDetails(GameGUIAsset& asset, GameGUIWidgetDef
 		SyncRuntimePreview();
 		SaveSelectedRoleGUI();
 	}
+	float textColour[3] = { 0.0f, 0.0f, 0.0f };
+	std::sscanf(widget.textColor.c_str(), "%f %f %f", &textColour[0], &textColour[1], &textColour[2]);
+	if (ImGui::ColorEdit3("Text color", textColour))
+	{
+		char colourValue[96] = {};
+		std::snprintf(colourValue, sizeof(colourValue), "%.3f %.3f %.3f",
+			textColour[0], textColour[1], textColour[2]);
+		widget.textColor = colourValue;
+		SyncRuntimePreview();
+		SaveSelectedRoleGUI();
+	}
 
 	// Treat the stored position as the image center in the editor.
 	int imagePosition[2] = { widget.x + widget.width / 2, widget.y + widget.height / 2 };
@@ -41,6 +55,26 @@ void GameGUICreator::DrawTextWidgetDetails(GameGUIAsset& asset, GameGUIWidgetDef
 	{
 		SyncRuntimePreview();
 		SaveSelectedRoleGUI();
+	}
+
+	ImGui::Separator();
+	ImGui::TextUnformatted("Value binding");
+	Scene* activeLevel = Root::Current().Scenes().ActiveLevel();
+	if (GameGUICreatorHelpers::DrawProgressBindingControls(widget, activeLevel))
+	{
+		SyncRuntimePreview();
+		SaveSelectedRoleGUI();
+	}
+	if (!widget.bindEntity.empty() || !widget.bindComponent.empty() || !widget.bindMember.empty())
+	{
+		if (ImGui::Button("Clear Binding"))
+		{
+			widget.bindEntity.clear();
+			widget.bindComponent.clear();
+			widget.bindMember.clear();
+			SyncRuntimePreview();
+			SaveSelectedRoleGUI();
+		}
 	}
 
 }

@@ -6,6 +6,7 @@
 #include "Engine/Core/Controller.h"
 #include "Engine/Core/Debug.h"
 #include "Engine/Core/Root.h"
+#include "Engine/Core/FrameProfiler.h"
 #include "Engine/Core/ModelImporter.h"
 
 #include <algorithm>
@@ -131,6 +132,16 @@ Entity::~Entity()
 }
 
 Mesh* Entity::GetMesh() { return m_mesh; }
+bool Entity::RefreshAnimationsFromDisk()
+{
+	if (!m_mesh || !m_mesh->RefreshAnimationsFromDisk())
+		return false;
+	if (EntityStateMachine* stateMachine = GetEntityState())
+		stateMachine->ReloadAnimations(m_mesh);
+	if (CutsceneAnimator* cutsceneAnimator = GetCutsceneAnimator())
+		cutsceneAnimator->ReloadAnimations(m_mesh);
+	return true;
+}
 ShaderProgram* Entity::GetShader() { return &m_shader; }
 EntityStateMachine* Entity::GetEntityState() { return GetComponent<EntityStateMachine>(); }
 CutsceneAnimator* Entity::GetCutsceneAnimator() { return GetComponent<CutsceneAnimator>(); }
@@ -221,9 +232,18 @@ void Entity::UpdateComponents(float dt)
 {
 	// Update all components in execution order so components with dependencies
 	// can opt into predictable ordering.
+	FrameProfiler& profiler = Root::Current().Profiler();
 	for (Component* component : OrderedComponents(*this))
 	{
-		component->Update(*this, dt);
+		if (profiler.IsEnabled())
+		{
+			FrameProfiler::Scope componentScope(profiler, component->Name());
+			component->Update(*this, dt);
+		}
+		else
+		{
+			component->Update(*this, dt);
+		}
 	}
 }
 

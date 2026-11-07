@@ -52,6 +52,7 @@ namespace ProjectStateData {
 		std::string componentClassName;
 		float triggerRadius = 90.0f;
 		bool triggerEnabled = true;
+		glm::vec3 triggerPositionOffset{0.0f};
 		int hitboxShape = 3;
 		float hitboxRadius = 25.0f;
 		std::string hitboxBoneName;
@@ -68,6 +69,10 @@ namespace ProjectStateData {
 		bool attackDrawInstance = false;
 		std::string attackTargetInstanceName;
 		std::string attackTargetBoneName;
+		std::string combatProjectileName;
+		std::string combatSpawnBoneName;
+		int combatProjectileSpawnFrame = 0;
+		glm::vec3 combatLaunchDirection{0.0f};
 		float particleEmissionRate = 12.0f;
 		int particleMaxParticles = 128;
 		float particleLifetime = 1.0f;
@@ -171,6 +176,7 @@ namespace ProjectStateData {
 			bool ignoreCameraCollision = false;
 			bool blocksCameraView = true;
 			bool showPhysicsBoundingBox = false;
+			bool rigidBody = false;
 			int physicsColliderShape = 0;
 		};
 		std::vector<PendingObject> objects;

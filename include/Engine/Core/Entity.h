@@ -49,6 +49,7 @@ public:
 	void FirstFrameComponents();
 
 	Mesh* GetMesh();
+	bool RefreshAnimationsFromDisk();
 	ShaderProgram* GetShader();
 	EntityStateMachine* GetEntityState();
 	CutsceneAnimator* GetCutsceneAnimator();
@@ -118,6 +119,19 @@ public:
 	bool BlocksCollision() const { return m_blocksCollision; }
 	void SetBlocksCameraView(bool blocks) { m_blocksCameraView = blocks; }
 	bool BlocksCameraView() const { return m_blocksCameraView; }
+	void SetRigidBody(bool enabled) { m_rigidBody = enabled; if (!enabled) m_linearVelocity = glm::vec3(0.0f); }
+	bool IsRigidBody() const { return m_rigidBody; }
+	const glm::vec3& LinearVelocity() const { return m_linearVelocity; }
+	void SetLinearVelocity(const glm::vec3& velocity) { m_linearVelocity = velocity; }
+	float LinearDamping() const { return m_linearDamping; }
+	void SetLinearDamping(float damping) { m_linearDamping = damping < 0.0f ? 0.0f : damping; }
+	// Launch enables non-controller rigid-body simulation and sets velocity in world units/second.
+	void Launch(const glm::vec3& velocity)
+	{
+		if (GetController()) return;
+		m_rigidBody = true;
+		m_linearVelocity = velocity;
+	}
 	void SetShowPhysicsBoundingBox(bool show) { m_showPhysicsBoundingBox = show; }
 	bool ShowPhysicsBoundingBox() const { return m_showPhysicsBoundingBox; }
 	void SetPhysicsColliderShape(PhysicsColliderShape shape) { m_physicsColliderShape = shape; }
@@ -137,6 +151,9 @@ protected:
 	bool m_blocksCollision = true;
 	bool m_ignoreCameraCollision = false;
 	bool m_blocksCameraView = true;
+	bool m_rigidBody = false;
+	glm::vec3 m_linearVelocity{ 0.0f };
+	float m_linearDamping = 0.0f;
 	bool m_showPhysicsBoundingBox = false;
 	PhysicsColliderShape m_physicsColliderShape = PhysicsColliderShape::Box;
 	std::string m_name;

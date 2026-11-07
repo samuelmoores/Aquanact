@@ -490,21 +490,28 @@ void GameplayManager::Update(float dt, FrontEndManager& frontEndManager, Debug& 
 		Entity* object = activeLevel->Objects()[objectIndex].get();
 		if (object)
 		{
-			if (object->GetController())
+			if (object->GetController() || object->IsRigidBody())
 			{
-				// Only controller entities are currently classified as dynamic. Static
-				// level geometry keeps the bounds captured during scene registration.
+				// Controllers and rigid bodies move during this gameplay pass. Refresh
+				// their bounds before collision queries; static geometry stays cached.
+				FrameProfiler::Scope physicsSyncScope(Root::Current().Profiler(), "Physics Sync");
 				PhysicsWorld::Instance().Update(*object);
 			}
 
-			FrameProfiler::Scope controllerScope(Root::Current().Profiler(), "Controllers");
+			FrameProfiler::Scope controllerScope(Root::Current().Profiler(), "Entity Updates");
 			object->UpdateComponents(dt);
 			if (object->GetController())
 			{
 				// Camera queries run after gameplay. Refresh again after movement so
 				// the followed player and other dynamic blockers use this frame's
 				// transforms instead of the previous frame's cached bounds.
+				FrameProfiler::Scope physicsSyncScope(Root::Current().Profiler(), "Physics Sync");
 				PhysicsWorld::Instance().Update(*object);
+			}
+			else if (object->IsRigidBody())
+			{
+				FrameProfiler::Scope rigidBodyScope(Root::Current().Profiler(), "Rigid Body Simulation");
+				PhysicsWorld::Instance().SimulateRigidBody(*object, dt);
 			}
 			if (EntityStateMachine* animator = object->GetEntityState())
 			{

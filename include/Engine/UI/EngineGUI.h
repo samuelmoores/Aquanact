@@ -5,6 +5,7 @@
 #include "Engine/UI/EngineMenuBar.h"
 #include "Engine/UI/SceneWindow.h"
 #include "Engine/UI/EntityWindow.h"
+#include "Engine/UI/GameManagerWindow.h"
 #include "Engine/UI/EntityStateMachineWindow.h"
 #include "Engine/UI/InputMapWindow.h"
 #include "Engine/UI/CodeCreationWindow.h"
@@ -86,6 +87,7 @@ private:
 	EngineMenuBar m_menuBar;
 	SceneWindow m_sceneWindow;
 	EntityWindow m_entityWindow;
+	GameManagerWindow m_gameManagerWindow;
 	EditorSceneInteraction m_sceneInteraction;
 
 	// Visibility toggles

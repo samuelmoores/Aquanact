@@ -18,9 +18,11 @@
 #include "Game/AIController.h"
 #include "Game/Health.h"
 #include "Game/PlayerAttack.h"
+#include "Game/PlayerCombat.h"
 #include "Game/PlayerController.h"
 
 #include <imgui.h>
+#include <glm/gtc/matrix_transform.hpp>
 #include <cfloat>
 #include <cstdint>
 #include <algorithm>
@@ -189,26 +191,26 @@ void EntityWindow::DrawTransform(Entity& entity) const
 		entity.Translate(glm::vec3(0.0f, 0.0f, z - position.z));
 
 	ImGui::Separator();
-	ImGui::TextUnformatted("Rotation");
+	ImGui::TextUnformatted("Rotation (degrees)");
 	const glm::vec3 defaultRotation = entity.DefaultRotation();
 	ImGui::SameLine();
 	if (ImGui::SmallButton("Reset##Rotation"))
 		entity.SetRotation(defaultRotation);
 	const glm::vec3 rotation = entity.Rotation();
-	float rx = rotation.x;
-	float ry = rotation.y;
-	float rz = rotation.z;
+	float rx = glm::degrees(rotation.x);
+	float ry = glm::degrees(rotation.y);
+	float rz = glm::degrees(rotation.z);
 	ImGui::SetNextItemWidth(55.0f);
 	if (ImGui::DragFloat("X##Rotation", &rx, 0.1f, -360.0f, 360.0f, "%.1f"))
-		entity.SetRotation(glm::vec3(rx, rotation.y, rotation.z));
+		entity.SetRotation(glm::vec3(glm::radians(rx), rotation.y, rotation.z));
 	ImGui::SameLine();
 	ImGui::SetNextItemWidth(55.0f);
 	if (ImGui::DragFloat("Y##Rotation", &ry, 0.1f, -360.0f, 360.0f, "%.1f"))
-		entity.SetRotation(glm::vec3(rotation.x, ry, rotation.z));
+		entity.SetRotation(glm::vec3(rotation.x, glm::radians(ry), rotation.z));
 	ImGui::SameLine();
 	ImGui::SetNextItemWidth(55.0f);
 	if (ImGui::DragFloat("Z##Rotation", &rz, 0.1f, -360.0f, 360.0f, "%.1f"))
-		entity.SetRotation(glm::vec3(rotation.x, rotation.y, rz));
+		entity.SetRotation(glm::vec3(rotation.x, rotation.y, glm::radians(rz)));
 }
 
 void EntityWindow::DrawPhysics(Entity& entity) const
@@ -220,6 +222,21 @@ void EntityWindow::DrawPhysics(Entity& entity) const
 	if (!ImGui::CollapsingHeader("Physics", ImGuiTreeNodeFlags_DefaultOpen))
 	{
 		return;
+	}
+
+	bool rigidBody = entity.IsRigidBody();
+	const bool hasController = entity.GetController() != nullptr;
+	if (hasController)
+		ImGui::BeginDisabled();
+	if (ImGui::Checkbox("Rigid Body", &rigidBody))
+	{
+		entity.SetRigidBody(rigidBody);
+		PhysicsWorld::Instance().Update(entity);
+	}
+	if (hasController)
+	{
+		ImGui::EndDisabled();
+		ImGui::TextDisabled("Controller entities use controller movement and gravity.");
 	}
 
 	const char* colliderShapes[] = { "Box", "Capsule", "Convex" };
@@ -374,6 +391,46 @@ void EntityWindow::DrawComponentControls(Component& component) const
 		ImGui::SameLine();
 		if (ImGui::Button("Restart")) particles->Restart();
 	}
+	else if (PlayerCombat* combat = dynamic_cast<PlayerCombat*>(&component))
+	{
+		const auto& definitions = Root::Current().Spawns().Definitions();
+		const std::string& projectile = combat->ProjectileName();
+		if (ImGui::BeginCombo("Projectile", projectile.empty() ? "None" : projectile.c_str()))
+		{
+			if (ImGui::Selectable("None", projectile.empty())) combat->SetProjectileName({});
+			for (const auto& entry : definitions)
+			{
+				const bool selected = projectile == entry.first;
+				if (ImGui::Selectable(entry.first.c_str(), selected)) combat->SetProjectileName(entry.first);
+				if (selected) ImGui::SetItemDefaultFocus();
+			}
+			ImGui::EndCombo();
+		}
+		Entity* owner = combat->Owner();
+		const std::vector<std::string> bones = owner && owner->GetMesh()
+			? owner->GetMesh()->BoneNames() : std::vector<std::string>{};
+		const char* preview = combat->SpawnBoneName().empty() ? "Entity origin" : combat->SpawnBoneName().c_str();
+		if (ImGui::BeginCombo("Spawn Bone", preview))
+		{
+			if (ImGui::Selectable("Entity origin", combat->SpawnBoneName().empty())) combat->SetSpawnBoneName({});
+			for (const std::string& bone : bones)
+			{
+				const bool selected = combat->SpawnBoneName() == bone;
+				if (ImGui::Selectable(bone.c_str(), selected)) combat->SetSpawnBoneName(bone);
+				if (selected) ImGui::SetItemDefaultFocus();
+			}
+			ImGui::EndCombo();
+		}
+		if (bones.empty()) ImGui::TextDisabled("No skeletal bones available; using entity origin.");
+		int spawnFrame = combat->ProjectileSpawnFrame();
+		if (ImGui::InputInt("Projectile Spawn Frame", &spawnFrame))
+			combat->SetProjectileSpawnFrame(std::max(0, spawnFrame));
+		ImGui::TextDisabled("Maya timeline frames at 24 fps; 0 spawns immediately.");
+		glm::vec3 launchDirection = combat->LaunchDirection();
+		if (ImGui::DragFloat3("Launch Direction Add", &launchDirection.x, 0.01f, -10.0f, 10.0f, "%.2f"))
+			combat->SetLaunchDirection(launchDirection);
+		ImGui::TextDisabled("Added to the forward/upward launch vector; Y adjusts the arc height.");
+	}
 	else if (PlayerAttack* attack = dynamic_cast<PlayerAttack*>(&component))
 	{
 		const auto& definitions = Root::Current().Spawns().Definitions();
@@ -500,6 +557,9 @@ void EntityWindow::DrawComponentControls(Component& component) const
 		float radius = trigger->Radius();
 		ImGui::SetNextItemWidth(140.0f);
 		if (ImGui::DragFloat("Radius", &radius, 0.1f, 0.0f, 10000.0f, "%.2f")) trigger->SetRadius(radius);
+		glm::vec3 positionOffset = trigger->PositionOffset();
+		if (ImGui::DragFloat3("Position Offset", &positionOffset.x, 0.1f, -10000.0f, 10000.0f, "%.2f"))
+			trigger->SetPositionOffset(positionOffset);
 		bool enabled = trigger->Enabled();
 		if (ImGui::Checkbox("Enabled", &enabled)) trigger->SetEnabled(enabled);
 		bool debugDraw = Root::Current().Debugger().ShowTriggerSpheres();

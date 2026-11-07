@@ -42,9 +42,7 @@ public:
 	void ConfigureDefaultState();
 	// Called immediately before GUI submission so overlays do not inherit scene GL state.
 	void ConfigureGuiState();
-	void DrawMainMenuBackground();
 	bool SetSplashTexture(const std::string& path);
-	ShaderProgram* MainMenuShader() const { return m_balatroShader.get(); }
 	void RenderShadowMaps(const RenderCommand* commands, std::size_t commandCount, const LightingManager& lightingManager);
 
 	void Draw(const RenderCommand& command, const Camera& camera, const LightingManager& lightingManager) override;
@@ -69,7 +67,6 @@ private:
 	std::unique_ptr<class ShaderProgram> m_pointShadowShader;
 	std::unique_ptr<class ShaderProgram> m_selectionOutlineShader;
 	std::unique_ptr<class ShaderProgram> m_particleShader;
-	std::unique_ptr<class ShaderProgram> m_balatroShader;
 	Window* m_window = nullptr;
 	uint32_t m_shadowFramebuffer = 0;
 	uint32_t m_shadowDepthTexture = 0;
@@ -91,7 +88,6 @@ private:
 	int32_t m_particleSplashBrightnessUniform = -1;
 	int32_t m_particleSplashOpacityUniform = -1;
 	uint32_t m_particleSplashTexture = 0;
-	uint32_t m_balatroVao = 0;
 	FrameStats m_frameStats;
 };
 

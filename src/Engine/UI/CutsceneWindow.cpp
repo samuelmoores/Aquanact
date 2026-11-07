@@ -99,9 +99,12 @@ void CutsceneWindow::Draw(SceneManager& scenes, ProjectManager& projects, bool& 
 {
 	if (!open)
 	{
+		m_wasOpen = false;
 		if (Root::HasCurrent()) Root::Current().SetCutscenePreviewCamera(false);
 		return;
 	}
+	const bool justOpened = !m_wasOpen;
+	m_wasOpen = true;
 
 	Scene* scene = scenes.ActiveLevel();
 	if (!scene || scenes.SceneKindFor(scene->Name()) != SceneManager::SceneKind::Cutscene)
@@ -110,6 +113,14 @@ void CutsceneWindow::Draw(SceneManager& scenes, ProjectManager& projects, bool& 
 		return;
 	}
 	EnsureCutsceneAnimators(*scene);
+	if (justOpened)
+	{
+		for (const auto& object : scene->Objects())
+		{
+			if (object)
+				object->RefreshAnimationsFromDisk();
+		}
+	}
 	Root::Current().SetCutscenePreviewCamera(!m_engineCamera);
 
 	if (m_time > scene->Cutscene().duration)

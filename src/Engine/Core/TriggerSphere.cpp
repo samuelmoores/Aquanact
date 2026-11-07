@@ -10,6 +10,13 @@ void TriggerSphere::startUp(Entity& owner)
 	(void)owner;
 }
 
+glm::vec3 TriggerSphere::WorldPosition(Entity& owner) const
+{
+	const glm::vec3 worldOffset = glm::vec3(owner.BuildModelMatrix()
+		* glm::vec4(m_positionOffset, 0.0f));
+	return owner.WorldCenterPosition() + worldOffset;
+}
+
 void TriggerSphere::Update(Entity& owner, float deltaTime)
 {
 	// A disabled trigger should not retain stale occupants. If it is enabled
@@ -23,7 +30,7 @@ void TriggerSphere::Update(Entity& owner, float deltaTime)
 	// Query the physics world rather than duplicating collider overlap math here.
 	// The owner is excluded so a trigger never enters itself.
 	const std::vector<Entity*> current = PhysicsWorld::Instance().QuerySphere(
-		owner.WorldCenterPosition(), m_radius, &owner);
+		WorldPosition(owner), m_radius, &owner);
 
 	// Convert the query result to a set so membership checks are constant-time
 	// and each entity can produce at most one enter callback per update.

@@ -34,6 +34,8 @@ namespace
 
 void EntityStateMachineWindow::Open(EntityStateMachine& machine)
 {
+	if (Entity* owner = machine.Owner())
+		owner->RefreshAnimationsFromDisk();
 	m_machine = &machine;
 	m_openRequested = true;
 	m_popupOpenRequested = true;

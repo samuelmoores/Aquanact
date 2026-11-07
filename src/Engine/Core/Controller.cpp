@@ -5,6 +5,7 @@
 #include "Engine/Core/Root.h"
 #include "Engine/Core/Physics.h"
 #include "Engine/Core/PhysicsWorld.h"
+#include "Engine/Core/FrameProfiler.h"
 
 #include <algorithm>
 #include <cmath>
@@ -138,6 +139,7 @@ void Controller::Move(Entity& owner, const glm::vec2& direction, float dt)
 
 void Controller::MoveWithCollisions(Entity& owner, const glm::vec3& desiredMovement, float dt)
 {
+	FrameProfiler::Scope movementScope(Root::Current().Profiler(), "Controller Movement");
 	if (dt <= 0.0f || glm::length(desiredMovement) <= 0.0001f)
 	{
 		return;

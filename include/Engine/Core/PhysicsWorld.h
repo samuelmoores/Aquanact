@@ -92,6 +92,7 @@ public:
 	// Refreshes an entity's cached collider state when it has moved or changed
 	// shape. This overload keeps callers from managing temporary handles.
 	void Update(Entity& entity);
+	void SimulateRigidBody(Entity& entity, float dt);
 
 	// Refreshes the entity's cached bounds and shape without changing its handle.
 	// Invalid or no-longer-collidable entities are disabled in world storage.

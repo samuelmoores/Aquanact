@@ -172,6 +172,7 @@ std::filesystem::path EngineMenuBar::DrawStartupProjectWindow(const EngineGuiFra
 	}
 
 	std::vector<std::filesystem::directory_entry> explorerEntries;
+	std::vector<std::filesystem::path> projectFiles;
 	std::error_code error;
 	if (IsValidProjectDirectory(g_projectExplorerDirectory))
 	{
@@ -182,6 +183,21 @@ std::filesystem::path EngineMenuBar::DrawStartupProjectWindow(const EngineGuiFra
 				break;
 			}
 			explorerEntries.push_back(entry);
+		}
+		error.clear();
+		for (std::filesystem::recursive_directory_iterator it(
+			g_projectExplorerDirectory,
+			std::filesystem::directory_options::skip_permission_denied,
+			error), end;
+			it != end; it.increment(error))
+		{
+			if (error)
+			{
+				break;
+			}
+			if (it->is_regular_file(error) && it->path().extension() == ".aqua")
+				projectFiles.push_back(it->path());
+			error.clear();
 		}
 	}
 	std::sort(explorerEntries.begin(), explorerEntries.end(),
@@ -203,28 +219,30 @@ std::filesystem::path EngineMenuBar::DrawStartupProjectWindow(const EngineGuiFra
 		{
 			const std::filesystem::path entryPath = entry.path();
 			const bool isDirectory = entry.is_directory(error);
-			const bool isProject = !isDirectory && entryPath.extension() == ".aqua";
-			if (!isDirectory && !isProject) continue;
-			const std::string label = (isDirectory ? "[Folder] " : "[Project] ") +
-				entryPath.filename().string() + "##" + entryPath.generic_string();
-			const bool selected = isDirectory
-				? entryPath == g_projectExplorerSelectedDirectory
-				: entryPath == g_selectedProjectPath;
+			if (!isDirectory) continue;
+			const std::string label = "[Folder] " + entryPath.filename().string() +
+				"##" + entryPath.generic_string();
+			const bool selected = entryPath == g_projectExplorerSelectedDirectory;
 			if (ImGui::Selectable(label.c_str(), selected))
 			{
-				if (isDirectory)
-				{
-					g_projectExplorerSelectedDirectory = entryPath;
-				}
-				else
-				{
-					g_selectedProjectPath = entryPath;
-					SetProjectPathInput(entryPath);
-				}
+				g_projectExplorerSelectedDirectory = entryPath;
 			}
-			if (isDirectory && selected && ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+			if (selected && ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
 			{
 				SetProjectExplorerDirectory(entryPath);
+			}
+		}
+		std::sort(projectFiles.begin(), projectFiles.end());
+		for (const auto& projectFile : projectFiles)
+		{
+			const std::filesystem::path relativePath = projectFile.lexically_relative(g_projectExplorerDirectory);
+			const std::string label = "[Project] " + relativePath.generic_string() +
+				"##" + projectFile.generic_string();
+			const bool selected = projectFile == g_selectedProjectPath;
+			if (ImGui::Selectable(label.c_str(), selected))
+			{
+				g_selectedProjectPath = projectFile;
+				SetProjectPathInput(projectFile);
 			}
 		}
 	}
@@ -442,7 +460,11 @@ bool EngineMenuBar::DrawNewProjectDialog(
 		std::string name(g_newProjectName);
 		const bool validName = !name.empty() &&
 			name.find_first_of("\\/:*?\"<>|") == std::string::npos;
-		const std::filesystem::path projectPath = projectManager.ProjectsRoot() / name / "project.aqua";
+		const std::filesystem::path projectDirectory = IsValidProjectDirectory(g_projectExplorerDirectory)
+			? g_projectExplorerDirectory
+			: projectManager.ProjectsRoot();
+		const std::filesystem::path projectPath = projectDirectory / name / "project.aqua";
+		ImGui::Text("Location: %s", projectDirectory.string().c_str());
 		const bool alreadyExists = validName && std::filesystem::exists(projectPath);
 
 		if (alreadyExists)

@@ -31,6 +31,26 @@ namespace
 
 CutsceneAnimator::CutsceneAnimator(Mesh* mesh)
 {
+	ReloadAnimations(mesh);
+}
+
+void CutsceneAnimator::ReloadAnimations(Mesh* mesh)
+{
+	std::string activeAnimation;
+	float activeSeconds = 0.0f;
+	if (m_animator)
+	{
+		const int activeClip = m_animator->CurrentClipIndex();
+		if (activeClip >= 0 && activeClip < static_cast<int>(m_animationNames.size()))
+		{
+			activeAnimation = m_animationNames[static_cast<std::size_t>(activeClip)];
+			const float ticksPerSecond = m_animator->CurrentClipTicksPerSecond();
+			if (ticksPerSecond > 0.0f)
+				activeSeconds = m_animator->CurrentTimeTicks() / ticksPerSecond;
+		}
+	}
+	m_animationNames.clear();
+	m_animator.reset();
 	if (!mesh || !mesh->Skinned())
 	{
 		return;
@@ -42,6 +62,9 @@ CutsceneAnimator::CutsceneAnimator(Mesh* mesh)
 		m_animator->AddClip(new Animation(mesh->GetAnimation(index)));
 		m_animationNames.push_back(mesh->GetAnimationSource(index));
 	}
+	const int activeClip = FindAnimationIndex(activeAnimation);
+	if (activeClip >= 0)
+		m_animator->EvaluateClipAt(activeClip, activeSeconds, true);
 }
 
 int CutsceneAnimator::FindAnimationIndex(const std::string& animationName) const

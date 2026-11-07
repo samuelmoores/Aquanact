@@ -322,8 +322,11 @@ void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManage
 
 	if (m_windowState.showSceneWindow)
 	{
-		m_sceneWindow.Draw(context, m_windowState.showSceneWindow, m_windowState.showEntityWindow);
+		m_sceneWindow.Draw(context, m_windowState.showSceneWindow, m_windowState.showEntityWindow,
+			m_windowState.showGameManagerWindow);
 	}
+	if (m_windowState.showGameManagerWindow)
+		m_gameManagerWindow.Draw(SceneManager.ActiveLevel(), m_windowState.showGameManagerWindow);
 	if (m_windowState.showLevelColliderWindow)
 		m_sceneWindow.DrawLevelColliderWindow(context, m_windowState.showLevelColliderWindow);
 

@@ -34,13 +34,18 @@ private:
 	std::vector<std::filesystem::path> m_models;
 	std::vector<std::string> m_modelLabels;
 	bool m_modelsLoaded = false;
+	bool m_wasOpen = false;
 	int m_selectedModel = -1;
+	bool m_triggerVolume = false;
+	float m_triggerRadius = 90.0f;
+	glm::vec3 m_triggerPositionOffset{0.0f};
 	std::string m_attachToEntityName;
 	std::vector<std::string> m_componentTypes;
 	bool m_blocksCollision = true;
 	bool m_ignoreCameraCollision = false;
 	bool m_blocksCameraView = true;
 	bool m_showPhysicsBoundingBox = false;
+	bool m_rigidBody = false;
 	int m_physicsColliderShape = 0;
 	std::string m_editingDefinitionName;
 	EntityWindow m_entityWindow;

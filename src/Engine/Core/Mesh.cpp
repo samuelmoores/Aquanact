@@ -517,6 +517,25 @@ const std::string& Mesh::GetAnimationSource(int i) const
 	return m_animationSources[i];
 }
 
+bool Mesh::RefreshAnimationsFromDisk()
+{
+	if (m_sourcePath.empty())
+		return false;
+
+	ImportedAnimationSet refreshed = ModelImporter().ImportAnimations(m_sourcePath);
+	if (refreshed.sources == m_animationSources)
+		return false;
+
+	// Existing Animator instances refer to Assimp-owned animation data. Keep the
+	// old importers alive until the owning entity rebuilds its animation components.
+	if (!m_animImporters.empty())
+		m_retiredAnimImporters.push_back(std::move(m_animImporters));
+	m_animImporters = std::move(refreshed.importers);
+	m_animations = std::move(refreshed.animations);
+	m_animationSources = std::move(refreshed.sources);
+	return true;
+}
+
 const aiNode* Mesh::GetRootNode() const
 {
 	return m_scene ? m_scene->mRootNode : nullptr;

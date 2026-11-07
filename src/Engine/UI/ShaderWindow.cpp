@@ -5,7 +5,6 @@
 #include "Engine/Core/Scene.h"
 #include "Engine/Core/SceneManager.h"
 #include "Engine/Core/ShaderProgram.h"
-#include "Engine/Core/RenderManager.h"
 
 #include <imgui.h>
 #include <filesystem>
@@ -21,30 +20,6 @@ namespace
 		return std::filesystem::current_path() / "shaders";
 	}
 
-	glm::vec4 DefaultValue(const std::string& shader, const std::string& uniform)
-	{
-		if (shader != "balatro.frag") return glm::vec4(0.0f);
-		if (uniform == "SPIN_ROTATION") return glm::vec4(-2.0f, 0.0f, 0.0f, 0.0f);
-		if (uniform == "SPIN_SPEED") return glm::vec4(7.0f, 0.0f, 0.0f, 0.0f);
-		if (uniform == "COLOUR_1") return glm::vec4(0.871f, 0.267f, 0.231f, 1.0f);
-		if (uniform == "COLOUR_2") return glm::vec4(0.0f, 0.42f, 0.706f, 1.0f);
-		if (uniform == "COLOUR_3") return glm::vec4(0.086f, 0.137f, 0.145f, 1.0f);
-		if (uniform == "CONTRAST") return glm::vec4(3.5f, 0.0f, 0.0f, 0.0f);
-		if (uniform == "LIGTHING") return glm::vec4(0.4f, 0.0f, 0.0f, 0.0f);
-		if (uniform == "SPIN_AMOUNT") return glm::vec4(0.25f, 0.0f, 0.0f, 0.0f);
-		if (uniform == "PIXEL_FILTER") return glm::vec4(745.0f, 0.0f, 0.0f, 0.0f);
-		if (uniform == "SPIN_EASE") return glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
-		if (uniform == "SHAPE_SCALE") return glm::vec4(30.0f, 0.0f, 0.0f, 0.0f);
-		if (uniform == "RADIAL_TWIST") return glm::vec4(20.0f, 0.0f, 0.0f, 0.0f);
-		if (uniform == "WARP_STRENGTH") return glm::vec4(0.5f, 0.0f, 0.0f, 0.0f);
-		if (uniform == "WARP_FREQUENCY") return glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
-		if (uniform == "WARP_ITERATIONS") return glm::vec4(5.0f, 0.0f, 0.0f, 0.0f);
-		if (uniform == "BAND_WIDTH") return glm::vec4(5.0f, 0.0f, 0.0f, 0.0f);
-		if (uniform == "LIGHTING_THRESHOLD") return glm::vec4(4.0f, 0.0f, 0.0f, 0.0f);
-		if (uniform == "BACKGROUND_BLEND") return glm::vec4(0.3f, 0.0f, 0.0f, 0.0f);
-		if (uniform == "LOOP_TIME") return glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
-		return glm::vec4(0.0f);
-	}
 }
 
 void ShaderWindow::ReloadShaders()
@@ -130,9 +105,7 @@ void ShaderWindow::Draw(SceneManager&, unsigned int selectedEntityId, bool& open
 	if (ImGui::Button("Reset to defaults"))
 	{
 		ShaderProgram* resetShader = nullptr;
-		if (m_selectedShader == "balatro.frag")
-			resetShader = Root::Current().Render().MainMenuShader();
-		else if (Scene* scene = Root::Current().Scenes().ActiveLevel())
+		if (Scene* scene = Root::Current().Scenes().ActiveLevel())
 		{
 			for (const auto& object : scene->Objects())
 				if (object && object->Id() == selectedEntityId) { resetShader = object->GetShader(); break; }
@@ -150,9 +123,7 @@ void ShaderWindow::Draw(SceneManager&, unsigned int selectedEntityId, bool& open
 	if (m_uniforms.empty()) ImGui::TextUnformatted("No supported uniforms found.");
 
 	ShaderProgram* shader = nullptr;
-	if (m_selectedShader == "balatro.frag")
-		shader = Root::Current().Render().MainMenuShader();
-	else if (Scene* scene = Root::Current().Scenes().ActiveLevel())
+	if (Scene* scene = Root::Current().Scenes().ActiveLevel())
 	{
 		for (const auto& object : scene->Objects())
 			if (object && object->Id() == selectedEntityId) { shader = object->GetShader(); break; }
@@ -163,7 +134,7 @@ void ShaderWindow::Draw(SceneManager&, unsigned int selectedEntityId, bool& open
 		const std::string valueKey = m_selectedShader + ":" + uniform.name;
 		auto valueIt = m_values.find(valueKey);
 		if (valueIt == m_values.end())
-			valueIt = m_values.emplace(valueKey, DefaultValue(m_selectedShader, uniform.name)).first;
+			valueIt = m_values.emplace(valueKey, glm::vec4(0.0f)).first;
 		glm::vec4& storedValue = valueIt->second;
 		if (!shader) { ImGui::Text("%s %s (select a matching target)", uniform.type.c_str(), uniform.name.c_str()); continue; }
 		if (uniform.type == "float")

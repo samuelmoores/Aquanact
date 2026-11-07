@@ -47,6 +47,26 @@ namespace
 
 EntityStateMachine::EntityStateMachine(Mesh* mesh)
 {
+	ReloadAnimations(mesh);
+}
+
+void EntityStateMachine::ReloadAnimations(Mesh* mesh)
+{
+	std::string activeAnimation;
+	float activeSeconds = 0.0f;
+	if (m_animator)
+	{
+		const int activeClip = m_animator->CurrentClipIndex();
+		if (activeClip >= 0 && activeClip < static_cast<int>(m_animationNames.size()))
+		{
+			activeAnimation = m_animationNames[static_cast<std::size_t>(activeClip)];
+			const float ticksPerSecond = m_animator->CurrentClipTicksPerSecond();
+			if (ticksPerSecond > 0.0f)
+				activeSeconds = m_animator->CurrentTimeTicks() / ticksPerSecond;
+		}
+	}
+	m_animationNames.clear();
+	m_animator.reset();
 	if (!mesh)
 	{
 		return;
@@ -57,6 +77,21 @@ EntityStateMachine::EntityStateMachine(Mesh* mesh)
 	{
 		m_animator->AddClip(new Animation(mesh->GetAnimation(i)));
 		m_animationNames.push_back(mesh->GetAnimationSource(i));
+	}
+
+	int activeClip = FindAnimationIndex(activeAnimation);
+	if (activeClip < 0)
+	{
+		if (const State* state = FindCurrentState())
+			activeClip = ResolveAnimationClipIndex(*state);
+	}
+	if (activeClip >= 0)
+	{
+		bool loop = true;
+		if (const State* state = FindCurrentState())
+			loop = state->loop;
+		m_animator->SetLooping(loop);
+		m_animator->EvaluateClipAt(activeClip, activeSeconds, loop);
 	}
 }
 

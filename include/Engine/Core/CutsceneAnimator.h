@@ -14,6 +14,7 @@ class CutsceneAnimator final : public Component
 {
 public:
 	explicit CutsceneAnimator(Mesh* mesh);
+	void ReloadAnimations(Mesh* mesh);
 
 	const char* Name() const override { return "CutsceneAnimator"; }
 	Animator* GetAnimator() { return m_animator.get(); }

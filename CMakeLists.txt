@@ -73,6 +73,7 @@ set(SOURCES
     "include/Engine/UI/EngineGUI.h" "src/Engine/UI/EngineGUI.cpp"
     "include/Engine/UI/EngineMenuBar.h" "src/Engine/UI/EngineMenuBar.cpp"
     "include/Engine/UI/SceneWindow.h" "src/Engine/UI/SceneWindow.cpp"
+    "include/Engine/UI/GameManagerWindow.h" "src/Engine/UI/GameManagerWindow.cpp"
     "include/Engine/UI/EditorSceneInteraction.h" "src/Engine/UI/EditorSceneInteraction.cpp"
     "include/Engine/UI/EntityWindow.h" "src/Engine/UI/EntityWindow.cpp"
     "include/Engine/UI/InputMapWindow.h" "src/Engine/UI/InputMapWindow.cpp"

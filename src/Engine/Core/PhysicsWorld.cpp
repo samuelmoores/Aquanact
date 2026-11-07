@@ -2,6 +2,8 @@
 
 #include "Engine/Core/Scene.h"
 #include "Engine/Core/LevelCollider.h"
+#include "Engine/Core/FrameProfiler.h"
+#include "Engine/Core/Root.h"
 
 #include <algorithm>
 #include <cmath>
@@ -240,6 +242,14 @@ namespace
 			}
 		}
 
+		// A bounded 3D convex volume needs at least four distinct face planes.
+		// Treat degenerate/open meshes as unavailable so callers can use their
+		// existing AABB fallback instead of sweeping against an unbounded shape.
+		if (planes.size() < 4)
+		{
+			return {};
+		}
+
 		return planes;
 	}
 
@@ -280,7 +290,7 @@ namespace
 		}
 		case PhysicsColliderShape::Convex:
 		{
-			std::vector<Physics::ConvexPlane> planes = BuildConvexPlanes(collider);
+			std::vector<Physics::ConvexPlane> planes = collider.convexPlanes;
 			if (planes.empty())
 			{
 				return Physics::GetSphereAABBSweep(
@@ -319,8 +329,7 @@ namespace
 		}
 		case PhysicsColliderShape::Convex:
 		{
-			const std::vector<Physics::ConvexPlane> planes =
-				BuildConvexPlanes(collider);
+			const std::vector<Physics::ConvexPlane>& planes = collider.convexPlanes;
 			if (planes.empty())
 			{
 				return Physics::SphereAABBOverlap(
@@ -583,6 +592,7 @@ Physics::SweepCollision PhysicsWorld::Sweep(
 	const glm::vec3& movement,
 	Entity** hitEntity) const
 {
+	FrameProfiler::Scope sweepScope(Root::Current().Profiler(), "Physics Sweep");
 	// This method discovers a contact; the caller remains responsible for
 	// applying movement and resolving the resulting slide.
 	if (hitEntity)
@@ -662,31 +672,44 @@ Physics::SweepCollision PhysicsWorld::Sweep(
 		{
 			// Convex candidates are represented by their outward-facing planes.
 			// Build those planes from the candidate's world-space mesh geometry.
-			std::vector<Physics::ConvexPlane> planes = BuildConvexPlanes(candidate);
-
-			// The convex sweep receives a point moving through expanded planes. The
-			// point is the moving shape's center, while its support distance is added
-			// to each plane below to account for the shape's size.
-			const glm::vec3 movingCenter = useCapsule
-				? (capsuleBase + capsuleTip) * 0.5f
-				: (minBounds + maxBounds) * 0.5f;
-			const glm::vec3 movingHalfExtents = (maxBounds - minBounds) * 0.5f;
-			const float capsuleHalfLength = useCapsule ? moving.capsuleHalfLength : 0.0f;
-
-			// Expand every plane by the moving shape's support distance. Capsules
-			// use radius plus axial length; boxes use projected half-extents.
-			for (Physics::ConvexPlane& plane : planes)
+			std::vector<Physics::ConvexPlane> planes = candidate.convexPlanes;
+			if (planes.empty())
 			{
-				const float support = useCapsule
-					? moving.capsuleRadius + capsuleHalfLength * std::abs(plane.normal.y)
-					: glm::dot(glm::abs(plane.normal), movingHalfExtents);
-
-				plane.distance += support;
+				hit = useCapsule
+					? Physics::GetCapsuleAABBSweep(
+						capsuleBase, capsuleTip, moving.capsuleRadius, movement,
+						candidate.minBounds, candidate.maxBounds)
+					: Physics::GetAABBSweep(
+						minBounds, maxBounds, movement,
+						candidate.minBounds, candidate.maxBounds);
 			}
+			else
+			{
 
-			// Sweep the center through the expanded convex volume. The result uses
-			// the same normalized time interval as the box and capsule sweeps.
-			hit = Physics::GetConvexSweep(planes, movingCenter, movement);
+				// The convex sweep receives a point moving through expanded planes.
+				// The point is the moving shape's center, while its support distance
+				// accounts for the moving shape's size.
+				const glm::vec3 movingCenter = useCapsule
+					? (capsuleBase + capsuleTip) * 0.5f
+					: (minBounds + maxBounds) * 0.5f;
+				const glm::vec3 movingHalfExtents = (maxBounds - minBounds) * 0.5f;
+				const float capsuleHalfLength = useCapsule ? moving.capsuleHalfLength : 0.0f;
+
+				// Expand every plane by the moving shape's support distance. Capsules
+				// use radius plus axial length; boxes use projected half-extents.
+				for (Physics::ConvexPlane& plane : planes)
+				{
+					const float support = useCapsule
+						? moving.capsuleRadius + capsuleHalfLength * std::abs(plane.normal.y)
+						: glm::dot(glm::abs(plane.normal), movingHalfExtents);
+
+					plane.distance += support;
+				}
+
+				// Sweep the center through the expanded convex volume. The result uses
+				// the same normalized time interval as the box and capsule sweeps.
+				hit = Physics::GetConvexSweep(planes, movingCenter, movement);
+			}
 		}
 		else if (useCapsule && candidate.shape == PhysicsColliderShape::Capsule)
 		{
@@ -851,9 +874,9 @@ bool PhysicsWorld::OverlapsCamera(
 
 std::vector<Entity*> PhysicsWorld::QuerySphere(const glm::vec3& center, float radius, const Entity* ignoredEntity) const
 {
-	// Return non-owning entity pointers for every enabled collider whose cached
-	// world AABB overlaps the query sphere. The caller must not retain these
-	// pointers beyond the owning scene's lifetime.
+	// Return non-owning entity pointers for every enabled collider whose shape
+	// overlaps the query sphere. The caller must not retain these pointers beyond
+	// the owning scene's lifetime.
 	std::vector<Entity*> result;
 	const float safeRadius = std::max(radius, 0.0f);
 
@@ -863,9 +886,16 @@ std::vector<Entity*> PhysicsWorld::QuerySphere(const glm::vec3& center, float ra
 		// trigger query.
 		if (!collider.enabled || collider.isHitbox || !collider.owner || collider.owner == ignoredEntity)
 			continue;
+		// Reject distant colliders before invoking shape-specific tests. This is
+		// especially important for convex meshes, whose exact test checks planes.
+		if (!Physics::SphereAABBOverlap(
+			center, safeRadius, collider.minBounds, collider.maxBounds))
+		{
+			continue;
+		}
 
-		// Find the closest point on the collider AABB to the sphere center. The
-		// sphere overlaps when that distance is within the sphere radius.
+		// Use exact sphere tests for spherical colliders and shape-aware overlap
+		// tests for boxes, capsules, and convex meshes.
 		bool overlaps = false;
 		if (collider.shape == PhysicsColliderShape::Sphere && collider.sphereRadius > 0.0f)
 		{
@@ -876,9 +906,7 @@ std::vector<Entity*> PhysicsWorld::QuerySphere(const glm::vec3& center, float ra
 		}
 		else
 		{
-			const glm::vec3 closest = glm::clamp(center, collider.minBounds, collider.maxBounds);
-			const glm::vec3 delta = center - closest;
-			overlaps = glm::dot(delta, delta) <= safeRadius * safeRadius;
+			overlaps = CameraOverlapsCollider(center, safeRadius, collider);
 		}
 
 		if (overlaps)
@@ -927,8 +955,7 @@ std::vector<Entity*> PhysicsWorld::QueryHitbox(ColliderHandle hitboxHandle, cons
 			}
 			else
 			{
-				overlaps = Physics::SphereAABBOverlap(hitboxCenter, hitbox.sphereRadius,
-					candidate.minBounds, candidate.maxBounds);
+				overlaps = CameraOverlapsCollider(hitboxCenter, hitbox.sphereRadius, candidate);
 			}
 		}
 		else
@@ -969,6 +996,8 @@ ColliderHandle PhysicsWorld::Add(Entity& entity)
 	collider.shape = entity.GetPhysicsColliderShape();
 	collider.minBounds = minBounds;
 	collider.maxBounds = maxBounds;
+	if (collider.shape == PhysicsColliderShape::Convex)
+		collider.convexPlanes = BuildConvexPlanes(collider);
 	if (collider.shape == PhysicsColliderShape::Capsule)
 	{
 		glm::vec3 capsuleBase;
@@ -978,7 +1007,7 @@ ColliderHandle PhysicsWorld::Add(Entity& entity)
 		collider.capsuleHalfLength = glm::length(capsuleTip - capsuleBase) * 0.5f;
 		collider.capsuleAxis = glm::vec3(0.0f, 1.0f, 0.0f);
 	}
-	collider.isStatic = entity.GetController() == nullptr;
+	collider.isStatic = entity.GetController() == nullptr && !entity.IsRigidBody();
 
 	m_colliders.push_back(collider);
 	return m_colliders.size() - 1;
@@ -1022,6 +1051,7 @@ bool PhysicsWorld::UpdateHitbox(ColliderHandle handle, Entity& entity, PhysicsCo
 
 void PhysicsWorld::Update(ColliderHandle handle)
 {
+	FrameProfiler::Scope syncScope(Root::Current().Profiler(), "Physics Sync");
 	// Ignore stale handles instead of allowing an invalid index to access the
 	// packed collider storage.
 	if (handle >= m_colliders.size())
@@ -1048,6 +1078,9 @@ void PhysicsWorld::Update(ColliderHandle handle)
 	collider.shape = collider.owner->GetPhysicsColliderShape();
 	collider.minBounds = minBounds;
 	collider.maxBounds = maxBounds;
+	collider.convexPlanes.clear();
+	if (collider.shape == PhysicsColliderShape::Convex)
+		collider.convexPlanes = BuildConvexPlanes(collider);
 	if (collider.shape == PhysicsColliderShape::Capsule)
 	{
 		glm::vec3 capsuleBase;
@@ -1067,6 +1100,76 @@ void PhysicsWorld::Update(Entity& entity)
 	{
 		Update(handle);
 	}
+}
+
+void PhysicsWorld::SimulateRigidBody(Entity& entity, float dt)
+{
+	if (dt <= 0.0f || !entity.IsRigidBody() || entity.GetController())
+		return;
+
+	const ColliderHandle collider = Find(entity);
+	if (collider == InvalidColliderHandle)
+		return;
+
+	glm::vec3 minBounds;
+	glm::vec3 maxBounds;
+	if (!entity.WorldAABB(minBounds, maxBounds))
+		return;
+
+	// Engine assets use centimeters as world units, matching Controller gravity.
+	constexpr float gravity = 981.0f;
+	constexpr float terminalFallSpeed = 5500.0f;
+	constexpr float collisionSkin = 0.1f;
+	constexpr int maxSlideIterations = 4;
+	glm::vec3 velocity = entity.LinearVelocity();
+	velocity.y = std::max(velocity.y - gravity * dt, -terminalFallSpeed);
+	glm::vec3 remainingMovement = velocity * dt;
+	glm::vec3 resolvedMovement(0.0f);
+
+	for (int iteration = 0; iteration < maxSlideIterations; ++iteration)
+	{
+		if (glm::length(remainingMovement) <= 0.0001f)
+			break;
+
+		const Physics::SweepCollision collision = Sweep(
+			collider,
+			minBounds + resolvedMovement,
+			maxBounds + resolvedMovement,
+			remainingMovement);
+		if (!collision.hit)
+		{
+			resolvedMovement += remainingMovement;
+			break;
+		}
+
+		const glm::vec3 normal = glm::normalize(collision.normal);
+		const float hitTime = glm::clamp(collision.time, 0.0f, 1.0f);
+		resolvedMovement += remainingMovement * hitTime;
+		remainingMovement *= 1.0f - hitTime;
+
+		const float velocityIntoSurface = glm::dot(velocity, normal);
+		if (velocityIntoSurface < 0.0f)
+			velocity -= normal * velocityIntoSurface;
+
+		const float movementIntoSurface = glm::dot(remainingMovement, normal);
+		if (movementIntoSurface < 0.0f)
+			remainingMovement -= normal * movementIntoSurface;
+
+		if (normal.y >= 0.65f && velocity.y <= 0.0f)
+			velocity.y = 0.0f;
+		resolvedMovement += normal * collisionSkin;
+	}
+
+	entity.Move(resolvedMovement);
+	// Exponential damping is stable across frame rates. A small rest threshold
+	// prevents residual motion from making a landed body slide forever.
+	const float damping = std::max(0.0f, entity.LinearDamping());
+	if (damping > 0.0f)
+		velocity *= std::exp(-damping * dt);
+	if (glm::length(velocity) < 5.0f)
+		velocity = glm::vec3(0.0f);
+	entity.SetLinearVelocity(velocity);
+	Update(collider);
 }
 
 void PhysicsWorld::Remove(ColliderHandle handle)

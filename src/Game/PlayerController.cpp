@@ -8,6 +8,9 @@
 #include "Engine/Core/InputManager.h"
 #include "Engine/Core/RenderManager.h"
 #include "Engine/Core/MathUtils.h"
+#include "Engine/Core/Scene.h"
+#include "Engine/Core/SceneManager.h"
+#include "Game/GameManager.h"
 
 #include <algorithm>
 #include <cmath>
@@ -112,9 +115,12 @@ void PlayerController::startUp(Entity& owner)
 
 void PlayerController::OnTriggerEnter(Entity& triggerOwner)
 {
-	// Trigger behavior is intentionally empty until gameplay-specific effects
-	// are assigned. The override provides a concrete hook for player triggers.
-	std::cout << "Player Controller entered trigger sphere owned by: " << triggerOwner.Name() << std::endl;
+	Scene* scene = Root::Current().Scenes().ActiveLevel();
+	Entity* managerEntity = scene ? scene->FindObjectByName("GameManager") : nullptr;
+	GameManager* manager = managerEntity ? managerEntity->GetComponent<GameManager>() : nullptr;
+	if (manager)
+		manager->RecordOverlap();
+	(void)triggerOwner;
 }
 
 void PlayerController::FirstFrame(Entity& owner)

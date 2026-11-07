@@ -612,6 +612,7 @@ MyGUI::TextBox* GameGUI::CreateTextWidget(const GameGUIWidgetDef& def, MyGUI::Wi
 	}
 
 	text->setCaption(def.text);
+	text->setTextColour(ParseColour(def.textColor, MyGUI::Colour::Black));
 	if (def.fontSize > 0)
 	{
 		text->setFontHeight(def.fontSize);
