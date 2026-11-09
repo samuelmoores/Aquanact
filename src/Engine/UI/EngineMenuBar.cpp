@@ -33,6 +33,10 @@ namespace
 	char g_projectDirectoryInput[1024] = {};
 	std::filesystem::path g_projectExplorerDirectory;
 	std::filesystem::path g_projectExplorerSelectedDirectory;
+	std::filesystem::path g_startupProjectDeleteDirectory;
+	std::filesystem::path g_startupSelectedProjectFile;
+	bool g_showStartupNewProjectForm = false;
+	bool g_confirmStartupProjectDelete = false;
 	bool g_startupProjectPreferenceApplied = false;
 	bool IsValidProjectPath(const std::filesystem::path& path);
 
@@ -130,19 +134,9 @@ std::filesystem::path EngineMenuBar::DrawStartupProjectWindow(const EngineGuiFra
 	if (!g_startupProjectPreferenceApplied)
 	{
 		g_startupProjectPreferenceApplied = true;
-		const std::filesystem::path savedProject = LoadSavedProjectPath();
-		if (!savedProject.empty())
-		{
-			g_selectedProjectPath = savedProject;
-			SetProjectPathInput(savedProject);
-			SetProjectExplorerDirectory(savedProject.parent_path());
-		}
-	}
-	if (!IsValidProjectDirectory(g_projectExplorerDirectory))
-	{
-		const std::filesystem::path defaultDirectory = projectManager.ProjectsRoot();
-		SetProjectExplorerDirectory(IsValidProjectDirectory(defaultDirectory)
-			? defaultDirectory : std::filesystem::current_path());
+		g_projectExplorerDirectory = std::filesystem::path("C:/projects");
+		g_selectedProjectPath.clear();
+		g_startupSelectedProjectFile.clear();
 	}
 
 	const ImGuiViewport* viewport = ImGui::GetMainViewport();
@@ -154,148 +148,150 @@ std::filesystem::path EngineMenuBar::DrawStartupProjectWindow(const EngineGuiFra
 	ImGui::SetNextWindowSize(ImVec2(620.0f, 520.0f), ImGuiCond_Always);
 	ImGui::Begin("Projects", nullptr,
 		ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
-	ImGui::TextUnformatted("Project directory");
-	if (ImGui::InputText("##StartupProjectDirectory", g_projectDirectoryInput, sizeof(g_projectDirectoryInput)))
-	{
-		// Keep the typed path visible without changing the active directory until
-		// the user confirms it with Use Directory.
-	}
-	ImGui::SameLine();
-	if (ImGui::Button("Use Directory"))
-	{
-		SetProjectExplorerDirectory(std::filesystem::path(g_projectDirectoryInput));
-	}
-	ImGui::SameLine();
-	if (ImGui::Button("Up") && g_projectExplorerDirectory.has_parent_path())
-	{
-		SetProjectExplorerDirectory(g_projectExplorerDirectory.parent_path());
-	}
-
-	std::vector<std::filesystem::directory_entry> explorerEntries;
-	std::vector<std::filesystem::path> projectFiles;
+	std::vector<std::pair<std::filesystem::path, std::filesystem::path>> projectFolders;
 	std::error_code error;
 	if (IsValidProjectDirectory(g_projectExplorerDirectory))
 	{
-		for (const auto& entry : std::filesystem::directory_iterator(g_projectExplorerDirectory, error))
-		{
-			if (error)
-			{
-				break;
-			}
-			explorerEntries.push_back(entry);
-		}
-		error.clear();
-		for (std::filesystem::recursive_directory_iterator it(
+		const auto end = std::filesystem::directory_iterator();
+		for (std::filesystem::directory_iterator it(
 			g_projectExplorerDirectory,
 			std::filesystem::directory_options::skip_permission_denied,
-			error), end;
-			it != end; it.increment(error))
+			error);
+			!error && it != end;
+			it.increment(error))
 		{
-			if (error)
+			const std::filesystem::directory_entry& entry = *it;
+			if (!entry.is_directory(error))
 			{
-				break;
+				error.clear();
+				continue;
 			}
-			if (it->is_regular_file(error) && it->path().extension() == ".aqua")
-				projectFiles.push_back(it->path());
+			const std::filesystem::path folder = entry.path();
 			error.clear();
+			std::filesystem::path projectFile;
+			for (std::filesystem::directory_iterator child(folder,
+				std::filesystem::directory_options::skip_permission_denied, error);
+				!error && child != end;
+				child.increment(error))
+			{
+				if (child->is_regular_file(error) && child->path().extension() == ".aqua")
+				{
+					projectFile = child->path();
+					break;
+				}
+				error.clear();
+			}
+			error.clear();
+			if (!projectFile.empty())
+			{
+				projectFolders.emplace_back(folder, projectFile);
+			}
 		}
 	}
-	std::sort(explorerEntries.begin(), explorerEntries.end(),
-		[](const auto& left, const auto& right)
-		{
-			if (left.is_directory() != right.is_directory()) return left.is_directory();
-			return left.path().filename().string() < right.path().filename().string();
-		});
-
-	ImGui::Text("Browsing: %s", g_projectExplorerDirectory.string().c_str());
-	ImGui::BeginChild("StartupProjectFileList", ImVec2(0.0f, 260.0f), true);
-	if (explorerEntries.empty())
+	std::sort(projectFolders.begin(), projectFolders.end(), [](const auto& left, const auto& right)
 	{
-		ImGui::TextDisabled("This directory is empty or unavailable.");
+		return left.first.filename().string() < right.first.filename().string();
+	});
+
+	ImGui::Text("Projects: %s", g_projectExplorerDirectory.string().c_str());
+	ImGui::BeginChild("StartupProjectFileList", ImVec2(0.0f, 300.0f), true);
+	if (projectFolders.empty())
+	{
+		ImGui::TextDisabled("No project folders containing a .aqua file were found.");
 	}
 	else
 	{
-		for (const auto& entry : explorerEntries)
+		for (const auto& project : projectFolders)
 		{
-			const std::filesystem::path entryPath = entry.path();
-			const bool isDirectory = entry.is_directory(error);
-			if (!isDirectory) continue;
-			const std::string label = "[Folder] " + entryPath.filename().string() +
-				"##" + entryPath.generic_string();
-			const bool selected = entryPath == g_projectExplorerSelectedDirectory;
-			if (ImGui::Selectable(label.c_str(), selected))
+			const auto& folder = project.first;
+			ImGui::PushID(folder.generic_string().c_str());
+			if (ImGui::Selectable(folder.filename().string().c_str(), g_startupSelectedProjectFile == project.second))
 			{
-				g_projectExplorerSelectedDirectory = entryPath;
+				g_startupProjectDeleteDirectory = folder;
+				g_startupSelectedProjectFile = project.second;
+				g_selectedProjectPath = project.second;
+				SetProjectPathInput(project.second);
 			}
-			if (selected && ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-			{
-				SetProjectExplorerDirectory(entryPath);
-			}
-		}
-		std::sort(projectFiles.begin(), projectFiles.end());
-		for (const auto& projectFile : projectFiles)
-		{
-			const std::filesystem::path relativePath = projectFile.lexically_relative(g_projectExplorerDirectory);
-			const std::string label = "[Project] " + relativePath.generic_string() +
-				"##" + projectFile.generic_string();
-			const bool selected = projectFile == g_selectedProjectPath;
-			if (ImGui::Selectable(label.c_str(), selected))
-			{
-				g_selectedProjectPath = projectFile;
-				SetProjectPathInput(projectFile);
-			}
+			ImGui::PopID();
 		}
 	}
 	ImGui::EndChild();
-
-	ImGui::Separator();
-	ImGui::TextUnformatted("Project file");
-	if (ImGui::InputText("##StartupProjectPath", g_projectPathInput, sizeof(g_projectPathInput)))
+	const bool hasSelection = !g_startupProjectDeleteDirectory.empty() &&
+		!g_startupSelectedProjectFile.empty();
+	if (hasSelection)
 	{
-		g_selectedProjectPath = std::filesystem::path(g_projectPathInput);
+		if (ImGui::Button("Open Project") && IsValidProjectPath(g_startupSelectedProjectFile))
+		{
+			projectToOpen = g_startupSelectedProjectFile;
+			SaveProjectPath(projectToOpen);
+		}
+		ImGui::SameLine();
+		if (ImGui::Button(g_confirmStartupProjectDelete ? "Confirm Delete" : "Delete Project"))
+		{
+			if (!g_confirmStartupProjectDelete)
+			{
+				g_confirmStartupProjectDelete = true;
+			}
+			else
+			{
+				std::error_code deleteError;
+				std::filesystem::remove_all(g_startupProjectDeleteDirectory, deleteError);
+				if (!deleteError)
+				{
+					g_startupProjectDeleteDirectory.clear();
+					g_startupSelectedProjectFile.clear();
+					g_selectedProjectPath.clear();
+					g_projectPathInput[0] = '\0';
+					g_confirmStartupProjectDelete = false;
+				}
+			}
+		}
+		if (g_confirmStartupProjectDelete)
+		{
+			ImGui::SameLine();
+			if (ImGui::SmallButton("Cancel"))
+			{
+				g_confirmStartupProjectDelete = false;
+			}
+			ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.25f, 1.0f), "Delete this project folder and all its files?");
+		}
 	}
-	if (ImGui::IsItemDeactivatedAfterEdit())
+	if (!g_showStartupNewProjectForm)
 	{
-		g_selectedProjectPath = std::filesystem::path(g_projectPathInput);
+		if (ImGui::Button("New Project"))
+		{
+			std::strncpy(g_newProjectName, "NewProject", sizeof(g_newProjectName));
+			g_newProjectName[sizeof(g_newProjectName) - 1] = '\0';
+			g_showStartupNewProjectForm = true;
+		}
 	}
-	const bool validTypedProject = IsValidProjectPath(g_selectedProjectPath);
-	if (!g_selectedProjectPath.empty() && !validTypedProject)
+	else
 	{
-		ImGui::TextDisabled("Enter the full path to an existing .aqua file.");
-	}
-
-	const bool canLoad = validTypedProject;
-	ImGui::BeginDisabled(!canLoad);
-	if (ImGui::Button("Open Project"))
-	{
-		// Defer the expensive project load until after EngineGUI has presented a
-		// complete boot-image frame. The already-presented image then remains on
-		// screen while the synchronous load is running.
-		projectToOpen = g_selectedProjectPath;
-		SaveProjectPath(projectToOpen);
-		g_selectedProjectPath.clear();
-	}
-	ImGui::EndDisabled();
-	ImGui::SameLine();
-	if (ImGui::Button("New Project"))
-	{
-		std::strncpy(g_newProjectName, "NewProject", sizeof(g_newProjectName));
-		g_newProjectName[sizeof(g_newProjectName) - 1] = '\0';
-		g_openNewProjectPopup = true;
-	}
-	ImGui::SameLine();
-	if (ImGui::Button("Quit") && context.window)
-	{
-		glfwSetWindowShouldClose(context.window->GLFW(), GLFW_TRUE);
+		ImGui::Separator();
+		ImGui::TextUnformatted("New project name");
+		const bool submitted = ImGui::InputText("##StartupNewProjectName", g_newProjectName,
+			sizeof(g_newProjectName), ImGuiInputTextFlags_EnterReturnsTrue);
+		const std::string name(g_newProjectName);
+		const bool validName = !name.empty() && name.find_first_of("\\/:*?\"<>|") == std::string::npos;
+		const std::filesystem::path projectPath = g_projectExplorerDirectory / name / "project.aqua";
+		const bool canCreate = validName && !std::filesystem::exists(projectPath);
+		bool createPressed = false;
+		if (!canCreate) ImGui::BeginDisabled();
+		createPressed = ImGui::Button("Create");
+		if ((submitted || createPressed) && canCreate &&
+			projectManager.CreateNewProject(projectPath, sceneManager))
+		{
+			g_showStartupNewProjectForm = false;
+			g_startupProjectDeleteDirectory = projectPath.parent_path();
+			g_startupSelectedProjectFile = projectPath;
+			g_selectedProjectPath = projectPath;
+			SetProjectPathInput(projectPath);
+		}
+		if (!canCreate) ImGui::EndDisabled();
+		ImGui::SameLine();
+		if (ImGui::Button("Cancel")) g_showStartupNewProjectForm = false;
 	}
 	ImGui::End();
-
-	if (g_openNewProjectPopup)
-	{
-		ImGui::OpenPopup("New Project");
-		g_openNewProjectPopup = false;
-	}
-	(void)DrawNewProjectDialog(sceneManager, projectManager);
 	return projectToOpen;
 }
 

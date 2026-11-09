@@ -85,7 +85,7 @@ float CalculateShadow(vec3 geometricNormal, vec3 lightDirection)
 	}
 
 	float normalAlignment = clamp(dot(geometricNormal, lightDirection), 0.0, 1.0);
-	float bias = max(0.0025 * (1.0 - normalAlignment), 0.00035);
+	float bias = max(0.004 * (1.0 - normalAlignment), 0.0008);
 	vec2 texelSize = 1.0 / vec2(textureSize(shadowMap, 0));
 	float shadow = 0.0;
 	for (int x = -1; x <= 1; ++x)

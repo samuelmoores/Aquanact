@@ -26,7 +26,9 @@
 namespace {
 	constexpr int DirectionalShadowMapResolution = 2048;
 	constexpr int PointShadowMapResolution = 512;
-	constexpr int DirectionalShadowTextureUnit = 3;
+	// Material roughness is bound to unit 3 by Mesh::Bind. Keep the directional
+	// depth map on its own unit so binding a material cannot replace it.
+	constexpr int DirectionalShadowTextureUnit = 12;
 	constexpr int FirstPointShadowTextureUnit = 4;
 	constexpr int SplashTextureUnit = 5;
 	int FirstBuffer(const RenderCommand& command)
@@ -485,10 +487,31 @@ void OpenGLGraphicsDevice::RenderShadowMaps(const RenderCommand* commands, std::
 				? glm::vec3(0.0f, 0.0f, 1.0f)
 				: glm::vec3(0.0f, 1.0f, 0.0f);
 			const glm::mat4 lightView = glm::lookAt(lightPosition, sceneCenter, lightUp);
+			glm::vec3 lightMin(std::numeric_limits<float>::max());
+			glm::vec3 lightMax(std::numeric_limits<float>::lowest());
+			for (int x = 0; x < 2; ++x)
+			{
+				for (int y = 0; y < 2; ++y)
+				{
+					for (int z = 0; z < 2; ++z)
+					{
+						const glm::vec3 worldCorner(
+							x ? maxBounds.x : minBounds.x,
+							y ? maxBounds.y : minBounds.y,
+							z ? maxBounds.z : minBounds.z);
+						const glm::vec3 lightCorner = glm::vec3(lightView * glm::vec4(worldCorner, 1.0f));
+						lightMin = glm::min(lightMin, lightCorner);
+						lightMax = glm::max(lightMax, lightCorner);
+					}
+				}
+			}
+			const float shadowPadding = std::max(std::max(lightMax.x - lightMin.x, lightMax.y - lightMin.y) * 0.02f, 0.5f);
+			const float nearPlane = std::max(0.1f, -lightMax.z - shadowPadding);
+			const float farPlane = std::max(nearPlane + 1.0f, -lightMin.z + shadowPadding);
 			const glm::mat4 lightProjection = glm::ortho(
-				-sceneExtent, sceneExtent,
-				-sceneExtent, sceneExtent,
-				0.1f, sceneExtent * 4.0f);
+				lightMin.x - shadowPadding, lightMax.x + shadowPadding,
+				lightMin.y - shadowPadding, lightMax.y + shadowPadding,
+				nearPlane, farPlane);
 			m_lightSpaceMatrix = lightProjection * lightView;
 
 			glViewport(0, 0, DirectionalShadowMapResolution, DirectionalShadowMapResolution);
