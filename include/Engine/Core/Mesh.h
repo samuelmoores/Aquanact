@@ -33,6 +33,9 @@ struct SubMeshMaterial {
 	glm::vec3 ambientColor;
 	glm::vec3 directionalColor;
 	glm::vec3 directionalLight;
+	glm::vec3 emissiveColor{0.0f};
+	bool emissiveEnabled = false;
+	float emissiveBlendFactor = 0.5f;
 };
 
 class Mesh {
@@ -67,26 +70,35 @@ class Mesh {
 		const Skeleton& GetSkeleton() const;
 		Skeleton* GetSkeletonPtr();
 		const SubMeshMaterial& GetMaterial(int index) const;
+		void SetEmissiveEnabled(int index, bool enabled);
+		void SetEmissiveColor(int index, const glm::vec3& color);
+		void SetEmissiveBlendFactor(int index, float factor);
+		bool CastsShadow(int index) const;
+		void SetCastsShadow(int index, bool enabled);
 		const std::vector<Vertex3D>& Vertices() const { return m_vertices; }
 		const std::vector<uint32_t>& Faces() const { return m_faces; }
 		bool HasColorTexture(int index) const;
 		bool HasSpecularTexture(int index) const;
 		bool HasNormalTexture(int index) const;
 		bool HasRoughnessTexture(int index) const;
+		bool HasHeightTexture(int index) const;
 		bool ColorTextureEnabled(int index) const;
 		bool SpecularTextureEnabled(int index) const;
 		bool NormalTextureEnabled(int index) const;
 		bool RoughnessTextureEnabled(int index) const;
+		bool HeightTextureEnabled(int index) const;
 		void SetColorTextureEnabled(int index, bool enabled);
 		void SetSpecularTextureEnabled(int index, bool enabled);
 		void SetNormalTextureEnabled(int index, bool enabled);
 		void SetRoughnessTextureEnabled(int index, bool enabled);
+		void SetHeightTextureEnabled(int index, bool enabled);
 		uint32_t FacesOffset(int index) const;
 		const glm::vec3& SubMeshMinBounds(int index) const;
 		const glm::vec3& SubMeshMaxBounds(int index) const;
 		void SetAmbientColor(int index, glm::vec3 color);
 		bool Skinned();
 		int NumBuffers() const;
+		const std::string& SubMeshName(int index) const;
 
 		//animation data access (for Animator setup)
 		int NumAnimations() const;
@@ -104,11 +116,13 @@ class Mesh {
 			Diffuse,
 			Specular,
 			Normal,
-			Roughness
+			Roughness,
+			Height
 		};
 
 		void AdoptImportedModel(ImportedModel&& importedModel);
 		void LoadMaterialTextures(aiMaterial* mat, int subMeshIndex);
+		void LoadTexture(aiMaterial* mat, aiTextureType textureType, TextureSlot slot);
 		void LoadTextureFile(TextureSlot slot, const std::filesystem::path& texturePath);
 		void LoadTextureMemory(TextureSlot slot, aiTexture* texture);
 		TextureSlot SlotForTextureType(aiTextureType textureType) const;
@@ -123,10 +137,12 @@ class Mesh {
 		std::vector<uint32_t> m_textureSpecular;
 		std::vector<uint32_t> m_textureNormal;
 		std::vector<uint32_t> m_textureRoughness;
+		std::vector<uint32_t> m_textureHeight;
 		std::vector<bool> m_colorTextureEnabled;
 		std::vector<bool> m_specularTextureEnabled;
 		std::vector<bool> m_normalTextureEnabled;
 		std::vector<bool> m_roughnessTextureEnabled;
+		std::vector<bool> m_heightTextureEnabled;
 		int m_currVao;
 		int m_currTextureColor;
 		glm::vec3 m_minBounds;
@@ -140,6 +156,8 @@ class Mesh {
 		const aiScene* m_scene;
 		bool m_skinned;
 		std::vector<int> m_facesSize;
+		std::vector<bool> m_castsShadow;
+		std::vector<std::string> m_subMeshNames;
 		std::vector<int> m_faceOffsets;
 		std::vector<glm::vec3> m_subMeshMinBounds;
 		std::vector<glm::vec3> m_subMeshMaxBounds;

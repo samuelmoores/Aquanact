@@ -100,6 +100,7 @@ ImportedModel ModelImporter::Import(const std::string& path, bool flipUvs, bool 
 		}
 
 		model.facesSize.push_back(static_cast<int>(mesh->mNumFaces * VERTICES_PER_FACE));
+		model.subMeshNames.emplace_back(mesh->mName.C_Str());
 		model.subMeshMinBounds.push_back(subMeshMin);
 		model.subMeshMaxBounds.push_back(subMeshMax);
 

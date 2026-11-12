@@ -126,42 +126,60 @@ EntityWindowResult EntityWindow::Draw(const EngineGuiFrameContext& context, bool
 
 void EntityWindow::DrawMaterials(Entity& entity) const
 {
-		Mesh* mesh = entity.GetMesh();
-		if (!mesh || !ImGui::CollapsingHeader("Materials", ImGuiTreeNodeFlags_DefaultOpen))
-			return;
+	Mesh* mesh = entity.GetMesh();
+	if (!mesh || !ImGui::CollapsingHeader("Materials", ImGuiTreeNodeFlags_DefaultOpen))
+		return;
 
-		ImGui::Text("Model: %s", entity.SourcePath().empty() ? "Generated mesh" : entity.SourcePath().c_str());
-		for (int index = 0; index < mesh->NumBuffers(); ++index)
+	ImGui::Text("Model: %s", entity.SourcePath().empty() ? "Generated mesh" : entity.SourcePath().c_str());
+	const auto drawSubMesh = [mesh](int index)
+	{
+		ImGui::PushID(index);
+		const SubMeshMaterial& material = mesh->GetMaterial(index);
+		const std::string& sourceName = mesh->SubMeshName(index);
+		const std::string submeshLabel = sourceName.empty()
+			? "Submesh " + std::to_string(index)
+			: sourceName;
+		if (ImGui::TreeNode(submeshLabel.c_str()))
 		{
-			ImGui::PushID(index);
-			const SubMeshMaterial& material = mesh->GetMaterial(index);
-			const std::string submeshLabel = "Submesh " + std::to_string(index);
-			if (ImGui::TreeNode(submeshLabel.c_str()))
+			bool emissiveEnabled = material.emissiveEnabled;
+			if (ImGui::Checkbox("Emissive", &emissiveEnabled))
+				mesh->SetEmissiveEnabled(index, emissiveEnabled);
+			glm::vec3 emissiveColor = material.emissiveColor;
+			if (ImGui::ColorEdit3("Emissive Color", &emissiveColor.x))
+				mesh->SetEmissiveColor(index, emissiveColor);
+			float emissiveBlendFactor = material.emissiveBlendFactor;
+			if (ImGui::SliderFloat("Emissive Blend", &emissiveBlendFactor, 0.0f, 1.0f, "%.2f"))
+				mesh->SetEmissiveBlendFactor(index, emissiveBlendFactor);
+			bool castsShadow = mesh->CastsShadow(index);
+			if (ImGui::Checkbox("Casts Shadow", &castsShadow))
+				mesh->SetCastsShadow(index, castsShadow);
+			ImGui::Text("Specular: %.2f", material.phong.z);
+			ImGui::Text("Shininess: %.2f", material.phong.w);
+			ImGui::TextUnformatted("Textures");
+
+			const auto drawTextureToggle = [&](const char* label, bool enabled, auto setEnabled)
 			{
-				ImGui::Text("Specular: %.2f", material.phong.z);
-				ImGui::Text("Shininess: %.2f", material.phong.w);
-				ImGui::TextUnformatted("Textures");
-
-				const auto drawTextureToggle = [&](const char* label, bool enabled,
-					auto setEnabled)
-				{
-					bool value = enabled;
-					if (ImGui::Checkbox(label, &value))
-						setEnabled(value);
-				};
-
-				drawTextureToggle("Color",
-					mesh->ColorTextureEnabled(index), [&](bool value) { mesh->SetColorTextureEnabled(index, value); });
-				ImGui::SameLine();
-				drawTextureToggle("Roughness",
-					mesh->RoughnessTextureEnabled(index), [&](bool value) { mesh->SetRoughnessTextureEnabled(index, value); });
-				ImGui::SameLine();
-				drawTextureToggle("Normal",
-					mesh->NormalTextureEnabled(index), [&](bool value) { mesh->SetNormalTextureEnabled(index, value); });
-				ImGui::TreePop();
-			}
-			ImGui::PopID();
+				bool value = enabled;
+				if (ImGui::Checkbox(label, &value))
+					setEnabled(value);
+			};
+			drawTextureToggle("Color", mesh->ColorTextureEnabled(index),
+				[mesh, index](bool value) { mesh->SetColorTextureEnabled(index, value); });
+			ImGui::SameLine();
+			drawTextureToggle("Roughness", mesh->RoughnessTextureEnabled(index),
+				[mesh, index](bool value) { mesh->SetRoughnessTextureEnabled(index, value); });
+			ImGui::SameLine();
+			drawTextureToggle("Normal", mesh->NormalTextureEnabled(index),
+				[mesh, index](bool value) { mesh->SetNormalTextureEnabled(index, value); });
+			ImGui::SameLine();
+			drawTextureToggle("Height", mesh->HeightTextureEnabled(index),
+				[mesh, index](bool value) { mesh->SetHeightTextureEnabled(index, value); });
+			ImGui::TreePop();
 		}
+		ImGui::PopID();
+	};
+	for (int index = 0; index < mesh->NumBuffers(); ++index)
+		drawSubMesh(index);
 }
 
 void EntityWindow::DrawTransform(Entity& entity) const

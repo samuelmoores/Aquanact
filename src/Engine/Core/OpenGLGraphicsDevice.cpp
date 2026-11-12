@@ -96,6 +96,8 @@ namespace {
 				: Frustum{};
 			for (int bufferIndex = FirstBuffer(command); bufferIndex < BufferEnd(command); ++bufferIndex)
 			{
+				if (!command.mesh->CastsShadow(bufferIndex))
+					continue;
 				// Animated bind-pose bounds are not conservative, so only static
 				// submeshes participate in shadow-frustum culling.
 				if (lightViewProjection && !command.isSkinned &&
@@ -773,6 +775,7 @@ void OpenGLGraphicsDevice::DrawInternal(const RenderCommand& command, const Came
 	command.shader->setUniform("specularTexture", 1);
 	command.shader->setUniform("normalTexture", 2);
 	command.shader->setUniform("roughnessTexture", 3);
+	command.shader->setUniform("heightTexture", 13);
 	command.shader->setUniform("shadowMap", DirectionalShadowTextureUnit);
 
 	command.shader->setUniform("model", command.modelMatrix);
@@ -820,6 +823,9 @@ void OpenGLGraphicsDevice::DrawInternal(const RenderCommand& command, const Came
 		const SubMeshMaterial& mat = command.mesh->GetMaterial(j);
 		command.shader->setUniform("material", mat.phong);
 		command.shader->setUniform("ambientColor", mat.ambientColor);
+		command.shader->setUniform("emissiveEnabled", mat.emissiveEnabled);
+		command.shader->setUniform("emissiveColor", mat.emissiveColor);
+		command.shader->setUniform("emissiveBlendFactor", mat.emissiveBlendFactor);
 		command.shader->setUniform("hasBaseTexture",
 			command.mesh->HasColorTexture(j) && command.mesh->ColorTextureEnabled(j));
 		command.shader->setUniform("hasSpecularTexture",
@@ -828,6 +834,8 @@ void OpenGLGraphicsDevice::DrawInternal(const RenderCommand& command, const Came
 			command.mesh->HasNormalTexture(j) && command.mesh->NormalTextureEnabled(j));
 		command.shader->setUniform("hasRoughnessTexture",
 			command.mesh->HasRoughnessTexture(j) && command.mesh->RoughnessTextureEnabled(j));
+		command.shader->setUniform("hasHeightTexture",
+			command.mesh->HasHeightTexture(j) && command.mesh->HeightTextureEnabled(j));
 		command.mesh->Bind(j);
 
 		glDrawElements(GL_TRIANGLES, command.mesh->FacesSize(j), GL_UNSIGNED_INT, reinterpret_cast<void*>(static_cast<uintptr_t>(command.mesh->FacesOffset(j) * sizeof(uint32_t))));

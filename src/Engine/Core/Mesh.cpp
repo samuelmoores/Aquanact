@@ -53,6 +53,14 @@ namespace {
 		return textureId;
 	}
 
+	bool IsHeightMapPath(const aiString& texturePath)
+	{
+		std::string filename = std::filesystem::path(texturePath.C_Str()).filename().string();
+		std::transform(filename.begin(), filename.end(), filename.begin(),
+			[](unsigned char character) { return static_cast<char>(std::tolower(character)); });
+		return filename.find("height") != std::string::npos;
+	}
+
 }
 
 Mesh::Mesh()
@@ -135,6 +143,8 @@ void Mesh::AdoptImportedModel(ImportedModel&& importedModel)
 	m_vertices = std::move(importedModel.vertices); // Final imported vertex buffer for GPU upload.
 	m_faces = std::move(importedModel.faces); // Final imported index buffer for GPU upload.
 	m_facesSize = std::move(importedModel.facesSize); // One index-count entry per imported submesh.
+	m_castsShadow.assign(m_facesSize.size(), true);
+	m_subMeshNames = std::move(importedModel.subMeshNames);
 	m_subMeshMinBounds = std::move(importedModel.subMeshMinBounds);
 	m_subMeshMaxBounds = std::move(importedModel.subMeshMaxBounds);
 	m_materials = std::move(importedModel.materials); // Per-submesh material parameters.
@@ -188,6 +198,7 @@ void Mesh::AdoptImportedModel(ImportedModel&& importedModel)
 		m_specularTextureEnabled.assign(m_textureSpecular.size(), true);
 		m_normalTextureEnabled.assign(m_textureNormal.size(), true);
 		m_roughnessTextureEnabled.assign(m_textureRoughness.size(), true);
+		m_heightTextureEnabled.assign(m_textureHeight.size(), true);
 	}
 
 	if (!m_vertices.empty() && !m_faces.empty())
@@ -418,6 +429,35 @@ const SubMeshMaterial& Mesh::GetMaterial(int index) const
 	return m_materials[index];
 }
 
+void Mesh::SetEmissiveEnabled(int index, bool enabled)
+{
+	if (index >= 0 && index < static_cast<int>(m_materials.size()))
+		m_materials[index].emissiveEnabled = enabled;
+}
+
+void Mesh::SetEmissiveColor(int index, const glm::vec3& color)
+{
+	if (index >= 0 && index < static_cast<int>(m_materials.size()))
+		m_materials[index].emissiveColor = glm::max(color, glm::vec3(0.0f));
+}
+
+void Mesh::SetEmissiveBlendFactor(int index, float factor)
+{
+	if (index >= 0 && index < static_cast<int>(m_materials.size()))
+		m_materials[index].emissiveBlendFactor = glm::clamp(factor, 0.0f, 1.0f);
+}
+
+bool Mesh::CastsShadow(int index) const
+{
+	return index >= 0 && index < static_cast<int>(m_castsShadow.size()) && m_castsShadow[index];
+}
+
+void Mesh::SetCastsShadow(int index, bool enabled)
+{
+	if (index >= 0 && index < static_cast<int>(m_castsShadow.size()))
+		m_castsShadow[index] = enabled;
+}
+
 bool Mesh::HasNormalTexture(int index) const
 {
 	return index >= 0 &&
@@ -446,6 +486,11 @@ bool Mesh::HasRoughnessTexture(int index) const
 		m_textureRoughness[index] != 0;
 }
 
+bool Mesh::HasHeightTexture(int index) const
+{
+	return index >= 0 && index < static_cast<int>(m_textureHeight.size()) && m_textureHeight[index] != 0;
+}
+
 namespace
 {
 	bool TextureEnabled(const std::vector<bool>& enabled, int index)
@@ -464,10 +509,12 @@ bool Mesh::ColorTextureEnabled(int index) const { return TextureEnabled(m_colorT
 bool Mesh::SpecularTextureEnabled(int index) const { return TextureEnabled(m_specularTextureEnabled, index); }
 bool Mesh::NormalTextureEnabled(int index) const { return TextureEnabled(m_normalTextureEnabled, index); }
 bool Mesh::RoughnessTextureEnabled(int index) const { return TextureEnabled(m_roughnessTextureEnabled, index); }
+bool Mesh::HeightTextureEnabled(int index) const { return TextureEnabled(m_heightTextureEnabled, index); }
 void Mesh::SetColorTextureEnabled(int index, bool enabled) { SetTextureEnabled(m_colorTextureEnabled, index, enabled); }
 void Mesh::SetSpecularTextureEnabled(int index, bool enabled) { SetTextureEnabled(m_specularTextureEnabled, index, enabled); }
 void Mesh::SetNormalTextureEnabled(int index, bool enabled) { SetTextureEnabled(m_normalTextureEnabled, index, enabled); }
 void Mesh::SetRoughnessTextureEnabled(int index, bool enabled) { SetTextureEnabled(m_roughnessTextureEnabled, index, enabled); }
+void Mesh::SetHeightTextureEnabled(int index, bool enabled) { SetTextureEnabled(m_heightTextureEnabled, index, enabled); }
 
 uint32_t Mesh::FacesOffset(int index) const
 {
@@ -500,6 +547,14 @@ bool Mesh::Skinned()
 int Mesh::NumBuffers() const
 {
 	return static_cast<int>(std::min(m_facesSize.size(), m_materials.size()));
+}
+
+const std::string& Mesh::SubMeshName(int index) const
+{
+	static const std::string emptyName;
+	if (index < 0 || index >= static_cast<int>(m_subMeshNames.size()))
+		return emptyName;
+	return m_subMeshNames[index];
 }
 
 int Mesh::NumAnimations() const
@@ -591,6 +646,8 @@ std::vector<uint32_t>& Mesh::TexturesForSlot(TextureSlot slot)
 		return m_textureNormal;
 	case TextureSlot::Roughness:
 		return m_textureRoughness;
+	case TextureSlot::Height:
+		return m_textureHeight;
 	}
 	return m_textureColor;
 }
@@ -607,6 +664,8 @@ const char* Mesh::TextureSlotName(TextureSlot slot) const
 		return "normal";
 	case TextureSlot::Roughness:
 		return "roughness";
+	case TextureSlot::Height:
+		return "height";
 	}
 	return "unknown";
 }
@@ -655,6 +714,8 @@ Mesh::TextureSlot Mesh::SlotForTextureType(aiTextureType textureType) const
 		return TextureSlot::Specular;
 	if (textureType == aiTextureType_NORMALS || textureType == aiTextureType_NORMAL_CAMERA)
 		return TextureSlot::Normal;
+	if (textureType == aiTextureType_HEIGHT || textureType == aiTextureType_DISPLACEMENT)
+		return TextureSlot::Height;
 	if (textureType == aiTextureType_DIFFUSE_ROUGHNESS || textureType == aiTextureType_UNKNOWN)
 		return TextureSlot::Roughness;
 	return TextureSlot::Diffuse;
@@ -665,10 +726,10 @@ aiReturn Mesh::GetMaterialTexturePath(aiMaterial* mat, aiTextureType textureType
 	aiReturn result = mat->GetTexture(textureType, 0, &texturePath);
 	if (result != AI_SUCCESS && textureType == aiTextureType_DIFFUSE)
 		result = mat->GetTexture(aiTextureType_BASE_COLOR, 0, &texturePath);
+	if (result != AI_SUCCESS && textureType == aiTextureType_HEIGHT)
+		result = mat->GetTexture(aiTextureType_DISPLACEMENT, 0, &texturePath);
 	if (result != AI_SUCCESS && textureType == aiTextureType_NORMALS)
 		result = mat->GetTexture(aiTextureType_NORMAL_CAMERA, 0, &texturePath);
-	if (result != AI_SUCCESS && textureType == aiTextureType_NORMALS)
-		result = mat->GetTexture(aiTextureType_HEIGHT, 0, &texturePath);
 	// glTF stores metallic and roughness together in an UNKNOWN texture slot.
 	if (result != AI_SUCCESS && textureType == aiTextureType_DIFFUSE_ROUGHNESS)
 		result = mat->GetTexture(aiTextureType_UNKNOWN, 0, &texturePath);
@@ -711,6 +772,7 @@ void Mesh::LoadMaterialTextures(aiMaterial* mat, int subMeshIndex)
 		"\" unknown=\"" + texturePath(aiTextureType_UNKNOWN) +
 		"\" shininess=\"" + texturePath(aiTextureType_SHININESS) +
 		"\" normal=\"" + texturePath(aiTextureType_NORMALS) +
+		"\" height=\"" + texturePath(aiTextureType_HEIGHT) +
 		"\" rawSpecularRoughness=\"" + rawRoughnessPath);
 
 	LoadTexture(mat, aiTextureType_DIFFUSE); // Fallback to BASE_COLOR.
@@ -726,7 +788,34 @@ void Mesh::LoadMaterialTextures(aiMaterial* mat, int subMeshIndex)
 	const bool specularSlotIsRoughness = IsFbxSource() && hasSpecular && !hasExplicitRoughness;
 	if (!specularSlotIsRoughness)
 		LoadTexture(mat, aiTextureType_SPECULAR);
-	LoadTexture(mat, aiTextureType_NORMALS); // Fallback to HEIGHT/bump maps.
+	aiString normalPath;
+	aiTextureType normalType = aiTextureType_NORMALS;
+	bool hasNormalPath = mat->GetTexture(normalType, 0, &normalPath) == AI_SUCCESS;
+	if (!hasNormalPath)
+	{
+		normalType = aiTextureType_NORMAL_CAMERA;
+		hasNormalPath = mat->GetTexture(normalType, 0, &normalPath) == AI_SUCCESS;
+	}
+	const bool normalPathIsHeight = hasNormalPath && IsHeightMapPath(normalPath);
+	if (hasNormalPath && !normalPathIsHeight)
+		LoadTexture(mat, normalType, TextureSlot::Normal);
+	else
+		m_textureNormal.push_back(0);
+
+	aiString heightPath;
+	aiTextureType heightType = aiTextureType_HEIGHT;
+	bool hasHeightPath = mat->GetTexture(heightType, 0, &heightPath) == AI_SUCCESS;
+	if (!hasHeightPath)
+	{
+		heightType = aiTextureType_DISPLACEMENT;
+		hasHeightPath = mat->GetTexture(heightType, 0, &heightPath) == AI_SUCCESS;
+	}
+	if (hasHeightPath)
+		LoadTexture(mat, heightType, TextureSlot::Height);
+	else if (normalPathIsHeight)
+		LoadTexture(mat, normalType, TextureSlot::Height);
+	else
+		m_textureHeight.push_back(0);
 	LoadTexture(mat, aiTextureType_DIFFUSE_ROUGHNESS);
 
 	Root::Current().Debugger().LogTagged(
@@ -736,12 +825,17 @@ void Mesh::LoadMaterialTextures(aiMaterial* mat, int subMeshIndex)
 		" loaded(color=" + (HasColorTexture(subMeshIndex) ? "true" : "false") +
 		",specular=" + (HasSpecularTexture(subMeshIndex) ? "true" : "false") +
 		",normal=" + (HasNormalTexture(subMeshIndex) ? "true" : "false") +
+		",height=" + (HasHeightTexture(subMeshIndex) ? "true" : "false") +
 		",roughness=" + (HasRoughnessTexture(subMeshIndex) ? "true" : "false") + ")");
 }
 
 void Mesh::LoadTexture(aiMaterial* mat, aiTextureType textureType)
 {
-	const TextureSlot slot = SlotForTextureType(textureType);
+	LoadTexture(mat, textureType, SlotForTextureType(textureType));
+}
+
+void Mesh::LoadTexture(aiMaterial* mat, aiTextureType textureType, TextureSlot slot)
+{
 	aiString texturePath;
 	const aiReturn result = GetMaterialTexturePath(mat, textureType, texturePath);
 
@@ -811,6 +905,11 @@ void Mesh::Bind(int index)
 	glActiveTexture(GL_TEXTURE3);
 	if (index < static_cast<int>(m_textureRoughness.size()) && m_textureRoughness[index] != 0 && RoughnessTextureEnabled(index))
 		glBindTexture(GL_TEXTURE_2D, m_textureRoughness[index]);
+
+	glActiveTexture(GL_TEXTURE0 + 13);
+	if (index < static_cast<int>(m_textureHeight.size()) && m_textureHeight[index] != 0 && HeightTextureEnabled(index))
+		glBindTexture(GL_TEXTURE_2D, m_textureHeight[index]);
+	glActiveTexture(GL_TEXTURE0);
 }
 
 void Mesh::UnBind()
@@ -819,6 +918,8 @@ void Mesh::UnBind()
 	glActiveTexture(GL_TEXTURE2);
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glActiveTexture(GL_TEXTURE3);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glActiveTexture(GL_TEXTURE0 + 13);
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, 0);
