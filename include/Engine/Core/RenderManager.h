@@ -3,15 +3,13 @@
 #include <chrono>
 #include <memory>
 #include <string>
-#include "Engine/Core/GLHeaders.h"
-
 #include "Engine/Core/FrameAllocator.h"
 #include "Engine/Core/Camera.h"
 #include "Engine/Core/EngineCamera.h"
 #include "Engine/Core/PathedCamera.h"
 #include "Engine/Core/CameraManager.h"
 #include "Engine/Core/RenderCommand.h"
-#include "Engine/Core/OpenGLGraphicsDevice.h"
+#include "Engine/Core/GraphicsDevice.h"
 #include "Engine/Core/LightingManager.h"
 #include "Engine/Core/ProjectStateData.h"
 
@@ -79,7 +77,7 @@ public:
 	std::size_t FrameAllocatorCapacityBytes() const;
 	std::size_t FrameAllocatorUsedBytes() const;
 	std::size_t FrameAllocatorPeakBytes() const;
-	const OpenGLGraphicsDevice::FrameStats& LastFrameGraphicsStats() const { return m_device.Stats(); }
+	const GraphicsDevice::FrameStats& LastFrameGraphicsStats() const { return m_device->Stats(); }
 	bool SetSplashTexture(const std::string& path);
 
 private:
@@ -109,7 +107,7 @@ private:
 	CameraManager m_cameraManager;
 	CameraMode m_cameraMode = CameraMode::ThirdPerson;
 	bool m_cutscenePreviewCamera = false;
-	OpenGLGraphicsDevice m_device;
+	std::unique_ptr<GraphicsDevice> m_device;
 	FrameAllocator m_frameAllocator;
 	RenderCommand* m_commands = nullptr;
 	std::unique_ptr<LightingManager> m_lightingManager = nullptr;

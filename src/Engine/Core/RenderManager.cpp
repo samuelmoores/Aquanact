@@ -106,7 +106,10 @@ void RenderManager::startUp(Window& window)
 	}
 
 	//Graphics Device
-	m_device.startUp(window);
+	// Keep backend selection at this seam so the scene/editor systems depend only
+	// on GraphicsDevice. OpenGL is the initial implementation on every platform.
+	m_device = CreateGraphicsDevice(GraphicsBackend::AQUANACT_GRAPHICS_BACKEND);
+	m_device->startUp(window);
 	m_activeSplashTexturePath = std::filesystem::path("spritesheets/rain splash.png").generic_string();
 
 	//Lighting
@@ -119,7 +122,7 @@ void RenderManager::startUp(Window& window)
 
 bool RenderManager::SetSplashTexture(const std::string& path)
 {
-	if (!m_device.SetSplashTexture(path))
+	if (!m_device->SetSplashTexture(path))
 		return false;
 	m_activeSplashTexturePath = std::filesystem::path(path).lexically_normal().generic_string();
 	return true;
@@ -239,7 +242,8 @@ void RenderManager::shutDown()
 	}
 
 	//Graphics
-	m_device.shutDown();
+	if (m_device)
+		m_device->shutDown();
 	m_activeSplashTexturePath.clear();
 
 	//Camera
@@ -340,15 +344,15 @@ void RenderManager::ApplyCameraMode(const EngineState& engineState)
 
 void RenderManager::BeginFrame()
 {
-	m_device.ConfigureDefaultState();
-	m_device.Clear(0.0f, 0.0f, 0.0f, 0.0f);
-	m_device.BeginFrame();
+	m_device->ConfigureDefaultState();
+	m_device->Clear(0.0f, 0.0f, 0.0f, 0.0f);
+	m_device->BeginFrame();
 }
 
 void RenderManager::PresentFrame(Window& window)
 {
 	(void)window;
-	m_device.EndFrame();
+	m_device->EndFrame();
 }
 
 void RenderManager::UpdateCameraPhase(const Input& input, const EngineState& engineState)
@@ -818,7 +822,7 @@ void RenderManager::Flush(const Camera& camera, unsigned int /*selectedEntityId*
 	}
 
 	const LightingManager& lighting = Lights();
-	m_device.RenderShadowMaps(m_commands, m_commandCount, lighting);
+	m_device->RenderShadowMaps(m_commands, m_commandCount, lighting);
 
 	const Frustum frustum = Frustum::FromViewProjection(
 		camera.GetProjectionMatrix() * camera.GetViewMatrix());
@@ -843,14 +847,14 @@ void RenderManager::Flush(const Camera& camera, unsigned int /*selectedEntityId*
 
 		if (command.isSkinned)
 		{
-			m_device.Draw(command, camera, lighting);
+			m_device->Draw(command, camera, lighting);
 		}
 		else
 		{
 			std::size_t visibleSubMeshes = 0;
 			std::size_t culledSubMeshes = 0;
 
-			m_device.DrawCulled(command, camera, lighting, frustum,
+			m_device->DrawCulled(command, camera, lighting, frustum,
 				visibleSubMeshes, culledSubMeshes);
 
 			m_lastFrameFrustumCulledObjects += culledSubMeshes;
@@ -895,7 +899,7 @@ void RenderManager::Flush(const Camera& camera, unsigned int /*selectedEntityId*
 	m_lastFrameFrustumCulledObjects += culledParticleEmitters;
 	m_lastFrameDrawCallsSaved += culledParticleEmitters;
 	m_lastFrameCommandCount += m_particleCommands.size();
-	m_device.DrawParticles(m_particleCommands.data(), m_particleCommands.size(), camera, lighting);
+	m_device->DrawParticles(m_particleCommands.data(), m_particleCommands.size(), camera, lighting);
 
 	m_commandCount = 0;
 	const auto flushEnd = std::chrono::high_resolution_clock::now();

@@ -5,6 +5,8 @@
   "dependencies": [
     "assimp",
     "glm",
+    "freetype",
+    "imguizmo",
 
     {
       "name": "glfw3",

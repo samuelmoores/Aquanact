@@ -2,9 +2,13 @@
 
 #include <fstream>
 #include <iterator>
+#include <vector>
 
 #ifdef _WIN32
 #include <windows.h>
+#elif defined(__APPLE__)
+#include <cstdint>
+#include <mach-o/dyld.h>
 #endif
 
 std::filesystem::path FileSystem::ExecutableDirectory() const
@@ -26,6 +30,28 @@ std::filesystem::path FileSystem::ExecutableDirectory() const
 			return std::filesystem::path(buffer).parent_path();
 		}
 		buffer.resize(buffer.size() * 2);
+	}
+#elif defined(__APPLE__)
+	std::vector<char> buffer(1024);
+	for (;;)
+	{
+		uint32_t bufferSize = static_cast<uint32_t>(buffer.size());
+		if (_NSGetExecutablePath(buffer.data(), &bufferSize) == 0)
+		{
+			const std::filesystem::path executablePath(buffer.data());
+			std::error_code error;
+			const std::filesystem::path absolutePath = std::filesystem::absolute(executablePath, error);
+			if (!error)
+			{
+				return absolutePath.parent_path();
+			}
+			return executablePath.parent_path();
+		}
+		if (bufferSize <= buffer.size())
+		{
+			break;
+		}
+		buffer.resize(bufferSize);
 	}
 #endif
 	return std::filesystem::current_path();

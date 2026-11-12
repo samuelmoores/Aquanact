@@ -816,6 +816,13 @@ bool EntityStateMachine::RemoveStateSoundEvent(const std::string& stateName, std
 // Transition editing.
 // -----------------------------------------------------------------------------
 
+bool EntityStateMachine::AddTransition(std::string from, std::string to, float blendSeconds,
+	bool waitForCurrentStateComplete)
+{
+	return AddTransition(std::move(from), std::move(to), blendSeconds,
+		waitForCurrentStateComplete, Condition{});
+}
+
 bool EntityStateMachine::AddTransition(std::string from, std::string to, float blendSeconds, bool waitForCurrentStateComplete, Condition condition)
 {
 	std::vector<Condition> conditions{ condition };
@@ -831,6 +838,13 @@ bool EntityStateMachine::AddTransition(std::string from, std::string to, float b
 
 	m_transitions.push_back({ std::move(from), std::move(to), blendSeconds, waitForCurrentStateComplete, conditions.front(), std::move(conditions) });
 	return true;
+}
+
+bool EntityStateMachine::UpdateTransition(std::size_t index, std::string from, std::string to,
+	float blendSeconds, bool waitForCurrentStateComplete)
+{
+	return UpdateTransition(index, std::move(from), std::move(to), blendSeconds,
+		waitForCurrentStateComplete, Condition{});
 }
 
 bool EntityStateMachine::UpdateTransition(std::size_t index, std::string from, std::string to, float blendSeconds, bool waitForCurrentStateComplete, Condition condition)

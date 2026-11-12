@@ -127,9 +127,11 @@ public:
 	bool RemoveStateSoundEvent(const std::string& stateName, std::size_t eventIndex);
 
 	// Transition editing.
-	bool AddTransition(std::string from, std::string to, float blendSeconds, bool waitForCurrentStateComplete, Condition condition = {});
+	bool AddTransition(std::string from, std::string to, float blendSeconds, bool waitForCurrentStateComplete);
+	bool AddTransition(std::string from, std::string to, float blendSeconds, bool waitForCurrentStateComplete, Condition condition);
 	bool AddTransition(std::string from, std::string to, float blendSeconds, bool waitForCurrentStateComplete, std::vector<Condition> conditions);
-	bool UpdateTransition(std::size_t index, std::string from, std::string to, float blendSeconds, bool waitForCurrentStateComplete, Condition condition = {});
+	bool UpdateTransition(std::size_t index, std::string from, std::string to, float blendSeconds, bool waitForCurrentStateComplete);
+	bool UpdateTransition(std::size_t index, std::string from, std::string to, float blendSeconds, bool waitForCurrentStateComplete, Condition condition);
 	bool UpdateTransition(std::size_t index, std::string from, std::string to, float blendSeconds, bool waitForCurrentStateComplete, std::vector<Condition> conditions);
 	bool RemoveTransition(std::size_t index);
 

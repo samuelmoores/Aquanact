@@ -22,6 +22,12 @@ enable_testing()
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(AQUANACT_GRAPHICS_BACKEND "OpenGL" CACHE STRING "Graphics backend implementation")
+set_property(CACHE AQUANACT_GRAPHICS_BACKEND PROPERTY STRINGS OpenGL)
+if (NOT AQUANACT_GRAPHICS_BACKEND STREQUAL "OpenGL")
+    message(FATAL_ERROR "Unsupported graphics backend '${AQUANACT_GRAPHICS_BACKEND}'. Only OpenGL is currently implemented.")
+endif()
+set(AQUANACT_GAME_EXECUTABLE_NAME "AquanactGame${CMAKE_EXECUTABLE_SUFFIX}")
 
 if (MSVC)
     # Match the MSVC runtime used by the vcpkg binaries so debug/release and iterator
@@ -137,8 +143,6 @@ set(SOURCES
     "include/Engine/Core/Root.h" "src/Engine/Core/Root.cpp"
     "include/Engine/Core/RenderManager.h" "src/Engine/Core/RenderManager.cpp"
     "include/Engine/Core/GraphicsDevice.h"
-    "include/Engine/Core/OpenGLGraphicsDevice.h" "src/Engine/Core/OpenGLGraphicsDevice.cpp"
-    "include/Engine/Core/OpenGLGraphics.h" "src/Engine/Core/OpenGLGraphics.cpp"
     "include/Engine/Core/Physics.h" "src/Engine/Core/Physics.cpp"
     "include/Engine/Core/PhysicsCollider.h"
     "include/Engine/Core/PhysicsWorld.h" "src/Engine/Core/PhysicsWorld.cpp"
@@ -152,28 +156,35 @@ set(SOURCES
     "include/Engine/Core/AquanactBuildSystem.h" "src/Engine/Core/AquanactBuildSystem.cpp"
 )
 
-add_executable (AquanactEngine ${SOURCES} ${GAME_SOURCES} "include/Engine/Core/LightingManager.h" "src/Engine/Core/LightingManager.cpp" "src/Engine/UI/GameGUICreator_DetailsProgressBar.cpp")
-target_sources(AquanactEngine PRIVATE "external/imguizmo/src/ImGuizmo.cpp")
+if (AQUANACT_GRAPHICS_BACKEND STREQUAL "OpenGL")
+    set(AQUANACT_GRAPHICS_BACKEND_SOURCES
+        "include/Engine/Core/OpenGLGraphicsDevice.h" "src/Engine/Core/OpenGLGraphicsDevice.cpp"
+        "include/Engine/Core/OpenGLGraphics.h" "src/Engine/Core/OpenGLGraphics.cpp"
+    )
+endif()
+
+add_executable (AquanactEngine ${SOURCES} ${AQUANACT_GRAPHICS_BACKEND_SOURCES} ${GAME_SOURCES} "include/Engine/Core/LightingManager.h" "src/Engine/Core/LightingManager.cpp" "src/Engine/UI/GameGUICreator_DetailsProgressBar.cpp")
 target_compile_definitions(AquanactEngine PRIVATE AQUANACT_EDITOR)
+target_compile_definitions(AquanactEngine PRIVATE AQUANACT_GRAPHICS_BACKEND=${AQUANACT_GRAPHICS_BACKEND})
 target_compile_definitions(AquanactEngine PRIVATE AQUANACT_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
 target_compile_definitions(AquanactEngine PRIVATE MYGUI_STATIC)
 target_compile_definitions(AquanactEngine PRIVATE AQUANACT_VCPKG_TARGET_TRIPLET="${AQUANACT_VCPKG_TARGET_TRIPLET}")
-target_compile_definitions(AquanactEngine PRIVATE AQUANACT_MYGUI_ENGINE_LIBRARY="${MYGUI_ENGINE_LIBRARY_DEBUG}")
-target_compile_definitions(AquanactEngine PRIVATE AQUANACT_MYGUI_OPENGL_LIBRARY="${MYGUI_OPENGL_LIBRARY_DEBUG}")
 target_compile_definitions(AquanactEngine PRIVATE AQUANACT_FREETYPE_LIBRARY="freetype")
+target_compile_definitions(AquanactEngine PRIVATE AQUANACT_GAME_EXECUTABLE_NAME="${AQUANACT_GAME_EXECUTABLE_NAME}")
 target_compile_features(AquanactEngine PRIVATE cxx_std_20)
 
 if (EMSCRIPTEN)
-    add_executable (AquanactGame ${SOURCES} ${GAME_SOURCES} "include/Engine/Core/LightingManager.h" "src/Engine/Core/LightingManager.cpp" "src/Engine/UI/GameGUICreator_DetailsProgressBar.cpp")
+    add_executable (AquanactGame ${SOURCES} ${AQUANACT_GRAPHICS_BACKEND_SOURCES} ${GAME_SOURCES} "include/Engine/Core/LightingManager.h" "src/Engine/Core/LightingManager.cpp" "src/Engine/UI/GameGUICreator_DetailsProgressBar.cpp")
+elseif (WIN32)
+    add_executable (AquanactGame WIN32 ${SOURCES} ${AQUANACT_GRAPHICS_BACKEND_SOURCES} ${GAME_SOURCES} "include/Engine/Core/LightingManager.h" "src/Engine/Core/LightingManager.cpp" "src/Engine/UI/GameGUICreator_DetailsProgressBar.cpp")
 else()
-    add_executable (AquanactGame WIN32 ${SOURCES} ${GAME_SOURCES} "include/Engine/Core/LightingManager.h" "src/Engine/Core/LightingManager.cpp" "src/Engine/UI/GameGUICreator_DetailsProgressBar.cpp")
+    add_executable (AquanactGame ${SOURCES} ${AQUANACT_GRAPHICS_BACKEND_SOURCES} ${GAME_SOURCES} "include/Engine/Core/LightingManager.h" "src/Engine/Core/LightingManager.cpp" "src/Engine/UI/GameGUICreator_DetailsProgressBar.cpp")
 endif()
 target_compile_definitions(AquanactGame PRIVATE AQUANACT_GAME)
+target_compile_definitions(AquanactGame PRIVATE AQUANACT_GRAPHICS_BACKEND=${AQUANACT_GRAPHICS_BACKEND})
 target_compile_definitions(AquanactGame PRIVATE AQUANACT_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
 target_compile_definitions(AquanactGame PRIVATE MYGUI_STATIC)
 target_compile_definitions(AquanactGame PRIVATE AQUANACT_VCPKG_TARGET_TRIPLET="${AQUANACT_VCPKG_TARGET_TRIPLET}")
-target_compile_definitions(AquanactGame PRIVATE AQUANACT_MYGUI_ENGINE_LIBRARY="${MYGUI_ENGINE_LIBRARY_DEBUG}")
-target_compile_definitions(AquanactGame PRIVATE AQUANACT_MYGUI_OPENGL_LIBRARY="${MYGUI_OPENGL_LIBRARY_DEBUG}")
 target_compile_definitions(AquanactGame PRIVATE AQUANACT_FREETYPE_LIBRARY="freetype")
 target_compile_features(AquanactGame PRIVATE cxx_std_20)
 
@@ -205,6 +216,8 @@ add_executable (AquanactBuildTool
     "src/Engine/Core/BuildToolMain.cpp"
     "include/Engine/Core/AquanactBuildSystem.h" "src/Engine/Core/AquanactBuildSystem.cpp")
 target_compile_definitions(AquanactBuildTool PRIVATE AQUANACT_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
+target_compile_definitions(AquanactBuildTool PRIVATE "AQUANACT_DEFAULT_GAME_EXECUTABLE_PATH=\"$<TARGET_FILE:AquanactGame>\"")
+add_dependencies(AquanactBuildTool AquanactGame)
 
 if (MSVC)
     target_link_options(AquanactEngine PRIVATE
@@ -227,8 +240,10 @@ if (MSVC)
     )
 endif()
 
-target_link_libraries(AquanactEngine PRIVATE Psapi)
-target_link_libraries(AquanactGame PRIVATE Psapi)
+if (WIN32)
+    target_link_libraries(AquanactEngine PRIVATE Psapi)
+    target_link_libraries(AquanactGame PRIVATE Psapi)
+endif()
 
 if (NOT EMSCRIPTEN)
     find_package(glfw3 CONFIG REQUIRED)
@@ -239,6 +254,10 @@ endif()
 find_package(assimp CONFIG REQUIRED)
 target_link_libraries(AquanactEngine PRIVATE assimp::assimp)
 target_link_libraries(AquanactGame PRIVATE assimp::assimp)
+
+find_package(glm CONFIG REQUIRED)
+target_link_libraries(AquanactEngine PRIVATE glm::glm)
+target_link_libraries(AquanactGame PRIVATE glm::glm)
 
 find_package(glad CONFIG REQUIRED)
 target_link_libraries(AquanactEngine PRIVATE glad::glad)
@@ -252,6 +271,9 @@ find_package(imgui CONFIG REQUIRED)
 target_link_libraries(AquanactEngine PRIVATE imgui::imgui)
 target_link_libraries(AquanactGame PRIVATE imgui::imgui)
 
+find_package(imguizmo CONFIG REQUIRED)
+target_link_libraries(AquanactEngine PRIVATE imguizmo::imguizmo)
+
 # MyGUI's vcpkg package did not provide a simple CONFIG target in this setup, so we
 # locate the headers and libraries explicitly and choose the debug or release variant
 # ourselves.
@@ -262,38 +284,71 @@ find_path(MYGUI_INCLUDE_DIR
 )
 get_filename_component(MYGUI_INCLUDE_DIR "${MYGUI_INCLUDE_DIR}" DIRECTORY)
 
-find_library(MYGUI_ENGINE_LIBRARY_DEBUG
-    NAMES MyGUIEngineStatic_d
-    REQUIRED
-)
-find_library(MYGUI_ENGINE_LIBRARY_RELEASE
-    NAMES MyGUIEngineStatic
-    REQUIRED
-)
+if (VCPKG_INSTALLED_DIR AND VCPKG_TARGET_TRIPLET)
+    set(_AQUANACT_VCPKG_MYGUI_DEBUG_LIB_DIR
+        "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/debug/lib")
+    set(_AQUANACT_VCPKG_MYGUI_RELEASE_LIB_DIR
+        "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib")
+    find_library(AQUANACT_MYGUI_ENGINE_LIBRARY_DEBUG
+        NAMES MyGUIEngineStatic_d MyGUIEngineStatic
+        PATHS "${_AQUANACT_VCPKG_MYGUI_DEBUG_LIB_DIR}"
+        NO_DEFAULT_PATH REQUIRED)
+    find_library(AQUANACT_MYGUI_ENGINE_LIBRARY_RELEASE
+        NAMES MyGUIEngineStatic
+        PATHS "${_AQUANACT_VCPKG_MYGUI_RELEASE_LIB_DIR}"
+        NO_DEFAULT_PATH REQUIRED)
+    find_library(AQUANACT_MYGUI_OPENGL_LIBRARY_DEBUG
+        NAMES MyGUI.OpenGLPlatform_d MyGUI.OpenGLPlatform
+        PATHS "${_AQUANACT_VCPKG_MYGUI_DEBUG_LIB_DIR}"
+        NO_DEFAULT_PATH REQUIRED)
+    find_library(AQUANACT_MYGUI_OPENGL_LIBRARY_RELEASE
+        NAMES MyGUI.OpenGLPlatform
+        PATHS "${_AQUANACT_VCPKG_MYGUI_RELEASE_LIB_DIR}"
+        NO_DEFAULT_PATH REQUIRED)
+else()
+    find_library(AQUANACT_MYGUI_ENGINE_LIBRARY_DEBUG NAMES MyGUIEngineStatic_d MyGUIEngineStatic REQUIRED)
+    find_library(AQUANACT_MYGUI_ENGINE_LIBRARY_RELEASE NAMES MyGUIEngineStatic REQUIRED)
+    find_library(AQUANACT_MYGUI_OPENGL_LIBRARY_DEBUG NAMES MyGUI.OpenGLPlatform_d MyGUI.OpenGLPlatform REQUIRED)
+    find_library(AQUANACT_MYGUI_OPENGL_LIBRARY_RELEASE NAMES MyGUI.OpenGLPlatform REQUIRED)
+endif()
 
-find_library(MYGUI_OPENGL_LIBRARY_DEBUG
-    NAMES MyGUI.OpenGLPlatform_d
-    REQUIRED
-)
-find_library(MYGUI_OPENGL_LIBRARY_RELEASE
-    NAMES MyGUI.OpenGLPlatform
-    REQUIRED
-)
+target_compile_definitions(AquanactEngine PRIVATE AQUANACT_MYGUI_ENGINE_LIBRARY="${AQUANACT_MYGUI_ENGINE_LIBRARY_DEBUG}")
+target_compile_definitions(AquanactEngine PRIVATE AQUANACT_MYGUI_OPENGL_LIBRARY="${AQUANACT_MYGUI_OPENGL_LIBRARY_DEBUG}")
+target_compile_definitions(AquanactGame PRIVATE AQUANACT_MYGUI_ENGINE_LIBRARY="${AQUANACT_MYGUI_ENGINE_LIBRARY_DEBUG}")
+target_compile_definitions(AquanactGame PRIVATE AQUANACT_MYGUI_OPENGL_LIBRARY="${AQUANACT_MYGUI_OPENGL_LIBRARY_DEBUG}")
 
-find_package(freetype CONFIG REQUIRED)
+find_package(Freetype CONFIG REQUIRED)
+
+set(AQUANACT_MYGUI_SOURCE_MEDIA_DIR "${CMAKE_SOURCE_DIR}/external/mygui-upstream/Media/MyGUI_Media")
+if (AQUANACT_MYGUI_MEDIA_DIR)
+    set(AQUANACT_MYGUI_MEDIA_DIR "${AQUANACT_MYGUI_MEDIA_DIR}" CACHE PATH "MyGUI runtime media directory")
+elseif (EXISTS "${AQUANACT_MYGUI_SOURCE_MEDIA_DIR}")
+    set(AQUANACT_MYGUI_MEDIA_DIR "${AQUANACT_MYGUI_SOURCE_MEDIA_DIR}" CACHE PATH "MyGUI runtime media directory")
+else()
+    set(AQUANACT_MYGUI_MEDIA_DIR
+        "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/mygui/Media/MyGUI_Media"
+        CACHE PATH "MyGUI runtime media directory")
+endif()
+if (NOT IS_DIRECTORY "${AQUANACT_MYGUI_MEDIA_DIR}")
+    message(FATAL_ERROR "MyGUI runtime media directory not found: ${AQUANACT_MYGUI_MEDIA_DIR}")
+endif()
+
+target_compile_definitions(AquanactEngine PRIVATE AQUANACT_MYGUI_MEDIA_DIR="${AQUANACT_MYGUI_MEDIA_DIR}")
+target_compile_definitions(AquanactGame PRIVATE AQUANACT_MYGUI_MEDIA_DIR="${AQUANACT_MYGUI_MEDIA_DIR}")
+target_compile_definitions(AquanactBuildTool PRIVATE AQUANACT_MYGUI_MEDIA_DIR="${AQUANACT_MYGUI_MEDIA_DIR}")
 
 target_include_directories(AquanactEngine PRIVATE ${MYGUI_INCLUDE_DIR})
 target_include_directories(AquanactGame PRIVATE ${MYGUI_INCLUDE_DIR})
 target_include_directories(AquanactBuildTool PRIVATE ${MYGUI_INCLUDE_DIR})
 target_link_libraries(AquanactEngine PRIVATE
-    debug ${MYGUI_ENGINE_LIBRARY_DEBUG} optimized ${MYGUI_ENGINE_LIBRARY_RELEASE}
-    debug ${MYGUI_OPENGL_LIBRARY_DEBUG} optimized ${MYGUI_OPENGL_LIBRARY_RELEASE}
-    freetype
+    debug ${AQUANACT_MYGUI_ENGINE_LIBRARY_DEBUG} optimized ${AQUANACT_MYGUI_ENGINE_LIBRARY_RELEASE}
+    debug ${AQUANACT_MYGUI_OPENGL_LIBRARY_DEBUG} optimized ${AQUANACT_MYGUI_OPENGL_LIBRARY_RELEASE}
+    Freetype::Freetype
 )
 target_link_libraries(AquanactGame PRIVATE
-    debug ${MYGUI_ENGINE_LIBRARY_DEBUG} optimized ${MYGUI_ENGINE_LIBRARY_RELEASE}
-    debug ${MYGUI_OPENGL_LIBRARY_DEBUG} optimized ${MYGUI_OPENGL_LIBRARY_RELEASE}
-    freetype
+    debug ${AQUANACT_MYGUI_ENGINE_LIBRARY_DEBUG} optimized ${AQUANACT_MYGUI_ENGINE_LIBRARY_RELEASE}
+    debug ${AQUANACT_MYGUI_OPENGL_LIBRARY_DEBUG} optimized ${AQUANACT_MYGUI_OPENGL_LIBRARY_RELEASE}
+    Freetype::Freetype
 )
 
 add_executable(AquanactUIInputRouterTests
@@ -329,7 +384,6 @@ endif()
 add_test(NAME AquanactGameGUIAssetTests COMMAND AquanactGameGUIAssetTests)
 
 target_include_directories(AquanactEngine PUBLIC "./include")
-target_include_directories(AquanactEngine PRIVATE "${CMAKE_SOURCE_DIR}/external/imguizmo/src")
 target_include_directories(AquanactGame PUBLIC "./include")
 target_include_directories(AquanactBuildTool PUBLIC "./include")
 if (AQUANACT_PROJECT_ROOT)
@@ -369,13 +423,12 @@ add_custom_target(copyspritesheets
 add_custom_target(copymygui
         # Keep media beside the editor executable and under resources/ for the
         # packaged-game layout. Both targets share this copy step.
-        COMMAND ${CMAKE_COMMAND} -E rm -rf ${CMAKE_BINARY_DIR}/MyGUI_Media
-        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/external/mygui-upstream/Media/MyGUI_Media ${CMAKE_BINARY_DIR}
-        COMMAND ${CMAKE_COMMAND} -E rm -rf ${CMAKE_BINARY_DIR}/resources
-        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/external/mygui-upstream/Media/MyGUI_Media ${CMAKE_BINARY_DIR}/resources
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${AQUANACT_MYGUI_MEDIA_DIR}" "${CMAKE_BINARY_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${AQUANACT_MYGUI_MEDIA_DIR}" "${CMAKE_BINARY_DIR}/resources"
         COMMENT "syncing MyGUI media to ${CMAKE_BINARY_DIR}"
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
+add_dependencies(copymygui copymodels)
 add_dependencies(AquanactEngine copyshaders copymodels copyspritesheets)
 add_dependencies(AquanactEngine copymygui)
 add_dependencies(AquanactGame copyshaders copymodels copymygui copyspritesheets)

@@ -33,12 +33,14 @@ namespace
 	char g_projectDirectoryInput[1024] = {};
 	std::filesystem::path g_projectExplorerDirectory;
 	std::filesystem::path g_projectExplorerSelectedDirectory;
+	std::string g_projectDirectoryError;
 	std::filesystem::path g_startupProjectDeleteDirectory;
 	std::filesystem::path g_startupSelectedProjectFile;
 	bool g_showStartupNewProjectForm = false;
 	bool g_confirmStartupProjectDelete = false;
 	bool g_startupProjectPreferenceApplied = false;
 	bool IsValidProjectPath(const std::filesystem::path& path);
+	bool IsValidProjectDirectory(const std::filesystem::path& path);
 
 	std::string UniqueEmptyEntityName(const Scene& scene)
 	{
@@ -62,6 +64,11 @@ namespace
 		return Root::Current().FileSystemRef().ExecutableDirectory() / "aquanact_last_project.txt";
 	}
 
+	std::filesystem::path ProjectsDirectoryPreferencePath()
+	{
+		return Root::Current().FileSystemRef().ExecutableDirectory() / "aquanact_projects_directory.txt";
+	}
+
 	std::filesystem::path LoadSavedProjectPath()
 	{
 		std::string savedPath = Root::Current().FileSystemRef().ReadTextFile(ProjectPreferencePath());
@@ -79,6 +86,18 @@ namespace
 		{
 			Root::Current().FileSystemRef().WriteTextFile(ProjectPreferencePath(), path.string() + "\n");
 		}
+	}
+
+	std::filesystem::path LoadSavedProjectsDirectory()
+	{
+		std::string savedPath = Root::Current().FileSystemRef().ReadTextFile(ProjectsDirectoryPreferencePath());
+		while (!savedPath.empty() && (savedPath.back() == '\r' || savedPath.back() == '\n'))
+		{
+			savedPath.pop_back();
+		}
+		const std::filesystem::path path(savedPath);
+		return IsValidProjectDirectory(path) ? std::filesystem::absolute(path).lexically_normal()
+			: std::filesystem::path{};
 	}
 
 	void SetProjectPathInput(const std::filesystem::path& path)
@@ -109,15 +128,32 @@ namespace
 		return !path.empty() && std::filesystem::is_directory(path, error);
 	}
 
-	void SetProjectExplorerDirectory(const std::filesystem::path& path)
+	bool SetProjectExplorerDirectory(const std::filesystem::path& path, bool createIfMissing)
 	{
+		std::error_code error;
+		if (createIfMissing && !path.empty())
+		{
+			std::filesystem::create_directories(path, error);
+			if (error)
+			{
+				return false;
+			}
+		}
 		if (!IsValidProjectDirectory(path))
 		{
-			return;
+			return false;
 		}
-		g_projectExplorerDirectory = std::filesystem::absolute(path).lexically_normal();
+		const std::filesystem::path absolutePath = std::filesystem::absolute(path, error);
+		if (error)
+		{
+			return false;
+		}
+		g_projectExplorerDirectory = absolutePath.lexically_normal();
 		g_projectExplorerSelectedDirectory.clear();
 		SetProjectDirectoryInput(g_projectExplorerDirectory);
+		Root::Current().FileSystemRef().WriteTextFile(
+			ProjectsDirectoryPreferencePath(), g_projectExplorerDirectory.string() + "\n");
+		return true;
 	}
 }
 
@@ -134,7 +170,21 @@ std::filesystem::path EngineMenuBar::DrawStartupProjectWindow(const EngineGuiFra
 	if (!g_startupProjectPreferenceApplied)
 	{
 		g_startupProjectPreferenceApplied = true;
-		g_projectExplorerDirectory = std::filesystem::path("C:/projects");
+		g_projectExplorerDirectory = LoadSavedProjectsDirectory();
+		if (g_projectExplorerDirectory.empty())
+		{
+		#ifdef _WIN32
+			g_projectExplorerDirectory = std::filesystem::path("C:/projects");
+		#else
+			g_projectExplorerDirectory = projectManager.ProjectsRoot();
+		#endif
+		}
+		if (!IsValidProjectDirectory(g_projectExplorerDirectory))
+		{
+			std::error_code createError;
+			std::filesystem::create_directories(g_projectExplorerDirectory, createError);
+		}
+		SetProjectDirectoryInput(g_projectExplorerDirectory);
 		g_selectedProjectPath.clear();
 		g_startupSelectedProjectFile.clear();
 	}
@@ -148,6 +198,29 @@ std::filesystem::path EngineMenuBar::DrawStartupProjectWindow(const EngineGuiFra
 	ImGui::SetNextWindowSize(ImVec2(620.0f, 520.0f), ImGuiCond_Always);
 	ImGui::Begin("Projects", nullptr,
 		ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
+	ImGui::TextUnformatted("Project directory");
+	ImGui::SetNextItemWidth(-1.0f);
+	ImGui::InputText("##ProjectsDirectory", g_projectDirectoryInput, sizeof(g_projectDirectoryInput));
+	if (ImGui::Button("Use Directory"))
+	{
+		if (!SetProjectExplorerDirectory(std::filesystem::path(g_projectDirectoryInput), false))
+			g_projectDirectoryError = "Choose an existing directory, or use Create & Use.";
+		else
+			g_projectDirectoryError.clear();
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Create & Use"))
+	{
+		if (!SetProjectExplorerDirectory(std::filesystem::path(g_projectDirectoryInput), true))
+			g_projectDirectoryError = "Could not create or use that directory.";
+		else
+			g_projectDirectoryError.clear();
+	}
+	if (!g_projectDirectoryError.empty())
+		ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.25f, 1.0f), "%s", g_projectDirectoryError.c_str());
+	else
+		ImGui::TextDisabled("Enter a full path. This location stores and lists your projects.");
+	ImGui::Separator();
 	std::vector<std::pair<std::filesystem::path, std::filesystem::path>> projectFolders;
 	std::error_code error;
 	if (IsValidProjectDirectory(g_projectExplorerDirectory))
@@ -193,7 +266,7 @@ std::filesystem::path EngineMenuBar::DrawStartupProjectWindow(const EngineGuiFra
 		return left.first.filename().string() < right.first.filename().string();
 	});
 
-	ImGui::Text("Projects: %s", g_projectExplorerDirectory.string().c_str());
+	ImGui::Text("Projects in: %s", g_projectExplorerDirectory.string().c_str());
 	ImGui::BeginChild("StartupProjectFileList", ImVec2(0.0f, 300.0f), true);
 	if (projectFolders.empty())
 	{

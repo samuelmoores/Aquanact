@@ -23,6 +23,16 @@
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
 
+std::unique_ptr<GraphicsDevice> CreateGraphicsDevice(GraphicsBackend backend)
+{
+	switch (backend)
+	{
+	case GraphicsBackend::OpenGL:
+		return std::make_unique<OpenGLGraphicsDevice>();
+	}
+	throw std::invalid_argument("Unsupported graphics backend");
+}
+
 namespace {
 	constexpr int DirectionalShadowMapResolution = 2048;
 	constexpr int PointShadowMapResolution = 512;

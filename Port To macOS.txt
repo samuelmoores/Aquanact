@@ -1,0 +1,361 @@
+Aquanact: Port To macOS
+======================
+
+Goal
+----
+Build and run the Aquanact editor and standalone game natively on macOS while
+preserving the existing Windows build. Keep graphics backend choices modular:
+the initial macOS implementation may use OpenGL, while a future Metal backend
+must be addable without spreading backend-specific code through shared engine
+systems.
+
+Scope and constraints
+--------------------
+- First milestone: configure, compile, launch, and exercise the editor and game
+  on a specified macOS version and Mac architecture (Apple Silicon or Intel).
+- Keep Windows presets, compiler options, platform implementations, and runtime
+  behavior working.
+- Keep renderer-facing code independent of OpenGL and Metal implementation
+  details. Use the existing GraphicsDevice / OpenGLGraphicsDevice boundary as
+  the starting point and extend it deliberately where necessary.
+- Treat web packaging as a separate follow-up. The current web build flow calls
+  PowerShell and is not part of the first native macOS milestone.
+- Do not claim a platform is supported until it has been built and exercised on
+  that platform. Record the tested macOS version, architecture, and GPU.
+
+Step 1: Record the target and establish a baseline
+-------------------------------------------------
+1. Record the target macOS version, CPU architecture, and GPU.
+2. Record the current Windows configure/build commands and expected outputs so
+   they can be used for regression checks.
+3. Review the current CMake targets and source list before changing them.
+4. Capture existing behavior for editor startup, game startup, assets, and the
+   in-app build flow where practical.
+
+Acceptance: there is a defined Mac target and a known Windows baseline.
+
+Step 1 baseline findings (2026-11-12)
+------------------------------------
+- Available target in this workspace: macOS 27.0.1, arm64 (Apple Silicon).
+- Mac model identifier: Mac16,3; the graphics device reports Apple M4 GPU.
+  `system_profiler` timed out, so the identifier was obtained from I/O Registry
+  metadata instead.
+- Apple Command Line Tools are selected at `/Library/Developer/CommandLineTools`;
+  the reported SDK version is 27.0.
+- Installed through Homebrew during Step 1: CMake 4.4.5, Ninja 1.13.2, and the
+  vcpkg executable (2026-10-29). Their commands resolve under `/opt/homebrew/bin`.
+- The Homebrew vcpkg package contains the executable but not the cloned vcpkg
+  repository/scripts. A shallow checkout is now available at
+  `/Users/samuelmoores/.cache/vcpkg` (revision 177e8175), and its
+  `scripts/buildsystems/vcpkg.cmake` toolchain file is present. Set
+  `VCPKG_ROOT` to that path in the build shell; it has not been added to a shell
+  startup file.
+- Current source revision: b9b5822 (emmisive and height material properties).
+- Working tree at capture: clean apart from this untracked plan document.
+- Windows configure command from the checked-in preset:
+  `cmake --preset x64-debug`
+- Windows build command from the checked-in layout:
+  `cmake --build out/build/x64-debug`
+- Expected CMake targets include AquanactEngine, AquanactGame,
+  AquanactBuildTool, AquanactUIInputRouterTests, and
+  AquanactGameGUIAssetTests. AquanactEngine depends on AquanactGame. The editor
+  and game targets have resource-copy dependencies for shaders, models,
+  spritesheets, and MyGUI media.
+- The editor and game Debug executables are configured for the build directory;
+  a Windows editor launch from the preset output is expected at
+  `out/build/x64-debug/AquanactEngine.exe`. CTest can be invoked with
+  `ctest --test-dir out/build/x64-debug -C Debug --output-on-failure`.
+- CMake requires C++20. The repository has no `out` build tree or existing
+  executable artifacts at the time of inspection, so there is no prior binary
+  available for a startup comparison.
+- The Windows preset is x64 Debug with Ninja, MSVC, and the x64-windows vcpkg
+  triplet. Its compiler, Ninja, and Windows SDK paths are machine-specific.
+- Windows binaries and tests have not been built or launched as part of this
+  baseline capture. The Windows commands above are source-derived expectations,
+  not a verified result.
+- Existing Mac runtime behavior is not yet captured because no Mac build has
+  been performed. The current runtime smoke-test baseline remains outstanding.
+
+Step 1 status: complete for environment identification and source-level
+baseline capture. The target OS, architecture, and GPU are identified; CMake,
+Ninja, the vcpkg executable, and its source/toolchain checkout are available.
+Project dependencies have not yet been installed or configured. The Windows
+build baseline is source-derived; verifying it on Windows is a later regression
+check, not a prerequisite for the macOS work. Mac runtime behavior can only be
+captured after the port has a runnable build. No project configure, compile,
+link, or automated build commands were run.
+
+Step 2: Add a macOS build configuration
+---------------------------------------
+1. Add a macOS CMake preset using Apple Clang and a supported generator.
+2. Put its build output in a distinct directory so it cannot overwrite Windows
+   build output.
+3. Select the vcpkg target triplet for the requested Mac architecture.
+4. Keep existing Windows presets and settings intact.
+5. Make platform-specific compiler, linker, executable, and library settings
+   conditional rather than applying Windows paths globally.
+
+Acceptance: CMake configuration succeeds on the target Mac without changing the
+Windows preset behavior.
+
+Step 2 implementation notes (2026-11-12)
+----------------------------------------
+- Added `macos-arm64-debug` and `macos-arm64-release` configure presets. Both
+  use Ninja, separate `out/build/<preset>` directories, the `arm64-osx` vcpkg
+  triplet, and the Apple Silicon architecture setting.
+- Made the AquanactGame Windows GUI-subsystem setting conditional on WIN32;
+  macOS now receives a normal executable target.
+- Limited the Psapi link dependency to Windows.
+- `cmake --list-presets=configure` recognizes both macOS presets. CMake
+  configuration succeeds on the target Mac after Steps 3 and 4 changes. No
+  Aquanact target has been compiled or linked yet.
+
+Step 3: Resolve third-party dependencies
+----------------------------------------
+1. Install the dependencies declared in vcpkg.json for the chosen Mac triplet:
+   Assimp, GLM, GLFW, GLAD, MyGUI, and ImGui.
+2. Confirm each package provides the headers, CMake targets, and libraries used
+   by the project on macOS.
+3. Replace MyGUI's manual debug/release library lookup with a portable target or
+   platform-aware lookup if the installed package layout requires it.
+4. Check FreeType linkage and any transitive dependencies on the target Mac.
+5. Keep dependency discovery in CMake; do not hard-code local machine paths.
+
+Acceptance: dependency discovery and linking are reproducible from a clean Mac
+configuration.
+
+Step 3 implementation notes (2026-11-12)
+----------------------------------------
+- Added GLM, FreeType, and ImGuizmo as declared vcpkg/CMake dependencies. The
+  source tree referenced an absent vendored ImGuizmo source file, so CMake now
+  uses the pinned vcpkg ImGuizmo package target instead.
+- Installed the manifest dependencies for `arm64-osx`. The pinned MyGUI package
+  exposes pkg-config metadata but no CMake target, so CMake locates its headers
+  and libraries explicitly. Debug and release libraries have identical names
+  on macOS; the lookup now searches their separate vcpkg directories to prevent
+  accidentally linking the debug archive in Release builds.
+- Added a MyGUI vcpkg overlay that installs the runtime media assets, plus a
+  libpng overlay patch needed to build the pinned libpng against the current
+  macOS SDK. The macOS presets select these overlays; Windows presets are not
+  changed.
+- CMake configuration succeeded with `VCPKG_ROOT` set to
+  `/Users/samuelmoores/.cache/vcpkg` using
+  `cmake --preset macos-arm64-debug`. CMake resolved the expected separate
+  MyGUI debug/release archives and all declared package targets. It emitted a
+  non-fatal RapidJSON CMake deprecation warning.
+- Project compilation/linking and a clean-machine dependency reproduction
+  remain unverified. Windows configuration/build regression checks also remain
+  outstanding.
+
+Step 4 implementation notes (2026-11-12)
+----------------------------------------
+- The standalone game uses the normal `main` entry point on macOS; the Windows
+  `WinMain` entry point and `Windows.h` include remain restricted to Windows.
+- `FileSystem::ExecutableDirectory()` now uses dyld's executable-path API on
+  macOS and retains the existing Windows implementation.
+- Build output naming, the build tool's default game executable path, packaged
+  executable naming, and runtime-library extension handling now account for
+  macOS. Runtime media can be sourced from the installed MyGUI package.
+- The PowerShell-based web packaging action is hidden and compiled only on
+  Windows. The native package flow remains available on macOS.
+- Static source inspection and `git diff --check` passed. No Aquanact build or
+  runtime launch was performed. Windows behavior has not been revalidated on
+  Windows, so the port is not yet claimed as supported.
+
+Step 4: Isolate operating-system-specific code
+----------------------------------------------
+1. Provide a normal `main` entry point for the macOS game executable. Keep the
+   Windows `WinMain` implementation and its Windows header behind Windows-only
+   guards.
+2. Add a macOS implementation for locating the running executable's directory
+   in FileSystem, keeping the existing Windows implementation unchanged.
+3. Search all source and build scripts for Windows-only headers, APIs, link
+   libraries, command invocations, path assumptions, and executable naming.
+4. Keep each OS-specific implementation behind a small, explicit boundary so
+   shared engine logic does not accumulate platform checks.
+
+Acceptance: macOS targets no longer require Windows headers or libraries, and
+Windows targets retain their existing entry point and file behavior.
+
+Step 5: Make graphics backend selection explicit and modular
+------------------------------------------------------------
+1. Treat GraphicsDevice as the engine-facing graphics interface. Move any
+   renderer-facing OpenGL-specific operations behind that interface instead of
+   adding new direct OpenGL calls to shared engine or UI logic.
+2. Keep OpenGL implementation code in OpenGLGraphicsDevice and closely related
+   backend-specific files. Avoid leaking OpenGL types into general engine
+   interfaces where a backend-neutral type is practical.
+3. Add an explicit backend selection/factory seam so startup can select an
+   implementation without making game/editor systems construct OpenGL classes
+   directly.
+4. Keep platform context/window setup separate from graphics-device behavior.
+   GLFW may remain the initial window/context layer, but its macOS-specific
+   context hints should not be mixed into renderer algorithms.
+5. Document which operations the interface must expose for the editor, game,
+   debug drawing, and UI integration. Add interface methods only for actual
+   engine needs.
+6. Keep GUI rendering integration behind a similarly clear boundary. MyGUI and
+   ImGui currently use OpenGL integration, so a future Metal backend will need
+   corresponding GUI renderers or a backend-neutral UI rendering layer.
+7. Do not implement Metal as part of the first macOS build unless separately
+   scoped. The initial goal is a clean OpenGL implementation behind the seam.
+
+Acceptance: backend-independent systems depend on the graphics interface, and
+OpenGL-specific code remains localized. A future Metal implementation has a
+clear place to plug in without rewriting engine systems.
+
+Step 5 implementation notes (2026-11-12)
+----------------------------------------
+- Added an explicit `AQUANACT_GRAPHICS_BACKEND` CMake setting and a
+  `CreateGraphicsDevice` factory. `RenderManager` now owns the abstract
+  `GraphicsDevice` interface and asks the factory for the selected implementation
+  instead of constructing `OpenGLGraphicsDevice` directly.
+- Moved frame statistics and the operations currently needed by the renderer
+  (frame state, scene/shadow drawing, particle drawing, submesh culling, and
+  splash texture selection) onto the interface. The OpenGL implementation is
+  now included through a backend-specific CMake source list. The renderer manager
+  header no longer includes the GL function header or concrete OpenGL device.
+- OpenGL is still the only selectable implementation. Metal source files,
+  resource implementations, and GUI renderer adapters do not exist yet.
+- The source audit shows additional OpenGL coupling outside
+  `OpenGLGraphicsDevice`: `ShaderProgram`, `Texture`, debug/axis drawing,
+  ImGui's OpenGL3 renderer, and MyGUI's OpenGL platform use GL directly. Window
+  context creation also currently carries OpenGL hints. Render commands still
+  refer to the existing shader type. These are known boundaries that must move
+  behind backend-owned resource and GUI interfaces before the Step 5 acceptance
+  criterion can be considered complete or a Metal backend can be added without
+  broader engine changes.
+- The macOS Debug preset configured and generated successfully after this
+  refactor. A subsequent full Debug build completed, including AquanactGame,
+  AquanactEngine, AquanactBuildTool, and the test executables. Windows regression
+  checks are still outstanding.
+
+macOS build follow-up (2026-11-12)
+---------------------------------
+- The first compile found Clang errors from default arguments using `{}` for the
+  nested `EntityStateMachine::Condition` type while its enclosing class was
+  still being declared. Replaced those defaults with overloads that forward a
+  default-constructed condition from the `.cpp` file. The follow-up full Debug
+  build completed successfully.
+- Non-fatal warnings remain: a non-literal ImGui format string in
+  `EngineGuiWidgets.h` and duplicate static dependency archives reported by the
+  linker. The editor and game have not yet been launched.
+
+Step 6: Adapt OpenGL context creation for macOS
+----------------------------------------------
+1. The current Window setup requests OpenGL 3.3 compatibility. macOS requires a
+   forward-compatible core profile for OpenGL 3.2 and later; the macOS path must
+   request a supported core profile.
+2. The project contains a GLSL 4.10 shader. Verify that the requested context
+   and the actual target Mac GPU support OpenGL 4.1, or revise shader/context
+   requirements consistently if support for a lower version is needed.
+3. Keep Windows context behavior unchanged unless a shared fix is demonstrably
+   safe and covered by Windows regression checks.
+4. Check GLAD initialization and the order of context creation, function loading,
+   and renderer startup.
+5. Check framebuffer dimensions and viewport updates on Retina displays. Use
+   framebuffer pixel dimensions rather than logical window dimensions for GL
+   viewport setup.
+
+Acceptance: the application creates the intended context on the target Mac,
+reports its actual OpenGL version, initializes GLAD, and sets the correct
+framebuffer viewport.
+
+Step 6 implementation and first launch (2026-11-12)
+--------------------------------------------------
+- `Window` now requests a forward-compatible OpenGL 4.1 core context on macOS,
+  while retaining the existing 3.3 compatibility request on non-Apple desktop
+  builds. This matches the macOS OpenGL profile requirements and the project's
+  GLSL 4.10 shader. A GLFW error callback now reports the underlying GLFW error
+  if window creation fails again.
+- Rebuilt the macOS Debug game and editor successfully after this change.
+- Launched `out/build/macos-arm64-debug/AquanactEngine`; it remained running
+  without the prior `Failed to create GLFW window` exception. A macOS Launch
+  Services XPC warning appeared in the terminal, but no GLFW error followed.
+- The actual context version, GLAD initialization details, framebuffer scaling,
+  rendering, and interactive behavior still need visual/runtime verification.
+
+Step 7: Audit core-profile compatibility and graphics features
+--------------------------------------------------------------
+1. Search for compatibility-only rendering calls and state, including fixed
+   function matrix/vertex APIs, immediate mode, and removed primitive types.
+2. Check geometry shaders, framebuffer formats, texture formats, sampler use,
+   depth/shadow rendering, and shader language versions against the Mac context.
+3. Check assumptions about line width and other driver-dependent features.
+4. Exercise editor-only rendering such as grid, axis, selection, gizmos, debug
+   overlays, and ImGui/MyGUI drawing; these paths may differ from game rendering.
+5. Add useful GL error and shader compilation diagnostics without assuming that
+   macOS provides the same debug-context support as Windows.
+6. Keep fixes within the OpenGL backend or a backend-neutral interface unless
+   the behavior is truly shared across backends.
+
+Acceptance: no compatibility-only behavior is required by the macOS core
+context, and the important editor/game rendering paths work on the target GPU.
+
+Step 8: Configure and build incrementally
+-----------------------------------------
+1. Configure the macOS preset and resolve CMake/dependency errors first.
+2. Build the smallest independent targets first, then the game, then the editor.
+3. Fix compile and link errors in the narrowest relevant platform or backend
+   layer.
+4. Keep Windows configuration and build checks in the regression loop for
+   changes to shared CMake, interfaces, or engine code.
+5. Use existing tests where they are portable and relevant. Add tests only for
+   behavior changed by the port.
+
+Acceptance: all required native targets build on Mac and the Windows baseline
+still builds.
+
+Step 9: Run and verify the editor and game
+------------------------------------------
+1. Launch the editor from its build output directory.
+2. Confirm window creation, OpenGL context version, GLAD loading, GUI setup,
+   input, resize, fullscreen behavior, and clean shutdown.
+3. Open or create a project and verify shaders, models, textures, fonts, MyGUI
+   media, spritesheets, and project files resolve correctly.
+4. Exercise core editor features: scene view, grid/axis, entity selection,
+   gizmos, debug overlays, and project save/load.
+5. Launch the standalone game and verify startup, rendering, input, audio, and
+   project assets.
+6. Test on each Mac architecture the project intends to support. Do not infer
+   Apple Silicon support from an Intel Mac result or vice versa.
+
+Acceptance: the editor and game launch and pass the agreed smoke-test checklist
+on each supported target configuration.
+
+Step 10: Port packaging workflows and document support
+------------------------------------------------------
+1. Keep PowerShell-based web packaging outside the native build milestone.
+2. If macOS web packaging is required, add a separate macOS script or portable
+   packaging implementation and verify its output independently.
+3. Document prerequisites, dependency setup, configure/build/run commands,
+   output locations, target Mac configurations, and known limitations.
+4. Record that Apple's OpenGL implementation is deprecated. Keep the modular
+   backend seam so a future Metal backend can be developed independently.
+
+Acceptance: another developer can reproduce the native Mac build, and the
+support statement distinguishes verified configurations from planned ones.
+
+Primary risks and decision points
+---------------------------------
+- OpenGL context: the current compatibility-profile request is not suitable for
+  macOS OpenGL 3.2+ contexts, which require core profile.
+- OpenGL ceiling: macOS provides up to OpenGL 4.1; the project has a GLSL 4.10
+  shader, so the actual GPU/context must support that requirement.
+- Renderer compatibility: a successful compile does not prove compatibility
+  with core profile. Editor-only drawing, GUI backends, and shader paths need
+  runtime validation.
+- Third-party GUI backends: MyGUI and ImGui currently use OpenGL integration.
+  Metal support will require separate GUI backend work.
+- Runtime assets and paths: running from a build directory can expose path
+  assumptions that do not appear during compilation.
+- Windows regression: all shared changes must preserve the current Windows
+  build and runtime path.
+
+Out of scope for the first milestone
+------------------------------------
+- Replacing OpenGL with Metal.
+- Rewriting the renderer for a new graphics API.
+- Porting the PowerShell web packaging flow unless web packaging is explicitly
+  included in the Mac deliverable.
+- Claiming support for untested macOS versions or GPU architectures.

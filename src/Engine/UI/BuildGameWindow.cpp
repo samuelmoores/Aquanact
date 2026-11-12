@@ -14,6 +14,14 @@
 #include <cstdlib>
 #include <filesystem>
 
+#ifndef AQUANACT_GAME_EXECUTABLE_NAME
+#if defined(_WIN32)
+#define AQUANACT_GAME_EXECUTABLE_NAME "AquanactGame.exe"
+#else
+#define AQUANACT_GAME_EXECUTABLE_NAME "AquanactGame"
+#endif
+#endif
+
 namespace
 {
 	std::filesystem::path SourceRoot()
@@ -44,12 +52,14 @@ void BuildGameWindow::Draw(bool& popupRequested)
 	{
 		m_requestedBuild = true;
 	}
+	#if defined(_WIN32)
 	ImGui::SameLine();
 	if (ImGui::Button("Package for Web"))
 	{
 		m_requestedWebBuild = true;
 	}
 	ImGui::SameLine();
+	#endif
 	EngineGuiWidgets::CloseButton();
 
 	if (m_requestedBuild)
@@ -60,7 +70,7 @@ void BuildGameWindow::Draw(bool& popupRequested)
 		const std::filesystem::path outputRoot = std::filesystem::path(m_buildPath);
 		const std::filesystem::path projectFile = Root::Current().Projects().CurrentProjectPath();
 		const std::filesystem::path executablePath =
-			Root::Current().FileSystemRef().ExecutableDirectory() / "AquanactGame.exe";
+			Root::Current().FileSystemRef().ExecutableDirectory() / AQUANACT_GAME_EXECUTABLE_NAME;
 		Root::Current().FrontEnd().Creator().SaveAllRoleGUIs();
 		if (projectFile.empty() || !Root::Current().Projects().SaveProject(projectFile, Root::Current().Scenes()))
 		{
@@ -74,6 +84,7 @@ void BuildGameWindow::Draw(bool& popupRequested)
 		}
 	}
 
+	#if defined(_WIN32)
 	if (m_requestedWebBuild)
 	{
 		m_requestedWebBuild = false;
@@ -104,6 +115,7 @@ void BuildGameWindow::Draw(bool& popupRequested)
 				: "Web package failed. Check the Emscripten output above.";
 		}
 	}
+	#endif
 
 	EngineGuiWidgets::StatusMessage(m_statusMessage);
 }

@@ -1,6 +1,6 @@
 #include <Engine/Core/Root.h>
 
-#if defined(AQUANACT_GAME) && !defined(AQUANACT_WEB)
+#if defined(AQUANACT_GAME) && !defined(AQUANACT_WEB) && defined(_WIN32)
 #include <Windows.h>
 #endif
 
@@ -13,7 +13,7 @@ static int RunApplication(int argc, char** argv)
     return 0;
 }
 
-#if defined(AQUANACT_GAME) && !defined(AQUANACT_WEB)
+#if defined(AQUANACT_GAME) && !defined(AQUANACT_WEB) && defined(_WIN32)
 int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR, int) 
 {
     return RunApplication(__argc, __argv);

@@ -5,15 +5,30 @@
 
 void Window::startUp()
 {
+    glfwSetErrorCallback([](int errorCode, const char* description)
+    {
+        std::cerr << "GLFW error " << errorCode << ": "
+            << (description ? description : "unknown error") << std::endl;
+    });
+
     /* Initialize the library */
     if (!glfwInit())
         throw std::runtime_error("Failed to initialize GLFW");
 
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
+#if defined(__APPLE__)
+    // macOS supports OpenGL only through a forward-compatible core profile;
+    // its highest supported version is 4.1.
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
+#else
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE);
+#endif
     glfwWindowHint(GLFW_STENCIL_BITS, 8);
     glfwWindowHint(GLFW_SAMPLES, 4);
 

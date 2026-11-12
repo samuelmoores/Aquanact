@@ -8,6 +8,26 @@
 
 namespace
 {
+	const char* PackagedGameExecutableName()
+	{
+#ifdef _WIN32
+		return "game.exe";
+#else
+		return "game";
+#endif
+	}
+
+	const char* RuntimeLibraryExtension()
+	{
+#ifdef _WIN32
+		return ".dll";
+#elif defined(__APPLE__)
+		return ".dylib";
+#else
+		return ".so";
+#endif
+	}
+
 	bool IsWithin(const std::filesystem::path& child, const std::filesystem::path& parent)
 	{
 		const std::string childText = child.lexically_normal().generic_string();
@@ -24,27 +44,27 @@ namespace
 			std::filesystem::copy_options::overwrite_existing);
 	}
 
-	std::vector<std::string> CopyDllsFromDirectory(const std::filesystem::path& sourceDir,
+	std::vector<std::string> CopyRuntimeLibrariesFromDirectory(const std::filesystem::path& sourceDir,
 		const std::filesystem::path& destinationDir)
 	{
-		std::vector<std::string> copiedDlls;
+		std::vector<std::string> copiedLibraries;
 		if (sourceDir.empty() || !std::filesystem::is_directory(sourceDir))
-			return copiedDlls;
+			return copiedLibraries;
 
 		std::filesystem::create_directories(destinationDir);
 		for (const auto& entry : std::filesystem::directory_iterator(sourceDir))
 		{
-			if (!entry.is_regular_file() || entry.path().extension() != ".dll")
+			if (!entry.is_regular_file() || entry.path().extension() != RuntimeLibraryExtension())
 				continue;
 
 			const std::filesystem::path destination = destinationDir / entry.path().filename();
 			if (std::filesystem::exists(destination))
-				throw std::runtime_error("Duplicate runtime DLL: " + entry.path().filename().string());
+				throw std::runtime_error("Duplicate runtime library: " + entry.path().filename().string());
 
 			std::filesystem::copy_file(entry.path(), destination);
-			copiedDlls.push_back(entry.path().filename().string());
+			copiedLibraries.push_back(entry.path().filename().string());
 		}
-		return copiedDlls;
+		return copiedLibraries;
 	}
 }
 
@@ -99,8 +119,12 @@ AquanactBuildSystem::Result AquanactBuildSystem::Build(
 		// Project-relative references therefore resolve inside the packaged game.
 		if (std::filesystem::is_directory(projectAssets))
 			CopyDirectory(projectAssets, stagingRoot / "assets");
+		#ifdef AQUANACT_MYGUI_MEDIA_DIR
+		const std::filesystem::path myGuiMedia(AQUANACT_MYGUI_MEDIA_DIR);
+		#else
 		const std::filesystem::path myGuiMedia =
 			source / "external" / "mygui-upstream" / "Media" / "MyGUI_Media";
+		#endif
 		if (!std::filesystem::is_directory(myGuiMedia))
 			throw std::runtime_error("MyGUI media directory does not exist: " + myGuiMedia.string());
 		CopyDirectory(myGuiMedia, stagingRoot / "resources");
@@ -121,14 +145,15 @@ AquanactBuildSystem::Result AquanactBuildSystem::Build(
 		}
 
 		std::filesystem::copy_file(project, stagingRoot / "project.aqua");
-		std::filesystem::copy_file(executable, stagingRoot / "game.exe");
-		std::vector<std::string> runtimeDlls =
-			CopyDllsFromDirectory(executable.parent_path(), stagingRoot);
+		const std::string packagedExecutableName = PackagedGameExecutableName();
+		std::filesystem::copy_file(executable, stagingRoot / packagedExecutableName);
+		std::vector<std::string> runtimeLibraries =
+			CopyRuntimeLibrariesFromDirectory(executable.parent_path(), stagingRoot);
 		if (!dependencyDirectory.empty())
 		{
-			const std::vector<std::string> dependencyDlls =
-				CopyDllsFromDirectory(absolute(dependencyDirectory), stagingRoot);
-			runtimeDlls.insert(runtimeDlls.end(), dependencyDlls.begin(), dependencyDlls.end());
+			const std::vector<std::string> dependencyLibraries =
+				CopyRuntimeLibrariesFromDirectory(absolute(dependencyDirectory), stagingRoot);
+			runtimeLibraries.insert(runtimeLibraries.end(), dependencyLibraries.begin(), dependencyLibraries.end());
 		}
 
 		std::ofstream manifest(stagingRoot / "build.manifest", std::ios::trunc);
@@ -139,13 +164,19 @@ AquanactBuildSystem::Result AquanactBuildSystem::Build(
 		// belong in the editor log, not in files shipped with the game.
 		manifest << "sourceRoot=.\n";
 		manifest << "projectFile=project.aqua\n";
-		manifest << "executablePath=game.exe\n";
-		manifest << "runtimeDllCount=" << runtimeDlls.size() << "\n";
-		for (const std::string& runtimeDll : runtimeDlls)
-			manifest << "runtimeDll=" << runtimeDll << "\n";
+		manifest << "executablePath=" << packagedExecutableName << "\n";
+#ifdef _WIN32
+		manifest << "runtimeDllCount=" << runtimeLibraries.size() << "\n";
+		for (const std::string& runtimeLibrary : runtimeLibraries)
+			manifest << "runtimeDll=" << runtimeLibrary << "\n";
+#else
+		manifest << "runtimeLibraryCount=" << runtimeLibraries.size() << "\n";
+		for (const std::string& runtimeLibrary : runtimeLibraries)
+			manifest << "runtimeLibrary=" << runtimeLibrary << "\n";
+#endif
 		manifest.close();
 
-		if (!std::filesystem::is_regular_file(stagingRoot / "game.exe") ||
+		if (!std::filesystem::is_regular_file(stagingRoot / packagedExecutableName) ||
 			!std::filesystem::is_regular_file(stagingRoot / "project.aqua"))
 			throw std::runtime_error("Staged package is incomplete");
 
