@@ -166,6 +166,7 @@ namespace ProjectStateData {
 		DirectionalLightData sunLight;
 		std::vector<PointLightData> pointLights;
 		struct PendingObject {
+			struct SubmeshColliderData { bool enabled = true; int shape = 0; bool useEntityDefaultShape = true; std::string name; };
 			std::filesystem::path sourcePath;
 			std::string name;
 			glm::vec3 position{ 0.0f };
@@ -178,6 +179,9 @@ namespace ProjectStateData {
 			bool showPhysicsBoundingBox = false;
 			bool rigidBody = false;
 			int physicsColliderShape = 0;
+			float capsuleRadiusOverride = 0.0f;
+			bool useBaseMeshCollider = false;
+			std::vector<SubmeshColliderData> submeshColliderSettings;
 		};
 		std::vector<PendingObject> objects;
 		struct PendingLevelCollider {

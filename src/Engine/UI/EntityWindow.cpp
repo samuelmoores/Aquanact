@@ -131,14 +131,14 @@ void EntityWindow::DrawMaterials(Entity& entity) const
 		return;
 
 	ImGui::Text("Model: %s", entity.SourcePath().empty() ? "Generated mesh" : entity.SourcePath().c_str());
-	const auto drawSubMesh = [mesh](int index)
+	const auto drawSubMesh = [&entity, mesh](int index)
 	{
 		ImGui::PushID(index);
 		const SubMeshMaterial& material = mesh->GetMaterial(index);
 		const std::string& sourceName = mesh->SubMeshName(index);
 		const std::string submeshLabel = sourceName.empty()
 			? "Submesh " + std::to_string(index)
-			: sourceName;
+			: sourceName + " (Submesh " + std::to_string(index) + ")";
 		if (ImGui::TreeNode(submeshLabel.c_str()))
 		{
 			bool emissiveEnabled = material.emissiveEnabled;
@@ -267,6 +267,22 @@ void EntityWindow::DrawPhysics(Entity& entity) const
 			: colliderShape == 2 ? PhysicsColliderShape::Convex : PhysicsColliderShape::Box);
 		PhysicsWorld::Instance().Update(entity);
 	}
+	bool useBaseMeshCollider = entity.UseBaseMeshCollider();
+	if (ImGui::Checkbox("Base Mesh Collision", &useBaseMeshCollider))
+	{
+		entity.SetUseBaseMeshCollider(useBaseMeshCollider);
+		PhysicsWorld::Instance().Update(entity);
+	}
+	if (ImGui::IsItemHovered())
+		ImGui::SetTooltip("Use one collider covering the combined bounds of every submesh. The entity Collision Shape setting applies.");
+	float capsuleRadius = entity.CapsuleRadiusOverride();
+	if (ImGui::DragFloat("Capsule Radius", &capsuleRadius, 0.5f, 0.0f, FLT_MAX, "%.2f"))
+	{
+		entity.SetCapsuleRadiusOverride(capsuleRadius);
+		PhysicsWorld::Instance().Update(entity);
+	}
+	if (ImGui::IsItemHovered())
+		ImGui::SetTooltip("Radius in world units. Set to 0 to derive it automatically from the mesh bounds.");
 
 	bool showBoundingBox = entity.ShowPhysicsBoundingBox();
 	if (ImGui::Checkbox("Draw Bounding Volume", &showBoundingBox))
@@ -283,6 +299,71 @@ void EntityWindow::DrawPhysics(Entity& entity) const
 	bool blocksCameraView = entity.BlocksCameraView();
 	if (ImGui::Checkbox("Blocks Camera View", &blocksCameraView))
 		entity.SetBlocksCameraView(blocksCameraView);
+
+	Mesh* mesh = entity.GetMesh();
+	if (mesh && ImGui::TreeNode("Per-Submesh Colliders"))
+	{
+		if (useBaseMeshCollider)
+			ImGui::BeginDisabled();
+		static const ImVec4 colliderDebugColors[] = {
+			{ 1.0f, 0.7f, 0.1f, 1.0f }, { 0.2f, 0.85f, 1.0f, 1.0f },
+			{ 0.25f, 1.0f, 0.35f, 1.0f }, { 1.0f, 0.3f, 0.75f, 1.0f },
+			{ 0.35f, 0.45f, 1.0f, 1.0f }, { 1.0f, 0.9f, 0.2f, 1.0f },
+			{ 0.9f, 0.45f, 0.15f, 1.0f }, { 0.65f, 0.45f, 1.0f, 1.0f }
+		};
+		constexpr std::size_t colliderDebugColorCount =
+			sizeof(colliderDebugColors) / sizeof(colliderDebugColors[0]);
+		const char* submeshColliderShapes[] = { "Box", "Capsule", "Convex" };
+		for (int index = 0; index < mesh->NumBuffers(); ++index)
+		{
+			ImGui::PushID(index);
+			const std::string& sourceName = mesh->SubMeshName(index);
+			const std::string submeshLabel = sourceName.empty()
+				? "Submesh " + std::to_string(index)
+				: sourceName + " (Submesh " + std::to_string(index) + ")";
+			if (ImGui::TreeNode(submeshLabel.c_str()))
+			{
+				const std::size_t submeshIndex = static_cast<std::size_t>(index);
+				const SubmeshColliderSettings settings = entity.GetSubmeshColliderSettings(submeshIndex);
+				ImGui::TextUnformatted("Debug color");
+				ImGui::SameLine();
+				ImGui::ColorButton("##SubmeshColliderDebugColor",
+					colliderDebugColors[submeshIndex % colliderDebugColorCount],
+					ImGuiColorEditFlags_NoTooltip);
+				bool collisionEnabled = settings.enabled;
+				if (ImGui::Checkbox("Collider Enabled", &collisionEnabled))
+				{
+					entity.SetSubmeshColliderEnabled(submeshIndex, collisionEnabled);
+					PhysicsWorld::Instance().Update(entity);
+				}
+			if (ImGui::IsItemHovered())
+				ImGui::SetTooltip("Turn off to remove this submesh from collision queries.");
+
+				int colliderShape = settings.shape == PhysicsColliderShape::Capsule ? 1
+					: settings.shape == PhysicsColliderShape::Convex ? 2 : 0;
+				if (!collisionEnabled)
+					ImGui::BeginDisabled();
+				if (ImGui::Combo("Collision Shape", &colliderShape,
+					submeshColliderShapes, IM_ARRAYSIZE(submeshColliderShapes)))
+				{
+					entity.SetSubmeshColliderShape(submeshIndex,
+						colliderShape == 1 ? PhysicsColliderShape::Capsule
+							: colliderShape == 2 ? PhysicsColliderShape::Convex
+							: PhysicsColliderShape::Box);
+					PhysicsWorld::Instance().Update(entity);
+				}
+				if (!collisionEnabled)
+					ImGui::EndDisabled();
+				ImGui::TreePop();
+			}
+			ImGui::PopID();
+		}
+		if (useBaseMeshCollider)
+			ImGui::EndDisabled();
+		ImGui::TreePop();
+	}
+	if (useBaseMeshCollider)
+		ImGui::TextDisabled("Per-submesh settings are inactive while Base Mesh Collision is enabled.");
 }
 
 bool EntityWindow::DrawStateMachineButton() const

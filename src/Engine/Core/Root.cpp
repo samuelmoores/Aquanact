@@ -292,14 +292,6 @@ void Root::RunFrame()
 			m_renderManager->Loop(*m_frontEndManager, *m_fileManager, *m_sceneManager, *m_projectManager, *m_debug, *m_input, *m_window, m_engineState);
 		}
 
-		// Make the displayed frame time include outstanding GPU work. Without this,
-		// the CPU can report 120 FPS while the GPU is still presenting frames much
-		// more slowly. This is intentionally only enabled when the profiler is on.
-		if (m_profiler->IsEnabled())
-		{
-			glFinish();
-		}
-
 		// Frame pacing is independent from optional profiler sampling.
 		if (m_frameCapEnabled && m_targetFrameRate > 0.0)
 		{

@@ -1342,7 +1342,7 @@ namespace ProjectStateSerializer {
 					continue;
 				}
 
-				if (((fields.size() < 11 || fields.size() > 19) || fields[0] != "object"))
+				if (fields.size() < 11 || fields[0] != "object")
 				{
 					continue;
 				}
@@ -1358,6 +1358,19 @@ namespace ProjectStateSerializer {
 					object.name = ProjectStateFormat::UnescapeField(fields[17]);
 				if (fields.size() >= 19)
 					object.rigidBody = fields[18] == "1" || fields[18] == "true" || fields[18] == "True";
+				for (std::size_t marker = 0; marker + 1 < fields.size(); ++marker)
+					if (fields[marker] == "basecollider")
+					{
+						object.useBaseMeshCollider = fields[marker + 1] == "1" || fields[marker + 1] == "true" || fields[marker + 1] == "True";
+						break;
+					}
+				for (std::size_t marker = 0; marker + 1 < fields.size(); ++marker)
+					if (fields[marker] == "capsuleradius")
+					{
+						try { object.capsuleRadiusOverride = std::max(0.0f, std::stof(fields[marker + 1])); }
+						catch (...) { object.capsuleRadiusOverride = 0.0f; }
+						break;
+					}
 				object.position = glm::vec3(std::stof(fields[2]), std::stof(fields[3]), std::stof(fields[4]));
 				object.rotation = glm::vec3(std::stof(fields[5]), std::stof(fields[6]), std::stof(fields[7]));
 				object.scale = glm::vec3(std::stof(fields[8]), std::stof(fields[9]), std::stof(fields[10]));
@@ -1404,6 +1417,27 @@ namespace ProjectStateSerializer {
 						fields[15 + physicsOffset] == "1" ||
 						fields[15 + physicsOffset] == "true" ||
 						fields[15 + physicsOffset] == "True";
+				}
+				for (std::size_t marker = 0; marker + 2 < fields.size(); ++marker)
+				{
+					if (fields[marker] != "submeshcolliders") continue;
+					try
+					{
+						const std::size_t count = std::min<std::size_t>(std::stoul(fields[marker + 1]), (fields.size() - marker - 2) / 4);
+						for (std::size_t i = 0; i < count; ++i)
+						{
+							const std::size_t offset = marker + 2 + i * 4;
+							PendingLevel::PendingObject::SubmeshColliderData setting;
+							setting.enabled = fields[offset] == "1" || fields[offset] == "true" || fields[offset] == "True";
+							const int shape = std::stoi(fields[offset + 1]);
+							setting.shape = shape >= 0 && shape <= 3 ? shape : 0;
+							setting.useEntityDefaultShape = fields[offset + 2] == "1" || fields[offset + 2] == "true" || fields[offset + 2] == "True";
+							setting.name = ProjectStateFormat::UnescapeField(fields[offset + 3]);
+							object.submeshColliderSettings.push_back(setting);
+						}
+					}
+					catch (...) { object.submeshColliderSettings.clear(); }
+					break;
 				}
 				currentLevel->objects.push_back(std::move(object));
 			}

@@ -177,11 +177,12 @@ void Controller::MoveWithCollisions(Entity& owner, const glm::vec3& desiredMovem
 			break;
 		}
 
-		const Physics::SweepCollision collision = PhysicsWorld::Instance().Sweep(
-			collider,
-			minBounds + resolvedMovement,
-			maxBounds + resolvedMovement,
-			remainingMovement);
+		Entity* hitEntity = nullptr;
+		const PhysicsCollider* hitCollider = nullptr;
+		const glm::vec3 movementBeforeSweep = remainingMovement;
+		const glm::vec3 resolvedBeforeSweep = resolvedMovement;
+		const Physics::SweepCollision collision = PhysicsWorld::Instance().SweepEntity(
+			owner, remainingMovement, resolvedMovement, &hitEntity, &hitCollider);
 
 		if (!collision.hit)
 		{
@@ -197,12 +198,21 @@ void Controller::MoveWithCollisions(Entity& owner, const glm::vec3& desiredMovem
 
 		const bool walkableSurface = IsWalkableSurface(collision.normal);
 		const bool collidedWithGround = remainingMovement.y <= 0.0f && walkableSurface;
+		const bool collidedWithCeiling = remainingMovement.y > 0.0f
+			&& IsWalkableSurface(-collision.normal);
 
 		m_groundNormal = collision.normal;
 
 		if (collidedWithGround)
 		{
 			m_grounded = true;
+			m_velocity.y = 0.0f;
+		}
+		else if (collidedWithCeiling)
+		{
+			// Stop the jump impulse on a downward-facing walkable contact. Movement
+			// was already projected off the ceiling; retaining upward velocity would
+			// keep driving the controller into it on subsequent frames.
 			m_velocity.y = 0.0f;
 		}
 
@@ -227,6 +237,38 @@ void Controller::MoveWithCollisions(Entity& owner, const glm::vec3& desiredMovem
 			remainingMovement = glm::vec3(0.0f);
 		}
 
+		if (hitEntity && hitCollider
+			&& hitCollider->shape == PhysicsColliderShape::Convex)
+		{
+			const auto formatVector = [](const glm::vec3& value)
+			{
+				return "(" + std::to_string(value.x) + ","
+					+ std::to_string(value.y) + ","
+					+ std::to_string(value.z) + ")";
+			};
+			const std::string colliderPart = hitCollider->isBaseMeshCollider
+				? "base-mesh" : "submesh-" + std::to_string(hitCollider->submeshIndex);
+			Root::Current().Debugger().LogConvexCollision(
+				"controller|" + owner.Name() + "|" + hitEntity->Name() + "|" + colliderPart,
+				"Controller contact moving=" + owner.Name()
+				+ " target=" + hitEntity->Name()
+				+ " collider=" + colliderPart
+				+ " planes=" + std::to_string(hitCollider->convexPlanes.size())
+				+ " parts=" + std::to_string(hitCollider->convexParts.size())
+				+ " fallback=" + (hitCollider->convexPlanes.empty() && hitCollider->convexParts.empty() ? "AABB" : "none")
+				+ " planeSource=" + (hitCollider->convexParts.size() > 1 ? "thin-plane-compound"
+					: hitCollider->convexFromThinPlane ? "thin-plane-hull"
+					: hitCollider->convexPlanes.empty() ? "unavailable" : "mesh-faces")
+				+ " iteration=" + std::to_string(iteration)
+				+ " time=" + std::to_string(collision.time)
+				+ " normal=" + formatVector(collision.normal)
+				+ " desired=" + formatVector(desiredMovement)
+				+ " sweepMovement=" + formatVector(movementBeforeSweep)
+				+ " resolvedBefore=" + formatVector(resolvedBeforeSweep)
+				+ " resolvedAfter=" + formatVector(resolvedMovement)
+				+ " remainingAfter=" + formatVector(remainingMovement));
+		}
+
 		// Avoid repeatedly resolving a zero-time contact that produces no useful
 		// change, which can otherwise consume every iteration at a corner.
 		const bool madeNoProgress = glm::length(resolvedMovement - previousResolvedMovement) <= 0.0001f;
@@ -243,25 +285,20 @@ void Controller::MoveWithCollisions(Entity& owner, const glm::vec3& desiredMovem
 	// downhill or across small gaps in collision geometry.
 	if (m_velocity.y <= 0.0f && !m_grounded)
 	{
-		glm::vec3 probeMin;
-		glm::vec3 probeMax;
-		if (owner.WorldAABB(probeMin, probeMax))
-		{
-			const glm::vec3 probeMovement(0.0f, -groundProbeDistance, 0.0f);
-			const Physics::SweepCollision probe = PhysicsWorld::Instance().Sweep(
-				collider, probeMin, probeMax, probeMovement);
+		const glm::vec3 probeMovement(0.0f, -groundProbeDistance, 0.0f);
+		const Physics::SweepCollision probe = PhysicsWorld::Instance().SweepEntity(
+			owner, probeMovement);
 
-			if (probe.hit && IsWalkableSurface(probe.normal))
-			{
-				verticalSweepHit = true;
-				verticalSweepTime = probe.time;
-				verticalSweepNormal = probe.normal;
-				owner.Move(probeMovement * glm::clamp(probe.time, 0.0f, 1.0f));
-				m_grounded = true;
-				m_groundNormal = probe.normal;
-				m_velocity.y = 0.0f;
-				PhysicsWorld::Instance().Update(owner);
-			}
+		if (probe.hit && IsWalkableSurface(probe.normal))
+		{
+			verticalSweepHit = true;
+			verticalSweepTime = probe.time;
+			verticalSweepNormal = probe.normal;
+			owner.Move(probeMovement * glm::clamp(probe.time, 0.0f, 1.0f));
+			m_grounded = true;
+			m_groundNormal = probe.normal;
+			m_velocity.y = 0.0f;
+			PhysicsWorld::Instance().Update(owner);
 		}
 	}
 

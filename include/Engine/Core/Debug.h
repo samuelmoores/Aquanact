@@ -93,6 +93,7 @@ public:
 	void LogMessage(Severity severity, const std::string& message);
 	// Tags are a simple way to group logs by subsystem like Render, GUI, Build, or IO.
 	void LogTagged(const std::string& tag, const std::string& message);
+	void LogConvexCollision(const std::string& key, const std::string& message);
 	// Tagged + severity-aware logging is useful for warnings and errors from a subsystem.
 	void LogTagged(Severity severity, const std::string& tag, const std::string& message);
 	// One-shot logging avoids repeated spam from conditions that only matter once.
@@ -158,6 +159,7 @@ public:
 
 private:
 	void DrawRenderStatsWindow();
+	void DrawEntityColliderVolumes(const Camera& camera);
 	// Rebuilds the axis/grid helpers when the grid configuration changes.
 	void RebuildGrid();
 	void RebuildAxis();
@@ -178,7 +180,6 @@ private:
 	std::vector<class Line*> m_cameraPathSegments;
 	class Line* m_cutsceneCameraMarker = nullptr;
 	std::vector<class Line*> m_entityBoundingBoxes;
-	std::vector<class Entity*> m_entityBoundingBoxObjects;
 	std::vector<class Line*> m_hitboxDebugVolumes;
 	std::vector<class Hitbox*> m_hitboxDebugObjects;
 	std::vector<class Line*> m_levelColliderBounds;
@@ -266,5 +267,6 @@ private:
 	std::vector<std::string> m_logMessages;
 	std::vector<std::string> m_logOnceKeys;
 	std::ofstream m_runtimeLog;
+	std::ofstream m_convexCollisionLog;
 };
 

@@ -74,7 +74,6 @@ void FrameProfiler::EndFrame()
 			sample->second.averageMs = sample->second.averageMs <= 0.0
 				? current.second
 				: (sample->second.averageMs * 0.9) + (current.second * 0.1);
-			sample->second.maximumMs = std::max(sample->second.maximumMs, current.second);
 		}
 	}
 	const double instantFps = m_frameMs > 0.0 ? 1000.0 / m_frameMs : 0.0;
@@ -86,6 +85,18 @@ void FrameProfiler::EndFrame()
 
 void FrameProfiler::SetEnabled(bool enabled)
 {
+	if (enabled && !m_enabled)
+	{
+		// Start each profiling session with fresh statistics so a one-time
+		// initialization spike does not remain as the displayed maximum forever.
+		for (auto& entry : m_samples)
+		{
+			entry.second.currentMs = 0.0;
+			entry.second.averageMs = 0.0;
+			entry.second.maximumMs = 0.0;
+		}
+		m_currentSamples.clear();
+	}
 	m_enabled = enabled;
 	if (!enabled)
 	{
@@ -128,6 +139,10 @@ void FrameProfiler::Record(const std::string& name, double milliseconds)
 		sample = std::prev(m_samples.end());
 	}
 	sample->second.currentMs += milliseconds;
+	// Maximum is the slowest individual scope invocation. currentMs and
+	// averageMs remain frame totals, so repeated scopes in one frame do not
+	// make the maximum look like one long sync operation.
+	sample->second.maximumMs = std::max(sample->second.maximumMs, milliseconds);
 }
 
 std::vector<FrameProfiler::Sample> FrameProfiler::Samples() const

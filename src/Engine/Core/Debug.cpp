@@ -158,40 +158,17 @@ namespace {
 		return vertices;
 	}
 
-	void BuildVerticalCapsule(const glm::vec3& boxMin, const glm::vec3& boxMax,
-		glm::vec3& base, glm::vec3& tip, float& radius)
+	glm::vec3 SubmeshColliderDebugColor(int submeshIndex)
 	{
-		const glm::vec3 center = (boxMin + boxMax) * 0.5f;
-		const glm::vec3 halfExtents = (boxMax - boxMin) * 0.5f;
-		radius = std::min(std::min(halfExtents.x, halfExtents.z), halfExtents.y);
-		radius = std::max(radius, 0.001f);
-		const float baseY = boxMin.y + radius;
-		const float tipY = boxMax.y - radius;
-		base = glm::vec3(center.x, std::min(baseY, tipY), center.z);
-		tip = glm::vec3(center.x, std::max(baseY, tipY), center.z);
-	}
-
-	bool BuildPhysicsCapsule(const Entity& object, const glm::vec3& boxMin,
-		const glm::vec3& boxMax, glm::vec3& base, glm::vec3& tip, float& radius)
-	{
-		const PhysicsWorld& world = PhysicsWorld::Instance();
-		const ColliderHandle handle = world.Find(object);
-		if (handle == InvalidColliderHandle || handle >= world.Colliders().size())
-		{
-			return false;
-		}
-
-		const PhysicsCollider& collider = world.Colliders()[handle];
-		if (collider.shape != PhysicsColliderShape::Capsule || collider.capsuleRadius <= 0.0f)
-		{
-			return false;
-		}
-
-		const glm::vec3 center = (boxMin + boxMax) * 0.5f;
-		radius = collider.capsuleRadius;
-		base = center - glm::vec3(0.0f, collider.capsuleHalfLength, 0.0f);
-		tip = center + glm::vec3(0.0f, collider.capsuleHalfLength, 0.0f);
-		return true;
+		static const glm::vec3 colors[] = {
+			{ 1.0f, 0.7f, 0.1f }, { 0.2f, 0.85f, 1.0f },
+			{ 0.25f, 1.0f, 0.35f }, { 1.0f, 0.3f, 0.75f },
+			{ 0.35f, 0.45f, 1.0f }, { 1.0f, 0.9f, 0.2f },
+			{ 0.9f, 0.45f, 0.15f }, { 0.65f, 0.45f, 1.0f }
+		};
+		constexpr int ColorCount = static_cast<int>(sizeof(colors) / sizeof(colors[0]));
+		const int colorIndex = ((submeshIndex % ColorCount) + ColorCount) % ColorCount;
+		return colors[colorIndex];
 	}
 
 	std::vector<LineVertex3D> MakeWireCapsuleVertices(
@@ -254,7 +231,8 @@ namespace {
 		return vertices;
 	}
 
-	std::vector<LineVertex3D> MakeWireConvexVertices(const Entity& object, const glm::vec3& color)
+	std::vector<LineVertex3D> MakeWireConvexVertices(
+		const Entity& object, int submeshIndex, const glm::vec3& color)
 	{
 		const Mesh* mesh = const_cast<Entity&>(object).GetMesh();
 		if (!mesh)
@@ -265,14 +243,18 @@ namespace {
 		const auto& vertices = mesh->Vertices();
 		const auto& faces = mesh->Faces();
 		const glm::mat4 model = const_cast<Entity&>(object).BuildModelMatrix();
+		const std::size_t firstFace = submeshIndex < 0 ? 0
+			: std::min<std::size_t>(mesh->FacesOffset(submeshIndex), faces.size());
+		const std::size_t lastFace = submeshIndex < 0 ? faces.size()
+			: std::min<std::size_t>(firstFace + mesh->FacesSize(submeshIndex), faces.size());
 		std::vector<LineVertex3D> result;
-		result.reserve(faces.size() * 2);
+		result.reserve((lastFace - firstFace) * 2);
 		auto addLine = [&](const glm::vec3& a, const glm::vec3& b)
 		{
 			result.push_back({ a.x, a.y, a.z, color.r, color.g, color.b });
 			result.push_back({ b.x, b.y, b.z, color.r, color.g, color.b });
 		};
-		for (std::size_t i = 0; i + 2 < faces.size(); i += 3)
+		for (std::size_t i = firstFace; i + 2 < lastFace; i += 3)
 		{
 			if (faces[i] >= vertices.size() || faces[i + 1] >= vertices.size() || faces[i + 2] >= vertices.size())
 			{
@@ -299,6 +281,15 @@ void Debug::startUp()
 			Root::Current().FileSystemRef().ExecutableDirectory() / "logs";
 		std::filesystem::create_directories(logDirectory);
 		m_runtimeLog.open(logDirectory / "aquanact-runtime.txt", std::ios::out | std::ios::trunc);
+		m_convexCollisionLog.open(
+			logDirectory / "aquanact-convex-collision.txt", std::ios::out | std::ios::trunc);
+		if (m_convexCollisionLog.is_open())
+		{
+			m_convexCollisionLog << "Aquanact Convex Collision Log\n"
+				<< "Mode: " << (Root::Current().State().IsGameMode() ? "Game" : "Editor") << '\n'
+				<< "Events are rate-limited to one per collider pair per second.\n";
+			m_convexCollisionLog.flush();
+		}
 	}
 	catch (...)
 	{
@@ -364,6 +355,11 @@ void Debug::shutDown()
 		m_runtimeLog.flush();
 		m_runtimeLog.close();
 	}
+	if (m_convexCollisionLog.is_open())
+	{
+		m_convexCollisionLog.flush();
+		m_convexCollisionLog.close();
+	}
 }
 
 void Debug::ClearEntityBoundingBoxes()
@@ -373,7 +369,6 @@ void Debug::ClearEntityBoundingBoxes()
 		delete box;
 	}
 	m_entityBoundingBoxes.clear();
-	m_entityBoundingBoxObjects.clear();
 }
 
 void Debug::ClearHitboxDebugVolumes()
@@ -773,67 +768,7 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 
 	DrawHitboxVolumes(camera);
 
-	std::vector<Entity*> currentBoundingBoxObjects;
-	if (activeLevel)
-	{
-		currentBoundingBoxObjects.reserve(activeLevel->Objects().size());
-		for (const auto& object : activeLevel->Objects())
-		{
-			if (object)
-			{
-				currentBoundingBoxObjects.push_back(object.get());
-			}
-		}
-	}
-	if (currentBoundingBoxObjects != m_entityBoundingBoxObjects)
-	{
-		ClearEntityBoundingBoxes();
-		m_entityBoundingBoxObjects = currentBoundingBoxObjects;
-		for (Entity* object : m_entityBoundingBoxObjects)
-		{
-			m_entityBoundingBoxes.push_back(new Line(glm::vec3(0.0f), glm::vec3(0.0f)));
-		}
-	}
-
-	for (std::size_t i = 0; i < m_entityBoundingBoxObjects.size(); ++i)
-	{
-		Entity* object = m_entityBoundingBoxObjects[i];
-		if (!object || !object->ShowPhysicsBoundingBox() || !object->GetMesh())
-		{
-			continue;
-		}
-
-		glm::vec3 boxMin;
-		glm::vec3 boxMax;
-		if (!object->WorldAABB(boxMin, boxMax))
-		{
-			continue;
-		}
-
-		Line* box = m_entityBoundingBoxes[i];
-		const glm::vec3 debugColor(1.0f, 0.7f, 0.1f);
-		if (object->GetPhysicsColliderShape() == PhysicsColliderShape::Capsule)
-		{
-			glm::vec3 base;
-			glm::vec3 tip;
-			float radius = 0.0f;
-			if (!BuildPhysicsCapsule(*object, boxMin, boxMax, base, tip, radius))
-			{
-				BuildVerticalCapsule(boxMin, boxMax, base, tip, radius);
-			}
-			box->SetVertices(MakeWireCapsuleVertices(base, tip, radius, debugColor));
-		}
-		else if (object->GetPhysicsColliderShape() == PhysicsColliderShape::Convex)
-		{
-			box->SetVertices(MakeWireConvexVertices(*object, debugColor));
-		}
-		else
-		{
-			box->SetBounds(boxMin, boxMax, debugColor);
-		}
-		box->UpdateProjection(projection);
-		box->draw(view);
-	}
+	DrawEntityColliderVolumes(camera);
 
 	if (m_showLogWindow)
 	{
@@ -990,6 +925,74 @@ void Debug::drawGameModeInput(const Input& input)
 		ImGui::Text("Last object: %s", m_physicsCollisionObject.empty() ? "<none>" : m_physicsCollisionObject.c_str());
 		ImGui::Text("Normal: %.3f, %.3f, %.3f", m_physicsCollisionNormal.x, m_physicsCollisionNormal.y, m_physicsCollisionNormal.z);
 		ImGui::Text("Penetration: %.3f", m_physicsPenetration);
+		if (ImGui::CollapsingHeader("Convex Collision", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			const std::vector<PhysicsCollider>& colliders = PhysicsWorld::Instance().Colliders();
+			std::size_t convexColliderCount = 0;
+			std::size_t aabbFallbackCount = 0;
+			for (const PhysicsCollider& collider : colliders)
+			{
+				if (collider.enabled && !collider.isHitbox && collider.owner
+					&& collider.shape == PhysicsColliderShape::Convex)
+				{
+					++convexColliderCount;
+					if (collider.convexPlanes.empty() && collider.convexParts.empty())
+						++aabbFallbackCount;
+				}
+			}
+			ImGui::Text("Active Convex colliders: %zu", convexColliderCount);
+			ImGui::Text("Using AABB fallback: %zu", aabbFallbackCount);
+			ImGui::TextWrapped("Runtime log: <executable directory>/logs/aquanact-convex-collision.txt");
+			ImGui::TextWrapped("Open planar meshes may use multiple thin convex parts; collision tests each part independently.");
+
+			for (std::size_t handle = 0; handle < colliders.size(); ++handle)
+			{
+				const PhysicsCollider& collider = colliders[handle];
+				if (!collider.enabled || collider.isHitbox || !collider.owner
+					|| collider.shape != PhysicsColliderShape::Convex)
+					continue;
+
+				std::string colliderName = collider.owner->Name();
+				if (collider.isBaseMeshCollider)
+					colliderName += " / Base Mesh";
+				else if (Mesh* mesh = collider.owner->GetMesh(); mesh && collider.submeshIndex >= 0)
+				{
+					const std::string& submeshName = mesh->SubMeshName(collider.submeshIndex);
+					colliderName += " / " + (submeshName.empty()
+						? "Submesh " + std::to_string(collider.submeshIndex)
+						: submeshName + " (Submesh " + std::to_string(collider.submeshIndex) + ")");
+				}
+
+				ImGui::PushID(static_cast<int>(handle));
+				if (ImGui::TreeNode(colliderName.c_str()))
+				{
+					ImGui::Text("Collider handle: %zu", handle);
+					ImGui::Text("Convex planes: %zu", collider.convexPlanes.size());
+					ImGui::Text("Convex parts: %zu", collider.convexParts.size());
+					if (collider.convexPlanes.empty() && collider.convexParts.empty())
+						ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.2f, 1.0f), "No valid planes; collision falls back to AABB.");
+					for (std::size_t partIndex = 0; partIndex < collider.convexParts.size(); ++partIndex)
+						ImGui::BulletText("Thin convex part %zu: %zu planes",
+							partIndex, collider.convexParts[partIndex].size());
+					ImGui::Text("Bounds min: %.3f, %.3f, %.3f",
+						collider.minBounds.x, collider.minBounds.y, collider.minBounds.z);
+					ImGui::Text("Bounds max: %.3f, %.3f, %.3f",
+						collider.maxBounds.x, collider.maxBounds.y, collider.maxBounds.z);
+					if (!collider.convexPlanes.empty() && ImGui::TreeNode("Plane details"))
+					{
+						for (std::size_t planeIndex = 0; planeIndex < collider.convexPlanes.size(); ++planeIndex)
+						{
+							const Physics::ConvexPlane& plane = collider.convexPlanes[planeIndex];
+							ImGui::BulletText("%zu: n=(%.4f, %.4f, %.4f), d=%.4f",
+								planeIndex, plane.normal.x, plane.normal.y, plane.normal.z, plane.distance);
+						}
+						ImGui::TreePop();
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+		}
 		ImGui::Separator();
 		ImGui::Text("IsGrounded true transitions: %d", m_groundedTrueCount);
 		ImGui::Text("IsGrounded false transitions: %d", m_groundedFalseCount);
@@ -1415,71 +1418,7 @@ void Debug::DrawPhysicsBoundingVolumes(const Camera& camera)
 	const glm::mat4 view = camera.GetViewMatrix();
 
 	DrawHitboxVolumes(camera);
-
-	std::vector<Entity*> currentBoundingBoxObjects;
-	if (activeLevel)
-	{
-		currentBoundingBoxObjects.reserve(activeLevel->Objects().size());
-		for (const auto& object : activeLevel->Objects())
-		{
-			if (object)
-			{
-				currentBoundingBoxObjects.push_back(object.get());
-			}
-		}
-	}
-
-	if (currentBoundingBoxObjects != m_entityBoundingBoxObjects)
-	{
-		ClearEntityBoundingBoxes();
-		m_entityBoundingBoxObjects = currentBoundingBoxObjects;
-		for (Entity* object : m_entityBoundingBoxObjects)
-		{
-			m_entityBoundingBoxes.push_back(new Line(glm::vec3(0.0f), glm::vec3(0.0f)));
-		}
-	}
-
-	for (std::size_t i = 0; i < m_entityBoundingBoxObjects.size(); ++i)
-	{
-		Entity* object = m_entityBoundingBoxObjects[i];
-		if (!object || !object->GetMesh() || object->GetController() == nullptr
-			|| !object->ShowPhysicsBoundingBox())
-		{
-			continue;
-		}
-
-		glm::vec3 boxMin;
-		glm::vec3 boxMax;
-		if (!object->WorldAABB(boxMin, boxMax))
-		{
-			continue;
-		}
-
-		Line* volume = m_entityBoundingBoxes[i];
-		const glm::vec3 debugColor(1.0f, 0.7f, 0.1f);
-		if (object->GetPhysicsColliderShape() == PhysicsColliderShape::Capsule)
-		{
-			glm::vec3 base;
-			glm::vec3 tip;
-			float radius = 0.0f;
-			if (!BuildPhysicsCapsule(*object, boxMin, boxMax, base, tip, radius))
-			{
-				BuildVerticalCapsule(boxMin, boxMax, base, tip, radius);
-			}
-			volume->SetVertices(MakeWireCapsuleVertices(base, tip, radius, debugColor));
-		}
-		else if (object->GetPhysicsColliderShape() == PhysicsColliderShape::Convex)
-		{
-			volume->SetVertices(MakeWireConvexVertices(*object, debugColor));
-		}
-		else
-		{
-			volume->SetBounds(boxMin, boxMax, debugColor);
-		}
-
-		volume->UpdateProjection(projection);
-		volume->draw(view);
-	}
+	DrawEntityColliderVolumes(camera);
 
 	if (!m_showLevelColliderDebugShapes)
 	{
@@ -1530,6 +1469,69 @@ void Debug::DrawPhysicsBoundingVolumes(const Camera& camera)
 		volume->draw(view, model);
 	}
 
+}
+
+void Debug::DrawEntityColliderVolumes(const Camera& camera)
+{
+	const std::vector<PhysicsCollider>& colliders = PhysicsWorld::Instance().Colliders();
+	while (m_entityBoundingBoxes.size() < colliders.size())
+		m_entityBoundingBoxes.push_back(new Line(glm::vec3(0.0f), glm::vec3(0.0f)));
+	while (m_entityBoundingBoxes.size() > colliders.size())
+	{
+		delete m_entityBoundingBoxes.back();
+		m_entityBoundingBoxes.pop_back();
+	}
+
+	const glm::mat4 projection = camera.GetProjectionMatrix();
+	const glm::mat4 view = camera.GetViewMatrix();
+	for (std::size_t handle = 0; handle < colliders.size(); ++handle)
+	{
+		const PhysicsCollider& collider = colliders[handle];
+		Entity* object = collider.owner;
+		if (!collider.enabled || collider.isHitbox || !object ||
+			(collider.submeshIndex < 0 && !collider.isBaseMeshCollider)
+			|| !object->ShowPhysicsBoundingBox())
+		{
+			continue;
+		}
+
+		Line* volume = m_entityBoundingBoxes[handle];
+		const glm::vec3 color = SubmeshColliderDebugColor(collider.submeshIndex);
+		glm::mat4 model(1.0f);
+		if (collider.shape == PhysicsColliderShape::Capsule)
+		{
+			const glm::vec3 center = (collider.minBounds + collider.maxBounds) * 0.5f;
+			const glm::vec3 axis = glm::length(collider.capsuleAxis) > 1e-5f
+				? glm::normalize(collider.capsuleAxis) : glm::vec3(0.0f, 1.0f, 0.0f);
+			const glm::vec3 base = center - axis * collider.capsuleHalfLength;
+			const glm::vec3 tip = center + axis * collider.capsuleHalfLength;
+			volume->SetVertices(MakeWireCapsuleVertices(
+				base, tip, std::max(collider.capsuleRadius, 0.001f), color));
+		}
+		else if (collider.shape == PhysicsColliderShape::Convex)
+		{
+			std::vector<LineVertex3D> vertices = MakeWireConvexVertices(
+				*object, collider.submeshIndex, color);
+			if (vertices.empty())
+				volume->SetBounds(collider.minBounds, collider.maxBounds, color);
+			else
+				volume->SetVertices(std::move(vertices));
+		}
+		else if (collider.shape == PhysicsColliderShape::Sphere && collider.sphereRadius > 0.0f)
+		{
+			volume->SetVertices(MakeWireSphereVertices(color));
+			const glm::vec3 center = (collider.minBounds + collider.maxBounds) * 0.5f;
+			model = glm::translate(glm::mat4(1.0f), center);
+			model = glm::scale(model, glm::vec3(collider.sphereRadius));
+		}
+		else
+		{
+			volume->SetBounds(collider.minBounds, collider.maxBounds, color);
+		}
+
+		volume->UpdateProjection(projection);
+		volume->draw(view, model);
+	}
 }
 
 bool Debug::ShowCameraCollisionDebug() const { return m_showCameraCollisionDebug; }
@@ -1801,6 +1803,27 @@ void Debug::LogTagged(Severity severity, const std::string& tag, const std::stri
 {
 	// Tags group related messages together without requiring a more complicated logging backend.
 	LogMessage(severity, "[" + tag + "] " + message);
+}
+
+void Debug::LogConvexCollision(const std::string& key, const std::string& message)
+{
+	if (!m_convexCollisionLog.is_open())
+		return;
+
+	using Clock = std::chrono::steady_clock;
+	static std::unordered_map<std::string, Clock::time_point> lastWriteByKey;
+	static const Clock::time_point start = Clock::now();
+	const Clock::time_point now = Clock::now();
+	const auto previous = lastWriteByKey.find(key);
+	if (previous != lastWriteByKey.end()
+		&& now - previous->second < std::chrono::seconds(1))
+		return;
+	lastWriteByKey[key] = now;
+
+	const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+		now - start).count();
+	m_convexCollisionLog << '[' << elapsed << " ms] " << message << '\n';
+	m_convexCollisionLog.flush();
 }
 
 void Debug::LogOnce(const std::string& key, const std::string& message)

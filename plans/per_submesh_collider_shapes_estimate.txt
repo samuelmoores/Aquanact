@@ -1,0 +1,27 @@
+Per-Submesh Collider Shapes: Implementation Estimate
+
+Estimated effort: 1–3 days for implementation and careful static review.
+
+The physics system currently treats an entity's mesh as one collider. Although
+the editor already lists submeshes under Materials, the physics world registers,
+updates, and draws collision shapes at the entity level.
+
+Main implementation work:
+
+- Store a collider shape for each submesh, using the current entity-wide shape
+  as the default for existing projects.
+- Register and update one physics collider per submesh, using that submesh's
+  bounds and selected shape.
+- Keep entity-level behavior such as rigid-body movement and collision queries
+  working across all of its submesh colliders.
+- Add per-submesh shape controls and a Draw Collision Shape option alongside
+  the material settings, then draw each shape in the debug view.
+- Persist the settings in project and spawn data so they survive save/load and
+  instance creation.
+
+The estimate depends on how much refinement is needed for concave or skinned
+meshes.
+
+Design choice: Each submesh collider could use its bounds, which is
+straightforward and consistent with the current shapes, or its actual triangles,
+which is more accurate and substantially more work.

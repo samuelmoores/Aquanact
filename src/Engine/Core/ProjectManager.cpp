@@ -164,6 +164,18 @@ namespace {
 				object->SetPhysicsColliderShape(pendingObject.physicsColliderShape == 1
 					? PhysicsColliderShape::Capsule
 					: pendingObject.physicsColliderShape == 2 ? PhysicsColliderShape::Convex : PhysicsColliderShape::Box);
+				object->SetUseBaseMeshCollider(pendingObject.useBaseMeshCollider);
+				object->SetCapsuleRadiusOverride(pendingObject.capsuleRadiusOverride);
+				for (std::size_t savedIndex = 0; savedIndex < pendingObject.submeshColliderSettings.size(); ++savedIndex)
+				{
+					const auto& saved = pendingObject.submeshColliderSettings[savedIndex];
+					std::size_t submeshIndex = savedIndex;
+					if (!saved.name.empty() && object->GetMesh())
+						for (int meshIndex = 0; meshIndex < object->GetMesh()->NumBuffers(); ++meshIndex)
+							if (object->GetMesh()->SubMeshName(meshIndex) == saved.name) { submeshIndex = static_cast<std::size_t>(meshIndex); break; }
+					object->SetSubmeshColliderSettings(submeshIndex,
+						{ saved.enabled, static_cast<PhysicsColliderShape>(saved.shape), saved.useEntityDefaultShape });
+				}
 				object->SetDefaultPosition(object->Position());
 				object->SetDefaultRotation(object->Rotation());
 				if (newObject)

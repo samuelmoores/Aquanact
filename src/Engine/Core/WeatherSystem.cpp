@@ -326,7 +326,15 @@ void WeatherSystem::SpawnRandomSplash(const Scene& scene)
 		std::uniform_real_distribution<float> zDistribution(
 			surface.minimum.z, surface.maximum.z);
 
-		if (surface.object->GetPhysicsColliderShape() == PhysicsColliderShape::Convex)
+		const auto& colliderSettings = surface.object->GetSubmeshColliderSettings();
+		const bool hasConvexSubmesh = surface.object->UseBaseMeshCollider()
+			? surface.object->GetPhysicsColliderShape() == PhysicsColliderShape::Convex
+			: std::any_of(colliderSettings.begin(), colliderSettings.end(),
+				[](const SubmeshColliderSettings& settings)
+				{
+					return settings.enabled && settings.shape == PhysicsColliderShape::Convex;
+				});
+		if (hasConvexSubmesh)
 		{
 			// The AABB is only used to choose a candidate location. Resolve its
 			// height against the actual convex collider so ramps and staircases do

@@ -220,7 +220,20 @@ namespace ProjectStateFormat {
 				contents += std::to_string(colliderShape) + ";";
 				contents += object->BlocksCameraView() ? "1;" : "0;";
 				contents += EscapeField(object->Name()) + ";";
-				contents += object->IsRigidBody() ? "1\n" : "0\n";
+				contents += object->IsRigidBody() ? "1" : "0";
+				contents += ";basecollider;" + std::to_string(object->UseBaseMeshCollider() ? 1 : 0);
+				contents += ";capsuleradius;" + std::to_string(object->CapsuleRadiusOverride());
+				const auto& submeshSettings = object->GetSubmeshColliderSettings();
+				contents += ";submeshcolliders;" + std::to_string(submeshSettings.size());
+				for (std::size_t submeshIndex = 0; submeshIndex < submeshSettings.size(); ++submeshIndex)
+				{
+					const auto& setting = submeshSettings[submeshIndex];
+					contents += ";" + std::to_string(setting.enabled ? 1 : 0)
+						+ ";" + std::to_string(static_cast<int>(setting.shape))
+						+ ";" + std::to_string(setting.useEntityDefaultShape ? 1 : 0)
+						+ ";" + EscapeField(object->GetMesh()->SubMeshName(static_cast<int>(submeshIndex)));
+				}
+				contents += "\n";
 			}
 			for (const auto& collider : Scene->LevelColliders())
 			{

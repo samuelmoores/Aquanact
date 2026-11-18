@@ -58,7 +58,7 @@ namespace
 		return ReadOperand(fields, index, condition.right);
 	}
 
-	void RecoverDefinitionFromEntity(InstanceDefinition& definition, const Entity& entity)
+	void RecoverDefinitionFromEntity(InstanceDefinition& definition, Entity& entity)
 	{
 	definition.name = entity.Name();
 	definition.modelPath = entity.SourcePath();
@@ -69,6 +69,15 @@ namespace
 	definition.showPhysicsBoundingBox = entity.ShowPhysicsBoundingBox();
 	definition.rigidBody = entity.IsRigidBody();
 	definition.physicsColliderShape = static_cast<int>(entity.GetPhysicsColliderShape());
+	definition.useBaseMeshCollider = entity.UseBaseMeshCollider();
+	definition.capsuleRadiusOverride = entity.CapsuleRadiusOverride();
+	definition.submeshColliderSettings.clear();
+	for (std::size_t index = 0; index < entity.GetSubmeshColliderSettings().size(); ++index)
+	{
+		const SubmeshColliderSettings& setting = entity.GetSubmeshColliderSettings()[index];
+		const std::string name = entity.GetMesh() ? entity.GetMesh()->SubMeshName(static_cast<int>(index)) : std::string{};
+		definition.submeshColliderSettings.push_back({ setting.enabled, static_cast<int>(setting.shape), setting.useEntityDefaultShape, name });
+	}
 	if (entity.Parent())
 		definition.attachToEntityName = entity.Parent()->Name();
 		for (const Component* component : entity.Components())
@@ -258,6 +267,13 @@ void SpawnManager::AppendProjectState(std::string& contents, const std::filesyst
 			contents += ";" + std::to_string(definition.triggerPositionOffset.y);
 			contents += ";" + std::to_string(definition.triggerPositionOffset.z);
 		}
+		contents += ";submeshcolliders;" + std::to_string(definition.submeshColliderSettings.size());
+		for (const auto& setting : definition.submeshColliderSettings)
+			contents += ";" + std::to_string(setting.enabled ? 1 : 0) + ";" + std::to_string(setting.shape)
+				+ ";" + std::to_string(setting.useEntityDefaultShape ? 1 : 0)
+				+ ";" + ProjectStateSerializer::EscapeField(setting.name);
+		contents += ";basecollider;" + std::to_string(definition.useBaseMeshCollider ? 1 : 0);
+		contents += ";capsuleradius;" + std::to_string(definition.capsuleRadiusOverride);
 		contents += "\n";
 	}
 }
@@ -395,6 +411,39 @@ void SpawnManager::LoadProjectState(const std::filesystem::path& projectPath)
 				definition.triggerPositionOffset.y = std::stof(fields.at(index++));
 				definition.triggerPositionOffset.z = std::stof(fields.at(index++));
 			}
+			if (index < fields.size() && fields[index] == "submeshcolliders")
+			{
+				++index;
+				const std::size_t requestedCount = std::stoul(fields.at(index++));
+				std::size_t settingsEnd = fields.size();
+				for (std::size_t marker = index; marker < fields.size(); ++marker)
+					if (fields[marker] == "basecollider" || fields[marker] == "capsuleradius")
+					{
+						settingsEnd = marker;
+						break;
+					}
+				const std::size_t count = std::min<std::size_t>(requestedCount, (settingsEnd - index) / 4);
+				for (std::size_t i = 0; i < count; ++i)
+				{
+					InstanceDefinition::SubmeshColliderSetting setting;
+					setting.enabled = std::stoi(fields.at(index++)) != 0;
+					const int shape = std::stoi(fields.at(index++));
+					setting.shape = shape >= 0 && shape <= 3 ? shape : 0;
+					setting.useEntityDefaultShape = std::stoi(fields.at(index++)) != 0;
+					setting.name = ProjectStateSerializer::UnescapeField(fields.at(index++));
+					definition.submeshColliderSettings.push_back(setting);
+				}
+			}
+			if (index + 1 < fields.size() && fields[index] == "basecollider")
+			{
+				++index;
+				definition.useBaseMeshCollider = std::stoi(fields.at(index++)) != 0;
+			}
+			if (index + 1 < fields.size() && fields[index] == "capsuleradius")
+			{
+				++index;
+				definition.capsuleRadiusOverride = std::max(0.0f, std::stof(fields.at(index++)));
+			}
 			if (!definition.name.empty() && (!definition.modelPath.empty() || definition.triggerVolume))
 				m_definitions[definition.name] = std::move(definition);
 		}
@@ -437,6 +486,18 @@ Entity* SpawnManager::SpawnInstance(Scene& scene, const std::string& definitionN
 	instance->SetPhysicsColliderShape(definition->second.physicsColliderShape == 1
 		? PhysicsColliderShape::Capsule
 		: definition->second.physicsColliderShape == 2 ? PhysicsColliderShape::Convex : PhysicsColliderShape::Box);
+	instance->SetUseBaseMeshCollider(definition->second.useBaseMeshCollider);
+	instance->SetCapsuleRadiusOverride(definition->second.capsuleRadiusOverride);
+	for (std::size_t savedIndex = 0; savedIndex < definition->second.submeshColliderSettings.size(); ++savedIndex)
+	{
+		const auto& saved = definition->second.submeshColliderSettings[savedIndex];
+		std::size_t submeshIndex = savedIndex;
+		if (!saved.name.empty() && instance->GetMesh())
+			for (int meshIndex = 0; meshIndex < instance->GetMesh()->NumBuffers(); ++meshIndex)
+				if (instance->GetMesh()->SubMeshName(meshIndex) == saved.name) { submeshIndex = static_cast<std::size_t>(meshIndex); break; }
+		instance->SetSubmeshColliderSettings(submeshIndex,
+			{ saved.enabled, static_cast<PhysicsColliderShape>(saved.shape), saved.useEntityDefaultShape });
+	}
 	if (parent)
 	{
 		// When a parent is supplied, the spawn transform is local to that parent.

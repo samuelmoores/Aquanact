@@ -4,14 +4,27 @@
 #include "Engine/Core/LevelCollider.h"
 #include "Engine/Core/FrameProfiler.h"
 #include "Engine/Core/Root.h"
+#include "Engine/Core/Debug.h"
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
+#include <chrono>
 #include <limits>
+#include <unordered_set>
 #include <glm/gtc/matrix_transform.hpp>
 
 namespace
 {
+	bool SameMatrix(const glm::mat4& left, const glm::mat4& right)
+	{
+		for (int column = 0; column < 4; ++column)
+			for (int row = 0; row < 4; ++row)
+				if (left[column][row] != right[column][row])
+					return false;
+		return true;
+	}
+
 	bool IsCameraCollisionCandidate(const PhysicsCollider& collider)
 	{
 		return collider.enabled && !collider.isHitbox &&
@@ -145,8 +158,12 @@ namespace
 		return {};
 	}
 
-	std::vector<Physics::ConvexPlane> BuildConvexPlanes(const PhysicsCollider& collider)
+	std::vector<Physics::ConvexPlane> BuildConvexPlanes(
+		const PhysicsCollider& collider, int submeshIndex = -1,
+		bool* generatedThinPlane = nullptr)
 	{
+		if (generatedThinPlane)
+			*generatedThinPlane = false;
 		// A convex collider needs the owning mesh and its current world transform.
 		// Invalid or incomplete meshes cannot provide a reliable plane set.
 		Entity* object = collider.owner;
@@ -158,15 +175,47 @@ namespace
 
 		const auto& vertices = mesh->Vertices();
 		const glm::mat4 model = object->BuildModelMatrix();
+		const auto& faces = mesh->Faces();
+		std::size_t firstFaceIndex = 0;
+		std::size_t lastFaceIndex = faces.size();
+		if (submeshIndex >= 0)
+		{
+			firstFaceIndex = std::min<std::size_t>(mesh->FacesOffset(submeshIndex), faces.size());
+			lastFaceIndex = std::min<std::size_t>(firstFaceIndex + mesh->FacesSize(submeshIndex), faces.size());
+		}
+		if (lastFaceIndex < firstFaceIndex + 3)
+			return {};
+
+		std::vector<std::uint32_t> pointIndices;
+		if (submeshIndex >= 0)
+		{
+			std::unordered_set<std::uint32_t> seenPointIndices;
+			for (std::size_t face = firstFaceIndex; face + 2 < lastFaceIndex; face += 3)
+			{
+				for (std::size_t corner = 0; corner < 3; ++corner)
+				{
+					const std::uint32_t vertexIndex = faces[face + corner];
+					if (vertexIndex < vertices.size() && seenPointIndices.insert(vertexIndex).second)
+					{
+						pointIndices.push_back(vertexIndex);
+					}
+				}
+			}
+		}
 
 		// Sample at most 256 vertices to make the face-orientation check bounded
 		// even when the source mesh contains a large number of vertices.
-		const std::size_t pointCount = std::min<std::size_t>(vertices.size(), 256);
+		const std::size_t candidatePointCount = submeshIndex >= 0 ? pointIndices.size() : vertices.size();
+		const std::size_t pointCount = std::min<std::size_t>(candidatePointCount, 256);
+		if (pointCount == 0)
+			return {};
 		std::vector<glm::vec3> points;
 		points.reserve(pointCount);
 		for (std::size_t i = 0; i < pointCount; ++i)
 		{
-			const std::size_t sourceIndex = i * vertices.size() / pointCount;
+			const std::size_t sourceIndex = submeshIndex >= 0
+				? pointIndices[i * pointIndices.size() / pointCount]
+				: i * vertices.size() / pointCount;
 			points.push_back(glm::vec3(model * glm::vec4(vertices[sourceIndex].position, 1.0f)));
 		}
 
@@ -180,8 +229,7 @@ namespace
 		}
 
 		std::vector<Physics::ConvexPlane> planes;
-		const auto& faces = mesh->Faces();
-		for (std::size_t face = 0; face + 2 < faces.size(); face += 3)
+		for (std::size_t face = firstFaceIndex; face + 2 < lastFaceIndex; face += 3)
 		{
 			// Faces are stored as triangle indices. Ignore incomplete or invalid
 			// triangles rather than indexing outside the transformed vertex array.
@@ -247,10 +295,268 @@ namespace
 		// existing AABB fallback instead of sweeping against an unbounded shape.
 		if (planes.size() < 4)
 		{
-			return {};
+			// Thin architectural meshes are often authored as a single open plane.
+			// Such geometry has no volume and therefore cannot provide four face
+			// planes directly. Build a 2D convex outline and extrude it into a small
+			// slab so it remains a real convex collider instead of falling back to
+			// the mesh's potentially enormous AABB.
+			glm::vec3 planeNormal(0.0f);
+			for (std::size_t face = firstFaceIndex; face + 2 < lastFaceIndex; face += 3)
+			{
+				if (faces[face] >= worldVertices.size()
+					|| faces[face + 1] >= worldVertices.size()
+					|| faces[face + 2] >= worldVertices.size())
+					continue;
+				planeNormal = glm::cross(
+					worldVertices[faces[face + 1]] - worldVertices[faces[face]],
+					worldVertices[faces[face + 2]] - worldVertices[faces[face]]);
+				if (glm::length(planeNormal) > 1e-5f)
+					break;
+			}
+			const float normalLength = glm::length(planeNormal);
+			if (normalLength <= 1e-5f)
+				return {};
+			planeNormal /= normalLength;
+
+			std::vector<glm::vec3> surfacePoints;
+			if (submeshIndex >= 0)
+			{
+				surfacePoints.reserve(pointIndices.size());
+				for (const std::uint32_t index : pointIndices)
+					if (index < worldVertices.size())
+						surfacePoints.push_back(worldVertices[index]);
+			}
+			else
+			{
+				surfacePoints = worldVertices;
+			}
+			if (surfacePoints.size() < 3)
+				return {};
+
+			const glm::vec3 planeOrigin = surfacePoints.front();
+			float minPlaneOffset = std::numeric_limits<float>::max();
+			float maxPlaneOffset = -std::numeric_limits<float>::max();
+			for (const glm::vec3& point : surfacePoints)
+			{
+				const float offset = glm::dot(point - planeOrigin, planeNormal);
+				minPlaneOffset = std::min(minPlaneOffset, offset);
+				maxPlaneOffset = std::max(maxPlaneOffset, offset);
+			}
+			const float meshScale = glm::length(collider.maxBounds - collider.minBounds);
+			const float planarTolerance = std::max(0.05f, meshScale * 1e-5f);
+			if (maxPlaneOffset - minPlaneOffset > planarTolerance)
+				return {};
+
+			const glm::vec3 slabCenter = planeOrigin
+				+ planeNormal * ((minPlaneOffset + maxPlaneOffset) * 0.5f);
+			const float halfThickness = std::max(
+				1.0f, (maxPlaneOffset - minPlaneOffset) * 0.5f);
+			const glm::vec3 referenceAxis = std::abs(planeNormal.y) < 0.9f
+				? glm::vec3(0.0f, 1.0f, 0.0f)
+				: glm::vec3(1.0f, 0.0f, 0.0f);
+			const glm::vec3 axisU = glm::normalize(glm::cross(referenceAxis, planeNormal));
+			const glm::vec3 axisV = glm::cross(planeNormal, axisU);
+
+			struct ProjectedPoint
+			{
+				float x;
+				float y;
+				glm::vec3 world;
+			};
+			std::vector<ProjectedPoint> projected;
+			projected.reserve(surfacePoints.size());
+			for (const glm::vec3& point : surfacePoints)
+			{
+				const glm::vec3 relative = point - slabCenter;
+				projected.push_back({ glm::dot(relative, axisU), glm::dot(relative, axisV), point });
+			}
+			std::sort(projected.begin(), projected.end(), [](const ProjectedPoint& left, const ProjectedPoint& right)
+			{
+				return left.x == right.x ? left.y < right.y : left.x < right.x;
+			});
+			projected.erase(std::unique(projected.begin(), projected.end(), [](const ProjectedPoint& left, const ProjectedPoint& right)
+			{
+				return std::abs(left.x - right.x) < 1e-4f
+					&& std::abs(left.y - right.y) < 1e-4f;
+			}), projected.end());
+			if (projected.size() < 3)
+				return {};
+
+			const auto cross2D = [](const ProjectedPoint& origin,
+				const ProjectedPoint& a, const ProjectedPoint& b)
+			{
+				return (a.x - origin.x) * (b.y - origin.y)
+					- (a.y - origin.y) * (b.x - origin.x);
+			};
+			std::vector<ProjectedPoint> hull;
+			for (const ProjectedPoint& point : projected)
+			{
+				while (hull.size() >= 2
+					&& cross2D(hull[hull.size() - 2], hull.back(), point) <= 1e-5f)
+					hull.pop_back();
+				hull.push_back(point);
+			}
+			const std::size_t lowerHullSize = hull.size();
+			for (std::size_t i = projected.size() - 1; i-- > 0;)
+			{
+				const ProjectedPoint& point = projected[i];
+				while (hull.size() > lowerHullSize
+					&& cross2D(hull[hull.size() - 2], hull.back(), point) <= 1e-5f)
+					hull.pop_back();
+				hull.push_back(point);
+			}
+			if (hull.size() > 1)
+				hull.pop_back();
+			if (hull.size() < 3)
+				return {};
+
+			std::vector<Physics::ConvexPlane> thinPlanes;
+			thinPlanes.push_back({ planeNormal, glm::dot(planeNormal, slabCenter) + halfThickness });
+			thinPlanes.push_back({ -planeNormal, glm::dot(-planeNormal, slabCenter) + halfThickness });
+			for (std::size_t i = 0; i < hull.size(); ++i)
+			{
+				const ProjectedPoint& start = hull[i];
+				const ProjectedPoint& end = hull[(i + 1) % hull.size()];
+				glm::vec3 sideNormal = axisU * (end.y - start.y)
+					- axisV * (end.x - start.x);
+				const float sideLength = glm::length(sideNormal);
+				if (sideLength <= 1e-5f)
+					continue;
+				sideNormal /= sideLength;
+				thinPlanes.push_back({ sideNormal, glm::dot(sideNormal, start.world) });
+			}
+			if (thinPlanes.size() < 5)
+				return {};
+
+			if (generatedThinPlane)
+				*generatedThinPlane = true;
+			return thinPlanes;
 		}
 
 		return planes;
+	}
+
+	std::vector<std::vector<Physics::ConvexPlane>> BuildPlanarConvexParts(
+		const PhysicsCollider& collider, int submeshIndex)
+	{
+		Entity* object = collider.owner;
+		const Mesh* mesh = object ? object->GetMesh() : nullptr;
+		if (!object || !mesh)
+			return {};
+
+		const auto& vertices = mesh->Vertices();
+		const auto& faces = mesh->Faces();
+		const std::size_t firstFace = submeshIndex < 0 ? 0
+			: std::min<std::size_t>(mesh->FacesOffset(submeshIndex), faces.size());
+		const std::size_t lastFace = submeshIndex < 0 ? faces.size()
+			: std::min<std::size_t>(firstFace + mesh->FacesSize(submeshIndex), faces.size());
+		const glm::mat4 model = object->BuildModelMatrix();
+		std::vector<glm::vec3> worldVertices;
+		worldVertices.reserve(vertices.size());
+		for (const Vertex3D& vertex : vertices)
+			worldVertices.push_back(glm::vec3(model * glm::vec4(vertex.position, 1.0f)));
+
+		struct PlanarGroup
+		{
+			glm::vec3 normal{ 0.0f };
+			float distance = 0.0f;
+			std::vector<glm::vec3> points;
+		};
+		std::vector<PlanarGroup> groups;
+		const float planeTolerance = std::max(
+			0.05f, glm::length(collider.maxBounds - collider.minBounds) * 1e-5f);
+		for (std::size_t face = firstFace; face + 2 < lastFace; face += 3)
+		{
+			const std::uint32_t ia = faces[face];
+			const std::uint32_t ib = faces[face + 1];
+			const std::uint32_t ic = faces[face + 2];
+			if (ia >= worldVertices.size() || ib >= worldVertices.size() || ic >= worldVertices.size())
+				continue;
+			const glm::vec3 a = worldVertices[ia];
+			const glm::vec3 b = worldVertices[ib];
+			const glm::vec3 c = worldVertices[ic];
+			glm::vec3 normal = glm::cross(b - a, c - a);
+			const float normalLength = glm::length(normal);
+			if (normalLength <= 1e-5f)
+				continue;
+			normal /= normalLength;
+			if (normal.x < -1e-5f || (std::abs(normal.x) <= 1e-5f && normal.y < -1e-5f)
+				|| (std::abs(normal.x) <= 1e-5f && std::abs(normal.y) <= 1e-5f && normal.z < 0.0f))
+				normal = -normal;
+			const float distance = glm::dot(normal, a);
+			PlanarGroup* group = nullptr;
+			for (PlanarGroup& candidate : groups)
+			{
+				if (glm::dot(candidate.normal, normal) > 0.9999f
+					&& std::abs(candidate.distance - distance) <= planeTolerance)
+				{
+					group = &candidate;
+					break;
+				}
+			}
+			if (!group)
+			{
+				groups.push_back({ normal, distance, {} });
+				group = &groups.back();
+			}
+			group->points.push_back(a);
+			group->points.push_back(b);
+			group->points.push_back(c);
+		}
+
+		std::vector<std::vector<Physics::ConvexPlane>> parts;
+		for (const PlanarGroup& group : groups)
+		{
+			if (group.points.size() < 3)
+				continue;
+			const glm::vec3 reference = std::abs(group.normal.y) < 0.9f
+				? glm::vec3(0.0f, 1.0f, 0.0f) : glm::vec3(1.0f, 0.0f, 0.0f);
+			const glm::vec3 axisU = glm::normalize(glm::cross(reference, group.normal));
+			const glm::vec3 axisV = glm::cross(group.normal, axisU);
+			glm::vec3 center(0.0f);
+			for (const glm::vec3& point : group.points)
+				center += point;
+			center /= static_cast<float>(group.points.size());
+			float minU = std::numeric_limits<float>::max();
+			float maxU = -std::numeric_limits<float>::max();
+			float minV = std::numeric_limits<float>::max();
+			float maxV = -std::numeric_limits<float>::max();
+			for (const glm::vec3& point : group.points)
+			{
+				const glm::vec3 relative = point - center;
+				const float u = glm::dot(relative, axisU);
+				const float v = glm::dot(relative, axisV);
+				minU = std::min(minU, u);
+				maxU = std::max(maxU, u);
+				minV = std::min(minV, v);
+				maxV = std::max(maxV, v);
+			}
+			constexpr float halfThickness = 1.0f;
+			std::vector<Physics::ConvexPlane> planes{
+				{ group.normal, glm::dot(group.normal, center) + halfThickness },
+				{ -group.normal, glm::dot(-group.normal, center) + halfThickness },
+				{ axisU, glm::dot(axisU, center) + maxU },
+				{ -axisU, glm::dot(-axisU, center) - minU },
+				{ axisV, glm::dot(axisV, center) + maxV },
+				{ -axisV, glm::dot(-axisV, center) - minV }
+			};
+			parts.push_back(std::move(planes));
+		}
+		return parts;
+	}
+
+	std::string ConvexColliderLabel(const PhysicsCollider& collider)
+	{
+		std::string label = collider.owner ? collider.owner->Name() : "<no owner>";
+		if (collider.isBaseMeshCollider)
+			return label + "/base-mesh";
+		if (collider.owner && collider.owner->GetMesh() && collider.submeshIndex >= 0)
+		{
+			const std::string& name = collider.owner->GetMesh()->SubMeshName(collider.submeshIndex);
+			label += "/" + (name.empty() ? "submesh-" : name + "/submesh-")
+				+ std::to_string(collider.submeshIndex);
+		}
+		return label;
 	}
 
 	bool CameraOverlapsCollider(
@@ -290,18 +596,34 @@ namespace
 		}
 		case PhysicsColliderShape::Convex:
 		{
-			std::vector<Physics::ConvexPlane> planes = collider.convexPlanes;
-			if (planes.empty())
+			if (collider.convexPlanes.empty() && collider.convexParts.empty())
 			{
 				return Physics::GetSphereAABBSweep(
 					position, radius, movement,
 					collider.minBounds, collider.maxBounds);
 			}
-			for (Physics::ConvexPlane& plane : planes)
+			std::vector<const std::vector<Physics::ConvexPlane>*> planeSets;
+			if (!collider.convexParts.empty())
 			{
-				plane.distance += radius;
+				for (const auto& part : collider.convexParts)
+					planeSets.push_back(&part);
 			}
-			return Physics::GetConvexSweep(planes, position, movement);
+			else
+			{
+				planeSets.push_back(&collider.convexPlanes);
+			}
+			Physics::SweepCollision earliestHit;
+			for (const auto* planeSet : planeSets)
+			{
+				std::vector<Physics::ConvexPlane> expandedPlanes = *planeSet;
+				for (Physics::ConvexPlane& plane : expandedPlanes)
+					plane.distance += radius;
+				const Physics::SweepCollision hit = Physics::GetConvexSweep(
+					expandedPlanes, position, movement);
+				if (hit.hit && (!earliestHit.hit || hit.time < earliestHit.time))
+					earliestHit = hit;
+			}
+			return earliestHit;
 		}
 		case PhysicsColliderShape::Box:
 		default:
@@ -329,27 +651,82 @@ namespace
 		}
 		case PhysicsColliderShape::Convex:
 		{
-			const std::vector<Physics::ConvexPlane>& planes = collider.convexPlanes;
-			if (planes.empty())
+			if (collider.convexPlanes.empty() && collider.convexParts.empty())
 			{
 				return Physics::SphereAABBOverlap(
 					position, radius, collider.minBounds, collider.maxBounds);
 			}
-			for (const Physics::ConvexPlane& plane : planes)
+			std::vector<const std::vector<Physics::ConvexPlane>*> planeSets;
+			if (!collider.convexParts.empty())
 			{
-				if (glm::dot(plane.normal, position) >
-					plane.distance + radius + 1e-5f)
-				{
-					return false;
-				}
+				for (const auto& part : collider.convexParts)
+					planeSets.push_back(&part);
 			}
-			return true;
+			else
+			{
+				planeSets.push_back(&collider.convexPlanes);
+			}
+			for (const auto* planeSet : planeSets)
+			{
+				bool overlapsPart = true;
+				for (const Physics::ConvexPlane& plane : *planeSet)
+				{
+					if (glm::dot(plane.normal, position) > plane.distance + radius + 1e-5f)
+					{
+						overlapsPart = false;
+						break;
+					}
+				}
+				if (overlapsPart)
+					return true;
+			}
+			return false;
 		}
 		case PhysicsColliderShape::Box:
 		default:
 			return Physics::SphereAABBOverlap(
 				position, radius, collider.minBounds, collider.maxBounds);
 		}
+	}
+
+	bool AABBOverlapsConvex(
+		const glm::vec3& boxMin, const glm::vec3& boxMax,
+		const PhysicsCollider& collider)
+	{
+		if (collider.convexPlanes.empty() && collider.convexParts.empty())
+			return Physics::AABBOverlap(boxMin, boxMax, collider.minBounds, collider.maxBounds);
+
+		// A plane separates the AABB from the convex collider when even the
+		// AABB corner closest to the plane's interior lies beyond that plane.
+		std::vector<const std::vector<Physics::ConvexPlane>*> planeSets;
+		if (!collider.convexParts.empty())
+		{
+			for (const auto& part : collider.convexParts)
+				planeSets.push_back(&part);
+		}
+		else
+		{
+			planeSets.push_back(&collider.convexPlanes);
+		}
+		for (const auto* planeSet : planeSets)
+		{
+			bool overlapsPart = true;
+			for (const Physics::ConvexPlane& plane : *planeSet)
+			{
+				const glm::vec3 closestToInterior(
+					plane.normal.x >= 0.0f ? boxMin.x : boxMax.x,
+					plane.normal.y >= 0.0f ? boxMin.y : boxMax.y,
+					plane.normal.z >= 0.0f ? boxMin.z : boxMax.z);
+				if (glm::dot(plane.normal, closestToInterior) > plane.distance + 1e-5f)
+				{
+					overlapsPart = false;
+					break;
+				}
+			}
+			if (overlapsPart)
+				return true;
+		}
+		return false;
 	}
 
 }
@@ -363,29 +740,39 @@ PhysicsWorld& PhysicsWorld::Instance()
 bool PhysicsWorld::FindConvexSurfacePoint(
 	const Entity& entity, const glm::vec2& horizontal, glm::vec3& point) const
 {
-	if (entity.GetPhysicsColliderShape() != PhysicsColliderShape::Convex)
-		return false;
-
-	// BuildConvexPlanes uses the current mesh transform, so this remains valid
-	// even when the entity has moved since the scene was registered.
-	PhysicsCollider collider;
-	collider.owner = const_cast<Entity*>(&entity);
-	const std::vector<Physics::ConvexPlane> planes = BuildConvexPlanes(collider);
-
 	float highest = -std::numeric_limits<float>::max();
 	bool found = false;
-
-	// Prefer the authored upward-facing mesh surface. This preserves every
-	// staircase tread instead of allowing the highest convex support plane to
-	// cover the complete AABB footprint.
 	Entity* object = const_cast<Entity*>(&entity);
 	const Mesh* mesh = object->GetMesh();
-	if (mesh)
+	if (!mesh)
+		return false;
+
+	const auto& vertices = mesh->Vertices();
+	const auto& faces = mesh->Faces();
+	const glm::mat4 model = object->BuildModelMatrix();
+	const bool baseMeshCollider = entity.UseBaseMeshCollider();
+	const int firstSubmesh = baseMeshCollider ? -1 : 0;
+	const int submeshLimit = baseMeshCollider ? 0 : mesh->NumBuffers();
+	for (int submeshIndex = firstSubmesh; submeshIndex < submeshLimit; ++submeshIndex)
 	{
-		const auto& vertices = mesh->Vertices();
-		const auto& faces = mesh->Faces();
-		const glm::mat4 model = object->BuildModelMatrix();
-		for (std::size_t face = 0; face + 2 < faces.size(); face += 3)
+		const SubmeshColliderSettings settings = baseMeshCollider
+			? SubmeshColliderSettings{ true, entity.GetPhysicsColliderShape(), true }
+			: entity.GetSubmeshColliderSettings(static_cast<std::size_t>(submeshIndex));
+		if (!settings.enabled || settings.shape != PhysicsColliderShape::Convex)
+			continue;
+
+		PhysicsCollider collider;
+		collider.owner = object;
+		collider.submeshIndex = submeshIndex;
+		collider.isBaseMeshCollider = baseMeshCollider;
+		const std::vector<Physics::ConvexPlane> planes = BuildConvexPlanes(collider, submeshIndex);
+
+		// Prefer authored triangle surfaces to preserve ramps and staircase treads.
+		const std::size_t firstFace = baseMeshCollider ? 0
+			: std::min<std::size_t>(mesh->FacesOffset(submeshIndex), faces.size());
+		const std::size_t lastFace = baseMeshCollider ? faces.size()
+			: std::min<std::size_t>(firstFace + mesh->FacesSize(submeshIndex), faces.size());
+		for (std::size_t face = firstFace; face + 2 < lastFace; face += 3)
 		{
 			if (faces[face] >= vertices.size() || faces[face + 1] >= vertices.size() ||
 				faces[face + 2] >= vertices.size())
@@ -419,35 +806,33 @@ bool PhysicsWorld::FindConvexSurfacePoint(
 				found = true;
 			}
 		}
-	}
-	if (found)
-		return true;
 
-	for (const Physics::ConvexPlane& plane : planes)
-	{
-		// A downward rain ray can meet only an upward-facing boundary plane.
-		if (plane.normal.y <= 1e-5f)
-			continue;
-
-		const float height = (plane.distance -
-			plane.normal.x * horizontal.x - plane.normal.z * horizontal.y) /
-			plane.normal.y;
-		const glm::vec3 candidate(horizontal.x, height, horizontal.y);
-		bool inside = true;
-		for (const Physics::ConvexPlane& boundary : planes)
+		for (const Physics::ConvexPlane& plane : planes)
 		{
-			if (glm::dot(boundary.normal, candidate) > boundary.distance + 1e-3f)
+			// A downward rain ray can meet only an upward-facing boundary plane.
+			if (plane.normal.y <= 1e-5f)
+				continue;
+
+			const float height = (plane.distance -
+				plane.normal.x * horizontal.x - plane.normal.z * horizontal.y) /
+				plane.normal.y;
+			const glm::vec3 candidate(horizontal.x, height, horizontal.y);
+			bool inside = true;
+			for (const Physics::ConvexPlane& boundary : planes)
 			{
-				inside = false;
-				break;
+				if (glm::dot(boundary.normal, candidate) > boundary.distance + 1e-3f)
+				{
+					inside = false;
+					break;
+				}
 			}
-		}
 
-		if (inside && (!found || height > highest))
-		{
-			highest = height;
-			point = candidate;
-			found = true;
+			if (inside && (!found || height > highest))
+			{
+				highest = height;
+				point = candidate;
+				found = true;
+			}
 		}
 	}
 
@@ -576,7 +961,7 @@ ColliderHandle PhysicsWorld::Find(const Entity& entity) const
 	for (ColliderHandle handle = 0; handle < m_colliders.size(); ++handle)
 	{
 		const PhysicsCollider& collider = m_colliders[handle];
-		if (collider.enabled && collider.owner == &entity)
+		if (collider.enabled && !collider.isHitbox && collider.owner == &entity)
 		{
 			return handle;
 		}
@@ -590,7 +975,8 @@ Physics::SweepCollision PhysicsWorld::Sweep(
 	const glm::vec3& minBounds,
 	const glm::vec3& maxBounds,
 	const glm::vec3& movement,
-	Entity** hitEntity) const
+	Entity** hitEntity,
+	const PhysicsCollider** hitCollider) const
 {
 	FrameProfiler::Scope sweepScope(Root::Current().Profiler(), "Physics Sweep");
 	// This method discovers a contact; the caller remains responsible for
@@ -598,6 +984,10 @@ Physics::SweepCollision PhysicsWorld::Sweep(
 	if (hitEntity)
 	{
 		*hitEntity = nullptr;
+	}
+	if (hitCollider)
+	{
+		*hitCollider = nullptr;
 	}
 
 	Physics::SweepCollision earliestHit;
@@ -670,10 +1060,7 @@ Physics::SweepCollision PhysicsWorld::Sweep(
 		Physics::SweepCollision hit;
 		if (candidate.shape == PhysicsColliderShape::Convex)
 		{
-			// Convex candidates are represented by their outward-facing planes.
-			// Build those planes from the candidate's world-space mesh geometry.
-			std::vector<Physics::ConvexPlane> planes = candidate.convexPlanes;
-			if (planes.empty())
+			if (candidate.convexPlanes.empty() && candidate.convexParts.empty())
 			{
 				hit = useCapsule
 					? Physics::GetCapsuleAABBSweep(
@@ -697,19 +1084,49 @@ Physics::SweepCollision PhysicsWorld::Sweep(
 
 				// Expand every plane by the moving shape's support distance. Capsules
 				// use radius plus axial length; boxes use projected half-extents.
-				for (Physics::ConvexPlane& plane : planes)
+				std::vector<const std::vector<Physics::ConvexPlane>*> planeSets;
+				if (!candidate.convexParts.empty())
 				{
-					const float support = useCapsule
-						? moving.capsuleRadius + capsuleHalfLength * std::abs(plane.normal.y)
-						: glm::dot(glm::abs(plane.normal), movingHalfExtents);
-
-					plane.distance += support;
+					for (const auto& part : candidate.convexParts)
+						planeSets.push_back(&part);
 				}
-
-				// Sweep the center through the expanded convex volume. The result uses
-				// the same normalized time interval as the box and capsule sweeps.
-				hit = Physics::GetConvexSweep(planes, movingCenter, movement);
+				else
+				{
+					planeSets.push_back(&candidate.convexPlanes);
+				}
+				for (const auto* planeSet : planeSets)
+				{
+					std::vector<Physics::ConvexPlane> expandedPlanes = *planeSet;
+					for (Physics::ConvexPlane& plane : expandedPlanes)
+					{
+						const float support = useCapsule
+							? moving.capsuleRadius + capsuleHalfLength * std::abs(plane.normal.y)
+							: glm::dot(glm::abs(plane.normal), movingHalfExtents);
+						plane.distance += support;
+					}
+					const Physics::SweepCollision partHit = Physics::GetConvexSweep(
+						expandedPlanes, movingCenter, movement);
+					if (partHit.hit && (!hit.hit || partHit.time < hit.time))
+						hit = partHit;
+				}
 			}
+			const std::string movingName = moving.owner ? moving.owner->Name() : "<no owner>";
+			const std::string candidateName = ConvexColliderLabel(candidate);
+			Root::Current().Debugger().LogConvexCollision(
+				"sweep|" + movingName + "|" + candidateName,
+				"Sweep moving=" + movingName + " target=" + candidateName
+				+ " result=" + (hit.hit ? "hit" : "miss")
+				+ " planes=" + std::to_string(candidate.convexPlanes.size())
+				+ " parts=" + std::to_string(candidate.convexParts.size())
+				+ " fallback=" + (candidate.convexPlanes.empty() && candidate.convexParts.empty() ? "AABB" : "none")
+				+ " planeSource=" + (candidate.convexParts.size() > 1 ? "thin-plane-compound"
+					: candidate.convexFromThinPlane ? "thin-plane-hull"
+					: candidate.convexPlanes.empty() ? "unavailable" : "mesh-faces")
+				+ " time=" + std::to_string(hit.time)
+				+ " normal=(" + std::to_string(hit.normal.x) + ","
+				+ std::to_string(hit.normal.y) + "," + std::to_string(hit.normal.z) + ")"
+				+ " movement=(" + std::to_string(movement.x) + ","
+				+ std::to_string(movement.y) + "," + std::to_string(movement.z) + ")");
 		}
 		else if (useCapsule && candidate.shape == PhysicsColliderShape::Capsule)
 		{
@@ -750,9 +1167,46 @@ Physics::SweepCollision PhysicsWorld::Sweep(
 				// candidate replaces the previous earliest hit.
 				*hitEntity = candidate.owner;
 			}
+			if (hitCollider)
+			{
+				*hitCollider = &candidate;
+			}
 		}
 	}
 
+	return earliestHit;
+}
+
+Physics::SweepCollision PhysicsWorld::SweepEntity(
+	const Entity& movingEntity, const glm::vec3& movement,
+	const glm::vec3& offset, Entity** hitEntity,
+	const PhysicsCollider** hitCollider) const
+{
+	if (hitEntity)
+		*hitEntity = nullptr;
+	if (hitCollider)
+		*hitCollider = nullptr;
+	Physics::SweepCollision earliestHit;
+	for (ColliderHandle handle = 0; handle < m_colliders.size(); ++handle)
+	{
+		const PhysicsCollider& moving = m_colliders[handle];
+		if (!moving.enabled || moving.isHitbox || moving.owner != &movingEntity)
+			continue;
+
+		Entity* candidateEntity = nullptr;
+		const PhysicsCollider* candidateCollider = nullptr;
+		const Physics::SweepCollision hit = Sweep(
+			handle, moving.minBounds + offset, moving.maxBounds + offset,
+			movement, &candidateEntity, &candidateCollider);
+		if (hit.hit && hit.time < earliestHit.time)
+		{
+			earliestHit = hit;
+			if (hitEntity)
+				*hitEntity = candidateEntity;
+			if (hitCollider)
+				*hitCollider = candidateCollider;
+		}
+	}
 	return earliestHit;
 }
 
@@ -825,19 +1279,17 @@ Physics::SweepCollision PhysicsWorld::SweepCameraAgainst(
 	const glm::vec3& movement,
 	const Entity& entity) const
 {
-	const ColliderHandle handle = Find(entity);
-	if (handle == InvalidColliderHandle)
+	Physics::SweepCollision earliestHit;
+	for (const PhysicsCollider& collider : m_colliders)
 	{
-		return {};
+		if (!collider.enabled || collider.isHitbox || collider.owner != &entity)
+			continue;
+		const Physics::SweepCollision hit = SweepCameraAgainstCollider(
+			position, radius, movement, collider);
+		if (hit.hit && hit.time < earliestHit.time)
+			earliestHit = hit;
 	}
-
-	const PhysicsCollider& collider = m_colliders[handle];
-	if (!collider.enabled || (!collider.owner && !collider.levelOwner))
-	{
-		return {};
-	}
-
-	return SweepCameraAgainstCollider(position, radius, movement, collider);
+	return earliestHit;
 }
 
 bool PhysicsWorld::OverlapsCamera(
@@ -874,9 +1326,9 @@ bool PhysicsWorld::OverlapsCamera(
 
 std::vector<Entity*> PhysicsWorld::QuerySphere(const glm::vec3& center, float radius, const Entity* ignoredEntity) const
 {
-	// Return non-owning entity pointers for every enabled collider whose shape
-	// overlaps the query sphere. The caller must not retain these pointers beyond
-	// the owning scene's lifetime.
+	// Return unique non-owning entity pointers for owners with an enabled collider
+	// overlapping the query sphere. The caller must not retain these pointers
+	// beyond the owning scene's lifetime.
 	std::vector<Entity*> result;
 	const float safeRadius = std::max(radius, 0.0f);
 
@@ -908,11 +1360,27 @@ std::vector<Entity*> PhysicsWorld::QuerySphere(const glm::vec3& center, float ra
 		{
 			overlaps = CameraOverlapsCollider(center, safeRadius, collider);
 		}
+		if (collider.shape == PhysicsColliderShape::Convex)
+		{
+			const std::string sourceName = ignoredEntity ? ignoredEntity->Name() : "<sphere-query>";
+			const std::string candidateName = ConvexColliderLabel(collider);
+			Root::Current().Debugger().LogConvexCollision(
+				"spherequery|" + sourceName + "|" + candidateName,
+				"Sphere query source=" + sourceName + " target=" + candidateName
+				+ " result=" + (overlaps ? "overlap" : "separate")
+				+ " planes=" + std::to_string(collider.convexPlanes.size())
+				+ " parts=" + std::to_string(collider.convexParts.size())
+				+ " fallback=" + (collider.convexPlanes.empty() && collider.convexParts.empty() ? "AABB" : "none")
+				+ " center=(" + std::to_string(center.x) + ","
+				+ std::to_string(center.y) + "," + std::to_string(center.z) + ")"
+				+ " radius=" + std::to_string(safeRadius));
+		}
 
 		if (overlaps)
 		{
 			// PhysicsWorld does not own entities; only report the collider owner.
-			result.push_back(collider.owner);
+			if (std::find(result.begin(), result.end(), collider.owner) == result.end())
+				result.push_back(collider.owner);
 		}
 	}
 
@@ -960,57 +1428,252 @@ std::vector<Entity*> PhysicsWorld::QueryHitbox(ColliderHandle hitboxHandle, cons
 		}
 		else
 		{
-			overlaps = Physics::AABBOverlap(hitbox.minBounds, hitbox.maxBounds,
-				candidate.minBounds, candidate.maxBounds);
+			if (candidate.shape == PhysicsColliderShape::Convex)
+				overlaps = AABBOverlapsConvex(
+					hitbox.minBounds, hitbox.maxBounds, candidate);
+			else
+				overlaps = Physics::AABBOverlap(hitbox.minBounds, hitbox.maxBounds,
+					candidate.minBounds, candidate.maxBounds);
 		}
 
 		if (overlaps && std::find(result.begin(), result.end(), candidate.owner) == result.end())
 			result.push_back(candidate.owner);
+		if (candidate.shape == PhysicsColliderShape::Convex)
+		{
+			const std::string hitboxName = hitbox.owner->Name();
+			const std::string candidateName = ConvexColliderLabel(candidate);
+			Root::Current().Debugger().LogConvexCollision(
+				"hitbox|" + hitboxName + "|" + candidateName,
+				"Box hitbox query source=" + hitboxName + " target=" + candidateName
+				+ " result=" + (overlaps ? "overlap" : "separate")
+				+ " planes=" + std::to_string(candidate.convexPlanes.size())
+				+ " parts=" + std::to_string(candidate.convexParts.size())
+				+ " fallback=" + (candidate.convexPlanes.empty() && candidate.convexParts.empty() ? "AABB" : "none"));
+		}
 	}
 
 	return result;
 }
 
+PhysicsCollider PhysicsWorld::BuildSubmeshCollider(
+	const Entity& entity, int submeshIndex) const
+{
+	const auto buildStart = std::chrono::steady_clock::now();
+	PhysicsCollider collider;
+	Entity& mutableEntity = const_cast<Entity&>(entity);
+	Mesh* mesh = mutableEntity.GetMesh();
+	const bool baseMeshCollider = submeshIndex < 0;
+	if (!mesh || (baseMeshCollider
+		? !entity.UseBaseMeshCollider()
+		: submeshIndex >= std::max(mesh->NumBuffers(), 0)))
+	{
+		collider.enabled = false;
+		return collider;
+	}
+
+	const SubmeshColliderSettings settings = baseMeshCollider
+		? SubmeshColliderSettings{ true, entity.GetPhysicsColliderShape(), true }
+		: entity.GetSubmeshColliderSettings(static_cast<std::size_t>(submeshIndex));
+	collider.owner = const_cast<Entity*>(&entity);
+	collider.submeshIndex = submeshIndex;
+	collider.isBaseMeshCollider = baseMeshCollider;
+	collider.enabled = settings.enabled;
+	collider.shape = settings.shape;
+	collider.isStatic = mutableEntity.GetController() == nullptr && !entity.IsRigidBody();
+	if (!settings.enabled)
+		return collider;
+
+	// Derive the submesh's local bounds from its index range. This also handles
+	// meshes created directly from vertices/faces, which have no imported bounds
+	// array but still expose one render buffer.
+	glm::vec3 localMin(std::numeric_limits<float>::max());
+	glm::vec3 localMax(-std::numeric_limits<float>::max());
+	bool hasLocalBounds = false;
+	if (baseMeshCollider)
+	{
+		localMin = mesh->minBounds();
+		localMax = mesh->maxBounds();
+		hasLocalBounds = true;
+	}
+	else if (submeshIndex < mesh->NumBuffers())
+	{
+		localMin = mesh->SubMeshMinBounds(submeshIndex);
+		localMax = mesh->SubMeshMaxBounds(submeshIndex);
+		hasLocalBounds = true;
+	}
+
+	// Mesh bounds are cached at import time. Retain the face-index fallback for
+	// meshes created procedurally or imported without valid per-submesh bounds.
+	const auto& vertices = mesh->Vertices();
+	const auto& faces = mesh->Faces();
+	const std::size_t firstIndex = baseMeshCollider ? 0
+		: std::min<std::size_t>(mesh->FacesOffset(submeshIndex), faces.size());
+	const std::size_t lastIndex = baseMeshCollider ? faces.size()
+		: std::min<std::size_t>(firstIndex + mesh->FacesSize(submeshIndex), faces.size());
+	if (!hasLocalBounds || !std::isfinite(localMin.x) || !std::isfinite(localMin.y)
+		|| !std::isfinite(localMin.z) || !std::isfinite(localMax.x)
+		|| !std::isfinite(localMax.y) || !std::isfinite(localMax.z)
+		|| localMin.x > localMax.x || localMin.y > localMax.y || localMin.z > localMax.z)
+	{
+		hasLocalBounds = false;
+		for (std::size_t index = firstIndex; index < lastIndex; ++index)
+		{
+			const std::uint32_t vertexIndex = faces[index];
+			if (vertexIndex >= vertices.size())
+				continue;
+			localMin = glm::min(localMin, vertices[vertexIndex].position);
+			localMax = glm::max(localMax, vertices[vertexIndex].position);
+			hasLocalBounds = true;
+		}
+	}
+	if (!hasLocalBounds)
+	{
+		collider.enabled = false;
+		return collider;
+	}
+
+	// Transform all eight corners so rotation, nonuniform scale, and parent
+	// transforms produce a conservative world-space AABB for this submesh.
+	const glm::mat4 model = mutableEntity.BuildModelMatrix();
+	collider.cachedModelMatrix = model;
+	collider.hasCachedModelMatrix = true;
+	const glm::vec3 first = glm::vec3(model * glm::vec4(localMin, 1.0f));
+	collider.minBounds = first;
+	collider.maxBounds = first;
+	for (int x = 0; x < 2; ++x)
+	{
+		for (int y = 0; y < 2; ++y)
+		{
+			for (int z = 0; z < 2; ++z)
+			{
+				const glm::vec3 corner(
+					x == 0 ? localMin.x : localMax.x,
+					y == 0 ? localMin.y : localMax.y,
+					z == 0 ? localMin.z : localMax.z);
+				const glm::vec3 worldCorner = glm::vec3(model * glm::vec4(corner, 1.0f));
+				collider.minBounds = glm::min(collider.minBounds, worldCorner);
+				collider.maxBounds = glm::max(collider.maxBounds, worldCorner);
+			}
+		}
+	}
+
+	if (collider.shape == PhysicsColliderShape::Convex)
+	{
+		collider.convexPlanes = BuildConvexPlanes(
+			collider, submeshIndex, &collider.convexFromThinPlane);
+		if (collider.convexPlanes.empty())
+		{
+			collider.convexParts = BuildPlanarConvexParts(collider, submeshIndex);
+			collider.convexFromThinPlane = !collider.convexParts.empty();
+			if (collider.convexFromThinPlane)
+			{
+				// Keep broadphase and overlap queries aware of the slab thickness.
+				collider.minBounds -= glm::vec3(1.0f);
+				collider.maxBounds += glm::vec3(1.0f);
+			}
+		}
+		const std::string colliderName = ConvexColliderLabel(collider);
+		Root::Current().Debugger().LogConvexCollision(
+			"build|" + colliderName,
+			"Built " + colliderName + " planes=" + std::to_string(collider.convexPlanes.size())
+			+ " parts=" + std::to_string(collider.convexParts.size())
+			+ " fallback=" + (collider.convexPlanes.empty() && collider.convexParts.empty() ? "AABB" : "none")
+			+ " planeSource=" + (collider.convexParts.size() > 1 ? "thin-plane-compound"
+				: collider.convexFromThinPlane ? "thin-plane-hull"
+				: collider.convexPlanes.empty() ? "unavailable" : "mesh-faces")
+			+ " boundsMin=(" + std::to_string(collider.minBounds.x) + ","
+			+ std::to_string(collider.minBounds.y) + "," + std::to_string(collider.minBounds.z) + ")"
+			+ " boundsMax=(" + std::to_string(collider.maxBounds.x) + ","
+			+ std::to_string(collider.maxBounds.y) + "," + std::to_string(collider.maxBounds.z) + ")");
+	}
+	else if (collider.shape == PhysicsColliderShape::Capsule)
+	{
+		// Derive a vertical capsule from local bounds and the model's scale axes.
+		// Measuring the rotated world AABB makes radius and height change as the
+		// character turns, which causes collision contacts to jump between frames.
+		const glm::vec3 worldScale(
+			glm::length(glm::vec3(model[0])),
+			glm::length(glm::vec3(model[1])),
+			glm::length(glm::vec3(model[2])));
+		const glm::vec3 localHalfExtents = (localMax - localMin) * 0.5f;
+		const glm::vec3 capsuleCenter = glm::vec3(model * glm::vec4((localMin + localMax) * 0.5f, 1.0f));
+		const float halfWidthX = localHalfExtents.x * worldScale.x;
+		const float halfWidthZ = localHalfExtents.z * worldScale.z;
+		const float halfHeight = localHalfExtents.y * worldScale.y;
+		const float meshDerivedRadius = glm::max(
+			glm::min(glm::min(halfWidthX, halfWidthZ), halfHeight), 0.001f);
+		collider.capsuleRadius = entity.CapsuleRadiusOverride() > 0.0f
+			? entity.CapsuleRadiusOverride() : meshDerivedRadius;
+		collider.capsuleHalfLength = glm::max(halfHeight - collider.capsuleRadius, 0.0f);
+		collider.capsuleRadii = glm::vec3(collider.capsuleRadius);
+		collider.capsuleAxis = glm::vec3(0.0f, 1.0f, 0.0f);
+		const glm::vec3 capsuleExtents(collider.capsuleRadius,
+			collider.capsuleHalfLength + collider.capsuleRadius, collider.capsuleRadius);
+		collider.minBounds = capsuleCenter - capsuleExtents;
+		collider.maxBounds = capsuleCenter + capsuleExtents;
+	}
+	else if (collider.shape == PhysicsColliderShape::Sphere)
+	{
+		const glm::vec3 center = (collider.minBounds + collider.maxBounds) * 0.5f;
+		collider.sphereRadius = glm::length((collider.maxBounds - collider.minBounds) * 0.5f);
+		collider.minBounds = center - glm::vec3(collider.sphereRadius);
+		collider.maxBounds = center + glm::vec3(collider.sphereRadius);
+	}
+
+	const double buildMs = std::chrono::duration<double, std::milli>(
+		std::chrono::steady_clock::now() - buildStart).count();
+	if (buildMs >= 0.5)
+	{
+		Root::Current().Debugger().LogTagged("Physics Sync",
+			"slow collider build entity=\"" + entity.Name() + "\" submesh="
+			+ std::to_string(submeshIndex) + " shape="
+			+ std::to_string(static_cast<int>(collider.shape)) + " faces="
+			+ std::to_string(mesh ? mesh->FacesSize(submeshIndex) : 0) + " vertices="
+			+ std::to_string(mesh ? mesh->Vertices().size() : 0) + " convexPlanes="
+			+ std::to_string(collider.convexPlanes.size()) + " convexParts="
+			+ std::to_string(collider.convexParts.size()) + " elapsedMs="
+			+ std::to_string(buildMs));
+	}
+	return collider;
+}
+
 ColliderHandle PhysicsWorld::Add(Entity& entity)
 {
-	// Mesh entities provide static collision geometry; controller entities use
-	// their registered collider as the moving shape.
-	if (!entity.GetMesh())
-	{
+	Mesh* mesh = entity.GetMesh();
+	if (!mesh)
 		return InvalidColliderHandle;
-	}
-
-	glm::vec3 minBounds;
-	glm::vec3 maxBounds;
-	// Store a world-space bounds snapshot so queries do not need to inspect
-	// unrelated entity data just to perform broadphase checks.
-	if (!entity.WorldAABB(minBounds, maxBounds))
+	for (const PhysicsCollider& existing : m_colliders)
 	{
-		return InvalidColliderHandle;
+		if (existing.owner == &entity && !existing.isHitbox)
+		{
+			// Add is idempotent. Callers that intentionally change transforms or
+			// collider settings use Update(entity), avoiding an accidental expensive
+			// convex rebuild when an already registered entity is added again.
+			return Find(entity);
+		}
 	}
 
-	// Copy the collision-facing state into the PhysicsWorld-owned record while
-	// retaining the entity pointer only for identifying future collision results.
-	PhysicsCollider collider;
-	collider.owner = &entity;
-	collider.shape = entity.GetPhysicsColliderShape();
-	collider.minBounds = minBounds;
-	collider.maxBounds = maxBounds;
-	if (collider.shape == PhysicsColliderShape::Convex)
-		collider.convexPlanes = BuildConvexPlanes(collider);
-	if (collider.shape == PhysicsColliderShape::Capsule)
+	entity.SyncSubmeshColliderSettings();
+	if (entity.UseBaseMeshCollider())
 	{
-		glm::vec3 capsuleBase;
-		glm::vec3 capsuleTip;
-		BuildVerticalCapsule(minBounds, maxBounds, capsuleBase, capsuleTip, collider.capsuleRadius);
-		collider.capsuleRadii = glm::vec3(collider.capsuleRadius);
-		collider.capsuleHalfLength = glm::length(capsuleTip - capsuleBase) * 0.5f;
-		collider.capsuleAxis = glm::vec3(0.0f, 1.0f, 0.0f);
+		PhysicsCollider collider = BuildSubmeshCollider(entity, -1);
+		if (!collider.enabled)
+			return InvalidColliderHandle;
+		m_colliders.push_back(std::move(collider));
+		return m_colliders.size() - 1;
 	}
-	collider.isStatic = entity.GetController() == nullptr && !entity.IsRigidBody();
-
-	m_colliders.push_back(collider);
-	return m_colliders.size() - 1;
+	const std::size_t submeshCount = entity.GetSubmeshColliderSettings().size();
+	ColliderHandle firstHandle = InvalidColliderHandle;
+	for (std::size_t submeshIndex = 0; submeshIndex < submeshCount; ++submeshIndex)
+	{
+		PhysicsCollider collider = BuildSubmeshCollider(entity, static_cast<int>(submeshIndex));
+		if (!collider.enabled)
+			continue;
+		m_colliders.push_back(std::move(collider));
+		if (firstHandle == InvalidColliderHandle)
+			firstHandle = m_colliders.size() - 1;
+	}
+	return firstHandle;
 }
 
 ColliderHandle PhysicsWorld::AddHitbox(Entity& entity, PhysicsColliderShape shape,
@@ -1060,46 +1723,109 @@ void PhysicsWorld::Update(ColliderHandle handle)
 	}
 
 	PhysicsCollider& collider = m_colliders[handle];
-	if (!collider.owner || !collider.owner->GetMesh())
+	if (!collider.owner || collider.isHitbox
+		|| (collider.submeshIndex < 0 && !collider.isBaseMeshCollider))
 	{
 		collider.enabled = false;
 		return;
 	}
-
-	glm::vec3 minBounds;
-	glm::vec3 maxBounds;
-	if (!collider.owner->WorldAABB(minBounds, maxBounds))
-	{
-		collider.enabled = false;
-		return;
-	}
-
-	// Refresh the cached collision representation without changing the handle.
-	collider.shape = collider.owner->GetPhysicsColliderShape();
-	collider.minBounds = minBounds;
-	collider.maxBounds = maxBounds;
-	collider.convexPlanes.clear();
-	if (collider.shape == PhysicsColliderShape::Convex)
-		collider.convexPlanes = BuildConvexPlanes(collider);
-	if (collider.shape == PhysicsColliderShape::Capsule)
-	{
-		glm::vec3 capsuleBase;
-		glm::vec3 capsuleTip;
-		BuildVerticalCapsule(minBounds, maxBounds, capsuleBase, capsuleTip, collider.capsuleRadius);
-		collider.capsuleRadii = glm::vec3(collider.capsuleRadius);
-		collider.capsuleHalfLength = glm::length(capsuleTip - capsuleBase) * 0.5f;
-		collider.capsuleAxis = glm::vec3(0.0f, 1.0f, 0.0f);
-	}
-	collider.enabled = true;
+	collider = BuildSubmeshCollider(*collider.owner, collider.submeshIndex);
 }
 
 void PhysicsWorld::Update(Entity& entity)
 {
-	const ColliderHandle handle = Find(entity);
-	if (handle != InvalidColliderHandle)
+	const auto updateStart = std::chrono::steady_clock::now();
+	entity.SyncSubmeshColliderSettings();
+	Mesh* mesh = entity.GetMesh();
+	const std::size_t submeshCount = mesh
+		? entity.GetSubmeshColliderSettings().size() : 0;
+	std::vector<bool> updatedSubmeshes(submeshCount, false);
+	bool updatedBaseMesh = false;
+	auto logSlowUpdate = [&]()
 	{
-		Update(handle);
+		const double updateMs = std::chrono::duration<double, std::milli>(
+			std::chrono::steady_clock::now() - updateStart).count();
+		if (updateMs < 0.5)
+			return;
+		std::size_t ownedColliders = 0;
+		for (const PhysicsCollider& collider : m_colliders)
+			if (collider.owner == &entity && !collider.isHitbox)
+				++ownedColliders;
+		Root::Current().Debugger().LogTagged("Physics Sync",
+			"slow entity update entity=\"" + entity.Name() + "\" colliders="
+			+ std::to_string(ownedColliders) + " sceneColliders="
+			+ std::to_string(m_colliders.size()) + " faces="
+			+ std::to_string(mesh ? mesh->Faces().size() : 0) + " elapsedMs="
+			+ std::to_string(updateMs));
+	};
+
+	for (ColliderHandle handle = 0; handle < m_colliders.size(); ++handle)
+	{
+		PhysicsCollider& existing = m_colliders[handle];
+		if (existing.owner != &entity || existing.isHitbox)
+			continue;
+
+		if (existing.isBaseMeshCollider)
+		{
+			if (!entity.UseBaseMeshCollider() || updatedBaseMesh)
+				existing = PhysicsCollider{};
+			else
+			{
+				const glm::mat4 model = entity.BuildModelMatrix();
+				const PhysicsColliderShape shape = entity.GetPhysicsColliderShape();
+				const bool shouldBeEnabled = true;
+				if (!existing.isStatic || !existing.hasCachedModelMatrix
+					|| !SameMatrix(existing.cachedModelMatrix, model)
+					|| existing.shape != shape || existing.enabled != shouldBeEnabled)
+					existing = BuildSubmeshCollider(entity, -1);
+				updatedBaseMesh = true;
+			}
+			continue;
+		}
+
+		if (entity.UseBaseMeshCollider() || existing.submeshIndex < 0
+			|| static_cast<std::size_t>(existing.submeshIndex) >= submeshCount)
+		{
+			existing = PhysicsCollider{};
+			continue;
+		}
+
+		const std::size_t submeshIndex = static_cast<std::size_t>(existing.submeshIndex);
+		if (updatedSubmeshes[submeshIndex])
+		{
+			existing.enabled = false;
+			continue;
+		}
+		const SubmeshColliderSettings settings = entity.GetSubmeshColliderSettings(submeshIndex);
+		const glm::mat4 model = entity.BuildModelMatrix();
+		if (!existing.isStatic || !existing.hasCachedModelMatrix
+			|| !SameMatrix(existing.cachedModelMatrix, model)
+			|| existing.shape != settings.shape || existing.enabled != settings.enabled)
+			existing = BuildSubmeshCollider(entity, static_cast<int>(submeshIndex));
+		updatedSubmeshes[submeshIndex] = true;
 	}
+
+	if (entity.UseBaseMeshCollider())
+	{
+		if (!updatedBaseMesh)
+		{
+			PhysicsCollider collider = BuildSubmeshCollider(entity, -1);
+			if (collider.enabled)
+				m_colliders.push_back(std::move(collider));
+		}
+		logSlowUpdate();
+		return;
+	}
+
+	for (std::size_t submeshIndex = 0; submeshIndex < submeshCount; ++submeshIndex)
+	{
+		if (updatedSubmeshes[submeshIndex])
+			continue;
+		PhysicsCollider collider = BuildSubmeshCollider(entity, static_cast<int>(submeshIndex));
+		if (collider.enabled)
+			m_colliders.push_back(std::move(collider));
+	}
+	logSlowUpdate();
 }
 
 void PhysicsWorld::SimulateRigidBody(Entity& entity, float dt)
@@ -1109,11 +1835,6 @@ void PhysicsWorld::SimulateRigidBody(Entity& entity, float dt)
 
 	const ColliderHandle collider = Find(entity);
 	if (collider == InvalidColliderHandle)
-		return;
-
-	glm::vec3 minBounds;
-	glm::vec3 maxBounds;
-	if (!entity.WorldAABB(minBounds, maxBounds))
 		return;
 
 	// Engine assets use centimeters as world units, matching Controller gravity.
@@ -1131,11 +1852,8 @@ void PhysicsWorld::SimulateRigidBody(Entity& entity, float dt)
 		if (glm::length(remainingMovement) <= 0.0001f)
 			break;
 
-		const Physics::SweepCollision collision = Sweep(
-			collider,
-			minBounds + resolvedMovement,
-			maxBounds + resolvedMovement,
-			remainingMovement);
+		const Physics::SweepCollision collision = SweepEntity(
+			entity, remainingMovement, resolvedMovement);
 		if (!collision.hit)
 		{
 			resolvedMovement += remainingMovement;
@@ -1169,7 +1887,7 @@ void PhysicsWorld::SimulateRigidBody(Entity& entity, float dt)
 	if (glm::length(velocity) < 5.0f)
 		velocity = glm::vec3(0.0f);
 	entity.SetLinearVelocity(velocity);
-	Update(collider);
+	Update(entity);
 }
 
 void PhysicsWorld::Remove(ColliderHandle handle)
@@ -1189,6 +1907,18 @@ void PhysicsWorld::Remove(ColliderHandle handle)
 	// generation-based handle or free-list can reclaim these slots if needed.
 	m_colliders[handle] = PhysicsCollider{};
 	m_colliders[handle].enabled = false;
+}
+
+void PhysicsWorld::Remove(Entity& entity)
+{
+	for (PhysicsCollider& collider : m_colliders)
+	{
+		if (collider.owner == &entity)
+		{
+			collider = PhysicsCollider{};
+			collider.enabled = false;
+		}
+	}
 }
 
 void PhysicsWorld::Clear()

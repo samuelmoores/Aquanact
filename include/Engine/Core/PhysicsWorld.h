@@ -3,6 +3,7 @@
 #include "Engine/Core/PhysicsCollider.h"
 #include "Engine/Core/Physics.h"
 
+#include <cstddef>
 #include <vector>
 
 class Scene;
@@ -15,10 +16,10 @@ public:
 
 	// Rebuilds the collision representation for one active scene. Existing
 	// records are cleared first, then each scene entity is passed to Add(),
-	// which excludes meshless entities and entities without a valid world AABB.
+	// which registers each enabled submesh with usable mesh geometry.
 	void RegisterScene(const Scene& scene);
 
-	// Finds the active collider record associated with an entity.
+	// Finds the first active ordinary collider record associated with an entity.
 	ColliderHandle Find(const Entity& entity) const;
 	// Finds the highest point on a convex entity's authored surface below the
 	// supplied horizontal coordinate, with convex physics planes as fallback.
@@ -35,7 +36,16 @@ public:
 		const glm::vec3& minBounds,
 		const glm::vec3& maxBounds,
 		const glm::vec3& movement,
-		Entity** hitEntity = nullptr) const;
+		Entity** hitEntity = nullptr,
+		const PhysicsCollider** hitCollider = nullptr) const;
+	// Sweeps all enabled submesh colliders owned by an entity. offset is the
+	// accumulated movement used during iterative slide resolution.
+	Physics::SweepCollision SweepEntity(
+		const Entity& movingEntity,
+		const glm::vec3& movement,
+		const glm::vec3& offset = glm::vec3(0.0f),
+		Entity** hitEntity = nullptr,
+		const PhysicsCollider** hitCollider = nullptr) const;
 
 	// Sweeps the camera's sphere through registered colliders without moving it.
 	// This is a continuous movement query: it finds whether the camera hits an
@@ -76,8 +86,8 @@ public:
 		const glm::vec3& targetPosition,
 		const Entity* target) const;
 
-	// Add only accepts entities with a mesh and a valid world AABB.
-	// The returned handle is InvalidColliderHandle when registration fails.
+	// Adds one collider record for every enabled submesh. The returned handle is
+	// the first record, or InvalidColliderHandle when none can be registered.
 	ColliderHandle Add(Entity& entity);
 	ColliderHandle AddHitbox(Entity& entity, PhysicsColliderShape shape,
 		const glm::vec3& center, const glm::vec3& halfExtents);
@@ -87,6 +97,7 @@ public:
 	ColliderHandle Add(LevelCollider& collider);
 	void Update(LevelCollider& collider);
 	void Remove(LevelCollider& collider);
+	void Remove(Entity& entity);
 
 	void Remove(ColliderHandle handle);
 	// Refreshes an entity's cached collider state when it has moved or changed
@@ -107,6 +118,9 @@ private:
 
 	PhysicsWorld(const PhysicsWorld&) = delete;
 	PhysicsWorld& operator=(const PhysicsWorld&) = delete;
+
+	// Builds one collider record from a submesh's local bounds and settings.
+	PhysicsCollider BuildSubmeshCollider(const Entity& entity, int submeshIndex) const;
 
 	std::vector<PhysicsCollider> m_colliders;
 };

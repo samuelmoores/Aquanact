@@ -10,6 +10,7 @@
 #include "Engine/Core/ModelImporter.h"
 
 #include <algorithm>
+#include <cmath>
 #include <glm/gtc/matrix_transform.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/euler_angles.hpp>
@@ -52,6 +53,7 @@ Entity::Entity(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces)
 	m_id = g_nextEntityId++;
 	m_skinned = false;
 	m_mesh = new Mesh(vertices, faces);
+	SyncSubmeshColliderSettings();
 	AddComponent<EntityStateMachine>(m_mesh);
 	m_shader.load("shaders/texture_perspective.vert", "shaders/texturing.frag");
 	m_shader.activate();
@@ -97,6 +99,7 @@ Entity::Entity(const char* modelFile, bool addDefaultComponents, bool loadAnimat
 		return;
 	}
 	m_mesh = new Mesh(std::move(model));
+	SyncSubmeshColliderSettings();
 	m_skinned = m_mesh->Skinned();
 	if (addDefaultComponents)
 	{
@@ -131,7 +134,99 @@ Entity::~Entity()
 	delete m_mesh;
 }
 
-Mesh* Entity::GetMesh() { return m_mesh; }
+Mesh* Entity::GetMesh()
+{
+	// Keep settings aligned if a future mesh replacement or reimport changes
+	// the number of imported submeshes.
+	SyncSubmeshColliderSettings();
+	return m_mesh;
+}
+
+void Entity::SetPhysicsColliderShape(PhysicsColliderShape shape)
+{
+	m_physicsColliderShape = shape;
+	for (SubmeshColliderSettings& settings : m_submeshColliderSettings)
+	{
+		if (settings.useEntityDefaultShape)
+			settings.shape = shape;
+	}
+}
+
+void Entity::SetCapsuleRadiusOverride(float radius)
+{
+	m_capsuleRadiusOverride = std::isfinite(radius) && radius > 0.0f ? radius : 0.0f;
+}
+
+void Entity::SyncSubmeshColliderSettings()
+{
+	const std::size_t submeshCount = m_mesh
+		? static_cast<std::size_t>(std::max(m_mesh->NumBuffers(), 0)) : 0;
+	if (m_submeshColliderSettings.size() > submeshCount)
+	{
+		m_submeshColliderSettings.resize(submeshCount);
+	}
+	else if (m_submeshColliderSettings.size() < submeshCount)
+	{
+		const std::size_t previousSize = m_submeshColliderSettings.size();
+		m_submeshColliderSettings.resize(submeshCount);
+		for (std::size_t index = previousSize; index < submeshCount; ++index)
+		{
+			m_submeshColliderSettings[index].shape = m_physicsColliderShape;
+			m_submeshColliderSettings[index].useEntityDefaultShape = true;
+		}
+	}
+	for (SubmeshColliderSettings& settings : m_submeshColliderSettings)
+	{
+		if (settings.useEntityDefaultShape)
+			settings.shape = m_physicsColliderShape;
+	}
+}
+
+const std::vector<SubmeshColliderSettings>& Entity::GetSubmeshColliderSettings()
+{
+	SyncSubmeshColliderSettings();
+	return m_submeshColliderSettings;
+}
+
+SubmeshColliderSettings Entity::GetSubmeshColliderSettings(std::size_t submeshIndex) const
+{
+	const_cast<Entity*>(this)->SyncSubmeshColliderSettings();
+	if (submeshIndex < m_submeshColliderSettings.size())
+		return m_submeshColliderSettings[submeshIndex];
+	return { true, m_physicsColliderShape, true };
+}
+
+void Entity::SetSubmeshColliderEnabled(std::size_t submeshIndex, bool enabled)
+{
+	SyncSubmeshColliderSettings();
+	if (submeshIndex < m_submeshColliderSettings.size())
+		m_submeshColliderSettings[submeshIndex].enabled = enabled;
+}
+
+void Entity::SetSubmeshColliderShape(std::size_t submeshIndex, PhysicsColliderShape shape)
+{
+	SyncSubmeshColliderSettings();
+	if (submeshIndex >= m_submeshColliderSettings.size())
+		return;
+	SubmeshColliderSettings& settings = m_submeshColliderSettings[submeshIndex];
+	settings.shape = shape;
+	settings.useEntityDefaultShape = false;
+}
+
+void Entity::SetSubmeshColliderSettings(std::size_t submeshIndex, const SubmeshColliderSettings& settings)
+{
+	SyncSubmeshColliderSettings();
+	if (submeshIndex >= m_submeshColliderSettings.size())
+		return;
+	SubmeshColliderSettings& destination = m_submeshColliderSettings[submeshIndex];
+	destination = settings;
+	if (destination.useEntityDefaultShape)
+		destination.shape = m_physicsColliderShape;
+	else if (destination.shape != PhysicsColliderShape::Capsule
+		&& destination.shape != PhysicsColliderShape::Convex
+		&& destination.shape != PhysicsColliderShape::Sphere)
+		destination.shape = PhysicsColliderShape::Box;
+}
 bool Entity::RefreshAnimationsFromDisk()
 {
 	if (!m_mesh || !m_mesh->RefreshAnimationsFromDisk())

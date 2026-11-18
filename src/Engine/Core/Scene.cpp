@@ -169,11 +169,7 @@ bool Scene::RemoveObject(Entity* entity)
 		Root::Current().Render().ClearPathedCameraTarget();
 	}
 
-	const ColliderHandle collider = PhysicsWorld::Instance().Find(*entity);
-	if (collider != InvalidColliderHandle)
-	{
-		PhysicsWorld::Instance().Remove(collider);
-	}
+	PhysicsWorld::Instance().Remove(*entity);
 	m_entities.erase(it);
 	return true;
 }

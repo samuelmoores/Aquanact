@@ -17,6 +17,7 @@ class SceneManager;
 
 struct InstanceDefinition
 {
+	struct SubmeshColliderSetting { bool enabled = true; int shape = 0; bool useEntityDefaultShape = true; std::string name; };
 	std::string name;
 	std::string modelPath;
 	bool triggerVolume = false;
@@ -32,6 +33,9 @@ struct InstanceDefinition
 	bool showPhysicsBoundingBox = false;
 	bool rigidBody = false;
 	int physicsColliderShape = 0;
+	float capsuleRadiusOverride = 0.0f;
+	bool useBaseMeshCollider = false;
+	std::vector<SubmeshColliderSetting> submeshColliderSettings;
 	bool hasEntityStateMachineConfiguration = false;
 	std::string entityStateMachineInitialState;
 	std::vector<EntityStateMachine::State> entityStateMachineStates;

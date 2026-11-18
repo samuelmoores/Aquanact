@@ -1,0 +1,253 @@
+Submesh Collider System: Implementation Plan
+
+Goal
+====
+Allow each mesh submesh to have collision enabled or disabled and to select
+its own collider shape, while preserving existing entity-level behavior for
+older projects and spawn data.
+
+1. Map current one-collider assumptions
+---------------------------------------
+Trace collider creation, refresh, registration, and removal in
+src/Engine/Core/PhysicsWorld.cpp. Find every caller of PhysicsWorld::Find(entity)
+and GetPhysicsColliderShape(), and record which callers need one collider and
+which need to consider every collider owned by an entity.
+
+Step 1 findings (source inspection)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Current collider representation and lifecycle:
+- PhysicsCollider in include/Engine/Core/PhysicsCollider.h stores one owner
+  pointer, shape, bounds, and shape-specific data. It has no submesh index or
+  identifier.
+- PhysicsWorld::Add(Entity&) in src/Engine/Core/PhysicsWorld.cpp rejects
+  meshless entities, calls Entity::WorldAABB once for the whole mesh, copies
+  Entity::GetPhysicsColliderShape(), and appends one record.
+- RegisterScene calls Add once per scene entity. Update(Entity&) calls Find,
+  then updates only the first matching record. Update(ColliderHandle) rebuilds
+  bounds for the owner's whole mesh and resets shape from the entity-wide
+  setting.
+- Find(Entity) returns the first enabled record for that owner. Remove(handle)
+  disables one slot; it preserves vector indices because handles are vector
+  indices. Scene::RemoveObject currently finds and removes only one record.
+- Entity stores one m_physicsColliderShape setting. EntityWindow exposes one
+  entity-wide shape control. ProjectStateFormat/ProjectStateSerializer and
+  SpawnManager persist that entity-wide shape.
+
+Runtime callers that assume one handle:
+- Controller::MoveWithCollisions obtains one handle with Find(owner), then
+  sweeps the entity's whole WorldAABB against the world. It refreshes through
+  Update(owner) after moving. SimulateRigidBody follows the same single-handle,
+  whole-entity-bounds pattern and updates that handle after movement.
+- PhysicsWorld::Sweep accepts one moving collider handle and skips every
+  candidate with the same owner as the moving collider. A multi-collider moving
+  entity therefore needs an explicit movement/query policy; simply passing one
+  of its handles will not represent its full collision shape.
+- SweepCameraAgainst(entity) selects only Find(entity)'s first collider.
+- Scene::RemoveObject removes only the first collider returned by Find.
+
+Other entity-level assumptions and query behavior:
+- FindConvexSurfacePoint gates on the entity-wide shape and builds convex
+  planes from the whole entity; its mesh-surface scan also walks all mesh faces.
+  WeatherSystem relies on this for convex splash placement.
+- QuerySphere can append the same owner more than once if multiple records
+  overlap. QueryHitbox already deduplicates owner pointers. Camera sweeps and
+  overlap checks naturally test every record and return a blocking result.
+- Debug.cpp draws an entity's whole WorldAABB and selects its shape from the
+  entity-wide setting. Capsule debug data is read from Find(entity), so it also
+  uses only the first record. This needs a per-record/per-submesh drawing path.
+- EntityWindow.cpp, ProjectStateFormat.cpp/ProjectStateSerializer.cpp,
+  ProjectManager.cpp, and SpawnManager.cpp read or write the entity-level shape;
+  these are persistence/UI work rather than PhysicsWorld registration paths.
+
+Recommended implementation boundary:
+Keep entity movement, ownership, and returned query results entity-based, but
+store an explicit submesh index on each collider record. PhysicsWorld needs a
+multi-record rebuild/update/remove path. Controller and rigid-body movement
+need a chosen entity movement shape or a sweep that evaluates all of the
+entity's submesh shapes, rather than an arbitrary first handle. Decide whether
+all enabled submesh colliders participate in camera blocking and convex surface
+queries, and deduplicate owner results in QuerySphere as part of the query
+audit. Preserve stable handle slots when rebuilding records, or use an explicit
+handle-remapping strategy, because existing handles are vector indices.
+
+2. Define per-submesh settings
+------------------------------
+In include/Engine/Core/Entity.h, add a settings type containing an enabled flag
+and a PhysicsColliderShape for each submesh. Store settings by imported submesh
+index and show the imported name in the editor. When settings are absent, use
+the current entity-wide collider configuration as the default so existing
+projects retain their behavior. Resize or reconcile settings when a mesh is
+loaded or changed.
+
+Step 2 implementation status
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Implemented the settings data model in Entity.h and its initialization,
+reconciliation, and accessors in Entity.cpp. Each submesh entry has an enabled
+flag and shape. Entries that still inherit the entity default track changes to
+SetPhysicsColliderShape(); setting a submesh shape makes that entry explicit.
+Settings are initialized after mesh construction and synchronized when queried
+or when GetMesh() is accessed, so the vector follows the mesh's current buffer
+count. The editor name display and project/spawn persistence remain in later
+steps.
+
+3. Generate colliders from submesh bounds
+-----------------------------------------
+Add a PhysicsWorld helper that reads each submesh's local bounds from Mesh,
+computes its center and half-extents, transforms them into world space, and
+builds the selected collider shape. Start with bounds-based Box, Capsule, and
+Convex shapes. Defer triangle-geometry colliders, which require more work and
+special handling for concave and skinned meshes.
+
+Step 3 implementation status
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Added the private PhysicsWorld::BuildSubmeshCollider helper. It derives local
+bounds from the selected submesh's face-index range and referenced mesh
+vertices, then transforms the eight corners through the entity's full model
+matrix (including parent transforms). It prepares Box, Capsule, Sphere, or
+Convex collider data using that submesh's settings. Convex plane generation can
+now be restricted to the selected submesh's face-index range and vertices.
+The existing entity-level Add/Update registration paths are unchanged; wiring
+this helper into multi-collider registration belongs to step 4.
+
+4. Let PhysicsWorld track multiple colliders per entity
+-------------------------------------------------------
+Change scene registration, Add, Update, and removal so they create, refresh,
+and remove a set of collider records for each entity, with one record per
+enabled submesh. Store the owning entity and submesh index on every record.
+Ensure rebuilding an entity's colliders does not leave stale records or
+invalidate unrelated collider handles unexpectedly.
+
+Step 4 implementation status
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+PhysicsCollider now stores a submesh index. PhysicsWorld::Add registers every
+enabled submesh and returns the first valid handle; Update(Entity&) refreshes
+each existing submesh slot in place, disables removed/disabled submeshes, and
+adds records for newly enabled submeshes. This preserves unrelated vector-index
+handles and avoids appending new records on each transform update. Entity
+removal now disables all of its collider records, and rigid-body movement
+refreshes the entity's full collider set. Find returns an ordinary entity
+collider rather than a hitbox. QuerySphere now deduplicates owners because one
+entity can produce several overlapping records.
+
+5. Adapt entity-level physics behavior
+--------------------------------------
+Audit sweeps, rigid-body updates, convex-surface queries, camera queries,
+hitbox queries, and trigger-related code. Queries should consider the relevant
+submesh colliders while returning the owning entity only once where their API
+returns entities. Keep movement and velocity at the entity level, and refresh
+all of that entity's collider records after its transform changes. Update
+controller code that currently assumes PhysicsWorld::Find(entity) returns the
+only collider. Define explicitly how entity-level operations such as convex
+surface lookup behave when several submesh colliders exist.
+
+Step 5 implementation status
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Added PhysicsWorld::SweepEntity, which sweeps each enabled submesh collider and
+returns the earliest contact. Controller movement, its ground probe, and
+rigid-body movement now use this aggregate query while retaining entity-level
+movement/velocity. Camera sweeps against a followed entity now inspect every
+enabled collider. Convex surface lookup scans enabled Convex submeshes and their
+own face ranges; WeatherSystem now detects per-submesh Convex settings. World
+camera and overlap queries already iterate all records, QuerySphere and
+QueryHitbox return unique owners, and trigger queries inherit that behavior
+through QuerySphere. Convex movers continue to use their submesh AABBs as the
+moving support shape in sweeps, matching the engine's existing convex-mover
+approximation.
+
+6. Add per-submesh editor controls
+----------------------------------
+In src/Engine/UI/EntityWindow.cpp, add a Collision checkbox and Shape dropdown
+beside each submesh row. Disable the shape selector when collision is off. When
+a setting changes, update the entity's settings and refresh its colliders via
+PhysicsWorld::Update(entity). Keep the existing entity-level controls as the
+default for legacy data and any applicable meshless cases.
+
+Step 6 implementation status
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Added a per-submesh collider tree to the Physics section with an Enabled
+checkbox and Box/Capsule/Convex shape selector for each imported submesh. The
+shape selector is disabled when that submesh's collision is off. Changes update
+the per-submesh setting and immediately call PhysicsWorld::Update(entity).
+Existing entity-level shape controls remain and continue to update submeshes
+that inherit the entity default.
+
+7. Draw collider debug shapes
+-----------------------------
+Extend the physics debug view to draw each enabled submesh collider using its
+world-space bounds and selected shape. Provide a show/hide control and make the
+submesh identity available during inspection. Ensure debug geometry updates
+when transforms or collider settings change.
+
+Step 7 implementation status
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The editor and runtime physics overlays now iterate cached PhysicsCollider
+records and draw one volume per enabled entity submesh. Box, Capsule, Sphere,
+and Convex records use their stored bounds or shape data; Convex wire geometry
+is restricted to the record's submesh face range. Submeshes use distinct
+index-based colors, with matching color swatches in inspector rows labeled by
+imported name and submesh index. The existing Draw Bounding Volume control
+toggles the entity's collider overlays. The debug line cache follows
+collider-record count and reuses stable vector-index slots as the physics world
+updates.
+
+8. Persist settings in project and spawn data
+---------------------------------------------
+Update project serialization/loading and spawn definition serialization and
+instantiation to save and restore the per-submesh enabled flag and shape.
+Treat missing per-submesh fields as legacy data and apply the entity-level
+collider defaults. Include enough information to diagnose entries by index and
+name; if settings must survive submesh reordering during reimport, introduce a
+stable imported identifier or a migration strategy.
+
+9. Review edge cases and compatibility
+--------------------------------------
+Review entities with no mesh, meshes with zero or one submesh, disabled
+submeshes, mesh reimport or reordering, attached entities, skinned meshes,
+controller movement, rigid-body movement, and collision queries involving
+multiple submeshes. Check that multi-collider queries do not return duplicate
+entity results and that collider handles remain valid under the chosen update
+strategy.
+
+10. Validate the implementation
+------------------------------
+Review the diff and run appropriate static checks. After a build is requested,
+exercise representative cases: toggle a submesh collider, change its shape,
+save and reload a project, create a spawned instance, and move an entity with
+multiple colliders. Confirm that collision and debug drawing follow each
+submesh's enabled state and selected shape.
+
+Step 8 implementation status
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Project object records and spawn definitions now store enabled state, shape,
+inheritance from the entity shape, and imported submesh name alongside the
+record index. Loading records without this section leaves submeshes at their
+entity-level defaults. New records match saved settings by imported name when
+possible and fall back to index for older or renamed submeshes. Spawned
+instances restore the same settings.
+
+Step 9 review status
+~~~~~~~~~~~~~~~~~~~~
+Meshless entities have no per-submesh entries. Newly imported submeshes inherit
+the entity shape, and removed submeshes drop their settings. Saved names allow
+settings to follow reordered submeshes when names are unique; duplicate or
+changed names fall back to the saved index. Disabled submeshes are omitted
+from registration, while multi-record query/update paths preserve unique entity
+results where required. Attached transforms and skinned bounds use the current
+entity/submesh world-bounds path. Runtime behavior still needs build and editor
+validation.
+
+Step 10 validation status
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Ran `git diff --check` with Git's excludes file redirected to the repository
+local exclude file; it reported no whitespace errors. No build or runtime test
+was run, following the workspace instruction not to build without an explicit
+request. Save/load and in-editor behavior remain to be confirmed in a requested
+build.
+
+Suggested implementation order
+===============================
+Settings and legacy defaults; bounds-to-world collider generation;
+multi-collider registration and updates; query and controller adaptations;
+editor controls and debug drawing; project and spawn persistence; edge-case
+review and validation.

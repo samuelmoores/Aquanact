@@ -5,6 +5,7 @@
 #include "Engine/Core/ShaderProgram.h"
 
 #include <glm/glm.hpp>
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <utility>
@@ -20,6 +21,15 @@ enum class PhysicsColliderShape
 	Capsule = 1,
 	Convex = 2,
 	Sphere = 3
+};
+
+struct SubmeshColliderSettings
+{
+	bool enabled = true;
+	PhysicsColliderShape shape = PhysicsColliderShape::Box;
+	// Untouched submesh settings follow the entity-level shape, including when
+	// legacy project data changes that default after entity construction.
+	bool useEntityDefaultShape = true;
 };
 
 class Entity
@@ -134,8 +144,18 @@ public:
 	}
 	void SetShowPhysicsBoundingBox(bool show) { m_showPhysicsBoundingBox = show; }
 	bool ShowPhysicsBoundingBox() const { return m_showPhysicsBoundingBox; }
-	void SetPhysicsColliderShape(PhysicsColliderShape shape) { m_physicsColliderShape = shape; }
+	void SetPhysicsColliderShape(PhysicsColliderShape shape);
 	PhysicsColliderShape GetPhysicsColliderShape() const { return m_physicsColliderShape; }
+	void SetCapsuleRadiusOverride(float radius);
+	float CapsuleRadiusOverride() const { return m_capsuleRadiusOverride; }
+	void SetUseBaseMeshCollider(bool enabled) { m_useBaseMeshCollider = enabled; }
+	bool UseBaseMeshCollider() const { return m_useBaseMeshCollider; }
+	void SyncSubmeshColliderSettings();
+	const std::vector<SubmeshColliderSettings>& GetSubmeshColliderSettings();
+	SubmeshColliderSettings GetSubmeshColliderSettings(std::size_t submeshIndex) const;
+	void SetSubmeshColliderEnabled(std::size_t submeshIndex, bool enabled);
+	void SetSubmeshColliderShape(std::size_t submeshIndex, PhysicsColliderShape shape);
+	void SetSubmeshColliderSettings(std::size_t submeshIndex, const SubmeshColliderSettings& settings);
 	bool HasEntityState() const;
 
 protected:
@@ -156,6 +176,9 @@ protected:
 	float m_linearDamping = 0.0f;
 	bool m_showPhysicsBoundingBox = false;
 	PhysicsColliderShape m_physicsColliderShape = PhysicsColliderShape::Box;
+	float m_capsuleRadiusOverride = 0.0f;
+	bool m_useBaseMeshCollider = false;
+	std::vector<SubmeshColliderSettings> m_submeshColliderSettings;
 	std::string m_name;
 	std::string m_sourcePath;
 	unsigned int m_id = 0;
