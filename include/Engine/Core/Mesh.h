@@ -158,6 +158,7 @@ class Mesh {
 		std::vector<int> m_facesSize;
 		std::vector<bool> m_castsShadow;
 		std::vector<std::string> m_subMeshNames;
+		std::vector<unsigned int> m_sourceMeshIndices;
 		std::vector<int> m_faceOffsets;
 		std::vector<glm::vec3> m_subMeshMinBounds;
 		std::vector<glm::vec3> m_subMeshMaxBounds;

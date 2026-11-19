@@ -111,6 +111,12 @@ void EntityStateMachine::FirstFrame(Entity& entity)
 
 void EntityStateMachine::UpdateEditorPreview(float dt)
 {
+	if (!m_editorPreviewAnimationEnabled)
+	{
+		if (m_animator)
+			m_animator->EvaluateBindPose();
+		return;
+	}
 	if (m_animator && dt > 0.0f)
 	{
 		m_animator->Update(dt);

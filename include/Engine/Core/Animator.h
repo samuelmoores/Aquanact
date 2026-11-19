@@ -35,6 +35,7 @@ public:
 	// Evaluates the active clip at an explicit time without advancing runtime
 	// state. Used by cutscene scrubbing and deterministic timeline playback.
 	void EvaluateClipAt(int clipIndex, float seconds, bool loop = true);
+	void EvaluateBindPose();
 	bool SampleClipRootTransform(int clipIndex, float seconds, bool loop,
 		glm::vec3& position, glm::vec3& rotation, glm::vec3& scale) const;
 

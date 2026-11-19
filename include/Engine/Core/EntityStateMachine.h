@@ -104,6 +104,7 @@ public:
 	// Advances only the selected animation clip for editor visualization. State
 	// transitions remain a gameplay concern and are not evaluated in this path.
 	void UpdateEditorPreview(float dt);
+	void SetEditorPreviewAnimationEnabled(bool enabled) { m_editorPreviewAnimationEnabled = enabled; }
 
 	// State editing.
 	void SetInitialState(const std::string& stateName);
@@ -226,6 +227,7 @@ private:
 	bool m_currentStateLockedUntilComplete = false;
 	glm::vec3 m_transformAnimationOffset{0.0f};
 	bool m_transformAnimationEnabled = true;
+	bool m_editorPreviewAnimationEnabled = true;
 
 	// Last comparator used by the UI when inspecting a transition.
 	Comparator m_lastTransitionComparator = Comparator::Equal;

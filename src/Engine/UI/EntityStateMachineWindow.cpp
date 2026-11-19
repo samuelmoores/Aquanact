@@ -242,6 +242,8 @@ void EntityStateMachineWindow::DrawStateOverview(
 	}
 
 	ImGui::SeparatorText("Animation Preview Timeline");
+	ImGui::Checkbox("Preview Animation", &ui.previewAnimation);
+	machine.SetEditorPreviewAnimationEnabled(ui.previewAnimation);
 	if (ui.previewStateIndex < 0 || ui.previewStateIndex >= static_cast<int>(states.size()))
 	{
 		ui.previewStateIndex = 0;
@@ -274,7 +276,13 @@ void EntityStateMachineWindow::DrawStateOverview(
 		? previewState.animationSequence.front() : previewState.animationName;
 	const int previewClip = machine.FindAnimationIndex(previewAnimation);
 	Animator* animator = machine.GetAnimator();
-	if (!animator || previewClip < 0)
+	if (!ui.previewAnimation)
+	{
+		if (animator)
+			animator->EvaluateBindPose();
+		ImGui::TextDisabled("Showing the mesh in its bind pose.");
+	}
+	else if (!animator || previewClip < 0)
 	{
 		ImGui::TextDisabled("No animation clip is available for this state.");
 	}

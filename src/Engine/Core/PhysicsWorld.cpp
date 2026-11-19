@@ -1596,14 +1596,41 @@ PhysicsCollider PhysicsWorld::BuildSubmeshCollider(
 			glm::length(glm::vec3(model[1])),
 			glm::length(glm::vec3(model[2])));
 		const glm::vec3 localHalfExtents = (localMax - localMin) * 0.5f;
-		const glm::vec3 capsuleCenter = glm::vec3(model * glm::vec4((localMin + localMax) * 0.5f, 1.0f));
+		glm::vec3 capsuleCenter = glm::vec3(model * glm::vec4((localMin + localMax) * 0.5f, 1.0f));
 		const float halfWidthX = localHalfExtents.x * worldScale.x;
 		const float halfWidthZ = localHalfExtents.z * worldScale.z;
-		const float halfHeight = localHalfExtents.y * worldScale.y;
+		float lowestVertexY = std::numeric_limits<float>::max();
+		float highestVertexY = -std::numeric_limits<float>::max();
+		auto includeVertexY = [&](std::uint32_t vertexIndex)
+		{
+			if (vertexIndex >= vertices.size())
+				return;
+			const float worldY = (model * glm::vec4(vertices[vertexIndex].position, 1.0f)).y;
+			lowestVertexY = std::min(lowestVertexY, worldY);
+			highestVertexY = std::max(highestVertexY, worldY);
+		};
+		if (baseMeshCollider)
+		{
+			for (std::size_t vertexIndex = 0; vertexIndex < vertices.size(); ++vertexIndex)
+				includeVertexY(static_cast<std::uint32_t>(vertexIndex));
+		}
+		else
+		{
+			for (std::size_t faceIndex = firstIndex; faceIndex < lastIndex; ++faceIndex)
+				includeVertexY(faces[faceIndex]);
+		}
+		if (!std::isfinite(lowestVertexY) || !std::isfinite(highestVertexY))
+		{
+			lowestVertexY = collider.minBounds.y;
+			highestVertexY = collider.maxBounds.y;
+		}
+		const float halfHeight = (highestVertexY - lowestVertexY) * 0.5f;
+		const float halfCapsuleHeight = glm::max(halfHeight, 0.001f);
+		capsuleCenter.y = (lowestVertexY + highestVertexY) * 0.5f;
 		const float meshDerivedRadius = glm::max(
 			glm::min(glm::min(halfWidthX, halfWidthZ), halfHeight), 0.001f);
-		collider.capsuleRadius = entity.CapsuleRadiusOverride() > 0.0f
-			? entity.CapsuleRadiusOverride() : meshDerivedRadius;
+		collider.capsuleRadius = glm::min(entity.CapsuleRadiusOverride() > 0.0f
+			? entity.CapsuleRadiusOverride() : meshDerivedRadius, halfCapsuleHeight);
 		collider.capsuleHalfLength = glm::max(halfHeight - collider.capsuleRadius, 0.0f);
 		collider.capsuleRadii = glm::vec3(collider.capsuleRadius);
 		collider.capsuleAxis = glm::vec3(0.0f, 1.0f, 0.0f);

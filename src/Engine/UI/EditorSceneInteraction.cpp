@@ -409,6 +409,7 @@ void EditorSceneInteraction::Draw(const EngineGuiFrameContext& context) const
 					if (context.gizmoScale && *context.gizmoScale)
 						selectedEntity->SetScale(glm::vec3(scaleValues[0], scaleValues[1], scaleValues[2]));
 				}
+				PhysicsWorld::Instance().Update(*selectedEntity);
 			}
 			else if (selectedPointLight)
 			{

@@ -1,12 +1,15 @@
 #include "Engine/Core/ModelImporter.h"
 
 #include "Engine/Core/Debug.h"
+#include "Engine/Core/FileSystem.h"
 #include "Engine/Core/Root.h"
 
 #include <algorithm>
 #include <cassert>
 #include <cfloat>
+#include <cctype>
 #include <filesystem>
+#include <fstream>
 #include <map>
 #include <stdexcept>
 
@@ -34,6 +37,131 @@ namespace {
 		return value;
 	}
 
+	bool IsRigControlNode(const aiNode* node)
+	{
+		std::string name = node && node->mName.length > 0 ? node->mName.C_Str() : "";
+		std::transform(name.begin(), name.end(), name.begin(),
+			[](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+		return name.find("_ctl") != std::string::npos
+			|| name.find("_ik") != std::string::npos
+			|| name.find("_fk") != std::string::npos
+			|| name.find("control") != std::string::npos;
+	}
+
+	void FindRigControlMeshReferences(const aiNode* node, const aiScene* scene,
+		std::vector<bool>& referencedByControl, std::vector<bool>& referencedOutsideControl)
+	{
+		if (!node)
+			return;
+
+		const bool isControlNode = IsRigControlNode(node);
+		for (unsigned int index = 0; index < node->mNumMeshes; ++index)
+		{
+			const unsigned int meshIndex = node->mMeshes[index];
+			if (meshIndex >= scene->mNumMeshes)
+				continue;
+			if (isControlNode)
+				referencedByControl[meshIndex] = true;
+			else
+				referencedOutsideControl[meshIndex] = true;
+		}
+
+		for (unsigned int index = 0; index < node->mNumChildren; ++index)
+			FindRigControlMeshReferences(node->mChildren[index], scene,
+				referencedByControl, referencedOutsideControl);
+	}
+
+	std::vector<bool> RigControlMeshesToIgnore(const aiScene* scene)
+	{
+		std::vector<bool> ignore(scene ? scene->mNumMeshes : 0, false);
+		if (!scene || !scene->mRootNode)
+			return ignore;
+
+		std::vector<bool> referencedByControl(scene->mNumMeshes, false);
+		std::vector<bool> referencedOutsideControl(scene->mNumMeshes, false);
+		FindRigControlMeshReferences(scene->mRootNode, scene,
+			referencedByControl, referencedOutsideControl);
+		for (unsigned int index = 0; index < scene->mNumMeshes; ++index)
+		{
+			const aiMesh* mesh = scene->mMeshes[index];
+			ignore[index] = std::string(mesh->mName.C_Str()) == "RootNode"
+				&& mesh->mNumBones == 0
+				&& referencedByControl[index]
+				&& !referencedOutsideControl[index];
+		}
+		return ignore;
+	}
+
+	void WriteNodeMeshReferences(std::ofstream& log, const aiNode* node,
+		const std::string& parentPath, const aiScene* scene)
+	{
+		if (!node)
+			return;
+
+		const std::string nodeName = node->mName.length > 0 ? node->mName.C_Str() : "<unnamed>";
+		const std::string nodePath = parentPath.empty() ? nodeName : parentPath + "/" + nodeName;
+		for (unsigned int index = 0; index < node->mNumMeshes; ++index)
+		{
+			const unsigned int meshIndex = node->mMeshes[index];
+			if (meshIndex >= scene->mNumMeshes)
+				continue;
+
+			const aiMatrix4x4& transform = node->mTransformation;
+			log << "  Node reference: mesh=" << meshIndex << " path=" << nodePath
+				<< " localTransform=["
+				<< transform.a1 << ',' << transform.a2 << ',' << transform.a3 << ',' << transform.a4 << ';'
+				<< transform.b1 << ',' << transform.b2 << ',' << transform.b3 << ',' << transform.b4 << ';'
+				<< transform.c1 << ',' << transform.c2 << ',' << transform.c3 << ',' << transform.c4 << ';'
+				<< transform.d1 << ',' << transform.d2 << ',' << transform.d3 << ',' << transform.d4 << "]\n";
+		}
+
+		for (unsigned int index = 0; index < node->mNumChildren; ++index)
+			WriteNodeMeshReferences(log, node->mChildren[index], nodePath, scene);
+	}
+
+	void WriteMultiMeshImportLog(const std::string& sourcePath, const aiScene* scene)
+	{
+		if (!scene || scene->mNumMeshes == 1)
+			return;
+
+		try
+		{
+			const std::filesystem::path logPath =
+				Root::Current().FileSystemRef().ExecutableDirectory() / "logs" / "aquanact-importer.txt";
+			std::filesystem::create_directories(logPath.parent_path());
+			std::ofstream log(logPath, std::ios::out | std::ios::app);
+			if (!log.is_open())
+				return;
+			const std::vector<bool> ignoredControlMeshes = RigControlMeshesToIgnore(scene);
+
+			log << "\n=== FBX import with " << scene->mNumMeshes << " meshes ===\n"
+				<< "Source: " << sourcePath << '\n'
+				<< "Materials: " << scene->mNumMaterials << '\n';
+			for (unsigned int index = 0; index < scene->mNumMeshes; ++index)
+			{
+				const aiMesh* mesh = scene->mMeshes[index];
+				aiString materialName("<invalid material index>");
+				if (mesh->mMaterialIndex < scene->mNumMaterials)
+					scene->mMaterials[mesh->mMaterialIndex]->Get(AI_MATKEY_NAME, materialName);
+				log << "Mesh " << index << ": name="
+					<< (mesh->mName.length > 0 ? mesh->mName.C_Str() : "<unnamed>")
+					<< " vertices=" << mesh->mNumVertices
+					<< " faces=" << mesh->mNumFaces
+					<< " materialIndex=" << mesh->mMaterialIndex
+					<< " materialName=" << materialName.C_Str()
+					<< " bones=" << mesh->mNumBones
+					<< " importGeometry=" << (ignoredControlMeshes[index] ? "ignored-control-shape" : "yes") << '\n';
+			}
+			log << "Scene node mesh references and local transforms:\n";
+			WriteNodeMeshReferences(log, scene->mRootNode, "", scene);
+			log.flush();
+		}
+		catch (...)
+		{
+			// Diagnostic logging must not prevent an FBX from importing.
+		}
+	}
+
 }
 
 ImportedModel ModelImporter::Import(const std::string& path, bool flipUvs, bool loadAnimations) const
@@ -53,6 +181,8 @@ ImportedModel ModelImporter::Import(const std::string& path, bool flipUvs, bool 
 		Root::Current().Debugger().LogMessage(std::string("ASSIMP ERROR: ") + model.importer->GetErrorString());
 		return model;
 	}
+	WriteMultiMeshImportLog(path, model.scene);
+	const std::vector<bool> ignoredControlMeshes = RigControlMeshesToIgnore(model.scene);
 
 	std::vector<Vertex3D> vertices;
 	std::vector<uint32_t> faces;
@@ -61,6 +191,8 @@ ImportedModel ModelImporter::Import(const std::string& path, bool flipUvs, bool 
 	for (int i = 0; i < static_cast<int>(model.scene->mNumMeshes); ++i)
 	{
 		const aiMesh* mesh = model.scene->mMeshes[i];
+		if (ignoredControlMeshes[static_cast<std::size_t>(i)])
+			continue;
 		const int numVertices = static_cast<int>(mesh->mNumVertices);
 		const int numBones = static_cast<int>(mesh->mNumBones);
 		glm::vec3 subMeshMin(FLT_MAX);
@@ -101,6 +233,7 @@ ImportedModel ModelImporter::Import(const std::string& path, bool flipUvs, bool 
 
 		model.facesSize.push_back(static_cast<int>(mesh->mNumFaces * VERTICES_PER_FACE));
 		model.subMeshNames.emplace_back(mesh->mName.C_Str());
+		model.sourceMeshIndices.push_back(static_cast<unsigned int>(i));
 		model.subMeshMinBounds.push_back(subMeshMin);
 		model.subMeshMaxBounds.push_back(subMeshMax);
 

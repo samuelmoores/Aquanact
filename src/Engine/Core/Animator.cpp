@@ -182,6 +182,12 @@ void Animator::EvaluateClipAt(int clipIndex, float seconds, bool loop)
 	Traverse(ticks, m_rootNode, aiMatrix4x4(), clip);
 }
 
+void Animator::EvaluateBindPose()
+{
+	if (m_rootNode && m_skeleton)
+		Traverse(0.0f, m_rootNode, aiMatrix4x4(), nullptr);
+}
+
 bool Animator::SampleClipRootTransform(int clipIndex, float seconds, bool loop,
 	glm::vec3& position, glm::vec3& rotation, glm::vec3& scale) const
 {
@@ -305,7 +311,7 @@ void Animator::Traverse(float timeTicks, const aiNode* node, const aiMatrix4x4& 
 	if (name.find("$AssimpFbx$") != std::string::npos)
 		nodeTransform = aiMatrix4x4();
 
-	const aiNodeAnim* ch = anim->FindChannel(name);
+	const aiNodeAnim* ch = anim ? anim->FindChannel(name) : nullptr;
 	if (ch)
 	{
 		aiVector3D   s; anim->CalcScaling(s, timeTicks, ch);

@@ -20,6 +20,7 @@ struct ImportedModel {
 	std::vector<uint32_t> faces;
 	std::vector<int> facesSize;
 	std::vector<std::string> subMeshNames;
+	std::vector<unsigned int> sourceMeshIndices;
 	std::vector<glm::vec3> subMeshMinBounds;
 	std::vector<glm::vec3> subMeshMaxBounds;
 	Skeleton skeleton;

@@ -184,6 +184,7 @@ void EntityWindow::DrawMaterials(Entity& entity) const
 
 void EntityWindow::DrawTransform(Entity& entity) const
 {
+	bool transformChanged = false;
 	ImGui::Separator();
 	ImGui::TextUnformatted("Position");
 	const glm::vec3 position = entity.Position();
@@ -192,43 +193,67 @@ void EntityWindow::DrawTransform(Entity& entity) const
 	if (ImGui::SmallButton("Reset##Position"))
 	{
 		entity.Translate(defaultPosition - position);
+		transformChanged = true;
 	}
 	float x = position.x;
 	float y = position.y;
 	float z = position.z;
 	ImGui::SetNextItemWidth(55.0f);
 	if (ImGui::DragFloat("X##Position", &x, 0.1f, -FLT_MAX, FLT_MAX, "%.2f"))
+	{
 		entity.Translate(glm::vec3(x - position.x, 0.0f, 0.0f));
+		transformChanged = true;
+	}
 	ImGui::SameLine();
 	ImGui::SetNextItemWidth(55.0f);
 	if (ImGui::DragFloat("Y##Position", &y, 0.1f, -FLT_MAX, FLT_MAX, "%.2f"))
+	{
 		entity.Translate(glm::vec3(0.0f, y - position.y, 0.0f));
+		transformChanged = true;
+	}
 	ImGui::SameLine();
 	ImGui::SetNextItemWidth(55.0f);
 	if (ImGui::DragFloat("Z##Position", &z, 0.1f, -FLT_MAX, FLT_MAX, "%.2f"))
+	{
 		entity.Translate(glm::vec3(0.0f, 0.0f, z - position.z));
+		transformChanged = true;
+	}
 
 	ImGui::Separator();
 	ImGui::TextUnformatted("Rotation (degrees)");
 	const glm::vec3 defaultRotation = entity.DefaultRotation();
 	ImGui::SameLine();
 	if (ImGui::SmallButton("Reset##Rotation"))
+	{
 		entity.SetRotation(defaultRotation);
+		transformChanged = true;
+	}
 	const glm::vec3 rotation = entity.Rotation();
 	float rx = glm::degrees(rotation.x);
 	float ry = glm::degrees(rotation.y);
 	float rz = glm::degrees(rotation.z);
 	ImGui::SetNextItemWidth(55.0f);
 	if (ImGui::DragFloat("X##Rotation", &rx, 0.1f, -360.0f, 360.0f, "%.1f"))
+	{
 		entity.SetRotation(glm::vec3(glm::radians(rx), rotation.y, rotation.z));
+		transformChanged = true;
+	}
 	ImGui::SameLine();
 	ImGui::SetNextItemWidth(55.0f);
 	if (ImGui::DragFloat("Y##Rotation", &ry, 0.1f, -360.0f, 360.0f, "%.1f"))
+	{
 		entity.SetRotation(glm::vec3(rotation.x, glm::radians(ry), rotation.z));
+		transformChanged = true;
+	}
 	ImGui::SameLine();
 	ImGui::SetNextItemWidth(55.0f);
 	if (ImGui::DragFloat("Z##Rotation", &rz, 0.1f, -360.0f, 360.0f, "%.1f"))
+	{
 		entity.SetRotation(glm::vec3(rotation.x, rotation.y, glm::radians(rz)));
+		transformChanged = true;
+	}
+	if (transformChanged)
+		PhysicsWorld::Instance().Update(entity);
 }
 
 void EntityWindow::DrawPhysics(Entity& entity) const

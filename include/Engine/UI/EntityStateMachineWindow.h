@@ -44,6 +44,7 @@ struct EntityStateMachineUiState
 	bool stateEditUseAnimationSequence = false;
 	int previewStateIndex = -1;
 	int previewFrame = 0;
+	bool previewAnimation = true;
 	std::string stateEditTransformAnimationName;
 	bool stateEditUseTransformAnimation = false;
 	glm::vec3 stateEditTransformStartPosition{0.0f};

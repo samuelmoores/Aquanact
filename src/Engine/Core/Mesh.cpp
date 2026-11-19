@@ -145,6 +145,7 @@ void Mesh::AdoptImportedModel(ImportedModel&& importedModel)
 	m_facesSize = std::move(importedModel.facesSize); // One index-count entry per imported submesh.
 	m_castsShadow.assign(m_facesSize.size(), true);
 	m_subMeshNames = std::move(importedModel.subMeshNames);
+	m_sourceMeshIndices = std::move(importedModel.sourceMeshIndices);
 	m_subMeshMinBounds = std::move(importedModel.subMeshMinBounds);
 	m_subMeshMaxBounds = std::move(importedModel.subMeshMaxBounds);
 	m_materials = std::move(importedModel.materials); // Per-submesh material parameters.
@@ -189,9 +190,12 @@ void Mesh::AdoptImportedModel(ImportedModel&& importedModel)
 
 	if (m_scene)
 	{
-		for (unsigned int i = 0; i < m_scene->mNumMeshes; ++i)
+		for (std::size_t i = 0; i < m_sourceMeshIndices.size(); ++i)
 		{
-			aiMaterial* mat = m_scene->mMaterials[m_scene->mMeshes[i]->mMaterialIndex];
+			const unsigned int sourceIndex = m_sourceMeshIndices[i];
+			if (sourceIndex >= m_scene->mNumMeshes)
+				continue;
+			aiMaterial* mat = m_scene->mMaterials[m_scene->mMeshes[sourceIndex]->mMaterialIndex];
 			LoadMaterialTextures(mat, static_cast<int>(i));
 		}
 		m_colorTextureEnabled.assign(m_textureColor.size(), true);
