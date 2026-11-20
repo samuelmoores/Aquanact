@@ -1,5 +1,5 @@
-#include "Game/AttackSphere.h"
-#include "Game/Health.h"
+#include "AttackSphere.h"
+#include "Health.h"
 
 #include "Engine/Core/Entity.h"
 #include "Engine/Core/EntityStateMachine.h"
@@ -7,7 +7,7 @@
 #include "Engine/Core/Root.h"
 #include "Engine/Core/Scene.h"
 #include "Engine/Core/SpawnManager.h"
-#include "Game/PlayerController.h"
+#include "PlayerController.h"
 
 #include <glm/common.hpp>
 #include <glm/geometric.hpp>

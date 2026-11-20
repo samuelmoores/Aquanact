@@ -94,6 +94,11 @@ bool EditorSceneInteraction::PickEntity(
 	float& distance)
 {
 	entityId = 0;
+	if (context.selection)
+	{
+		context.selection->submeshIndex = -1;
+		context.selection->submeshComponentEntityId = 0;
+	}
 	distance = std::numeric_limits<float>::max();
 	if (!context.sceneManager)
 		return false;
@@ -525,6 +530,8 @@ void EditorSceneInteraction::Draw(const EngineGuiFrameContext& context) const
 				Root::Current().Debugger().SetSelectedLevelColliderFace(faceAxis, faceDirection);
 				context.selection->levelColliderIndex = pickedLevelColliderIndex;
 				context.selection->entityId = 0;
+				context.selection->submeshIndex = -1;
+				context.selection->submeshComponentEntityId = 0;
 				context.selection->pointLightIndex = -1;
 				return;
 			}
@@ -536,6 +543,8 @@ void EditorSceneInteraction::Draw(const EngineGuiFrameContext& context) const
 	{
 		context.cameraPath->SelectPoint(pickedCameraPointIndex);
 		context.selection->entityId = 0;
+		context.selection->submeshIndex = -1;
+		context.selection->submeshComponentEntityId = 0;
 		context.selection->pointLightIndex = -1;
 		context.selection->levelColliderIndex = -1;
 	}
@@ -543,6 +552,8 @@ void EditorSceneInteraction::Draw(const EngineGuiFrameContext& context) const
 	{
 		if (context.cameraPath) context.cameraPath->SelectPoint(-1);
 		context.selection->entityId = 0;
+		context.selection->submeshIndex = -1;
+		context.selection->submeshComponentEntityId = 0;
 		context.selection->pointLightIndex = -1;
 		context.selection->levelColliderIndex = pickedLevelColliderIndex;
 	}
@@ -550,6 +561,8 @@ void EditorSceneInteraction::Draw(const EngineGuiFrameContext& context) const
 	{
 		if (context.cameraPath) context.cameraPath->SelectPoint(-1);
 		context.selection->entityId = 0;
+		context.selection->submeshIndex = -1;
+		context.selection->submeshComponentEntityId = 0;
 		context.selection->pointLightIndex = pickedPointLightIndex;
 		context.selection->levelColliderIndex = -1;
 	}
@@ -557,6 +570,8 @@ void EditorSceneInteraction::Draw(const EngineGuiFrameContext& context) const
 	{
 		if (context.cameraPath) context.cameraPath->SelectPoint(-1);
 		context.selection->entityId = pickedEntityId;
+		context.selection->submeshIndex = -1;
+		context.selection->submeshComponentEntityId = 0;
 		context.selection->pointLightIndex = -1;
 		context.selection->levelColliderIndex = -1;
 	}

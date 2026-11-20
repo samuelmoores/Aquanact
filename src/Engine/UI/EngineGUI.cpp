@@ -272,7 +272,35 @@ void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManage
 		}
 	}
 	if (!selectedEntityStillExists)
+	{
 		m_selection.entityId = 0;
+		m_selection.submeshIndex = -1;
+		m_selection.submeshComponentEntityId = 0;
+	}
+	else if (m_selection.submeshIndex >= 0)
+	{
+		bool validSubmesh = false;
+		bool validComponentEntity = false;
+		for (const auto& object : activeLevel->Objects())
+			if (object)
+			{
+				if (object->Id() == m_selection.entityId && object->GetMesh()
+					&& m_selection.submeshIndex < object->GetMesh()->NumBuffers())
+					validSubmesh = true;
+				if (object->Id() == m_selection.submeshComponentEntityId
+					&& object->IsSubmeshComponentOwner()
+					&& object->SubmeshComponentParentId() == m_selection.entityId
+					&& object->SubmeshComponentIndex() == m_selection.submeshIndex)
+					validComponentEntity = true;
+			}
+		if (!validSubmesh || !validComponentEntity)
+		{
+			m_selection.submeshIndex = -1;
+			m_selection.submeshComponentEntityId = 0;
+		}
+	}
+	else
+		m_selection.submeshComponentEntityId = 0;
 	if (m_selection.entityId != 0)
 		m_selection.pointLightIndex = -1;
 	const std::size_t pointLightCount = Root::Current().Render().Lights().PointLights().size();
@@ -322,11 +350,8 @@ void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManage
 
 	if (m_windowState.showSceneWindow)
 	{
-		m_sceneWindow.Draw(context, m_windowState.showSceneWindow, m_windowState.showEntityWindow,
-			m_windowState.showGameManagerWindow);
+		m_sceneWindow.Draw(context, m_windowState.showSceneWindow, m_windowState.showEntityWindow);
 	}
-	if (m_windowState.showGameManagerWindow)
-		m_gameManagerWindow.Draw(SceneManager.ActiveLevel(), m_windowState.showGameManagerWindow);
 	if (m_windowState.showLevelColliderWindow)
 		m_sceneWindow.DrawLevelColliderWindow(context, m_windowState.showLevelColliderWindow);
 

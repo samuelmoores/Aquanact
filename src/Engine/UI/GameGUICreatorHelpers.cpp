@@ -675,6 +675,9 @@ namespace GameGUICreatorHelpers {
 			widget.useSkin = readField("\"useSkin\":", widgetPos).find("false") == std::string::npos;
 			widget.uniformButtonSpacing = readField("\"uniformButtonSpacing\":", widgetPos).find("true") != std::string::npos;
 			widget.panelButtonUseSkin = readField("\"panelButtonUseSkin\":", widgetPos).find("false") == std::string::npos;
+			widget.panelButtonSkin = readField("\"panelButtonSkin\":", widgetPos);
+			if (widget.panelButtonSkin.empty()) widget.panelButtonSkin = "MultiListButtonSkin";
+			widget.panelButtonScale = ReadFloatField(readField("\"panelButtonScale\":", widgetPos), 1.0f);
 			widget.horizontalButtonLayout = readField("\"horizontalButtonLayout\":", widgetPos).find("true") != std::string::npos;
 			widget.panelPadding = ReadIntField(readField("\"panelPadding\":", widgetPos), 10);
 			widget.panelButtonWidth = ReadIntField(readField("\"panelButtonWidth\":", widgetPos), 100);
@@ -684,6 +687,9 @@ namespace GameGUICreatorHelpers {
 			{
 				widget.panelButtonTextColor = "0 0 0";
 			}
+			widget.panelButtonFontName = readField("\"panelButtonFontName\":", widgetPos);
+			widget.panelButtonFontSize = ReadIntField(readField("\"panelButtonFontSize\":", widgetPos), 10);
+			widget.panelButtonFocusSound = readField("\"panelButtonFocusSound\":", widgetPos);
 
 			widget.text = readField("\"text\":", widgetPos);
 			widget.textColor = readField("\"textColor\":", widgetPos);
@@ -693,6 +699,7 @@ namespace GameGUICreatorHelpers {
 			}
 
 			widget.texture = readField("\"texture\":", widgetPos);
+			widget.solidWhiteBox = ParseBoolField(readField("\"solidWhiteBox\":", widgetPos));
 			if (!widget.texture.empty())
 			{
 				RefreshTextureBaseline(widget, widget.texture, false);
@@ -703,8 +710,20 @@ namespace GameGUICreatorHelpers {
 			widget.y = ReadIntField(readField("\"y\":", widgetPos));
 			widget.width = ReadIntField(readField("\"width\":", widgetPos), widget.defaultWidth);
 			widget.height = ReadIntField(readField("\"height\":", widgetPos), widget.defaultHeight);
+			widget.textureWidth = ReadIntField(readField("\"textureWidth\":", widgetPos), 0);
+			widget.textureHeight = ReadIntField(readField("\"textureHeight\":", widgetPos), 0);
+			widget.worldAnchored = ParseBoolField(readField("\"worldAnchored\":", widgetPos));
+			widget.worldAnchorEntity = readField("\"worldAnchorEntity\":", widgetPos);
+			widget.worldAnchorUseSubmesh = ParseBoolField(readField("\"worldAnchorUseSubmesh\":", widgetPos));
+			widget.worldAnchorSubmeshIndex = std::max(0, ReadIntField(readField("\"worldAnchorSubmeshIndex\":", widgetPos), 0));
+			widget.worldX = ReadFloatField(readField("\"worldX\":", widgetPos), 0.0f);
+			widget.worldY = ReadFloatField(readField("\"worldY\":", widgetPos), 0.0f);
+			widget.worldZ = ReadFloatField(readField("\"worldZ\":", widgetPos), 0.0f);
 			widget.fontSize = ReadIntField(readField("\"fontSize\":", widgetPos), 0);
+			widget.fontName = readField("\"fontName\":", widgetPos);
 			widget.visible = ParseBoolField(readField("\"visible\":", widgetPos));
+			const std::string editorVisibleField = readField("\"editorVisible\":", widgetPos);
+			widget.editorVisible = editorVisibleField.empty() || ParseBoolField(editorVisibleField);
 			widget.alpha = 1.0f;
 			try { widget.alpha = std::stof(readField("\"alpha\":", widgetPos)); } catch (...) {}
 			widget.highlightColor = readField("\"highlightColor\":", widgetPos);

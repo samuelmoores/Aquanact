@@ -57,6 +57,7 @@ public:
 
 	// Lookup
 	MyGUI::Widget* RuntimeWidget(const std::string& name) const;
+	void SetRuntimeWidgetVisible(const std::string& name, bool visible);
 private:
 	// Widget creation
 	MyGUI::Widget* CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* parent);
@@ -86,6 +87,7 @@ private:
 	void ApplyTextHighlight(MyGUI::Button* button, bool highlighted);
 	void BindProgressBarFromDef(const GameGUIWidgetDef& def, MyGUI::ProgressBar* progress);
 	void UpdateDeathOverlay();
+	void UpdateWorldAnchoredImages();
 	void RefreshVisibleControllerButtons();
 	void FocusFirstControllerButtonInPanel(const std::string& panelName);
 
@@ -98,6 +100,7 @@ private:
 	// Runtime widget registry
 	std::vector<MyGUI::Widget*> m_runtimeWidgets;
 	std::unordered_map<std::string, MyGUI::Widget*> m_runtimeWidgetLookup;
+	std::unordered_map<std::string, bool> m_runtimeVisibilityOverrides;
 
 	// Controller navigation state
 	MyGUI::Button* m_testButton = nullptr;

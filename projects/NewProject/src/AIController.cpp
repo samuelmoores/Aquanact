@@ -1,4 +1,4 @@
-#include "Game/AIController.h"
+#include "AIController.h"
 
 #include "Engine/Core/Entity.h"
 #include "Engine/Core/EntityStateMachine.h"
@@ -8,8 +8,8 @@
 #include "Engine/Core/Root.h"
 #include "Engine/Core/Scene.h"
 #include "Engine/Core/SceneManager.h"
-#include "Game/PlayerController.h"
-#include "Game/Health.h"
+#include "PlayerController.h"
+#include "Health.h"
 
 #include <algorithm>
 #include <cmath>

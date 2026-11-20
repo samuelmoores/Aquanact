@@ -10,6 +10,20 @@ void TriggerSphere::startUp(Entity& owner)
 	(void)owner;
 }
 
+void TriggerSphere::OnEntityEnter(Entity& triggerOwner, Entity& enteringEntity)
+{
+	(void)triggerOwner;
+	(void)enteringEntity;
+	// Add shared trigger-entry gameplay here, or override this hook in a subclass.
+}
+
+void TriggerSphere::OnEntityExit(Entity& triggerOwner, Entity& leavingEntity)
+{
+	(void)triggerOwner;
+	(void)leavingEntity;
+	// Add shared trigger-exit gameplay here, or override this hook in a subclass.
+}
+
 glm::vec3 TriggerSphere::WorldPosition(Entity& owner) const
 {
 	const glm::vec3 worldOffset = glm::vec3(owner.BuildModelMatrix()
@@ -29,8 +43,10 @@ void TriggerSphere::Update(Entity& owner, float deltaTime)
 
 	// Query the physics world rather than duplicating collider overlap math here.
 	// The owner is excluded so a trigger never enters itself.
-	const std::vector<Entity*> current = PhysicsWorld::Instance().QuerySphere(
+	std::vector<Entity*> current = PhysicsWorld::Instance().QuerySphere(
 		WorldPosition(owner), m_radius, &owner);
+	if (owner.IsSubmeshComponentOwner() && owner.Parent())
+		current.erase(std::remove(current.begin(), current.end(), owner.Parent()), current.end());
 
 	// Convert the query result to a set so membership checks are constant-time
 	// and each entity can produce at most one enter callback per update.
@@ -41,6 +57,7 @@ void TriggerSphere::Update(Entity& owner, float deltaTime)
 	{
 		if (!m_overlapping.contains(entity))
 		{
+			OnEntityEnter(owner, *entity);
 			entity->OnTriggerEnter(owner);
 		}
 	}
@@ -48,6 +65,7 @@ void TriggerSphere::Update(Entity& owner, float deltaTime)
 	{
 		if (!currentSet.contains(entity))
 		{
+			OnEntityExit(owner, *entity);
 			entity->OnTriggerExit(owner);
 		}
 	}

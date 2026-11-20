@@ -41,7 +41,7 @@ namespace
 		}
 
 #ifdef AQUANACT_SOURCE_ROOT
-		return std::filesystem::path(AQUANACT_SOURCE_ROOT) / "projects" / "project" / "project.aqua";
+		return std::filesystem::path(AQUANACT_SOURCE_ROOT) / "projects" / "NewProject" / "project.aqua";
 #else
 		return executableProject;
 #endif
@@ -160,14 +160,6 @@ void Root::startUp(int argc, char** argv)
 
 	// scene
 	m_sceneManager->startUp();
-
-	// TODO: put this into scenemanager
-#ifdef AQUANACT_GAME
-	if (m_sceneManager->AppliedNewClassConfigurationOnStartup())
-	{
-		m_projectManager->SaveProject(projectPath, *m_sceneManager);
-	}
-#endif
 
 	// launch game or editor
 	if (m_engineState.IsGameMode())

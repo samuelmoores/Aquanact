@@ -18,6 +18,35 @@
 
 namespace
 {
+	Entity* FindSubmeshComponentEntity(Scene& scene, unsigned int parentId, int submeshIndex)
+	{
+		for (const auto& object : scene.Objects())
+			if (object && object->IsSubmeshComponentOwner()
+				&& object->SubmeshComponentParentId() == parentId
+				&& object->SubmeshComponentIndex() == submeshIndex)
+				return object.get();
+		return nullptr;
+	}
+
+	Entity* EnsureSubmeshComponentEntity(Scene& scene, Entity& parent, int submeshIndex)
+	{
+		if (Entity* existing = FindSubmeshComponentEntity(scene, parent.Id(), submeshIndex))
+			return existing;
+		Mesh* mesh = parent.GetMesh();
+		if (!mesh || submeshIndex < 0 || submeshIndex >= mesh->NumBuffers())
+			return nullptr;
+
+		const glm::vec3 localCenter = (mesh->SubMeshMinBounds(submeshIndex)
+			+ mesh->SubMeshMaxBounds(submeshIndex)) * 0.5f;
+		const std::string& sourceName = mesh->SubMeshName(submeshIndex);
+		const std::string childName = parent.Name() + " / "
+			+ (sourceName.empty() ? "Submesh " + std::to_string(submeshIndex) : sourceName);
+		auto child = std::make_unique<Entity>(childName, false);
+		child->SetSubmeshComponentOwner(parent.Id(), submeshIndex);
+		child->AttachTo(parent, localCenter);
+		return scene.AddObject(std::move(child));
+	}
+
 	std::string NormalizeSceneName(const std::string& input)
 	{
 		std::string output;
@@ -82,13 +111,14 @@ void SceneWindow::DrawNewLevelPopup(SceneManager& sceneManager, bool& requested)
 void SceneWindow::Draw(
 	const EngineGuiFrameContext& context,
 	bool& open,
-	bool& entityWindowOpen,
-	bool& gameManagerWindowOpen) const
+	bool& entityWindowOpen) const
 {
 	if (!context.sceneManager || !context.selection)
 		return;
 	SceneManager& sceneManager = *context.sceneManager;
 	unsigned int& selectedEntityId = context.selection->entityId;
+	unsigned int pendingSubmeshParentId = 0;
+	int pendingSubmeshIndex = -1;
 	Scene* activeScene = sceneManager.ActiveLevel();
 	const std::string title = activeScene ? activeScene->Name() : "Scene";
 	if (ImGui::Begin(title.c_str(), &open, ImGuiWindowFlags_NoFocusOnAppearing))
@@ -96,43 +126,78 @@ void SceneWindow::Draw(
 		if (activeScene)
 		{
 			const std::vector<std::unique_ptr<Entity>>& objects = activeScene->Objects();
-			Entity* gameManagerEntity = nullptr;
-			for (const auto& object : objects)
-				if (object && object->GetComponentByName("GameManager"))
-				{
-					gameManagerEntity = object.get();
-					break;
-				}
-			if (gameManagerEntity && ImGui::Selectable("GameManager##SceneManagerEntry", gameManagerWindowOpen))
-			{
-				gameManagerWindowOpen = true;
-				entityWindowOpen = false;
-				selectedEntityId = 0;
-				context.selection->pointLightIndex = -1;
-				context.selection->levelColliderIndex = -1;
-			}
 			ImGui::Separator();
 			bool hasSceneObject = false;
 			for (std::size_t i = 0; i < objects.size(); ++i)
 			{
 				const std::unique_ptr<Entity>& object = objects[i];
-				if (object && object->GetComponentByName("GameManager")) continue;
+				if (object && object->IsSubmeshComponentOwner()) continue;
 				hasSceneObject = true;
 				const std::string label = object ? object->Name() : "<null>";
 				const std::string visibleLabel = label.empty() ? "<unnamed>" : label;
-				const std::string selectableId = visibleLabel + "##LevelObject" + std::to_string(i);
-				if (ImGui::Selectable(selectableId.c_str(), object && selectedEntityId == object->Id()))
+				const bool hasSubmeshes = object && object->GetMesh() && object->GetMesh()->NumBuffers() > 0;
+				ImGui::PushID(static_cast<int>(i));
+				const ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanAvailWidth
+					| ImGuiTreeNodeFlags_OpenOnArrow
+					| ((object && selectedEntityId == object->Id() && context.selection->submeshIndex < 0)
+						? ImGuiTreeNodeFlags_Selected : 0)
+					| (hasSubmeshes ? 0 : ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen);
+				const bool expanded = ImGui::TreeNodeEx(visibleLabel.c_str(), flags);
+				if (ImGui::IsItemClicked())
 				{
 					selectedEntityId = object ? object->Id() : 0;
+					context.selection->submeshIndex = -1;
+					context.selection->submeshComponentEntityId = 0;
 					context.selection->levelColliderIndex = -1;
-					gameManagerWindowOpen = false;
 					context.selection->pointLightIndex = -1;
 					entityWindowOpen = true;
 				}
+				if (expanded && hasSubmeshes)
+				{
+					Mesh* mesh = object->GetMesh();
+					for (int submeshIndex = 0; submeshIndex < mesh->NumBuffers(); ++submeshIndex)
+					{
+						const std::string& sourceName = mesh->SubMeshName(submeshIndex);
+						const std::string childLabel = sourceName.empty()
+							? "Submesh " + std::to_string(submeshIndex)
+							: sourceName + " (Submesh " + std::to_string(submeshIndex) + ")";
+						const bool selected = object->Id() == selectedEntityId
+							&& context.selection->submeshIndex == submeshIndex;
+						ImGui::PushID(submeshIndex);
+						if (ImGui::Selectable(childLabel.c_str(), selected))
+						{
+							selectedEntityId = object->Id();
+							context.selection->submeshIndex = submeshIndex;
+							context.selection->submeshComponentEntityId = 0;
+							pendingSubmeshParentId = object->Id();
+							pendingSubmeshIndex = submeshIndex;
+							context.selection->levelColliderIndex = -1;
+							context.selection->pointLightIndex = -1;
+							entityWindowOpen = true;
+						}
+						ImGui::PopID();
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
 			}
 			if (!hasSceneObject)
 			{
 				ImGui::TextUnformatted("No entities in this Scene.");
+			}
+			if (pendingSubmeshParentId != 0 && pendingSubmeshIndex >= 0)
+			{
+				Entity* pendingParent = nullptr;
+				for (const auto& object : activeScene->Objects())
+					if (object && object->Id() == pendingSubmeshParentId)
+					{
+						pendingParent = object.get();
+						break;
+					}
+				if (pendingParent)
+					if (Entity* componentEntity = EnsureSubmeshComponentEntity(
+						*activeScene, *pendingParent, pendingSubmeshIndex))
+						context.selection->submeshComponentEntityId = componentEntity->Id();
 			}
 		}
 		else
@@ -156,6 +221,8 @@ void SceneWindow::DrawLevelColliderWindow(const EngineGuiFrameContext& context, 
 		LevelCollider* added = scene->AddLevelCollider(std::move(collider));
 		context.selection->levelColliderIndex = static_cast<int>(scene->LevelColliders().size() - 1);
 		context.selection->entityId = 0;
+		context.selection->submeshIndex = -1;
+		context.selection->submeshComponentEntityId = 0;
 		context.selection->pointLightIndex = -1;
 		if (added) PhysicsWorld::Instance().Add(*added);
 	}
@@ -182,6 +249,8 @@ void SceneWindow::DrawLevelColliderWindow(const EngineGuiFrameContext& context, 
 		{
 			context.selection->levelColliderIndex = static_cast<int>(i);
 			context.selection->entityId = 0;
+			context.selection->submeshIndex = -1;
+			context.selection->submeshComponentEntityId = 0;
 			context.selection->pointLightIndex = -1;
 		}
 	}

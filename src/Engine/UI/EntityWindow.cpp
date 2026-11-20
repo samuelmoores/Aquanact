@@ -4,6 +4,7 @@
 #include "Engine/Core/Component.h"
 #include "Engine/Core/Controller.h"
 #include "Engine/Core/Root.h"
+#include "Engine/Core/Window.h"
 #include "Engine/Core/Debug.h"
 #include "Engine/Core/ComponentFactory.h"
 #include "Engine/Core/TriggerSphere.h"
@@ -13,22 +14,65 @@
 #include "Engine/Core/SpawnManager.h"
 #include "Engine/Core/EntityStateMachine.h"
 #include "Engine/Core/PhysicsWorld.h"
+#include "Engine/Core/ProjectManager.h"
 #include "Engine/Core/ParticleSystem.h"
 #include "Engine/UI/EngineGuiWidgets.h"
-#include "Game/AIController.h"
-#include "Game/Health.h"
-#include "Game/PlayerAttack.h"
-#include "Game/PlayerCombat.h"
-#include "Game/PlayerController.h"
+#include "Engine/UI/GameCodeMaintenance.h"
+#include "AIController.h"
+#include "Health.h"
+#include "PlayerAttack.h"
+#include "PlayerController.h"
 
 #include <imgui.h>
+#include <GLFW/glfw3.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include <cfloat>
 #include <cstdint>
 #include <algorithm>
+#include <cctype>
+#include <filesystem>
 #include <memory>
 #include <string>
 #include <vector>
+
+namespace
+{
+	std::string TriggerSphereClassName(Entity& entity)
+	{
+		std::string entityName = entity.Name();
+		if (entity.IsSubmeshComponentOwner())
+		{
+			Entity* parent = entity.Parent();
+			const Mesh* mesh = parent ? parent->GetMesh() : nullptr;
+			const int submeshIndex = entity.SubmeshComponentIndex();
+			if (mesh && submeshIndex >= 0 && submeshIndex < mesh->NumBuffers())
+			{
+				const std::string& meshName = mesh->SubMeshName(submeshIndex);
+				if (!meshName.empty())
+					entityName = meshName;
+			}
+			else if (const std::size_t separator = entityName.rfind(" / "); separator != std::string::npos)
+			{
+				entityName = entityName.substr(separator + 3);
+			}
+		}
+		std::string suffix;
+		suffix.reserve(entityName.size());
+		bool capitalizeNext = true;
+		for (unsigned char character : entityName)
+		{
+			if (std::isalnum(character))
+			{
+				suffix.push_back(capitalizeNext
+					? static_cast<char>(std::toupper(character)) : static_cast<char>(character));
+				capitalizeNext = false;
+			}
+			else
+				capitalizeNext = true;
+		}
+		return "TriggerSphere" + (suffix.empty() ? std::string("Entity") : suffix);
+	}
+}
 
 EntityWindowResult EntityWindow::Draw(const EngineGuiFrameContext& context, bool& open) const
 {
@@ -68,25 +112,46 @@ EntityWindowResult EntityWindow::Draw(const EngineGuiFrameContext& context, bool
 		else
 		{
 			Entity& object = *objects[selectedIndex];
+			Entity* componentOwner = &object;
+			if (context.selection->submeshIndex >= 0)
+				for (const auto& candidate : activeScene->Objects())
+					if (candidate && candidate->Id() == context.selection->submeshComponentEntityId
+						&& candidate->IsSubmeshComponentOwner()
+						&& candidate->SubmeshComponentParentId() == object.Id()
+						&& candidate->SubmeshComponentIndex() == context.selection->submeshIndex)
+					{
+						componentOwner = candidate.get();
+						break;
+					}
 			const bool cutscene = sceneManager.SceneKindFor(activeScene->Name()) == SceneManager::SceneKind::Cutscene;
 			if (ImGui::Button("Delete"))
 				ImGui::OpenPopup("Delete Entity##Confirm");
 			ImGui::SameLine();
-			DrawAddComponent(object, cutscene);
+			DrawAddComponent(*componentOwner, cutscene, context);
 
+			const unsigned int deletedEntityId = object.Id();
 			if (DrawDeletePopup(object) && activeScene->RemoveObject(&object))
 			{
+				for (std::size_t childIndex = activeScene->Objects().size(); childIndex > 0; --childIndex)
+				{
+					Entity* child = activeScene->Objects()[childIndex - 1].get();
+					if (child && child->IsSubmeshComponentOwner()
+						&& child->SubmeshComponentParentId() == deletedEntityId)
+						activeScene->RemoveObject(child);
+				}
 				selectedEntityId = 0;
+				context.selection->submeshIndex = -1;
+				context.selection->submeshComponentEntityId = 0;
 				result.entityDeleted = true;
 			}
 			else
 			{
 				DrawTransform(object);
-				DrawMaterials(object);
+				DrawSelectedSubmesh(object, context.selection->submeshIndex);
 				ImGui::Separator();
 				if (!cutscene)
 				{
-					if (EntityStateMachine* stateMachine = object.GetEntityState())
+					if (EntityStateMachine* stateMachine = componentOwner->GetEntityState())
 					{
 						result.stateMachineToDraw = stateMachine;
 						if (DrawStateMachineButton())
@@ -98,7 +163,7 @@ EntityWindowResult EntityWindow::Draw(const EngineGuiFrameContext& context, bool
 				}
 				ImGui::TextUnformatted("Components");
 				ImGui::Separator();
-				const std::vector<Component*> components = object.Components();
+				const std::vector<Component*> components = componentOwner->Components();
 				for (std::size_t componentIndex = 0; componentIndex < components.size(); ++componentIndex)
 				{
 					Component* component = components[componentIndex];
@@ -109,9 +174,9 @@ EntityWindowResult EntityWindow::Draw(const EngineGuiFrameContext& context, bool
 					const EntityComponentHeaderResult header = DrawComponentHeader(*component);
 					if (header.removeRequested) ImGui::OpenPopup(popupId.c_str());
 					if (header.expanded) DrawComponentControls(*component);
-					if (DrawRemoveComponentPopup(object, *component, popupId.c_str()))
+					if (DrawRemoveComponentPopup(*componentOwner, *component, popupId.c_str()))
 					{
-						object.RemoveComponent(component);
+						componentOwner->RemoveComponent(component);
 						ImGui::PopID();
 						continue;
 					}
@@ -124,62 +189,89 @@ EntityWindowResult EntityWindow::Draw(const EngineGuiFrameContext& context, bool
 	return result;
 }
 
-void EntityWindow::DrawMaterials(Entity& entity) const
+void EntityWindow::DrawSelectedSubmesh(Entity& entity, int selectedSubmeshIndex) const
 {
 	Mesh* mesh = entity.GetMesh();
-	if (!mesh || !ImGui::CollapsingHeader("Materials", ImGuiTreeNodeFlags_DefaultOpen))
+	if (!mesh || selectedSubmeshIndex < 0 || selectedSubmeshIndex >= mesh->NumBuffers()
+		|| !ImGui::CollapsingHeader("Submesh Settings", ImGuiTreeNodeFlags_DefaultOpen))
 		return;
 
 	ImGui::Text("Model: %s", entity.SourcePath().empty() ? "Generated mesh" : entity.SourcePath().c_str());
-	const auto drawSubMesh = [&entity, mesh](int index)
-	{
-		ImGui::PushID(index);
-		const SubMeshMaterial& material = mesh->GetMaterial(index);
-		const std::string& sourceName = mesh->SubMeshName(index);
-		const std::string submeshLabel = sourceName.empty()
-			? "Submesh " + std::to_string(index)
-			: sourceName + " (Submesh " + std::to_string(index) + ")";
-		if (ImGui::TreeNode(submeshLabel.c_str()))
-		{
-			bool emissiveEnabled = material.emissiveEnabled;
-			if (ImGui::Checkbox("Emissive", &emissiveEnabled))
-				mesh->SetEmissiveEnabled(index, emissiveEnabled);
-			glm::vec3 emissiveColor = material.emissiveColor;
-			if (ImGui::ColorEdit3("Emissive Color", &emissiveColor.x))
-				mesh->SetEmissiveColor(index, emissiveColor);
-			float emissiveBlendFactor = material.emissiveBlendFactor;
-			if (ImGui::SliderFloat("Emissive Blend", &emissiveBlendFactor, 0.0f, 1.0f, "%.2f"))
-				mesh->SetEmissiveBlendFactor(index, emissiveBlendFactor);
-			bool castsShadow = mesh->CastsShadow(index);
-			if (ImGui::Checkbox("Casts Shadow", &castsShadow))
-				mesh->SetCastsShadow(index, castsShadow);
-			ImGui::Text("Specular: %.2f", material.phong.z);
-			ImGui::Text("Shininess: %.2f", material.phong.w);
-			ImGui::TextUnformatted("Textures");
+	const int selectedIndex = selectedSubmeshIndex;
+	const SubMeshMaterial& material = mesh->GetMaterial(selectedIndex);
+	const std::string& sourceName = mesh->SubMeshName(selectedIndex);
+	const std::string submeshLabel = sourceName.empty()
+		? "Submesh " + std::to_string(selectedIndex) : sourceName;
+	ImGui::Text("Submesh: %s", submeshLabel.c_str());
+	bool emissiveEnabled = material.emissiveEnabled;
+	if (ImGui::Checkbox("Emissive", &emissiveEnabled))
+		mesh->SetEmissiveEnabled(selectedIndex, emissiveEnabled);
+	glm::vec3 emissiveColor = material.emissiveColor;
+	if (ImGui::ColorEdit3("Emissive Color", &emissiveColor.x))
+		mesh->SetEmissiveColor(selectedIndex, emissiveColor);
+	float emissiveBlendFactor = material.emissiveBlendFactor;
+	if (ImGui::SliderFloat("Emissive Blend", &emissiveBlendFactor, 0.0f, 1.0f, "%.2f"))
+		mesh->SetEmissiveBlendFactor(selectedIndex, emissiveBlendFactor);
+	bool castsShadow = mesh->CastsShadow(selectedIndex);
+	if (ImGui::Checkbox("Casts Shadow", &castsShadow))
+		mesh->SetCastsShadow(selectedIndex, castsShadow);
+	ImGui::Text("Specular: %.2f", material.phong.z);
+	ImGui::Text("Shininess: %.2f", material.phong.w);
+	ImGui::TextUnformatted("Textures");
 
-			const auto drawTextureToggle = [&](const char* label, bool enabled, auto setEnabled)
-			{
-				bool value = enabled;
-				if (ImGui::Checkbox(label, &value))
-					setEnabled(value);
-			};
-			drawTextureToggle("Color", mesh->ColorTextureEnabled(index),
-				[mesh, index](bool value) { mesh->SetColorTextureEnabled(index, value); });
-			ImGui::SameLine();
-			drawTextureToggle("Roughness", mesh->RoughnessTextureEnabled(index),
-				[mesh, index](bool value) { mesh->SetRoughnessTextureEnabled(index, value); });
-			ImGui::SameLine();
-			drawTextureToggle("Normal", mesh->NormalTextureEnabled(index),
-				[mesh, index](bool value) { mesh->SetNormalTextureEnabled(index, value); });
-			ImGui::SameLine();
-			drawTextureToggle("Height", mesh->HeightTextureEnabled(index),
-				[mesh, index](bool value) { mesh->SetHeightTextureEnabled(index, value); });
-			ImGui::TreePop();
-		}
-		ImGui::PopID();
+	const auto drawTextureToggle = [&](const char* label, bool enabled, auto setEnabled)
+	{
+		bool value = enabled;
+		if (ImGui::Checkbox(label, &value))
+			setEnabled(value);
 	};
-	for (int index = 0; index < mesh->NumBuffers(); ++index)
-		drawSubMesh(index);
+	drawTextureToggle("Color", mesh->ColorTextureEnabled(selectedIndex),
+		[mesh, selectedIndex](bool value) { mesh->SetColorTextureEnabled(selectedIndex, value); });
+	ImGui::SameLine();
+	drawTextureToggle("Specular", mesh->SpecularTextureEnabled(selectedIndex),
+		[mesh, selectedIndex](bool value) { mesh->SetSpecularTextureEnabled(selectedIndex, value); });
+	ImGui::SameLine();
+	drawTextureToggle("Roughness", mesh->RoughnessTextureEnabled(selectedIndex),
+		[mesh, selectedIndex](bool value) { mesh->SetRoughnessTextureEnabled(selectedIndex, value); });
+	ImGui::SameLine();
+	drawTextureToggle("Normal", mesh->NormalTextureEnabled(selectedIndex),
+		[mesh, selectedIndex](bool value) { mesh->SetNormalTextureEnabled(selectedIndex, value); });
+	ImGui::SameLine();
+	drawTextureToggle("Height", mesh->HeightTextureEnabled(selectedIndex),
+		[mesh, selectedIndex](bool value) { mesh->SetHeightTextureEnabled(selectedIndex, value); });
+
+	if (ImGui::CollapsingHeader("Submesh Collider", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		const std::size_t submeshIndex = static_cast<std::size_t>(selectedIndex);
+		const SubmeshColliderSettings settings = entity.GetSubmeshColliderSettings(submeshIndex);
+		bool collisionEnabled = settings.enabled;
+		if (ImGui::Checkbox("Collider Enabled", &collisionEnabled))
+		{
+			entity.SetSubmeshColliderEnabled(submeshIndex, collisionEnabled);
+			PhysicsWorld::Instance().Update(entity);
+		}
+		const char* colliderShapes[] = { "Box", "Capsule", "Convex" };
+		int colliderShape = settings.shape == PhysicsColliderShape::Capsule ? 1
+			: settings.shape == PhysicsColliderShape::Convex ? 2 : 0;
+		if (entity.UseBaseMeshCollider())
+			ImGui::BeginDisabled();
+		if (!collisionEnabled)
+			ImGui::BeginDisabled();
+		if (ImGui::Combo("Collision Shape", &colliderShape, colliderShapes, IM_ARRAYSIZE(colliderShapes)))
+		{
+			entity.SetSubmeshColliderShape(submeshIndex, colliderShape == 1
+				? PhysicsColliderShape::Capsule
+				: colliderShape == 2 ? PhysicsColliderShape::Convex : PhysicsColliderShape::Box);
+			PhysicsWorld::Instance().Update(entity);
+		}
+		if (!collisionEnabled)
+			ImGui::EndDisabled();
+		if (entity.UseBaseMeshCollider())
+		{
+			ImGui::EndDisabled();
+			ImGui::TextDisabled("Inactive while Base Mesh Collision is enabled.");
+		}
+	}
 }
 
 void EntityWindow::DrawTransform(Entity& entity) const
@@ -325,70 +417,6 @@ void EntityWindow::DrawPhysics(Entity& entity) const
 	if (ImGui::Checkbox("Blocks Camera View", &blocksCameraView))
 		entity.SetBlocksCameraView(blocksCameraView);
 
-	Mesh* mesh = entity.GetMesh();
-	if (mesh && ImGui::TreeNode("Per-Submesh Colliders"))
-	{
-		if (useBaseMeshCollider)
-			ImGui::BeginDisabled();
-		static const ImVec4 colliderDebugColors[] = {
-			{ 1.0f, 0.7f, 0.1f, 1.0f }, { 0.2f, 0.85f, 1.0f, 1.0f },
-			{ 0.25f, 1.0f, 0.35f, 1.0f }, { 1.0f, 0.3f, 0.75f, 1.0f },
-			{ 0.35f, 0.45f, 1.0f, 1.0f }, { 1.0f, 0.9f, 0.2f, 1.0f },
-			{ 0.9f, 0.45f, 0.15f, 1.0f }, { 0.65f, 0.45f, 1.0f, 1.0f }
-		};
-		constexpr std::size_t colliderDebugColorCount =
-			sizeof(colliderDebugColors) / sizeof(colliderDebugColors[0]);
-		const char* submeshColliderShapes[] = { "Box", "Capsule", "Convex" };
-		for (int index = 0; index < mesh->NumBuffers(); ++index)
-		{
-			ImGui::PushID(index);
-			const std::string& sourceName = mesh->SubMeshName(index);
-			const std::string submeshLabel = sourceName.empty()
-				? "Submesh " + std::to_string(index)
-				: sourceName + " (Submesh " + std::to_string(index) + ")";
-			if (ImGui::TreeNode(submeshLabel.c_str()))
-			{
-				const std::size_t submeshIndex = static_cast<std::size_t>(index);
-				const SubmeshColliderSettings settings = entity.GetSubmeshColliderSettings(submeshIndex);
-				ImGui::TextUnformatted("Debug color");
-				ImGui::SameLine();
-				ImGui::ColorButton("##SubmeshColliderDebugColor",
-					colliderDebugColors[submeshIndex % colliderDebugColorCount],
-					ImGuiColorEditFlags_NoTooltip);
-				bool collisionEnabled = settings.enabled;
-				if (ImGui::Checkbox("Collider Enabled", &collisionEnabled))
-				{
-					entity.SetSubmeshColliderEnabled(submeshIndex, collisionEnabled);
-					PhysicsWorld::Instance().Update(entity);
-				}
-			if (ImGui::IsItemHovered())
-				ImGui::SetTooltip("Turn off to remove this submesh from collision queries.");
-
-				int colliderShape = settings.shape == PhysicsColliderShape::Capsule ? 1
-					: settings.shape == PhysicsColliderShape::Convex ? 2 : 0;
-				if (!collisionEnabled)
-					ImGui::BeginDisabled();
-				if (ImGui::Combo("Collision Shape", &colliderShape,
-					submeshColliderShapes, IM_ARRAYSIZE(submeshColliderShapes)))
-				{
-					entity.SetSubmeshColliderShape(submeshIndex,
-						colliderShape == 1 ? PhysicsColliderShape::Capsule
-							: colliderShape == 2 ? PhysicsColliderShape::Convex
-							: PhysicsColliderShape::Box);
-					PhysicsWorld::Instance().Update(entity);
-				}
-				if (!collisionEnabled)
-					ImGui::EndDisabled();
-				ImGui::TreePop();
-			}
-			ImGui::PopID();
-		}
-		if (useBaseMeshCollider)
-			ImGui::EndDisabled();
-		ImGui::TreePop();
-	}
-	if (useBaseMeshCollider)
-		ImGui::TextDisabled("Per-submesh settings are inactive while Base Mesh Collision is enabled.");
 }
 
 bool EntityWindow::DrawStateMachineButton() const
@@ -514,46 +542,6 @@ void EntityWindow::DrawComponentControls(Component& component) const
 		if (ImGui::Button("Burst 64")) particles->Burst(64);
 		ImGui::SameLine();
 		if (ImGui::Button("Restart")) particles->Restart();
-	}
-	else if (PlayerCombat* combat = dynamic_cast<PlayerCombat*>(&component))
-	{
-		const auto& definitions = Root::Current().Spawns().Definitions();
-		const std::string& projectile = combat->ProjectileName();
-		if (ImGui::BeginCombo("Projectile", projectile.empty() ? "None" : projectile.c_str()))
-		{
-			if (ImGui::Selectable("None", projectile.empty())) combat->SetProjectileName({});
-			for (const auto& entry : definitions)
-			{
-				const bool selected = projectile == entry.first;
-				if (ImGui::Selectable(entry.first.c_str(), selected)) combat->SetProjectileName(entry.first);
-				if (selected) ImGui::SetItemDefaultFocus();
-			}
-			ImGui::EndCombo();
-		}
-		Entity* owner = combat->Owner();
-		const std::vector<std::string> bones = owner && owner->GetMesh()
-			? owner->GetMesh()->BoneNames() : std::vector<std::string>{};
-		const char* preview = combat->SpawnBoneName().empty() ? "Entity origin" : combat->SpawnBoneName().c_str();
-		if (ImGui::BeginCombo("Spawn Bone", preview))
-		{
-			if (ImGui::Selectable("Entity origin", combat->SpawnBoneName().empty())) combat->SetSpawnBoneName({});
-			for (const std::string& bone : bones)
-			{
-				const bool selected = combat->SpawnBoneName() == bone;
-				if (ImGui::Selectable(bone.c_str(), selected)) combat->SetSpawnBoneName(bone);
-				if (selected) ImGui::SetItemDefaultFocus();
-			}
-			ImGui::EndCombo();
-		}
-		if (bones.empty()) ImGui::TextDisabled("No skeletal bones available; using entity origin.");
-		int spawnFrame = combat->ProjectileSpawnFrame();
-		if (ImGui::InputInt("Projectile Spawn Frame", &spawnFrame))
-			combat->SetProjectileSpawnFrame(std::max(0, spawnFrame));
-		ImGui::TextDisabled("Maya timeline frames at 24 fps; 0 spawns immediately.");
-		glm::vec3 launchDirection = combat->LaunchDirection();
-		if (ImGui::DragFloat3("Launch Direction Add", &launchDirection.x, 0.01f, -10.0f, 10.0f, "%.2f"))
-			combat->SetLaunchDirection(launchDirection);
-		ImGui::TextDisabled("Added to the forward/upward launch vector; Y adjusts the arc height.");
 	}
 	else if (PlayerAttack* attack = dynamic_cast<PlayerAttack*>(&component))
 	{
@@ -772,16 +760,25 @@ EntityComponentHeaderResult EntityWindow::DrawComponentHeader(Component& compone
 	return result;
 }
 
-void EntityWindow::DrawAddComponent(Entity& entity, bool cutscene) const
+void EntityWindow::DrawAddComponent(
+	Entity& entity, bool cutscene, const EngineGuiFrameContext& context) const
 {
 	ImGui::SetNextItemWidth(120.0f);
 	if (!ImGui::BeginCombo("##AddComponent", "Add Component"))
+	{
+		DrawTriggerSphereCodePopup(context);
 		return;
+	}
 
 	const std::vector<std::string> names = ComponentFactory::Instance().Names();
 	std::vector<std::string> attached;
 	for (Component* component : entity.Components())
-		if (component) attached.push_back(component->Name());
+		if (component)
+		{
+			attached.push_back(component->Name());
+			if (dynamic_cast<TriggerSphere*>(component))
+				attached.push_back("TriggerSphere");
+		}
 
 	for (const std::string& name : names)
 	{
@@ -791,10 +788,37 @@ void EntityWindow::DrawAddComponent(Entity& entity, bool cutscene) const
 		ImGui::BeginDisabled(cutscene || alreadyAttached || !validAnimator);
 		if (ImGui::Selectable(name.c_str()))
 		{
-			std::unique_ptr<Component> component = ComponentFactory::Instance().Create(name, entity);
-			if (component) entity.AddComponent(std::move(component));
+			if (name == "TriggerSphere")
+			{
+				const std::string className = TriggerSphereClassName(entity);
+				const std::vector<std::string> registeredNames = ComponentFactory::Instance().Names();
+				const bool classIsLoaded = std::find(registeredNames.begin(), registeredNames.end(), className)
+					!= registeredNames.end();
+				if (classIsLoaded)
+				{
+					std::unique_ptr<Component> component = ComponentFactory::Instance().Create(className, entity);
+					if (component) entity.AddComponent(std::move(component));
+				}
+				else
+				{
+					m_pendingTriggerClassName = className;
+					m_triggerCodeStatusMessage.clear();
+					m_pendingTriggerEntityId = entity.Id();
+					m_openTriggerCodePopupRequested = true;
+				}
+			}
+			else
+			{
+				std::unique_ptr<Component> component = ComponentFactory::Instance().Create(name, entity);
+				if (component) entity.AddComponent(std::move(component));
+			}
 		}
 		ImGui::EndDisabled();
+	}
+	if (std::find(attached.begin(), attached.end(), "TriggerSphere") != attached.end())
+	{
+		ImGui::Separator();
+		ImGui::TextDisabled("A TriggerSphere is already attached to this entity.");
 	}
 	if (cutscene)
 	{
@@ -812,6 +836,121 @@ void EntityWindow::DrawAddComponent(Entity& entity, bool cutscene) const
 		ImGui::TextDisabled("All components are already attached.");
 	}
 	ImGui::EndCombo();
+	if (m_openTriggerCodePopupRequested)
+	{
+		ImGui::OpenPopup("Generate Trigger C++ Class##ConfirmClose");
+		m_openTriggerCodePopupRequested = false;
+	}
+	DrawTriggerSphereCodePopup(context);
+}
+
+void EntityWindow::DrawTriggerSphereCodePopup(const EngineGuiFrameContext& context) const
+{
+	if (!ImGui::BeginPopupModal("Generate Trigger C++ Class##ConfirmClose", nullptr,
+		ImGuiWindowFlags_AlwaysAutoResize))
+		return;
+
+	ImGui::TextWrapped("The engine needs to close so you can edit and build the new trigger class.");
+	ImGui::TextWrapped("The generated class will be %s. The base TriggerSphere will be saved now; after editing its C++ file, rebuild the project and restart the editor.",
+		m_pendingTriggerClassName.c_str());
+	ImGui::Separator();
+	if (ImGui::Button("Save and Close"))
+	{
+		bool ready = true;
+		if (!context.projectManager || !context.sceneManager
+			|| context.projectManager->CurrentProjectPath().empty())
+		{
+			m_triggerCodeStatusMessage = "Open a project before creating a custom trigger class.";
+			ready = false;
+		}
+		if (ready)
+		{
+			const GameCodeGenerationResult result =
+				GameCodeMaintenance::CreateTriggerSphereSubclass(m_pendingTriggerClassName);
+			if (!result.success)
+			{
+				m_triggerCodeStatusMessage = result.statusMessage;
+				ready = false;
+			}
+		}
+		if (ready && !GameCodeMaintenance::SavePendingComponentAttachment(
+			m_pendingTriggerClassName, m_pendingTriggerEntityId))
+		{
+			m_triggerCodeStatusMessage = "Could not save the pending trigger attachment.";
+			ready = false;
+		}
+		Entity* pendingEntity = nullptr;
+		Component* addedBaseTrigger = nullptr;
+		if (ready && context.sceneManager && context.sceneManager->ActiveLevel())
+		{
+			for (const std::unique_ptr<Entity>& candidate : context.sceneManager->ActiveLevel()->Objects())
+			{
+				if (candidate && candidate->Id() == m_pendingTriggerEntityId)
+				{
+					pendingEntity = candidate.get();
+					break;
+				}
+			}
+			if (!pendingEntity)
+			{
+				m_triggerCodeStatusMessage = "Could not find the selected entity in the active scene.";
+				ready = false;
+			}
+			else if (!pendingEntity->GetComponent<TriggerSphere>())
+			{
+				std::unique_ptr<Component> baseTrigger =
+					ComponentFactory::Instance().Create("TriggerSphere", *pendingEntity);
+				addedBaseTrigger = pendingEntity->AddComponent(std::move(baseTrigger));
+				if (!addedBaseTrigger)
+				{
+					m_triggerCodeStatusMessage = "Could not add the TriggerSphere component.";
+					ready = false;
+				}
+			}
+		}
+		if (ready && !context.projectManager->SaveProject(
+			context.projectManager->CurrentProjectPath(), *context.sceneManager))
+		{
+			m_triggerCodeStatusMessage = "Could not save the project.";
+			if (pendingEntity && addedBaseTrigger)
+				pendingEntity->RemoveComponent(addedBaseTrigger);
+			if (context.projectManager)
+			{
+				std::error_code removeError;
+				std::filesystem::remove(context.projectManager->PendingClassConfigurationPath(), removeError);
+			}
+			ready = false;
+		}
+		else if (!ready)
+		{
+			if (pendingEntity && addedBaseTrigger)
+				pendingEntity->RemoveComponent(addedBaseTrigger);
+			if (context.projectManager)
+			{
+				std::error_code removeError;
+				std::filesystem::remove(context.projectManager->PendingClassConfigurationPath(), removeError);
+			}
+		}
+		if (ready)
+		{
+			Root::Current().Debugger().LogTagged("CodeGeneration",
+				"Generated " + m_pendingTriggerClassName + ". Edit src/"
+				+ m_pendingTriggerClassName + ".cpp, rebuild the project, then restart.");
+			ImGui::CloseCurrentPopup();
+			if (context.window)
+				glfwSetWindowShouldClose(context.window->GLFW(), GLFW_TRUE);
+		}
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Cancel"))
+	{
+		m_pendingTriggerClassName.clear();
+		m_triggerCodeStatusMessage.clear();
+		m_pendingTriggerEntityId = 0;
+		ImGui::CloseCurrentPopup();
+	}
+	EngineGuiWidgets::StatusMessage(m_triggerCodeStatusMessage);
+	ImGui::EndPopup();
 }
 
 bool EntityWindow::DrawDeletePopup(const Entity& entity) const

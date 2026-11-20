@@ -15,8 +15,8 @@
 #include "Engine/Core/Input.h"
 #include "Engine/Core/InputManager.h"
 #include "Engine/Core/PhysicsWorld.h"
-#include "Game/Health.h"
-#include "Game/PlayerController.h"
+#include "Health.h"
+#include "PlayerController.h"
 
 #include <algorithm>
 #include <filesystem>

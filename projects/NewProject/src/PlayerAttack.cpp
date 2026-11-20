@@ -1,5 +1,5 @@
-#include "Game/PlayerAttack.h"
-#include "Game/AttackSphere.h"
+#include "PlayerAttack.h"
+#include "AttackSphere.h"
 
 #include "Engine/Core/Entity.h"
 #include "Engine/Core/EntityStateMachine.h"

@@ -1,141 +1,47 @@
-﻿Aquanact Build Instructions
+Aquanact Build Instructions
 ===========================
 
-Overview
---------
-Aquanact uses CMake, Ninja, C++20, and vcpkg. The CMake presets configure
-separate build directories under out/build. The default build produces the
-editor, standalone game, build tool, and test executables.
+Requirements
+------------
+- CMake, Ninja, and Git.
+- A vcpkg checkout. Set VCPKG_ROOT to the checkout directory.
+- Windows: Visual Studio C++ build tools and Windows SDK.
+- macOS: Xcode Command Line Tools.
 
-Windows (x64)
--------------
-Prerequisites:
-- MSVC Build Tools with the C++ build tools and Windows SDK. The Visual Studio
-  IDE is not required.
-- CMake, Ninja, and Git. These can be installed separately or through the
-  Build Tools installer.
-- A vcpkg checkout. Set VCPKG_ROOT to its root directory (the directory that
-  contains scripts/buildsystems/vcpkg.cmake).
-
-Terminal build without the Visual Studio IDE
----------------------------------------------
-If this checkout already has a configured build directory, you can build it
-from a terminal without opening the IDE. The terminal must first load the MSVC
-compiler and Windows SDK environment. Open the x64 Native Tools Command Prompt
-for Visual Studio 2026, or initialize a regular Command Prompt with:
-
-    call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=amd64
-
-Then the build command is:
-
-    cmake --build out/build/x64-debug
-
-Use out/build/x64-release for Release. If cl.exe reports it cannot find
-standard headers such as filesystem or cmath, the terminal environment was not
-initialized; run the setup command above in that same terminal, then retry.
-
-For a fresh build directory, CMake first needs to configure the project and
-select a compiler toolchain. Use the MSVC Build Tools environment described
-below, then run the configure command followed by the build command.
-
-Open the x64 Native Tools Command Prompt for the installed MSVC Build Tools.
-This initializes the compiler and Windows SDK environment for the terminal.
-If using a regular Command Prompt, initialize it by calling VsDevCmd.bat;
-adjust the path to match the Build Tools installation:
-
-    call "C:\Program Files\Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat" -arch=amd64
-
-Set VCPKG_ROOT to your vcpkg checkout and make sure ninja.exe is on PATH. From
-the repository root, configure and build with:
+Windows
+-------
+Open the x64 Native Tools Command Prompt for Visual Studio, change to the
+repository root, and set VCPKG_ROOT to your vcpkg checkout. The developer
+prompt initializes the MSVC and Windows SDK environment, including the
+standard-library include paths required by headers such as <string>,
+<filesystem>, and <cmath>. A regular Command Prompt or PowerShell window may
+find cl.exe but fail to find these headers, causing C1083 errors:
 
     set VCPKG_ROOT=C:\path\to\vcpkg
-    cmake -S . -B out/build/terminal-x64-debug -G Ninja -DCMAKE_MAKE_PROGRAM=ninja -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE=%VCPKG_ROOT%/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows -DVCPKG_HOST_TRIPLET=x64-windows
-    cmake --build out/build/terminal-x64-debug --parallel
-
-For an optimized build, use a separate directory and set Release:
-
-    cmake -S . -B out/build/terminal-x64-release -G Ninja -DCMAKE_MAKE_PROGRAM=ninja -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=%VCPKG_ROOT%/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows -DVCPKG_HOST_TRIPLET=x64-windows
-    cmake --build out/build/terminal-x64-release --parallel
-
-On the first configure, vcpkg installs the dependencies listed in vcpkg.json.
-The checked-in x64-debug and x64-release presets are also usable from a
-terminal, but currently contain machine-specific Visual Studio 18 paths for
-MSVC and Ninja. The direct commands above use the tools already initialized in
-the current terminal and avoid those preset paths. They still use the MSVC
-compiler and Windows SDK supplied by Build Tools; a different compiler would
-need a compatible vcpkg triplet and has not been validated for this project.
-
-Preset-based terminal build
----------------------------
-If your MSVC and Ninja installation matches the paths in CMakePresets.json,
-these shorter commands work from the repository root:
-
     cmake --preset x64-debug
     cmake --build out/build/x64-debug
 
-For Release, use x64-release in both commands.
+If a build reports that standard headers such as 'filesystem', 'cmath', or
+'string' cannot be opened, rerun it from the x64 Native Tools Command Prompt.
 
-The main outputs are in out/build/x64-debug (or x64-release):
-- AquanactEngine.exe - editor
-- AquanactGame.exe - standalone game
-- AquanactBuildTool.exe - game packaging/build utility
+For an optimized build, replace x64-debug with x64-release in both commands.
+After building, launch the editor from its build directory:
 
-Run the editor from its build directory so the copied shaders and resources
-are available:
-
-    .\out\build\x64-debug\AquanactEngine.exe
+    cd out\build\x64-debug
+    .\AquanactEngine.exe
 
 macOS (Apple Silicon)
 --------------------
-Prerequisites:
-- Xcode Command Line Tools.
-- CMake and Ninja.
-- A vcpkg checkout with its toolchain file, with VCPKG_ROOT set to the
-  checkout directory.
+From a terminal at the repository root, set VCPKG_ROOT to your vcpkg checkout
+and run:
 
-From the repository root:
-
+    export VCPKG_ROOT=/path/to/vcpkg
     cmake --preset macos-arm64-debug
     cmake --build out/build/macos-arm64-debug
 
-For an optimized build, use macos-arm64-release in both commands. The preset
-uses the arm64-osx vcpkg triplet and the vcpkg overlay ports in vcpkg-overlays.
-Configuration installs dependencies declared in vcpkg.json.
+For an optimized build, replace macos-arm64-debug with macos-arm64-release in
+both commands.
+After building, launch the editor from its build directory:
 
-Build target selection
-----------------------
-To build only a specific target, add --target and its CMake target name, for
-example:
-
-    cmake --build out/build/x64-debug --target AquanactEngine
-
-Available targets include AquanactEngine, AquanactGame, AquanactBuildTool,
-AquanactUIInputRouterTests, and AquanactGameGUIAssetTests. The default build
-builds all configured targets.
-
-Running tests
--------------
-After building, run CTest from the selected build directory. On Windows:
-
-    ctest --test-dir out/build/x64-debug -C Debug --output-on-failure
-
-For Release, change the directory to out/build/x64-release and the config to
-Release. On macOS, use the corresponding macos-arm64 build directory; the
-configuration flag is generally unnecessary with the Ninja presets:
-
-    ctest --test-dir out/build/macos-arm64-debug --output-on-failure
-
-Changing build configuration
------------------------------
-If you change the compiler, vcpkg triplet, toolchain, or other fundamental
-CMake settings, use a fresh build directory or remove the existing preset
-build directory before configuring again. Debug and Release presets already
-use separate output directories.
-
-Project sources
----------------
-The default project sources are described by generated/GameSources.cmake.
-To build against a separate game project, configure with
-AQUANACT_PROJECT_ROOT set to that project's root directory, which should
-contain generated/GameSources.cmake and the expected src/Game and include/Game
-directories. Keep the setting consistent when reconfiguring the build.
+    cd out/build/macos-arm64-debug
+    ./AquanactEngine

@@ -13,6 +13,8 @@ class GameCodeMaintenance
 {
 public:
 	static GameCodeGenerationResult CreateComponent(const std::string& className);
+	static GameCodeGenerationResult CreateTriggerSphereSubclass(const std::string& className);
+	static bool SavePendingComponentAttachment(const std::string& className, unsigned int entityId);
 	static bool DeleteComponentFiles(const std::string& componentName);
 	static bool RegenerateBuildFiles();
 

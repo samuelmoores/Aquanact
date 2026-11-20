@@ -4,7 +4,7 @@
 
 #include "Engine/Core/EntityStateMachine.h"
 #include "Engine/Core/Hitbox.h"
-#include "Game/Health.h"
+#include "Health.h"
 #include "Engine/Core/Controller.h"
 #include "Engine/Core/Entity.h"
 #include "Engine/Core/FrontEndManager.h"
@@ -13,11 +13,10 @@
 #include "Engine/Core/Root.h"
 #include "Engine/UI/EngineGUI.h"
 #include "Engine/Core/SceneManager.h"
-#include "Game/PlayerController.h"
-#include "Game/PlayerAttack.h"
-#include "Game/PlayerCombat.h"
+#include "PlayerController.h"
+#include "PlayerAttack.h"
 #include "Engine/Core/RenderManager.h"
-#include "Game/AIController.h"
+#include "AIController.h"
 #include "Engine/Core/ParticleSystem.h"
 
 #include <glm/glm.hpp>
@@ -370,16 +369,6 @@ namespace ProjectStateSerializer {
 						contents += ";targetinstance;" + ProjectStateFormat::EscapeField(attack->AttackTargetInstanceName());
 						contents += ";" + ProjectStateFormat::EscapeField(attack->AttackTargetBoneName()) + "\n";
 					}
-					else if (const PlayerCombat* combat = dynamic_cast<const PlayerCombat*>(component))
-					{
-						AppendComponentLine(contents, projectPath, object, "gamecomponent");
-						contents += ";PlayerCombat;" + ProjectStateFormat::EscapeField(combat->ProjectileName());
-						contents += ";" + ProjectStateFormat::EscapeField(combat->SpawnBoneName());
-						contents += ";spawnframe;" + std::to_string(combat->ProjectileSpawnFrame());
-						contents += ";launchdirection;" + std::to_string(combat->LaunchDirection().x);
-						contents += ";" + std::to_string(combat->LaunchDirection().y);
-						contents += ";" + std::to_string(combat->LaunchDirection().z) + "\n";
-					}
 					else if (const ParticleSystem* particles = dynamic_cast<const ParticleSystem*>(component))
 					{
 						AppendComponentLine(contents, projectPath, object, "gamecomponent");
@@ -494,7 +483,12 @@ namespace ProjectStateSerializer {
 				else if (const TriggerSphere* trigger = dynamic_cast<const TriggerSphere*>(component))
 				{
 					AppendComponentLine(contents, projectPath, object, "gamecomponent");
-					contents += ";TriggerSphere;" + std::to_string(trigger->Radius()) + ";" + std::to_string(trigger->Enabled() ? 1 : 0);
+					contents += ";" + ProjectStateFormat::EscapeField(component->Name());
+					if (std::string(component->Name()) == "TriggerSphere")
+						contents += ";" + std::to_string(trigger->Radius()) + ";" + std::to_string(trigger->Enabled() ? 1 : 0);
+					else
+						contents += ";triggersphere;" + std::to_string(trigger->Radius())
+							+ ";" + std::to_string(trigger->Enabled() ? 1 : 0);
 					contents += ";offset;" + std::to_string(trigger->PositionOffset().x);
 					contents += ";" + std::to_string(trigger->PositionOffset().y);
 					contents += ";" + std::to_string(trigger->PositionOffset().z) + "\n";
@@ -1194,16 +1188,22 @@ namespace ProjectStateSerializer {
 							return false;
 						}
 						component.componentClassName = ProjectStateFormat::UnescapeField(fields[componentLayout.dataIndex]);
-						if (component.componentClassName == "TriggerSphere")
+						const bool baseTriggerSphere = component.componentClassName == "TriggerSphere";
+						const std::size_t triggerDataIndex = baseTriggerSphere
+							? componentLayout.dataIndex + 1 : componentLayout.dataIndex + 2;
+						const bool customTriggerSphere = !baseTriggerSphere
+							&& fields.size() > componentLayout.dataIndex + 1
+							&& fields[componentLayout.dataIndex + 1] == "triggersphere";
+						if (baseTriggerSphere || customTriggerSphere)
 						{
-							if (fields.size() > componentLayout.dataIndex + 1) component.triggerRadius = std::stof(fields[componentLayout.dataIndex + 1]);
-							if (fields.size() > componentLayout.dataIndex + 2) component.triggerEnabled = fields[componentLayout.dataIndex + 2] == "1";
-							if (fields.size() > componentLayout.dataIndex + 6
-								&& fields[componentLayout.dataIndex + 3] == "offset")
+							if (fields.size() > triggerDataIndex) component.triggerRadius = std::stof(fields[triggerDataIndex]);
+							if (fields.size() > triggerDataIndex + 1) component.triggerEnabled = fields[triggerDataIndex + 1] == "1";
+							if (fields.size() > triggerDataIndex + 5
+								&& fields[triggerDataIndex + 2] == "offset")
 							{
-								component.triggerPositionOffset.x = std::stof(fields[componentLayout.dataIndex + 4]);
-								component.triggerPositionOffset.y = std::stof(fields[componentLayout.dataIndex + 5]);
-								component.triggerPositionOffset.z = std::stof(fields[componentLayout.dataIndex + 6]);
+								component.triggerPositionOffset.x = std::stof(fields[triggerDataIndex + 3]);
+								component.triggerPositionOffset.y = std::stof(fields[triggerDataIndex + 4]);
+								component.triggerPositionOffset.z = std::stof(fields[triggerDataIndex + 5]);
 							}
 						}
 						else if (component.componentClassName == "Hitbox")
@@ -1241,21 +1241,6 @@ namespace ProjectStateSerializer {
 								component.attackTargetInstanceName = ProjectStateFormat::UnescapeField(fields[componentLayout.dataIndex + 11]);
 								if (fields.size() > componentLayout.dataIndex + 12)
 									component.attackTargetBoneName = ProjectStateFormat::UnescapeField(fields[componentLayout.dataIndex + 12]);
-							}
-						}
-						else if (component.componentClassName == "PlayerCombat")
-						{
-							if (fields.size() > componentLayout.dataIndex + 1) component.combatProjectileName = ProjectStateFormat::UnescapeField(fields[componentLayout.dataIndex + 1]);
-							if (fields.size() > componentLayout.dataIndex + 2) component.combatSpawnBoneName = ProjectStateFormat::UnescapeField(fields[componentLayout.dataIndex + 2]);
-							if (fields.size() > componentLayout.dataIndex + 4
-								&& fields[componentLayout.dataIndex + 3] == "spawnframe")
-								component.combatProjectileSpawnFrame = std::max(0, std::stoi(fields[componentLayout.dataIndex + 4]));
-							if (fields.size() > componentLayout.dataIndex + 8
-								&& fields[componentLayout.dataIndex + 5] == "launchdirection")
-							{
-								component.combatLaunchDirection.x = std::stof(fields[componentLayout.dataIndex + 6]);
-								component.combatLaunchDirection.y = std::stof(fields[componentLayout.dataIndex + 7]);
-								component.combatLaunchDirection.z = std::stof(fields[componentLayout.dataIndex + 8]);
 							}
 						}
 						else if (component.componentClassName == "ParticleSystem")
@@ -1420,6 +1405,51 @@ namespace ProjectStateSerializer {
 				}
 				for (std::size_t marker = 0; marker + 2 < fields.size(); ++marker)
 				{
+					if (fields[marker] == "submeshcomponent")
+					{
+						try
+						{
+							object.isSubmeshComponentEntity = true;
+							object.submeshComponentParentId = static_cast<unsigned int>(std::stoul(fields[marker + 1]));
+							object.submeshComponentIndex = std::stoi(fields[marker + 2]);
+						}
+						catch (...)
+						{
+							object.isSubmeshComponentEntity = false;
+							object.submeshComponentParentId = 0;
+							object.submeshComponentIndex = -1;
+						}
+						continue;
+					}
+					if (fields[marker] == "submeshmaterials")
+					{
+						try
+						{
+							const std::size_t count = std::min<std::size_t>(std::stoul(fields[marker + 1]), (fields.size() - marker - 2) / 12);
+							for (std::size_t i = 0; i < count; ++i)
+							{
+								const std::size_t offset = marker + 2 + i * 12;
+								PendingLevel::PendingObject::SubmeshMaterialData setting;
+								const auto isTrue = [&fields](std::size_t index)
+								{
+									return fields[index] == "1" || fields[index] == "true" || fields[index] == "True";
+								};
+								setting.emissiveEnabled = isTrue(offset);
+								setting.emissiveColor = glm::vec3(std::stof(fields[offset + 1]), std::stof(fields[offset + 2]), std::stof(fields[offset + 3]));
+								setting.emissiveBlendFactor = std::stof(fields[offset + 4]);
+								setting.castsShadow = isTrue(offset + 5);
+								setting.colorTextureEnabled = isTrue(offset + 6);
+								setting.specularTextureEnabled = isTrue(offset + 7);
+								setting.normalTextureEnabled = isTrue(offset + 8);
+								setting.roughnessTextureEnabled = isTrue(offset + 9);
+								setting.heightTextureEnabled = isTrue(offset + 10);
+								setting.name = ProjectStateFormat::UnescapeField(fields[offset + 11]);
+								object.submeshMaterialSettings.push_back(std::move(setting));
+							}
+						}
+						catch (...) { object.submeshMaterialSettings.clear(); }
+						continue;
+					}
 					if (fields[marker] != "submeshcolliders") continue;
 					try
 					{
@@ -1437,7 +1467,7 @@ namespace ProjectStateSerializer {
 						}
 					}
 					catch (...) { object.submeshColliderSettings.clear(); }
-					break;
+					continue;
 				}
 				currentLevel->objects.push_back(std::move(object));
 			}

@@ -1,4 +1,4 @@
-#include "Game/Health.h"
+#include "Health.h"
 
 #include "Engine/Core/Entity.h"
 

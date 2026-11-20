@@ -77,7 +77,8 @@ public:
 	void shutDown();
 	// Editor-mode overlay: draws axis/grid plus the visible debug windows.
 	void draw(const Camera& camera, const EngineGUI& gui);
-	void DrawCameraPath(const Camera& camera, const CameraPathData& path, int selectedPoint, bool drawPath = true);
+	void DrawCameraPath(const Camera& camera, const CameraPathData& path, int selectedPoint,
+		bool drawPath = true, bool drawMarkers = true);
 	void DrawPlayerAttackSpawnPreviews(const Camera& camera);
 	// Game-mode overlay: shows only the runtime input and gameplay diagnostics.
 	void drawGameModeInput(const Input& input);
@@ -159,14 +160,14 @@ public:
 
 private:
 	void DrawRenderStatsWindow();
-	void DrawEntityColliderVolumes(const Camera& camera);
+	void DrawEntityColliderVolumes(const Camera& camera, bool drawRoundedVolumes = true);
 	// Rebuilds the axis/grid helpers when the grid configuration changes.
 	void RebuildGrid();
 	void RebuildAxis();
 	void RebuildPointLightDebugSpheres();
 	void ClearEntityBoundingBoxes();
 	void ClearHitboxDebugVolumes();
-	void DrawHitboxVolumes(const Camera& camera);
+	void DrawHitboxVolumes(const Camera& camera, bool drawRoundedVolumes = true);
 	// Small formatting helper used by the log window.
 	std::string SeverityPrefix(Severity severity) const;
 

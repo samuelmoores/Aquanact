@@ -8,6 +8,9 @@
 #include "Engine/Core/Root.h"
 #include "Engine/Core/Scene.h"
 #include "Engine/Core/SceneManager.h"
+#include "Engine/Core/Entity.h"
+#include "Engine/Core/Input.h"
+#include "PlayerController.h"
 #include "Engine/UI/GameGUICreatorHelpers.h"
 
 #include <imgui.h>
@@ -54,9 +57,10 @@ void GameGUICreatorView::DrawWidgetList(GameGUICreator& creator)
 				}
 
 				std::string annotation;
+				annotation = widget.editorVisible ? " [editor visible]" : " [editor hidden]";
 				if (widget.type == "Panel")
 				{
-					annotation = widget.visible ? " [visible on load]" : " [hidden on load]";
+					annotation += widget.visible ? " [game visible on load]" : " [game hidden on load]";
 				}
 				else if (widget.type == "Button" && widget.action == GameGUIActionType::SubPanel)
 				{
@@ -111,6 +115,18 @@ void GameGUICreatorView::DrawWidgetDetails(GameGUICreator& creator)
 	}
 
 	GameGUIWidgetDef& widget = asset.widgets[static_cast<std::size_t>(creator.m_selectedWidgetIndex)];
+	ImGui::TextUnformatted("Visibility");
+	if (ImGui::Checkbox("Visible in editor", &widget.editorVisible))
+	{
+		creator.SyncRuntimePreview();
+		creator.SaveSelectedRoleGUI();
+	}
+	if (ImGui::Checkbox("Visible on gameplay load", &widget.visible))
+	{
+		creator.SyncRuntimePreview();
+		creator.SaveSelectedRoleGUI();
+	}
+	ImGui::Separator();
 
 	if (widget.type == "Button")
 	{
@@ -330,6 +346,91 @@ void GameGUICreatorView::Draw(GameGUICreator& creator, const Camera&)
 		}
 	}
 	ImGui::End();
+
+	const CameraPathData& cameraPath = Root::Current().FrontEnd().EditorGUI().CameraPath().Data();
+	if (!cameraPath.points.empty())
+	{
+		if (ImGui::Begin("Camera Path Preview", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+		{
+			PathedCamera& previewCamera = Root::Current().Render().GetPathedCamera();
+			EngineCamera& orientationCamera = Root::Current().Render().GetEngineCamera();
+			if (!creator.m_cameraPreviewSensitivityInitialized)
+			{
+				creator.m_cameraPreviewLookSensitivity = orientationCamera.LookSensitivity();
+				creator.m_cameraPreviewSensitivityInitialized = true;
+			}
+			ImGui::Checkbox("Look At Player", &creator.m_cameraPreviewLookAtPlayer);
+			if (!creator.m_cameraPreviewLookAtPlayer)
+			{
+				ImGui::TextDisabled("Hold right mouse and drag to rotate the camera.");
+				ImGui::SetNextItemWidth(160.0f);
+				ImGui::DragFloat("Look Sensitivity", &creator.m_cameraPreviewLookSensitivity,
+					0.001f, 0.001f, 1.0f, "%.3f");
+			}
+			Entity* playerTarget = nullptr;
+			if (Scene* activeScene = Root::Current().Scenes().ActiveLevel())
+			{
+				for (const std::unique_ptr<Entity>& object : activeScene->Objects())
+				{
+					if (object && object->GetComponent<PlayerController>())
+					{
+						playerTarget = object.get();
+						break;
+					}
+				}
+			}
+			if (cameraPath.points.size() < 2 || !IsValidCameraPath(cameraPath))
+			{
+				ImGui::TextDisabled("Add at least two camera path points to scrub the camera.");
+			}
+			else
+			{
+				float progress = previewCamera.PlayerProgress();
+				if (ImGui::SliderFloat("Path Position", &progress, 0.0f, 1.0f, "%.3f"))
+				{
+					previewCamera.ClearOverridePosition();
+					previewCamera.SetPlayerProgress(progress);
+				}
+			}
+
+			previewCamera.ClearOverridePosition();
+			glm::vec3 pathPosition = cameraPath.points.front().position;
+			if (cameraPath.points.size() >= 2 && IsValidCameraPath(cameraPath))
+			{
+				const std::size_t segmentCount = cameraPath.points.size() - 1;
+				const float pathCoordinate = glm::clamp(previewCamera.PlayerProgress(), 0.0f, 1.0f)
+					* static_cast<float>(segmentCount);
+				const std::size_t segment = std::min(
+					static_cast<std::size_t>(pathCoordinate), segmentCount - 1);
+				const float segmentProgress = glm::clamp(
+					pathCoordinate - static_cast<float>(segment), 0.0f, 1.0f);
+				pathPosition = EvaluateCameraPathSegment(cameraPath, segment, segmentProgress);
+			}
+
+			glm::vec3 facing = previewCamera.GetFacing();
+			if (creator.m_cameraPreviewLookAtPlayer && playerTarget)
+			{
+				const glm::vec3 toPlayer = playerTarget->WorldCenterPosition() - pathPosition;
+				if (glm::dot(toPlayer, toPlayer) > 1e-8f)
+					facing = glm::normalize(toPlayer);
+			}
+			else if (!creator.m_cameraPreviewLookAtPlayer)
+			{
+				orientationCamera.SetPose(pathPosition, facing);
+				const Input::InputFrame& inputFrame = Root::Current().InputRef().Frame();
+				if (inputFrame.lookActive && !inputFrame.lookBecameActive)
+				{
+					const float engineSensitivity = std::max(orientationCamera.LookSensitivity(), 0.0001f);
+					const glm::vec2 scaledMouseDelta = inputFrame.mouseDelta
+						* (creator.m_cameraPreviewLookSensitivity / engineSensitivity);
+					orientationCamera.FlyControl(scaledMouseDelta, glm::vec3(0.0f), inputFrame.deltaTime);
+				}
+				facing = orientationCamera.GetFacing();
+			}
+			previewCamera.SetPose(pathPosition, facing);
+		}
+		ImGui::End();
+	}
 
 	creator.DrawCreateWidgetPopup();
 	creator.DrawBindingPopup();

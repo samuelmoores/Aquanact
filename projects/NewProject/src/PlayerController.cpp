@@ -1,4 +1,4 @@
-#include "Game/PlayerController.h"
+#include "PlayerController.h"
 
 #include "Engine/Core/EntityStateMachine.h"
 #include "Engine/Core/Entity.h"
@@ -8,9 +8,6 @@
 #include "Engine/Core/InputManager.h"
 #include "Engine/Core/RenderManager.h"
 #include "Engine/Core/MathUtils.h"
-#include "Engine/Core/Scene.h"
-#include "Engine/Core/SceneManager.h"
-#include "Game/GameManager.h"
 
 #include <algorithm>
 #include <cmath>
@@ -111,16 +108,6 @@ void PlayerController::startUp(Entity& owner)
 	m_wantsToMove = false;
 	m_movementLocked = false;
 	m_inputActions = &Root::Current().InputActions();
-}
-
-void PlayerController::OnTriggerEnter(Entity& triggerOwner)
-{
-	Scene* scene = Root::Current().Scenes().ActiveLevel();
-	Entity* managerEntity = scene ? scene->FindObjectByName("GameManager") : nullptr;
-	GameManager* manager = managerEntity ? managerEntity->GetComponent<GameManager>() : nullptr;
-	if (manager)
-		manager->RecordOverlap();
-	(void)triggerOwner;
 }
 
 void PlayerController::FirstFrame(Entity& owner)

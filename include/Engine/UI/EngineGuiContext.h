@@ -12,6 +12,10 @@ struct EngineGuiSelection
 	// Entity IDs remain stable when the scene vector is reordered or an earlier
 	// object is removed. Zero is reserved for no selection.
 	unsigned int entityId = 0;
+	// Imported mesh child selected in the scene hierarchy; -1 selects the entity.
+	int submeshIndex = -1;
+	// Runtime entity that owns components for the selected submesh child.
+	unsigned int submeshComponentEntityId = 0;
 	// Point lights are stored in a fixed-capacity vector and are currently only
 	// appended, so their index is sufficient for editor selection. -1 is none.
 	int pointLightIndex = -1;
@@ -25,7 +29,6 @@ struct EngineGuiWindowState
 	bool showSceneWindow = true;
 	bool showLevelColliderWindow = false;
 	bool showEntityWindow = false;
-	bool showGameManagerWindow = false;
 	bool showLightingWindow = false;
 	bool showFileExplorer = false;
 	bool showInputMapWindow = false;

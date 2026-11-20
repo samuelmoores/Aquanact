@@ -25,6 +25,8 @@ namespace
 			if (component && component->TeamId() != 0)
 				return component->TeamId();
 		}
+		if (entity.IsSubmeshComponentOwner() && entity.Parent())
+			return CombatTeam(*entity.Parent());
 		return 0;
 	}
 }
@@ -79,9 +81,21 @@ void Hitbox::EndAttack()
 glm::vec3 Hitbox::DebugCenter() const
 {
 	Entity* owner = Owner();
-	if (!owner || !owner->GetMesh())
+	if (!owner)
 		return glm::vec3(0.0f);
 
+	if (owner->IsSubmeshComponentOwner())
+	{
+		if (m_boneName.empty())
+			return owner->WorldCenterPosition();
+		Entity* parent = owner->Parent();
+		if (!parent || !parent->GetMesh())
+			return owner->WorldCenterPosition();
+		const glm::vec3 bonePosition = parent->GetMesh()->BonePosition(m_boneName);
+		return glm::vec3(parent->BuildModelMatrix() * glm::vec4(bonePosition, 1.0f));
+	}
+	if (!owner->GetMesh())
+		return glm::vec3(0.0f);
 	if (m_boneName.empty())
 		return owner->WorldCenterPosition();
 
@@ -104,7 +118,7 @@ void Hitbox::Update(Entity& owner, float)
 
 void Hitbox::Sync(Entity& owner)
 {
-	if (!owner.GetMesh()) return;
+	if (!owner.GetMesh() && !owner.IsSubmeshComponentOwner()) return;
 
 	const glm::vec3 center = DebugCenter();
 	const glm::vec3 halfExtents(m_radius);
@@ -116,6 +130,8 @@ void Hitbox::Sync(Entity& owner)
 void Hitbox::UpdateAttackWindow(Entity& owner)
 {
 	EntityStateMachine* stateMachine = owner.GetComponent<EntityStateMachine>();
+	if (!stateMachine && owner.IsSubmeshComponentOwner() && owner.Parent())
+		stateMachine = owner.Parent()->GetComponent<EntityStateMachine>();
 	if (!stateMachine)
 	{
 		EndAttack();
@@ -152,7 +168,7 @@ void Hitbox::RegisterHits(Entity& owner)
 	const int ownerTeam = CombatTeam(owner);
 	for (Entity* target : PhysicsWorld::Instance().QueryHitbox(m_collider, &owner))
 	{
-		if (!target || m_hitTargets.contains(target))
+		if (!target || target == owner.Parent() || m_hitTargets.contains(target))
 			continue;
 		const int targetTeam = CombatTeam(*target);
 		if (ownerTeam != 0 && targetTeam != 0 && ownerTeam == targetTeam)

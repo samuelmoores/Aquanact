@@ -37,7 +37,7 @@ std::string CodeCreationWindow::NormalizeClassName(const std::string& input)
 void CodeCreationWindow::SaveNewClassConfiguration(const std::string& className, bool attachToExistingEntity,
 	const std::string& targetEntityName, bool attachToExistingInstance, const std::string& targetInstanceName)
 {
-	std::ofstream outFile("NewClassConfiguration");
+	std::ofstream outFile(Root::Current().Projects().PendingClassConfigurationPath());
 	if (!outFile) return;
 	outFile << "ClassName: " << className << "\n"
 		<< "AttachToExistingEntity: " << std::boolalpha << attachToExistingEntity << "\n"

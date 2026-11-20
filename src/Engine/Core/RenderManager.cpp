@@ -16,7 +16,7 @@
 #include "Engine/Core/ProjectStateData.h"
 #include "Engine/Core/FrameProfiler.h"
 #include "Engine/Core/Frustum.h"
-#include "Game/PlayerController.h"
+#include "PlayerController.h"
 
 #include <chrono>
 #include <iomanip>
@@ -980,7 +980,9 @@ void RenderManager::Loop(FrontEndManager& frontEndManager, FileManager& fileMana
 	const auto buildEnd = std::chrono::high_resolution_clock::now();
 	m_lastFrameBuildTime = buildEnd - buildStart;
 
-	if (engineState.IsEditorMode() && !ShouldPreviewMainMenu(frontEndManager, engineState))
+	if (engineState.IsEditorMode()
+		&& frontEndManager.FrontEndModeValue() != FrontEndMode::GameGUICreator
+		&& !ShouldPreviewMainMenu(frontEndManager, engineState))
 		debug.DrawPlayerAttackSpawnPreviews(ActiveCamera());
 	{
 		FrameProfiler::Scope scope(Root::Current().Profiler(), "Flush");

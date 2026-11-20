@@ -8,8 +8,8 @@
 #include "Engine/Core/ProjectManager.h"
 #include "Engine/Core/EntityStateMachine.h"
 #include "Engine/Core/Controller.h"
-#include "Game/PlayerController.h"
-#include "Game/AIController.h"
+#include "PlayerController.h"
+#include "AIController.h"
 
 #include <glm/glm.hpp>
 
@@ -233,6 +233,30 @@ namespace ProjectStateFormat {
 						+ ";" + std::to_string(setting.useEntityDefaultShape ? 1 : 0)
 						+ ";" + EscapeField(object->GetMesh()->SubMeshName(static_cast<int>(submeshIndex)));
 				}
+				if (Mesh* mesh = object->GetMesh())
+				{
+					contents += ";submeshmaterials;" + std::to_string(mesh->NumBuffers());
+					for (int submeshIndex = 0; submeshIndex < mesh->NumBuffers(); ++submeshIndex)
+					{
+						const SubMeshMaterial& material = mesh->GetMaterial(submeshIndex);
+						contents += ";" + std::to_string(material.emissiveEnabled ? 1 : 0)
+							+ ";" + std::to_string(material.emissiveColor.x)
+							+ ";" + std::to_string(material.emissiveColor.y)
+							+ ";" + std::to_string(material.emissiveColor.z)
+							+ ";" + std::to_string(material.emissiveBlendFactor)
+							+ ";" + std::to_string(mesh->CastsShadow(submeshIndex) ? 1 : 0)
+							+ ";" + std::to_string(mesh->ColorTextureEnabled(submeshIndex) ? 1 : 0)
+							+ ";" + std::to_string(mesh->SpecularTextureEnabled(submeshIndex) ? 1 : 0)
+							+ ";" + std::to_string(mesh->NormalTextureEnabled(submeshIndex) ? 1 : 0)
+							+ ";" + std::to_string(mesh->RoughnessTextureEnabled(submeshIndex) ? 1 : 0)
+							+ ";" + std::to_string(mesh->HeightTextureEnabled(submeshIndex) ? 1 : 0)
+							+ ";" + EscapeField(mesh->SubMeshName(submeshIndex));
+					}
+				}
+				if (object->IsSubmeshComponentOwner())
+					contents += ";submeshcomponent;"
+						+ std::to_string(object->SubmeshComponentParentId())
+						+ ";" + std::to_string(object->SubmeshComponentIndex());
 				contents += "\n";
 			}
 			for (const auto& collider : Scene->LevelColliders())

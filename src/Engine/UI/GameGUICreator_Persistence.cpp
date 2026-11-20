@@ -160,6 +160,7 @@ void GameGUICreator::SaveSelectedRoleGUI()
 		json << "      \"text\": \"" << widget.text << "\",\n";
 		json << "      \"textColor\": \"" << widget.textColor << "\",\n";
 		json << "      \"texture\": \"" << widget.texture << "\",\n";
+		json << "      \"solidWhiteBox\": " << (widget.solidWhiteBox ? "true" : "false") << ",\n";
 		json << "      \"layer\": \"" << widget.layer << "\",\n";
 		json << "      \"x\": " << widget.x << ",\n";
 		json << "      \"y\": " << widget.y << ",\n";
@@ -167,9 +168,17 @@ void GameGUICreator::SaveSelectedRoleGUI()
 		json << "      \"height\": " << widget.height << ",\n";
 		json << "      \"textureWidth\": " << widget.textureWidth << ",\n";
 		json << "      \"textureHeight\": " << widget.textureHeight << ",\n";
+		json << "      \"worldAnchored\": " << (widget.worldAnchored ? "true" : "false") << ",\n";
+		json << "      \"worldAnchorEntity\": \"" << widget.worldAnchorEntity << "\",\n";
+		json << "      \"worldAnchorUseSubmesh\": " << (widget.worldAnchorUseSubmesh ? "true" : "false") << ",\n";
+		json << "      \"worldAnchorSubmeshIndex\": " << widget.worldAnchorSubmeshIndex << ",\n";
+		json << "      \"worldX\": " << widget.worldX << ",\n";
+		json << "      \"worldY\": " << widget.worldY << ",\n";
+		json << "      \"worldZ\": " << widget.worldZ << ",\n";
 		json << "      \"fontSize\": " << widget.fontSize << ",\n";
 		json << "      \"fontName\": \"" << widget.fontName << "\",\n";
 		json << "      \"visible\": " << (widget.visible ? "true" : "false") << ",\n";
+		json << "      \"editorVisible\": " << (widget.editorVisible ? "true" : "false") << ",\n";
 			json << "      \"alpha\": " << widget.alpha << ",\n";
 		json << "      \"highlightColor\": \"" << widget.highlightColor << "\",\n";
 		json << "      \"clickedColor\": \"" << widget.clickedColor << "\",\n";
@@ -226,6 +235,7 @@ void GameGUICreator::SaveSelectedRoleGUI()
 	{
 		Root::Current().Debugger().LogMessage("Saved executable GUI asset: " + executableAssetPath.string());
 	}
+
 }
 
 void GameGUICreator::LoadSelectedRoleGUI()
@@ -262,9 +272,10 @@ void GameGUICreator::SyncRuntimePreview()
 	{
 		for (GameGUIWidgetDef& widget : previewAsset.widgets)
 		{
+			widget.visible = widget.editorVisible;
 			if (widget.type == "Panel")
 			{
-				widget.visible = widget.name == m_activeEditingPanel;
+				widget.visible = widget.editorVisible && widget.name == m_activeEditingPanel;
 			}
 		}
 	}

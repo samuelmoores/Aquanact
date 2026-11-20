@@ -5,6 +5,7 @@
 #include "Engine/Core/Root.h"
 
 #include <algorithm>
+#include <fstream>
 #include <system_error>
 #include <vector>
 
@@ -50,12 +51,12 @@ std::filesystem::path GameCodeMaintenance::ProjectRoot()
 
 std::filesystem::path GameCodeMaintenance::GameIncludeRoot()
 {
-	return ProjectRoot() / "include" / "Game";
+	return ProjectRoot() / "include";
 }
 
 std::filesystem::path GameCodeMaintenance::GameSourceRoot()
 {
-	return ProjectRoot() / "src" / "Game";
+	return ProjectRoot() / "src";
 }
 
 std::filesystem::path GameCodeMaintenance::GeneratedRoot()
@@ -98,7 +99,7 @@ std::string GameCodeMaintenance::MakeHeaderTemplate(const std::string& className
 std::string GameCodeMaintenance::MakeSourceTemplate(const std::string& className)
 {
 	return
-		"#include \"Game/" + className + ".h\"\n\n"
+		"#include \"" + className + ".h\"\n\n"
 		"#include \"Engine/Core/Entity.h\"\n"
 		"#include \"Engine/Core/EntityStateMachine.h\"\n"
 		"#include \"Engine/Core/Input.h\"\n"
@@ -115,16 +116,17 @@ std::string GameCodeMaintenance::MakeGameSourcesList()
 {
 	std::string result =
 		"if(NOT AQUANACT_PROJECT_ROOT)\n"
-		"    set(AQUANACT_GAME_CODE_ROOT \"${CMAKE_SOURCE_DIR}\")\n"
+		"    get_filename_component(AQUANACT_GAME_CODE_ROOT \"${CMAKE_CURRENT_LIST_DIR}/..\" ABSOLUTE)\n"
 		"else()\n"
 		"    set(AQUANACT_GAME_CODE_ROOT \"${AQUANACT_PROJECT_ROOT}\")\n"
 		"endif()\n\n"
 		"set(GAME_SOURCES\n";
 	for (const auto& path : CollectGameSourceFiles(GameSourceRoot()))
 	{
-		result += "    \"${AQUANACT_GAME_CODE_ROOT}/src/Game/" + path.filename().string() + "\"\n";
+		if (path.stem() != "ComponentRegistry")
+			result += "    \"${AQUANACT_GAME_CODE_ROOT}/src/" + path.filename().string() + "\"\n";
 	}
-	result += "    \"${AQUANACT_GAME_CODE_ROOT}/src/Game/ComponentRegistry.cpp\"\n)\n";
+	result += "    \"${AQUANACT_GAME_CODE_ROOT}/src/ComponentRegistry.cpp\"\n)\n";
 	return result;
 }
 
@@ -135,16 +137,20 @@ std::string GameCodeMaintenance::MakeComponentRegistryTemplate()
 		"#include \"Engine/Core/ComponentFactory.h\"\n"
 		"#include \"Engine/Core/Controller.h\"\n"
 		"#include \"Engine/Core/Entity.h\"\n";
+	result += "#include \"Engine/Core/EntityStateMachine.h\"\n";
 	result += "#include \"Engine/Core/ParticleSystem.h\"\n";
+	result += "#include \"Engine/Core/TriggerSphere.h\"\n";
 	std::vector<std::string> names;
 	for (const auto& path : CollectGameSourceFiles(GameSourceRoot()))
 	{
 		if (path.stem() != "ComponentRegistry") names.push_back(path.stem().string());
 	}
-	for (const std::string& name : names) result += "#include \"Game/" + name + ".h\"\n";
+	for (const std::string& name : names) result += "#include \"" + name + ".h\"\n";
 	result += "\n#include <memory>\n\nvoid RegisterGameComponents()\n{\n";
+	result += "\tComponentFactory::Instance().Register(\"EntityStateMachine\", [](Entity& owner) -> std::unique_ptr<Component>\n\t{\n\t\treturn std::make_unique<EntityStateMachine>(owner.GetMesh());\n\t});\n";
 	result += "\tComponentFactory::Instance().Register(\"Controller\", [](Entity&) -> std::unique_ptr<Component>\n\t{\n\t\treturn std::make_unique<Controller>();\n\t});\n";
 	result += "\tComponentFactory::Instance().Register(\"ParticleSystem\", [](Entity&) -> std::unique_ptr<Component>\n\t{\n\t\treturn std::make_unique<ParticleSystem>();\n\t});\n";
+	result += "\tComponentFactory::Instance().Register(\"TriggerSphere\", [](Entity&) -> std::unique_ptr<Component>\n\t{\n\t\treturn std::make_unique<TriggerSphere>();\n\t});\n";
 	for (const std::string& name : names)
 		result += "\tComponentFactory::Instance().Register(\"" + name + "\", [](Entity&) -> std::unique_ptr<Component>\n\t{\n\t\treturn std::make_unique<" + name + ">();\n\t});\n";
 	return result + "}\n";
@@ -175,6 +181,71 @@ GameCodeGenerationResult GameCodeMaintenance::CreateComponent(const std::string&
 			? "Created " + headerPath.string() + ", " + sourcePath.string() + ", " + registryPath.string() + " and updated " + generatedPath.string()
 			: "Failed to create one or more files."
 	};
+}
+
+GameCodeGenerationResult GameCodeMaintenance::CreateTriggerSphereSubclass(const std::string& className)
+{
+	const auto headerPath = GameIncludeRoot() / (className + ".h");
+	const auto sourcePath = GameSourceRoot() / (className + ".cpp");
+	std::error_code error;
+	std::filesystem::create_directories(headerPath.parent_path(), error);
+	std::filesystem::create_directories(sourcePath.parent_path(), error);
+
+	if (!std::filesystem::exists(headerPath) && !std::filesystem::exists(sourcePath))
+	{
+		const std::string header =
+			"#pragma once\n\n"
+			"#include \"Engine/Core/TriggerSphere.h\"\n\n"
+		"class Entity;\n\n"
+		"class " + className + " final : public TriggerSphere\n"
+		"{\n"
+		"public:\n"
+		"\tconst char* Name() const override { return \"" + className + "\"; }\n"
+		"\tvoid OnEntityEnter(Entity& triggerOwner, Entity& enteringEntity) override;\n"
+		"\tvoid OnEntityExit(Entity& triggerOwner, Entity& leavingEntity) override;\n"
+		"};\n";
+		const std::string source =
+			"#include \"" + className + ".h\"\n\n"
+			"#include \"Engine/Core/Entity.h\"\n\n"
+			"void " + className + "::OnEntityEnter(Entity& triggerOwner, Entity& enteringEntity)\n"
+			"{\n"
+			"\t// Add this trigger's entry behavior here.\n"
+			"\t(void)triggerOwner;\n"
+			"\t(void)enteringEntity;\n"
+			"}\n\n"
+			"void " + className + "::OnEntityExit(Entity& triggerOwner, Entity& leavingEntity)\n"
+			"{\n"
+			"\t// Add this trigger's exit behavior here.\n"
+			"\t(void)triggerOwner;\n"
+			"\t(void)leavingEntity;\n"
+			"}\n";
+		if (!Root::Current().FileSystemRef().WriteTextFile(headerPath, header)
+			|| !Root::Current().FileSystemRef().WriteTextFile(sourcePath, source))
+			return { false, "Failed to create trigger component files in " + GameSourceRoot().string() };
+	}
+	else if (!std::filesystem::exists(headerPath) || !std::filesystem::exists(sourcePath))
+	{
+		return { false, "Only one trigger component file exists for " + className + "; resolve it before adding this trigger." };
+	}
+
+	if (!RegenerateBuildFiles())
+		return { false, "Created trigger component files, but failed to update generated build files." };
+	return { true, "Created or found " + sourcePath.string() };
+}
+
+bool GameCodeMaintenance::SavePendingComponentAttachment(const std::string& className, unsigned int entityId)
+{
+	std::ofstream config(Root::Current().Projects().PendingClassConfigurationPath(), std::ios::trunc);
+	if (!config)
+		return false;
+	config << "ClassName: " << className << "\n"
+		<< "AttachToExistingEntity: true\n"
+		<< "CreateNewEntity: false\n"
+		<< "TargetEntityName: \n"
+		<< "TargetEntityId: " << entityId << "\n"
+		<< "AttachToExistingInstance: false\n"
+		<< "TargetInstanceName: \n";
+	return static_cast<bool>(config);
 }
 
 bool GameCodeMaintenance::RegenerateBuildFiles()

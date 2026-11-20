@@ -76,6 +76,9 @@ void GameGUICreator::OpenCreateWidgetPopup(NewWidgetType type)
 	m_newWidgetTargetPanel.clear();
 	m_newWidgetName[0] = '\0';
 	m_newWidgetTexture[0] = '\0';
+	m_newWidgetSolidWhiteBox = false;
+	m_newWidgetImageWidth = 128;
+	m_newWidgetImageHeight = 128;
 	if (type == NewWidgetType::Panel)
 	{
 		m_newWidgetParentPanel.clear();
@@ -324,15 +327,37 @@ void GameGUICreator::DrawCreateImagePopup()
 {
 	DrawCreateWidgetPopupHeader("Create an image widget:");
 	DrawCreateParentPanelField();
-	DrawCreateWidgetTextureField();
-
-	if (ImGui::Button("Create"))
+	ImGui::Checkbox("Solid White Box", &m_newWidgetSolidWhiteBox);
+	if (m_newWidgetSolidWhiteBox)
 	{
-		AddImageWidget();
+		int size[2] = { m_newWidgetImageWidth, m_newWidgetImageHeight };
+		if (ImGui::DragInt2("Size", size, 1.0f, 1, 8192))
+		{
+			m_newWidgetImageWidth = std::max(1, size[0]);
+			m_newWidgetImageHeight = std::max(1, size[1]);
+		}
+	}
+	else
+	{
+		DrawCreateWidgetTextureField();
+	}
+
+	int imageWidth = 0;
+	int imageHeight = 0;
+	const bool hasValidImage = m_newWidgetSolidWhiteBox
+		? m_newWidgetImageWidth > 0 && m_newWidgetImageHeight > 0
+		: GameGUICreatorHelpers::GetTextureDimensions(
+			GameGUICreatorHelpers::ResolveTexturePath(m_newWidgetTexture), imageWidth, imageHeight);
+	if (!hasValidImage)
+		ImGui::TextDisabled("Select a valid image file or create a solid white box.");
+	ImGui::BeginDisabled(!hasValidImage);
+	if (ImGui::Button("Create") && AddImageWidget())
+	{
 		SyncRuntimePreview();
 		Root::Current().Debugger().LogMessage("Create Image requested");
 		ImGui::CloseCurrentPopup();
 	}
+	ImGui::EndDisabled();
 
 	DrawCreateWidgetPopupFooter();
 }

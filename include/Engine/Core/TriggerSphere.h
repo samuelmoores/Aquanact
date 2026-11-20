@@ -7,7 +7,7 @@
 
 class Entity;
 
-class TriggerSphere final : public Component {
+class TriggerSphere : public Component {
 public:
 	const char* Name() const override { return "TriggerSphere"; }
 	void startUp(Entity& owner) override;
@@ -21,6 +21,11 @@ public:
 
 	void SetEnabled(bool enabled) { m_enabled = enabled; }
 	bool Enabled() const { return m_enabled; }
+
+	// Override these in a specialized trigger class, or implement the base
+	// methods in TriggerSphere.cpp for behavior shared by all trigger spheres.
+	virtual void OnEntityEnter(Entity& triggerOwner, Entity& enteringEntity);
+	virtual void OnEntityExit(Entity& triggerOwner, Entity& leavingEntity);
 
 	#define TRIGGER_SPHERE_BINDABLES(VALUE, FUNCTION) \
 		VALUE(m_radius) \

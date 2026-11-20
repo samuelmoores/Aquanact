@@ -7,7 +7,7 @@ int main(int argc, char** argv)
 {
 	const std::filesystem::path sourceRoot = argc > 1 ? argv[1] : std::filesystem::current_path();
 	const std::filesystem::path buildRoot = argc > 2 ? argv[2] : sourceRoot.parent_path() / "Aquanact-package";
-	const std::filesystem::path projectFile = argc > 3 ? argv[3] : sourceRoot / "projects/project/project.aqua";
+	const std::filesystem::path projectFile = argc > 3 ? argv[3] : sourceRoot / "projects/NewProject/project.aqua";
 #ifdef AQUANACT_DEFAULT_GAME_EXECUTABLE_PATH
 	const std::filesystem::path defaultExecutablePath = AQUANACT_DEFAULT_GAME_EXECUTABLE_PATH;
 #else

@@ -6,14 +6,14 @@
 #include "Engine/Core/EntityStateMachine.h"
 #include "Engine/Core/ParticleSystem.h"
 #include "Engine/Core/TriggerSphere.h"
-#include "Game/AIController.h"
-#include "Game/AttackSphere.h"
-#include "Game/Health.h"
-#include "Game/GameManager.h"
-#include "Game/PlayerAttack.h"
-#include "Game/PlayerCombat.h"
-#include "Game/PlayerController.h"
-#include "Game/PlayerHealth.h"
+#include "AIController.h"
+#include "AttackSphere.h"
+#include "Health.h"
+#include "GameManager.h"
+#include "PlayerAttack.h"
+#include "PlayerCombat.h"
+#include "PlayerController.h"
+#include "PlayerHealth.h"
 
 #include <memory>
 

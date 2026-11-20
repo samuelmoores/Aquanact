@@ -69,10 +69,6 @@ namespace ProjectStateData {
 		bool attackDrawInstance = false;
 		std::string attackTargetInstanceName;
 		std::string attackTargetBoneName;
-		std::string combatProjectileName;
-		std::string combatSpawnBoneName;
-		int combatProjectileSpawnFrame = 0;
-		glm::vec3 combatLaunchDirection{0.0f};
 		float particleEmissionRate = 12.0f;
 		int particleMaxParticles = 128;
 		float particleLifetime = 1.0f;
@@ -167,6 +163,18 @@ namespace ProjectStateData {
 		std::vector<PointLightData> pointLights;
 		struct PendingObject {
 			struct SubmeshColliderData { bool enabled = true; int shape = 0; bool useEntityDefaultShape = true; std::string name; };
+			struct SubmeshMaterialData {
+				bool emissiveEnabled = false;
+				glm::vec3 emissiveColor{ 0.0f };
+				float emissiveBlendFactor = 0.5f;
+				bool castsShadow = true;
+				bool colorTextureEnabled = true;
+				bool specularTextureEnabled = true;
+				bool normalTextureEnabled = true;
+				bool roughnessTextureEnabled = true;
+				bool heightTextureEnabled = true;
+				std::string name;
+			};
 			std::filesystem::path sourcePath;
 			std::string name;
 			glm::vec3 position{ 0.0f };
@@ -181,7 +189,11 @@ namespace ProjectStateData {
 			int physicsColliderShape = 0;
 			float capsuleRadiusOverride = 0.0f;
 			bool useBaseMeshCollider = false;
+			bool isSubmeshComponentEntity = false;
+			unsigned int submeshComponentParentId = 0;
+			int submeshComponentIndex = -1;
 			std::vector<SubmeshColliderData> submeshColliderSettings;
+			std::vector<SubmeshMaterialData> submeshMaterialSettings;
 		};
 		std::vector<PendingObject> objects;
 		struct PendingLevelCollider {

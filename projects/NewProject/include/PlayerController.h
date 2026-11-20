@@ -58,7 +58,6 @@ private:
 	void Move(Entity& owner, const glm::vec2& move2D, float dt);
 
 	// Trigger
-	void OnTriggerEnter(Entity& triggerOwner) override;
 
 	// External input sources.
 	const Input* m_inputDevice = nullptr;

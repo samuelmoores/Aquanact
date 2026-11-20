@@ -124,11 +124,6 @@ void GameGUICreator::DrawPanelWidgetDetails(GameGUIAsset& asset, GameGUIWidgetDe
 		}
 	}
 
-	if (ImGui::Checkbox("Visible on load", &widget.visible))
-	{
-		SyncRuntimePreview();
-		SaveSelectedRoleGUI();
-	}
 	bool layoutChanged = ImGui::Checkbox("Horizontal layout", &widget.horizontalButtonLayout);
 
 	ImGui::SeparatorText("Panel controls");

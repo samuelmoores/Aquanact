@@ -1,4 +1,4 @@
-#include "Game/PlayerHealth.h"
+#include "PlayerHealth.h"
 
 void PlayerHealth::startUp(Entity&)
 {

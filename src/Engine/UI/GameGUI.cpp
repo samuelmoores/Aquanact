@@ -10,6 +10,8 @@
 #include "Engine/Core/GameplayManager.h"
 #include "Engine/Core/ProjectManager.h"
 #include "Engine/Core/Window.h"
+#include "Engine/Core/RenderManager.h"
+#include "Engine/Core/Camera.h"
 #include "Engine/Core/StbImage.h"
 #include "Engine/Core/GLHeaders.h"
 #include "Engine/UI/GameGUIAsset.h"
@@ -18,10 +20,12 @@
 #include "Engine/Core/FileSystem.h"
 #include "Engine/Core/Scene.h"
 #include "Engine/Core/SceneManager.h"
+#include "Engine/Core/Entity.h"
+#include "Engine/Core/Mesh.h"
 #include "Engine/Core/Audio.h"
 #include "Engine/Core/EntityStateMachine.h"
-#include "Game/Health.h"
-#include "Game/PlayerController.h"
+#include "Health.h"
+#include "PlayerController.h"
 
 #include <MYGUI/MyGUI_Button.h>
 #include <MYGUI/MyGUI_Colour.h>
@@ -623,7 +627,8 @@ MyGUI::TextBox* GameGUI::CreateTextWidget(const GameGUIWidgetDef& def, MyGUI::Wi
 
 MyGUI::ImageBox* GameGUI::CreateImageWidget(const GameGUIWidgetDef& def, MyGUI::Widget* parent)
 {
-	const std::string skin = def.skin.empty() ? "ImageBox" : def.skin;
+	const std::string skin = def.solidWhiteBox ? "WhiteSkin"
+		: def.skin.empty() ? "ImageBox" : def.skin;
 	LogSkinLookup(def.name, skin);
 	MyGUI::ImageBox* image = CreateGuiWidget<MyGUI::ImageBox>(m_gui, parent, skin, def.x, def.y, def.width, def.height, def.layer, def.name);
 
@@ -632,9 +637,28 @@ MyGUI::ImageBox* GameGUI::CreateImageWidget(const GameGUIWidgetDef& def, MyGUI::
 		return nullptr;
 	}
 
-	if (!def.texture.empty())
+	if (!def.solidWhiteBox && !def.texture.empty())
 	{
-		image->setImageTexture(def.texture);
+		int imageWidth = 0;
+		int imageHeight = 0;
+		const std::filesystem::path imagePath = ResolveGameGUIImagePath(def.texture);
+		if (GameGUICreatorHelpers::GetTextureDimensions(imagePath, imageWidth, imageHeight))
+		{
+			try
+			{
+				image->setImageTexture(def.texture);
+			}
+			catch (const std::exception& ex)
+			{
+				Root::Current().Debugger().LogMessage(
+					"GameGUI image widget '" + def.name + "' texture assignment failed: " + ex.what());
+			}
+		}
+		else
+		{
+			Root::Current().Debugger().LogMessage(
+				"GameGUI image widget '" + def.name + "' has an empty or unreadable image file: " + def.texture);
+		}
 	}
 	FinalizeAndLogWidget(image, def, parent == nullptr, false, true);
 	return image;
@@ -854,6 +878,7 @@ void GameGUI::Draw()
 	}
 
 	UpdateDeathOverlay();
+	UpdateWorldAnchoredImages();
 
 	// MyGUI needs a per-frame tick so internal widget state and input-driven updates
 	// advance before the renderer submits the overlay.
@@ -873,6 +898,123 @@ void GameGUI::Draw()
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 	m_platform->getRenderManagerPtr()->drawOneFrame();
+}
+
+void GameGUI::UpdateWorldAnchoredImages()
+{
+	if (!m_window || m_runtimeWidgetLookup.empty())
+		return;
+
+	int viewportWidth = 0;
+	int viewportHeight = 0;
+	m_window->GetFramebufferSize(viewportWidth, viewportHeight);
+	if (viewportWidth <= 0 || viewportHeight <= 0)
+		return;
+
+	const Camera& camera = Root::Current().Render().ActiveCamera();
+	const glm::mat4 viewProjection = camera.GetProjectionMatrix() * camera.GetViewMatrix();
+	for (const GameGUIWidgetDef& definition : m_loadedAsset.widgets)
+	{
+		if (!definition.worldAnchored
+			|| (definition.type != "Image" && definition.type != "ImageBox"))
+			continue;
+
+		const auto widgetIt = m_runtimeWidgetLookup.find(definition.name);
+		if (widgetIt == m_runtimeWidgetLookup.end())
+			continue;
+		auto* image = dynamic_cast<MyGUI::ImageBox*>(widgetIt->second);
+		if (!image)
+			continue;
+
+		glm::vec3 worldPosition(definition.worldX, definition.worldY, definition.worldZ);
+		if (!definition.worldAnchorEntity.empty())
+		{
+			bool anchorFound = false;
+			if (Scene* scene = Root::Current().Scenes().ActiveLevel())
+			{
+				for (const std::unique_ptr<Entity>& object : scene->Objects())
+				{
+					if (object && object->Name() == definition.worldAnchorEntity)
+					{
+						glm::vec3 anchorPosition = object->WorldPosition();
+						if (definition.worldAnchorUseSubmesh)
+						{
+							Mesh* mesh = object->GetMesh();
+						if (!mesh || definition.worldAnchorSubmeshIndex < 0
+							|| definition.worldAnchorSubmeshIndex >= mesh->NumBuffers())
+							break;
+							const glm::vec3 localCenter =
+								(mesh->SubMeshMinBounds(definition.worldAnchorSubmeshIndex)
+									+ mesh->SubMeshMaxBounds(definition.worldAnchorSubmeshIndex)) * 0.5f;
+							anchorPosition = glm::vec3(object->BuildModelMatrix() * glm::vec4(localCenter, 1.0f));
+						}
+						worldPosition = anchorPosition + worldPosition;
+						anchorFound = true;
+						break;
+					}
+				}
+			}
+			if (!anchorFound)
+			{
+				image->setVisible(false);
+				continue;
+			}
+		}
+
+		const glm::vec4 clipPosition = viewProjection * glm::vec4(
+			worldPosition, 1.0f);
+		if (!std::isfinite(clipPosition.w) || clipPosition.w <= 0.0f)
+		{
+			image->setVisible(false);
+			continue;
+		}
+
+		const glm::vec3 ndc = glm::vec3(clipPosition) / clipPosition.w;
+		const bool inView = std::isfinite(ndc.x) && std::isfinite(ndc.y) && std::isfinite(ndc.z)
+			&& ndc.x >= -1.0f && ndc.x <= 1.0f
+			&& ndc.y >= -1.0f && ndc.y <= 1.0f
+			&& ndc.z >= -1.0f && ndc.z <= 1.0f;
+		const auto visibilityOverride = m_runtimeVisibilityOverrides.find(definition.name);
+		const bool visible = visibilityOverride == m_runtimeVisibilityOverrides.end()
+			? definition.visible
+			: visibilityOverride->second;
+		image->setVisible(visible && inView);
+		if (!inView)
+			continue;
+
+		// World anchored UI is rendered as a screen overlay, so emulate the
+		// perspective size change it would have in the 3D scene. Always derive
+		// from the saved widget dimensions to avoid compounding scale each frame.
+		const float cameraDistance = glm::distance(camera.GetPosition(), worldPosition);
+		if (std::isfinite(cameraDistance) && cameraDistance > 0.001f)
+		{
+			constexpr float referenceDistance = 5.0f;
+			const float distanceScale = std::clamp(referenceDistance / cameraDistance, 0.1f, 10.0f);
+			const int baseWidth = std::max(1, definition.width);
+			const int baseHeight = std::max(1, definition.height);
+			const int scaledWidth = std::max(1, static_cast<int>(std::round(baseWidth * distanceScale)));
+			const int scaledHeight = std::max(1, static_cast<int>(std::round(baseHeight * distanceScale)));
+			if (image->getWidth() != scaledWidth || image->getHeight() != scaledHeight)
+				image->setSize(scaledWidth, scaledHeight);
+		}
+
+		const int screenX = static_cast<int>((ndc.x * 0.5f + 0.5f) * viewportWidth);
+		const int screenY = static_cast<int>((0.5f - ndc.y * 0.5f) * viewportHeight);
+		int parentOffsetX = 0;
+		int parentOffsetY = 0;
+		if (!definition.parentName.empty())
+		{
+			const auto parentIt = m_runtimeWidgetLookup.find(definition.parentName);
+			if (parentIt != m_runtimeWidgetLookup.end())
+			{
+				const MyGUI::IntCoord parentCoord = parentIt->second->getAbsoluteCoord();
+				parentOffsetX = parentCoord.left;
+				parentOffsetY = parentCoord.top;
+			}
+		}
+		image->setPosition(screenX - image->getWidth() / 2 - parentOffsetX,
+			screenY - image->getHeight() / 2 - parentOffsetY);
+	}
 }
 
 void GameGUI::EndFrame()
@@ -1029,6 +1171,7 @@ void GameGUI::ClearUI()
 		m_allControllerButtons.clear();
 		m_controllerButtons.clear();
 		m_runtimeWidgetLookup.clear();
+		m_runtimeVisibilityOverrides.clear();
 		m_buttonDefaultTextColours.clear();
 		m_buttonLabels.clear();
 		m_buttonFocusSounds.clear();
@@ -1062,6 +1205,7 @@ void GameGUI::ClearUI()
 	m_allControllerButtons.clear();
 	m_controllerButtons.clear();
 	m_runtimeWidgetLookup.clear();
+	m_runtimeVisibilityOverrides.clear();
 	m_focusedControllerButton = -1;
 	m_lastFocusSoundButton = nullptr;
 }
@@ -1409,6 +1553,16 @@ MyGUI::Widget* GameGUI::RuntimeWidget(const std::string& name) const
 {
 	auto it = m_runtimeWidgetLookup.find(name);
 	return it != m_runtimeWidgetLookup.end() ? it->second : nullptr;
+}
+
+void GameGUI::SetRuntimeWidgetVisible(const std::string& name, bool visible)
+{
+	MyGUI::Widget* widget = RuntimeWidget(name);
+	if (!widget)
+		return;
+
+	m_runtimeVisibilityOverrides[name] = visible;
+	widget->setVisible(visible);
 }
 
 void GameGUI::BindWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* widget)

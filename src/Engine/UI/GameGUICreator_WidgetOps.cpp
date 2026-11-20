@@ -1,6 +1,7 @@
 #include "Engine/UI/GameGUICreator.h"
 
 #include "Engine/Core/Root.h"
+#include "Engine/Core/Debug.h"
 #include "Engine/Core/Window.h"
 #include "Engine/Core/Scene.h"
 #include "Engine/Core/SceneManager.h"
@@ -43,28 +44,38 @@ void GameGUICreator::AddButtonWidget()
 	SaveSelectedRoleGUI();
 }
 
-void GameGUICreator::AddImageWidget()
+bool GameGUICreator::AddImageWidget()
 {
 	GameGUIAsset& asset = CurrentGameGUI();
 	GameGUIWidgetDef widget;
 	widget.type = "Image";
 	widget.name = MakeUniqueWidgetName(asset, m_newWidgetName[0] != '\0' ? m_newWidgetName : "Image");
 	widget.parentName = m_newWidgetParentPanel;
-	widget.texture = m_newWidgetTexture;
+	widget.solidWhiteBox = m_newWidgetSolidWhiteBox;
+	widget.texture = widget.solidWhiteBox ? std::string{} : m_newWidgetTexture;
 	widget.layer = "Main";
-	// New image widgets should start at the texture's native size when a texture has been chosen.
-	if (GameGUICreatorHelpers::RefreshTextureBaseline(widget, widget.texture, false))
+	if (widget.solidWhiteBox)
+	{
+		widget.defaultWidth = widget.width = m_newWidgetImageWidth;
+		widget.defaultHeight = widget.height = m_newWidgetImageHeight;
+	}
+	else if (!GameGUICreatorHelpers::RefreshTextureBaseline(widget, widget.texture, false))
+	{
+		Root::Current().Debugger().LogMessage("Create Image aborted: select a valid image file first.");
+		return false;
+	}
+	else
 	{
 		widget.width = widget.defaultWidth;
 		widget.height = widget.defaultHeight;
 	}
-	assert(widget.defaultWidth > 0 && widget.defaultHeight > 0);
 	{
 		CenterWidget(widget);
 	}
 	asset.widgets.push_back(widget);
 	m_selectedWidgetIndex = static_cast<int>(asset.widgets.size() - 1);
 	SaveSelectedRoleGUI();
+	return true;
 }
 
 void GameGUICreator::AddProgressBarWidget()

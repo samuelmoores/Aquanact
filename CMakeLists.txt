@@ -38,18 +38,27 @@ endif()
 # Record the vcpkg triplet so the build can log which package target it was compiled against.
 set(AQUANACT_VCPKG_TARGET_TRIPLET "${VCPKG_TARGET_TRIPLET}")
 
-if (AQUANACT_PROJECT_ROOT STREQUAL "${CMAKE_SOURCE_DIR}/projects/project")
-    # Projects are external to the engine. Clear the old in-tree default left
-    # by earlier configurations, while preserving an explicitly selected path.
-    set(AQUANACT_PROJECT_ROOT "" CACHE PATH "External project directory containing src/Game and include/Game" FORCE)
-else()
-    set(AQUANACT_PROJECT_ROOT "${AQUANACT_PROJECT_ROOT}" CACHE PATH "External project directory containing src/Game and include/Game")
+set(AQUANACT_STARTER_PROJECT_ROOT "${CMAKE_SOURCE_DIR}/projects/NewProject")
+set(AQUANACT_DEFAULT_PROJECT_ROOT "${AQUANACT_STARTER_PROJECT_ROOT}")
+if (WIN32 AND EXISTS "C:/projects/semesterlong/project.aqua")
+    set(AQUANACT_DEFAULT_PROJECT_ROOT "C:/projects/semesterlong")
 endif()
-if (AQUANACT_PROJECT_ROOT AND EXISTS "${AQUANACT_PROJECT_ROOT}/generated/GameSources.cmake")
-    include("${AQUANACT_PROJECT_ROOT}/generated/GameSources.cmake")
+
+if (NOT AQUANACT_PROJECT_ROOT
+	OR AQUANACT_PROJECT_ROOT STREQUAL "${CMAKE_SOURCE_DIR}/projects/project"
+	OR AQUANACT_PROJECT_ROOT STREQUAL "${AQUANACT_STARTER_PROJECT_ROOT}")
+    # Prefer the user's semesterlong project when it is present; otherwise use
+    # the checked-in starter project.
+    set(AQUANACT_PROJECT_ROOT "${AQUANACT_DEFAULT_PROJECT_ROOT}" CACHE PATH
+        "Project directory containing src, include, and generated/GameSources.cmake" FORCE)
 else()
-    include("${CMAKE_SOURCE_DIR}/generated/GameSources.cmake")
+    set(AQUANACT_PROJECT_ROOT "${AQUANACT_PROJECT_ROOT}" CACHE PATH
+        "Project directory containing src, include, and generated/GameSources.cmake")
 endif()
+if (NOT EXISTS "${AQUANACT_PROJECT_ROOT}/generated/GameSources.cmake")
+    message(FATAL_ERROR "Project root '${AQUANACT_PROJECT_ROOT}' must contain generated/GameSources.cmake")
+endif()
+include("${AQUANACT_PROJECT_ROOT}/generated/GameSources.cmake")
 
 set(SOURCES
     "src/Engine/Core/main.cpp"
@@ -79,7 +88,6 @@ set(SOURCES
     "include/Engine/UI/EngineGUI.h" "src/Engine/UI/EngineGUI.cpp"
     "include/Engine/UI/EngineMenuBar.h" "src/Engine/UI/EngineMenuBar.cpp"
     "include/Engine/UI/SceneWindow.h" "src/Engine/UI/SceneWindow.cpp"
-    "include/Engine/UI/GameManagerWindow.h" "src/Engine/UI/GameManagerWindow.cpp"
     "include/Engine/UI/EditorSceneInteraction.h" "src/Engine/UI/EditorSceneInteraction.cpp"
     "include/Engine/UI/EntityWindow.h" "src/Engine/UI/EntityWindow.cpp"
     "include/Engine/UI/InputMapWindow.h" "src/Engine/UI/InputMapWindow.cpp"
@@ -196,10 +204,10 @@ add_dependencies(AquanactEngine AquanactGame)
 if (EMSCRIPTEN)
     target_compile_definitions(AquanactGame PRIVATE AQUANACT_WEB)
     if (NOT AQUANACT_WEB_ASSET_ROOT)
-        set(AQUANACT_WEB_ASSET_ROOT "${CMAKE_SOURCE_DIR}/projects/project/assets")
+        set(AQUANACT_WEB_ASSET_ROOT "${AQUANACT_PROJECT_ROOT}/assets")
     endif()
     if (NOT AQUANACT_WEB_PROJECT_FILE)
-        set(AQUANACT_WEB_PROJECT_FILE "${CMAKE_SOURCE_DIR}/projects/project/project.aqua")
+        set(AQUANACT_WEB_PROJECT_FILE "${AQUANACT_PROJECT_ROOT}/project.aqua")
     endif()
     target_link_options(AquanactGame PRIVATE
         "-sUSE_GLFW=3"

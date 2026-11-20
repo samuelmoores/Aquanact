@@ -218,12 +218,20 @@ namespace {
 			widget.textColor = readField("\"textColor\":", widgetPos);
 			if (widget.textColor.empty()) widget.textColor = "0 0 0";
 			widget.texture = readField("\"texture\":", widgetPos);
+			widget.solidWhiteBox = readField("\"solidWhiteBox\":", widgetPos).find("true") != std::string::npos;
 			if (!widget.texture.empty())
 			{
 				GameGUICreatorHelpers::RefreshTextureBaseline(widget, widget.texture, false);
 			}
 			widget.textureWidth = ReadIntField(readField("\"textureWidth\":", widgetPos), widget.textureWidth);
 			widget.textureHeight = ReadIntField(readField("\"textureHeight\":", widgetPos), widget.textureHeight);
+			widget.worldAnchored = readField("\"worldAnchored\":", widgetPos).find("true") != std::string::npos;
+			widget.worldAnchorEntity = readField("\"worldAnchorEntity\":", widgetPos);
+			widget.worldAnchorUseSubmesh = readField("\"worldAnchorUseSubmesh\":", widgetPos).find("true") != std::string::npos;
+			widget.worldAnchorSubmeshIndex = std::max(0, ReadIntField(readField("\"worldAnchorSubmeshIndex\":", widgetPos), 0));
+			widget.worldX = ReadFloatField(readField("\"worldX\":", widgetPos), 0.0f);
+			widget.worldY = ReadFloatField(readField("\"worldY\":", widgetPos), 0.0f);
+			widget.worldZ = ReadFloatField(readField("\"worldZ\":", widgetPos), 0.0f);
 			if (widget.defaultWidth <= 0) widget.defaultWidth = widget.textureWidth;
 			if (widget.defaultHeight <= 0) widget.defaultHeight = widget.textureHeight;
 			widget.layer = readField("\"layer\":", widgetPos);

@@ -12,7 +12,6 @@
 #include "Engine/Core/FrameProfiler.h"
 #include "Engine/Core/RenderManager.h"
 #include "Engine/Core/InputManager.h"
-#include "Game/GameManager.h"
 #include <algorithm>
 #include <fstream>
 #include <imgui.h>
@@ -121,30 +120,34 @@ namespace {
 				SceneManager.SetSceneKind(pendingLevel.name, SceneManager::SceneKind::Cutscene);
 			}
 
+			bool loadedGameManager = false;
 			for (const auto& pendingObject : pendingLevel.objects)
 			{
+				// Older project saves accumulated copies of the scene's manager
+				// entity. Keep the first authored instance in this scene and ignore
+				// the historical duplicates while materializing the project.
+				if (pendingObject.name == "GameManager")
+				{
+					if (loadedGameManager)
+						continue;
+					loadedGameManager = true;
+				}
+
 				Root::Current().Debugger().LogTagged("ProjectLoad", "Creating object from source: " + pendingObject.sourcePath.string() + " in scene: " + pendingLevel.name);
 				// Project component records are authoritative. Imported models still receive
 				// their default components through Entity's default constructor behavior.
-				Entity* object = nullptr;
-				if (pendingObject.sourcePath.empty() && pendingObject.name == "GameManager")
-				{
-					Entity* existingManager = Scene->FindObjectByName("GameManager");
-					if (existingManager && existingManager->GetComponent<GameManager>())
-						object = existingManager;
-				}
 				std::unique_ptr<Entity> newObject;
-				if (!object && pendingObject.sourcePath.empty())
+				if (pendingObject.sourcePath.empty())
 				{
 					newObject = std::make_unique<Entity>(
 						pendingObject.name.empty() ? std::string("Entity") : pendingObject.name,
 						false);
 				}
-				else if (!object)
+				else
 				{
 					newObject = std::make_unique<Entity>(pendingObject.sourcePath.string().c_str(), false);
 				}
-				if (!object) object = newObject.get();
+				Entity* object = newObject.get();
 				if (!pendingObject.name.empty() && !pendingObject.sourcePath.empty())
 				{
 					object->SetName(pendingObject.name);
@@ -166,6 +169,9 @@ namespace {
 					: pendingObject.physicsColliderShape == 2 ? PhysicsColliderShape::Convex : PhysicsColliderShape::Box);
 				object->SetUseBaseMeshCollider(pendingObject.useBaseMeshCollider);
 				object->SetCapsuleRadiusOverride(pendingObject.capsuleRadiusOverride);
+				if (pendingObject.isSubmeshComponentEntity)
+					object->SetSubmeshComponentOwner(pendingObject.submeshComponentParentId,
+						pendingObject.submeshComponentIndex);
 				for (std::size_t savedIndex = 0; savedIndex < pendingObject.submeshColliderSettings.size(); ++savedIndex)
 				{
 					const auto& saved = pendingObject.submeshColliderSettings[savedIndex];
@@ -176,10 +182,58 @@ namespace {
 					object->SetSubmeshColliderSettings(submeshIndex,
 						{ saved.enabled, static_cast<PhysicsColliderShape>(saved.shape), saved.useEntityDefaultShape });
 				}
+				if (Mesh* mesh = object->GetMesh())
+				{
+					for (std::size_t savedIndex = 0; savedIndex < pendingObject.submeshMaterialSettings.size(); ++savedIndex)
+					{
+						const auto& saved = pendingObject.submeshMaterialSettings[savedIndex];
+						std::size_t submeshIndex = savedIndex;
+						if (!saved.name.empty())
+							for (int meshIndex = 0; meshIndex < mesh->NumBuffers(); ++meshIndex)
+								if (mesh->SubMeshName(meshIndex) == saved.name) { submeshIndex = static_cast<std::size_t>(meshIndex); break; }
+						if (submeshIndex >= static_cast<std::size_t>(mesh->NumBuffers())) continue;
+						const int index = static_cast<int>(submeshIndex);
+						mesh->SetEmissiveEnabled(index, saved.emissiveEnabled);
+						mesh->SetEmissiveColor(index, saved.emissiveColor);
+						mesh->SetEmissiveBlendFactor(index, saved.emissiveBlendFactor);
+						mesh->SetCastsShadow(index, saved.castsShadow);
+						mesh->SetColorTextureEnabled(index, saved.colorTextureEnabled);
+						mesh->SetSpecularTextureEnabled(index, saved.specularTextureEnabled);
+						mesh->SetNormalTextureEnabled(index, saved.normalTextureEnabled);
+						mesh->SetRoughnessTextureEnabled(index, saved.roughnessTextureEnabled);
+						mesh->SetHeightTextureEnabled(index, saved.heightTextureEnabled);
+					}
+				}
 				object->SetDefaultPosition(object->Position());
 				object->SetDefaultRotation(object->Rotation());
 				if (newObject)
 					Scene->AddObject(std::move(newObject));
+			}
+			for (const auto& pendingObject : pendingLevel.objects)
+			{
+				if (!pendingObject.isSubmeshComponentEntity)
+					continue;
+				Entity* child = nullptr;
+				Entity* parent = nullptr;
+				for (const auto& candidate : Scene->Objects())
+				{
+					if (!candidate) continue;
+					if (candidate->Id() == pendingObject.id) child = candidate.get();
+					if (candidate->Id() == pendingObject.submeshComponentParentId) parent = candidate.get();
+				}
+				Mesh* mesh = parent ? parent->GetMesh() : nullptr;
+				if (!child)
+					continue;
+				if (!mesh || pendingObject.submeshComponentIndex < 0
+					|| pendingObject.submeshComponentIndex >= mesh->NumBuffers())
+				{
+					child->SetSubmeshComponentOwner(0, -1);
+					continue;
+				}
+				const int index = pendingObject.submeshComponentIndex;
+				const glm::vec3 localCenter = (mesh->SubMeshMinBounds(index)
+					+ mesh->SubMeshMaxBounds(index)) * 0.5f;
+				child->AttachTo(*parent, localCenter);
 			}
 			for (const auto& pendingCollider : pendingLevel.levelColliders)
 			{
@@ -198,33 +252,6 @@ namespace {
 			}
 		}
 
-		// Manager entities created for older projects may collide with an entity
-		// ID from the saved project. Preserve valid saved manager IDs, changing only
-		// an actual collision so pending component records still resolve correctly.
-		unsigned int highestEntityId = 0;
-		std::vector<unsigned int> nonManagerIds;
-		for (const auto& scene : SceneManager.Levels())
-		{
-			if (!scene) continue;
-			for (const auto& object : scene->Objects())
-				if (object)
-				{
-					highestEntityId = std::max(highestEntityId, object->Id());
-					if (!object->GetComponent<GameManager>())
-						nonManagerIds.push_back(object->Id());
-				}
-		}
-		for (const auto& scene : SceneManager.Levels())
-		{
-			if (!scene) continue;
-			for (const auto& object : scene->Objects())
-				if (object && object->GetComponent<GameManager>())
-				{
-					if (std::find(nonManagerIds.begin(), nonManagerIds.end(), object->Id()) != nonManagerIds.end())
-						object->SetId(++highestEntityId);
-					nonManagerIds.push_back(object->Id());
-				}
-		}
 	}
 
 	void ApplyStartupLevel(SceneManager& SceneManager, const std::string& startupLevelName, const std::vector<ProjectStateData::PendingLevel>& pendingLevels)
@@ -311,6 +338,13 @@ ProjectManager::ProjectManager(FileSystem& fileSystem)
 const std::filesystem::path& ProjectManager::CurrentProjectPath() const
 {
 	return m_currentProjectPath;
+}
+
+std::filesystem::path ProjectManager::PendingClassConfigurationPath() const
+{
+	if (!m_currentProjectPath.empty())
+		return m_currentProjectPath.parent_path() / "NewClassConfiguration";
+	return std::filesystem::current_path() / "NewClassConfiguration";
 }
 
 std::filesystem::path ProjectManager::ProjectDirectory() const

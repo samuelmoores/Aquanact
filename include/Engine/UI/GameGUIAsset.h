@@ -38,6 +38,7 @@ struct GameGUIWidgetDef
 	std::string text;
 	std::string textColor = "0 0 0";
 	std::string texture;
+	bool solidWhiteBox = false;
 
 	// Placement and geometry
 	// These values describe where the widget lives and how large it is.
@@ -50,12 +51,20 @@ struct GameGUIWidgetDef
 	int height = 0;
 	int textureWidth = 0;
 	int textureHeight = 0;
+	bool worldAnchored = false;
+	std::string worldAnchorEntity;
+	bool worldAnchorUseSubmesh = false;
+	int worldAnchorSubmeshIndex = 0;
+	float worldX = 0.0f;
+	float worldY = 0.0f;
+	float worldZ = 0.0f;
 
 	// Generic visibility and opacity
 	// These apply to every widget regardless of type.
 	int fontSize = 0;
 	std::string fontName;
 	bool visible = true;
+	bool editorVisible = true;
 	float alpha = 1.0f;
 
 	// Specialized panel-button layout

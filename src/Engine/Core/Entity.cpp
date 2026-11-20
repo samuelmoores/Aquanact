@@ -434,7 +434,13 @@ bool Entity::skinned()
 std::string Entity::SourcePath() const { return m_sourcePath; }
 glm::vec3 Entity::Position() const { return m_position; }
 glm::vec3 Entity::WorldPosition() { return glm::vec3(BuildModelMatrix()[3]); }
-glm::vec3 Entity::WorldCenterPosition() { const glm::vec3 localCenter = m_mesh ? m_mesh->centerAABB() : glm::vec3(0.0f); return glm::vec3(BuildModelMatrix() * glm::vec4(localCenter, 1.0f)); }
+glm::vec3 Entity::WorldCenterPosition()
+{
+	if (IsSubmeshComponentOwner())
+		return WorldPosition();
+	const glm::vec3 localCenter = m_mesh ? m_mesh->centerAABB() : glm::vec3(0.0f);
+	return glm::vec3(BuildModelMatrix() * glm::vec4(localCenter, 1.0f));
+}
 bool Entity::WorldAABB(glm::vec3& minBounds, glm::vec3& maxBounds)
 {
 	if (!m_mesh)

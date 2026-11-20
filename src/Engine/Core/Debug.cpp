@@ -27,7 +27,7 @@
 #include "Engine/Core/EntityStateMachine.h"
 #include "Engine/Core/Hitbox.h"
 #include "Engine/Core/PhysicsWorld.h"
-#include "Game/PlayerAttack.h"
+#include "PlayerAttack.h"
 
 #include <imgui.h>
 #include <chrono>
@@ -391,7 +391,8 @@ void Debug::DrawCameraCollisionDebug(const Camera& camera)
 	return;
 }
 
-void Debug::DrawCameraPath(const Camera& camera, const CameraPathData& path, int selectedPoint, bool drawPath)
+void Debug::DrawCameraPath(const Camera& camera, const CameraPathData& path, int selectedPoint,
+	bool drawPath, bool drawMarkers)
 {
 	// Rebuild each editor frame so dragging a point immediately moves its sphere
 	// and the connecting segments.
@@ -407,10 +408,11 @@ void Debug::DrawCameraPath(const Camera& camera, const CameraPathData& path, int
 		{
 			const glm::vec3 color = static_cast<int>(i) == selectedPoint
 				? glm::vec3(1.0f, 0.8f, 0.1f) : glm::vec3(0.2f, 0.7f, 1.0f);
-			m_cameraPathSpheres.push_back(new Line(MakeWireSphereVertices(color)));
-			if (path.points[i].island)
+			if (drawMarkers)
 			{
-				m_cameraPathTriggerSpheres.push_back(new Line(MakeWireSphereVertices(glm::vec3(1.0f, 0.1f, 0.1f))));
+				m_cameraPathSpheres.push_back(new Line(MakeWireSphereVertices(color)));
+				if (path.points[i].island)
+					m_cameraPathTriggerSpheres.push_back(new Line(MakeWireSphereVertices(glm::vec3(1.0f, 0.1f, 0.1f))));
 			}
 		}
 		const int curveSamples = Root::Current().Render().GetPathedCamera().PathSamplesPerSegment();
@@ -446,7 +448,7 @@ void Debug::DrawCameraPath(const Camera& camera, const CameraPathData& path, int
 	const glm::mat4 projection = camera.GetProjectionMatrix();
 	const glm::mat4 view = camera.GetViewMatrix();
 	constexpr float pointRadius = 7.5f;
-	for (std::size_t i = 0; drawPath && i < path.points.size() && i < m_cameraPathSpheres.size(); ++i)
+	for (std::size_t i = 0; drawPath && drawMarkers && i < path.points.size() && i < m_cameraPathSpheres.size(); ++i)
 	{
 		m_cameraPathSpheres[i]->UpdateProjection(projection);
 		const float radius = static_cast<int>(i) == selectedPoint
@@ -455,7 +457,7 @@ void Debug::DrawCameraPath(const Camera& camera, const CameraPathData& path, int
 		m_cameraPathSpheres[i]->draw(view, glm::translate(glm::mat4(1.0f), path.points[i].position) * glm::scale(glm::mat4(1.0f), glm::vec3(radius)));
 	}
 	std::size_t triggerSphereIndex = 0;
-	for (const CameraPathPoint& point : drawPath ? path.points : std::vector<CameraPathPoint>{})
+	for (const CameraPathPoint& point : drawPath && drawMarkers ? path.points : std::vector<CameraPathPoint>{})
 	{
 		if (!point.island || triggerSphereIndex >= m_cameraPathTriggerSpheres.size())
 		{
@@ -565,6 +567,8 @@ void Debug::RebuildPointLightDebugSpheres()
 
 void Debug::draw(const Camera& camera, const EngineGUI& gui)
 {
+	const bool suppressDebugSpheres =
+		Root::Current().FrontEnd().FrontEndModeValue() == FrontEndMode::GameGUICreator;
 	// This runs only in editor mode and is responsible for the visible debugging overlay.
 	// It intentionally reads current frame data instead of caching renderer state itself.
 	static bool firstFrame = true;
@@ -585,8 +589,9 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 
 	auto projection = camera.GetProjectionMatrix();
 	auto view = camera.GetViewMatrix();
-	DrawCameraCollisionDebug(camera);
-	if (m_showTriggerSpheres)
+	if (!suppressDebugSpheres)
+		DrawCameraCollisionDebug(camera);
+	if (m_showTriggerSpheres && !suppressDebugSpheres)
 	{
 		const Scene* scene = Root::Current().Scenes().ActiveLevel();
 		if (scene)
@@ -607,10 +612,11 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 	const Scene* activeScene = Root::Current().Scenes().ActiveLevel();
 	const bool showCutsceneCameraMarker = activeScene &&
 		Root::Current().Scenes().SceneKindFor(activeScene->Name()) == SceneManager::SceneKind::Cutscene &&
-		!Root::Current().Render().CutscenePreviewCamera();
+		!Root::Current().Render().CutscenePreviewCamera() && !suppressDebugSpheres;
 	if (gui.ShowCameraPath() || showCutsceneCameraMarker)
 	{
-		DrawCameraPath(camera, gui.CameraPath().Data(), gui.CameraPath().SelectedPoint(), gui.ShowCameraPath());
+		DrawCameraPath(camera, gui.CameraPath().Data(), gui.CameraPath().SelectedPoint(),
+			gui.ShowCameraPath(), !suppressDebugSpheres);
 	}
 
 	if (m_axis && gui.ShowAxis())
@@ -625,7 +631,7 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 		m_grid->draw(view, !gui.ShowAxis());
 	}
 
-	if (m_showPointLightDebugSpheres)
+	if (m_showPointLightDebugSpheres && !suppressDebugSpheres)
 	{
 		const std::vector<PointLight>& pointLights = Root::Current().Render().Lights().PointLights();
 		bool rebuildLightSpheres = m_pointLightDebugSpheres.size() != pointLights.size();
@@ -696,6 +702,8 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 	{
 		LevelCollider* collider = m_levelColliderObjects[i];
 		if (!collider || !collider->DebugVisible()) continue;
+		if (suppressDebugSpheres && (collider->Shape() == LevelColliderShape::Sphere
+			|| collider->Shape() == LevelColliderShape::Capsule)) continue;
 		Line* volume = m_levelColliderBounds[i];
 		glm::vec3 halfExtents = glm::abs(collider->Scale()) * 50.0f;
 		if (collider->Shape() == LevelColliderShape::Plane) halfExtents.y = 0.5f;
@@ -766,9 +774,9 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 		}
 	}
 
-	DrawHitboxVolumes(camera);
+	DrawHitboxVolumes(camera, !suppressDebugSpheres);
 
-	DrawEntityColliderVolumes(camera);
+	DrawEntityColliderVolumes(camera, !suppressDebugSpheres);
 
 	if (m_showLogWindow)
 	{
@@ -1354,7 +1362,7 @@ void Debug::drawGameModeInput(const Input& input)
 	}
 }
 
-void Debug::DrawHitboxVolumes(const Camera& camera)
+void Debug::DrawHitboxVolumes(const Camera& camera, bool drawRoundedVolumes)
 {
 	const Scene* activeLevel = Root::Current().Scenes().ActiveLevel();
 
@@ -1388,6 +1396,8 @@ void Debug::DrawHitboxVolumes(const Camera& camera)
 	{
 		const Hitbox* hitbox = m_hitboxDebugObjects[i];
 		if (!hitbox || !hitbox->Owner() || !hitbox->Owner()->GetMesh())
+			continue;
+		if (!drawRoundedVolumes && hitbox->Shape() == PhysicsColliderShape::Sphere)
 			continue;
 		Line* volume = m_hitboxDebugVolumes[i];
 		const glm::vec3 debugColor(1.0f, 0.15f, 0.1f);
@@ -1471,7 +1481,7 @@ void Debug::DrawPhysicsBoundingVolumes(const Camera& camera)
 
 }
 
-void Debug::DrawEntityColliderVolumes(const Camera& camera)
+void Debug::DrawEntityColliderVolumes(const Camera& camera, bool drawRoundedVolumes)
 {
 	const std::vector<PhysicsCollider>& colliders = PhysicsWorld::Instance().Colliders();
 	while (m_entityBoundingBoxes.size() < colliders.size())
@@ -1494,6 +1504,9 @@ void Debug::DrawEntityColliderVolumes(const Camera& camera)
 		{
 			continue;
 		}
+		if (!drawRoundedVolumes && (collider.shape == PhysicsColliderShape::Sphere
+			|| collider.shape == PhysicsColliderShape::Capsule))
+			continue;
 
 		Line* volume = m_entityBoundingBoxes[handle];
 		const glm::vec3 color = SubmeshColliderDebugColor(collider.submeshIndex);

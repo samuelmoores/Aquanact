@@ -1,4 +1,4 @@
-#include "Game/PlayerCombat.h"
+#include "PlayerCombat.h"
 
 #include "Engine/Core/Entity.h"
 #include "Engine/Core/EntityStateMachine.h"

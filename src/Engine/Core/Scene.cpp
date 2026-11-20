@@ -4,7 +4,6 @@
 #include "Engine/Core/RenderManager.h"
 #include "Engine/Core/PathedCamera.h"
 #include "Engine/Core/PhysicsWorld.h"
-#include "Game/GameManager.h"
 
 #include <iostream>
 #include <algorithm>
@@ -13,9 +12,6 @@ Scene::Scene(std::string name)
 	: m_name(std::move(name))
 	, m_cameraSystem(std::make_unique<PathedCamera>())
 {
-	auto managerEntity = std::make_unique<Entity>("GameManager", false);
-	managerEntity->AddComponent<GameManager>();
-	AddObject(std::move(managerEntity));
 }
 
 Scene::~Scene() = default;

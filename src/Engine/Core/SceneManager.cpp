@@ -2,24 +2,24 @@
 
 #include "Engine/Core/EntityStateMachine.h"
 #include "Engine/Core/Hitbox.h"
-#include "Game/Health.h"
+#include "Health.h"
 #include "Engine/Core/CutsceneAnimator.h"
 #include "Engine/Core/ComponentFactory.h"
 #include "Engine/Core/Controller.h"
 #include "Engine/Core/Entity.h"
-#include "Game/PlayerController.h"
+#include "PlayerController.h"
 #include "Engine/Core/ProjectStateData.h"
 #include "Engine/Core/PhysicsWorld.h"
 #include "Engine/Core/ParticleSystem.h"
 #include "Engine/Core/Root.h"
+#include "Engine/Core/ProjectManager.h"
 #include "Engine/Core/FrontEndManager.h"
 #include "Engine/Core/RenderManager.h"
 #include "Engine/Core/PathedCamera.h"
 #include "Engine/Core/TriggerSphere.h"
 #include "Engine/Core/SpawnManager.h"
-#include "Game/AIController.h"
-#include "Game/PlayerAttack.h"
-#include "Game/PlayerCombat.h"
+#include "AIController.h"
+#include "PlayerAttack.h"
 
 #include <fstream>
 #include <algorithm>
@@ -34,6 +34,7 @@ struct NewClassConfiguration
 	bool attachToExistingEntity = false;
 	bool createNewEntity = false;
 	std::string targetEntityName;
+	unsigned int targetEntityId = 0;
 	bool attachToExistingInstance = false;
 	std::string targetInstanceName;
 };
@@ -55,7 +56,6 @@ NewClassConfiguration loadConfiguration(const std::string& filename)
 
 	if (!inFile)
 	{
-		std::cerr << "Error: Could not open file " << filename << " for reading.\n";
 		return config;
 	}
 
@@ -66,6 +66,7 @@ NewClassConfiguration loadConfiguration(const std::string& filename)
 	std::string localAttachStr = "";
 	std::string localCreateStr = "";
 	std::string localTargetName = "";
+	std::string localTargetId = "";
 	std::string localAttachInstanceStr = "";
 	std::string localTargetInstanceName = "";
 
@@ -88,6 +89,10 @@ NewClassConfiguration loadConfiguration(const std::string& filename)
 		{
 			localTargetName = extractValue(line, "TargetEntityName: ");
 		}
+		else if (line.rfind("TargetEntityId: ", 0) == 0)
+		{
+			localTargetId = extractValue(line, "TargetEntityId: ");
+		}
 		else if (line.rfind("AttachToExistingInstance: ", 0) == 0)
 		{
 			localAttachInstanceStr = extractValue(line, "AttachToExistingInstance: ");
@@ -103,6 +108,8 @@ NewClassConfiguration loadConfiguration(const std::string& filename)
 	config.attachToExistingEntity = (localAttachStr == "true");
 	config.createNewEntity = (localCreateStr == "true");
 	config.targetEntityName = localTargetName;
+	try { config.targetEntityId = static_cast<unsigned int>(std::stoul(localTargetId)); }
+	catch (...) { config.targetEntityId = 0; }
 	config.attachToExistingInstance = (localAttachInstanceStr == "true");
 	config.targetInstanceName = localTargetInstanceName;
 
@@ -229,11 +236,14 @@ Scene* SceneManager::startUp()
 
 	// check for new game code
 	// load congiguration
-	NewClassConfiguration configuration = loadConfiguration("NewClassConfiguration");
-	// The configuration is a one-time startup handoff, so delete it after we
-	// read it to avoid replaying the same action on the next launch.
-	std::error_code configDeleteEc;
-	std::filesystem::remove("NewClassConfiguration", configDeleteEc);
+	std::filesystem::path pendingConfigurationPath = Root::Current().Projects().PendingClassConfigurationPath();
+	const std::filesystem::path legacyConfigurationPath = std::filesystem::current_path() / "NewClassConfiguration";
+	if (!std::filesystem::exists(pendingConfigurationPath)
+		&& std::filesystem::exists(legacyConfigurationPath))
+	{
+		pendingConfigurationPath = legacyConfigurationPath;
+	}
+	NewClassConfiguration configuration = loadConfiguration(pendingConfigurationPath.string());
 
 	Scene* activeLevel = m_activeLevel;
 	if (!activeLevel)
@@ -256,7 +266,29 @@ Scene* SceneManager::startUp()
 			return false;
 		}
 
-		entity.AddComponent(std::move(component));
+		TriggerSphere* baseTrigger = nullptr;
+		for (Component* candidate : entity.Components())
+		{
+			if (candidate && std::string(candidate->Name()) == "TriggerSphere")
+			{
+				baseTrigger = dynamic_cast<TriggerSphere*>(candidate);
+				break;
+			}
+		}
+		if (baseTrigger)
+		{
+			if (auto* specializedTrigger = dynamic_cast<TriggerSphere*>(component.get()))
+			{
+				specializedTrigger->SetRadius(baseTrigger->Radius());
+				specializedTrigger->SetPositionOffset(baseTrigger->PositionOffset());
+				specializedTrigger->SetEnabled(baseTrigger->Enabled());
+			}
+		}
+		Component* attached = entity.AddComponent(std::move(component));
+		if (!attached)
+			return false;
+		if (baseTrigger)
+			entity.RemoveComponent(baseTrigger);
 		return true;
 	};
 
@@ -273,11 +305,14 @@ Scene* SceneManager::startUp()
 			m_appliedNewClassConfigurationOnStartup = attachComponent(*entity);
 		}
 	}
-	else if (configuration.attachToExistingEntity && !configuration.targetEntityName.empty())
+	else if (configuration.attachToExistingEntity
+		&& (configuration.targetEntityId != 0 || !configuration.targetEntityName.empty()))
 	{
 		for (const std::unique_ptr<Entity>& entity : activeLevel->Objects())
 		{
-			if (!entity || entity->Name() != configuration.targetEntityName)
+			if (!entity || (configuration.targetEntityId != 0
+				? entity->Id() != configuration.targetEntityId
+				: entity->Name() != configuration.targetEntityName))
 			{
 				continue;
 			}
@@ -307,9 +342,6 @@ Scene* SceneManager::startUp()
 		}
 	}
 
-	std::error_code removeEc;
-	std::filesystem::remove("NewClassConfiguration", removeEc);
-
 	// ************ start up the active scene *************
 
 	// Choose the active scene from startup config first, then fall back to the first
@@ -334,6 +366,18 @@ Scene* SceneManager::startUp()
 		// Build the collision-world representation only after the active scene's
 		// entities have initialized their meshes and transforms.
 		PhysicsWorld::Instance().RegisterScene(*m_activeLevel);
+	}
+
+	// Persist a successful handoff in both the editor and game runtime. Keep the
+	// configuration file if saving fails so the attachment can be retried.
+	if (m_appliedNewClassConfigurationOnStartup)
+	{
+		const std::filesystem::path projectPath = Root::Current().Projects().CurrentProjectPath();
+		if (!projectPath.empty() && Root::Current().Projects().SaveProject(projectPath, *this))
+		{
+			std::error_code removeEc;
+			std::filesystem::remove(pendingConfigurationPath, removeEc);
+		}
 	}
 
 	return m_activeLevel;
@@ -642,13 +686,6 @@ void SceneManager::ApplyProjectState(
 							attack->SetDrawAttackInstance(pendingComponent.attackDrawInstance);
 							attack->SetAttackTargetInstanceName(pendingComponent.attackTargetInstanceName);
 							attack->SetAttackTargetBoneName(pendingComponent.attackTargetBoneName);
-						}
-						if (auto* combat = dynamic_cast<PlayerCombat*>(component.get()))
-						{
-							combat->SetProjectileName(pendingComponent.combatProjectileName);
-							combat->SetSpawnBoneName(pendingComponent.combatSpawnBoneName);
-							combat->SetProjectileSpawnFrame(pendingComponent.combatProjectileSpawnFrame);
-							combat->SetLaunchDirection(pendingComponent.combatLaunchDirection);
 						}
 						if (auto* particles = dynamic_cast<ParticleSystem*>(component.get()))
 						{

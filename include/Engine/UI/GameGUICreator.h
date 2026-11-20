@@ -55,7 +55,7 @@ private:
 	void SyncRuntimePreview();
 	// Widget creation and mutation helpers.
 	void AddButtonWidget();
-	void AddImageWidget();
+	bool AddImageWidget();
 	void AddProgressBarWidget();
 	void AddPanelWidget();
 	void AddTextWidget();
@@ -118,6 +118,12 @@ private:
 	NewWidgetType m_newWidgetType = NewWidgetType::Button;
 	char m_newWidgetName[64] = { 0 };
 	char m_newWidgetTexture[256] = { 0 };
+	bool m_newWidgetSolidWhiteBox = false;
+	int m_newWidgetImageWidth = 128;
+	int m_newWidgetImageHeight = 128;
+	bool m_cameraPreviewLookAtPlayer = true;
+	float m_cameraPreviewLookSensitivity = 0.08f;
+	bool m_cameraPreviewSensitivityInitialized = false;
 	GameGUIActionType m_newWidgetAction = GameGUIActionType::None;
 	std::string m_newWidgetLaunchLevel;
 	std::string m_newWidgetTargetPanel;

@@ -118,6 +118,14 @@ public:
 	void Detach(bool preserveWorldTransform = true);
 	bool IsAttached() const { return m_parent != nullptr; }
 	Entity* Parent() const { return m_parent; }
+	void SetSubmeshComponentOwner(unsigned int parentEntityId, int submeshIndex)
+	{
+		m_submeshComponentParentId = parentEntityId;
+		m_submeshComponentIndex = submeshIndex;
+	}
+	bool IsSubmeshComponentOwner() const { return m_submeshComponentParentId != 0 && m_submeshComponentIndex >= 0; }
+	unsigned int SubmeshComponentParentId() const { return m_submeshComponentParentId; }
+	int SubmeshComponentIndex() const { return m_submeshComponentIndex; }
 	void SetDefaultPosition(glm::vec3 position);
 	void SetDefaultRotation(glm::vec3 rotation);
 	void ResetToDefaultPosition();
@@ -184,6 +192,8 @@ protected:
 	unsigned int m_id = 0;
 	std::vector<std::unique_ptr<Component>> m_components;
 	Entity* m_parent = nullptr;
+	unsigned int m_submeshComponentParentId = 0;
+	int m_submeshComponentIndex = -1;
 	std::vector<Entity*> m_children;
 
 public:
