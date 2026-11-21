@@ -839,6 +839,25 @@ MyGUI::ImageBox* GameGUI::CreateImageWidget(const GameGUIWidgetDef& def, MyGUI::
 	return image;
 }
 
+MyGUI::Widget* GameGUI::CreateIconWidget(const GameGUIWidgetDef& def, MyGUI::Widget* parent)
+{
+	static const char* const iconSkins[] = {
+		"ButtonRightSkin", "ButtonLeftSkin", "ButtonUpSkin", "ButtonDownSkin"
+	};
+	bool validSkin = false;
+	for (const char* iconSkin : iconSkins)
+		validSkin = validSkin || def.skin == iconSkin;
+	const std::string skin = validSkin ? def.skin : iconSkins[0];
+	LogSkinLookup(def.name, skin);
+	MyGUI::Widget* icon = CreateGuiWidget<MyGUI::Widget>(
+		m_gui, parent, skin, def.x, def.y, def.width, def.height, def.layer, def.name);
+	if (!icon)
+		return nullptr;
+	icon->setNeedKeyFocus(false);
+	FinalizeAndLogWidget(icon, def, parent == nullptr, false, false);
+	return icon;
+}
+
 MyGUI::ProgressBar* GameGUI::CreateProgressBarWidget(const GameGUIWidgetDef& def, MyGUI::Widget* parent)
 {
 	const std::string skin = def.skin.empty() ? "ProgressBar" : def.skin;
@@ -1882,6 +1901,10 @@ MyGUI::Widget* GameGUI::CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::
 	{
 		return CreateButtonWidget(def, parent);
 	}
+	if (def.type == "Icon")
+	{
+		return CreateIconWidget(def, parent);
+	}
 	if (def.type == "TextBox" || def.type == "Text")
 	{
 		return CreateTextWidget(def, parent);
@@ -2260,18 +2283,28 @@ void GameGUI::BindWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* widg
 	}
 
 	auto* textWidget = dynamic_cast<MyGUI::TextBox*>(widget);
-	if (!textWidget)
+	if (textWidget)
 	{
+		BindTextWidgetFromDef(def, textWidget);
 		return;
 	}
 
-	if (def.bindMember.empty() && def.bindEvent.empty())
+	if (!def.bindingEnabled || def.bindMember.empty())
+		return;
+	if (Root::Current().State().IsEditorMode()
+		&& Root::Current().FrontEnd().FrontEndModeValue() == FrontEndMode::GameGUICreator)
 	{
-		Root::Current().Debugger().LogMessage("GameGUI binding ignored for unsupported widget: " + def.name);
+		// The HUD editor preview uses editorVisible as its authored visibility.
+		// Keep runtime visibility bindings from hiding a widget during editing.
 		return;
 	}
 
-	BindTextWidgetFromDef(def, textWidget);
+	// Non-text widgets use a boolean bindable to control visibility. This keeps
+	// static images and icons configurable without giving them button behavior.
+	BindValueWidgetRefresh(def, widget, [widget](float visible)
+	{
+		widget->setVisible(visible >= 0.5f);
+	});
 }
 
 void GameGUI::OnWidgetClicked(MyGUI::Widget* sender)

@@ -67,6 +67,7 @@ private:
 	MyGUI::Button* CreateButtonWidget(const GameGUIWidgetDef& def, MyGUI::Widget* parent);
 	MyGUI::TextBox* CreateTextWidget(const GameGUIWidgetDef& def, MyGUI::Widget* parent);
 	MyGUI::ImageBox* CreateImageWidget(const GameGUIWidgetDef& def, MyGUI::Widget* parent);
+	MyGUI::Widget* CreateIconWidget(const GameGUIWidgetDef& def, MyGUI::Widget* parent);
 	MyGUI::ProgressBar* CreateProgressBarWidget(const GameGUIWidgetDef& def, MyGUI::Widget* parent);
 	std::string ResolveButtonSkin(const GameGUIWidgetDef& def) const;
 	void ConfigureProgressBar(MyGUI::ProgressBar* progress);

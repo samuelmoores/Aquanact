@@ -532,12 +532,12 @@ namespace GameGUICreatorHelpers {
 		ImGui::BeginDisabled(!boundComponent);
 		const char* memberLabel = widget.bindMember.empty() ? "<Select Value>" : widget.bindMember.c_str();
 		std::vector<BindableMember> bindableMembers = boundComponent ? boundComponent->GetBindableMembers() : std::vector<BindableMember>{};
-		bool hasNumericBindableValue = false;
+		bool hasSupportedBindableValue = false;
 		for (const BindableMember& member : bindableMembers)
 		{
-			if (member.typeName == "int" || member.typeName == "float")
+			if (member.typeName == "int" || member.typeName == "float" || member.typeName == "bool")
 			{
-				hasNumericBindableValue = true;
+				hasSupportedBindableValue = true;
 				break;
 			}
 		}
@@ -547,17 +547,17 @@ namespace GameGUICreatorHelpers {
 		// placeholder instead of leaving the user wondering why the list is empty.
 		if (ImGui::BeginCombo("Value", memberLabel))
 		{
-			if (!hasNumericBindableValue)
+			if (!hasSupportedBindableValue)
 			{
 				ImGui::BeginDisabled(true);
-				ImGui::Selectable("No numeric bindable values available", false);
+				ImGui::Selectable("No bindable values available", false);
 				ImGui::EndDisabled();
 			}
 			else
 			{
 				for (const BindableMember& member : bindableMembers)
 				{
-					if (member.typeName != "int" && member.typeName != "float")
+					if (member.typeName != "int" && member.typeName != "float" && member.typeName != "bool")
 					{
 						continue;
 					}
@@ -737,11 +737,11 @@ namespace GameGUICreatorHelpers {
 			widget.bindEvent = readField("\"bindEvent\":", widgetPos);
 			const std::string bindingEnabledField = readField("\"bindingEnabled\":", widgetPos);
 			const bool isTextWidget = widget.type == "Text" || widget.type == "TextBox";
-			widget.bindingEnabled = isTextWidget && (bindingEnabledField.empty()
-				? (!widget.bindEntity.empty() || !widget.bindComponent.empty()
+			widget.bindingEnabled = bindingEnabledField.empty()
+				? (isTextWidget && (!widget.bindEntity.empty() || !widget.bindComponent.empty()
 					|| !widget.bindMember.empty() || !widget.bindEvent.empty()
-					|| ParseBoolField(readField("\"bindToggle\":", widgetPos)))
-				: ParseBoolField(bindingEnabledField));
+					|| ParseBoolField(readField("\"bindToggle\":", widgetPos))))
+				: ParseBoolField(bindingEnabledField);
 			widget.panelButtonFocusSound = readField("\"panelButtonFocusSound\":", widgetPos);
 
 			asset.widgets.push_back(widget);

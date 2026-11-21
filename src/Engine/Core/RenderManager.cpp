@@ -339,6 +339,22 @@ void RenderManager::ApplyCameraMode(const EngineState& engineState)
 	else
 	{
 		m_cameraManager.SetEditorMode(*m_engineCamera);
+		if (const Scene* scene = Root::Current().Scenes().ActiveLevel())
+		{
+			for (const auto& entity : scene->Objects())
+			{
+				if (!entity) continue;
+				for (Component* component : entity->Components())
+				{
+					if (component)
+						if (Camera* previewCamera = component->EditorPreviewCamera())
+						{
+							m_cameraManager.SetActiveCamera(*previewCamera);
+							return;
+						}
+				}
+			}
+		}
 	}
 }
 
@@ -433,6 +449,22 @@ void RenderManager::UpdateCameraPhase(const Input& input, const EngineState& eng
 			gameCamera.SetOverridePosition(m_cameraIslandPosition);
 		}
 		gameCamera.Update(input.Frame().deltaTime);
+		if (const Scene* scene = Root::Current().Scenes().ActiveLevel())
+		{
+			for (const auto& entity : scene->Objects())
+			{
+				if (!entity) continue;
+				for (Component* component : entity->Components())
+				{
+					if (component)
+						if (Camera* overrideCamera = component->RuntimeCameraOverride())
+						{
+							m_cameraManager.SetActiveCamera(*overrideCamera);
+							return;
+						}
+				}
+			}
+		}
 	}
 	if (engineState.IsEditorMode())
 	{

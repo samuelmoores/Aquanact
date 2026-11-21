@@ -8,6 +8,7 @@
 #include "Engine/Core/TriggerSphere.h"
 #include "AIController.h"
 #include "AttackSphere.h"
+#include "CharacterEditor.h"
 #include "GameManager.h"
 #include "Health.h"
 #include "PlayerAttack.h"
@@ -65,6 +66,10 @@ void RegisterGameComponents()
 	ComponentFactory::Instance().Register("PlayerController", [](Entity&) -> std::unique_ptr<Component>
 	{
 		return std::make_unique<PlayerController>();
+	});
+	ComponentFactory::Instance().Register("CharacterEditor", [](Entity&) -> std::unique_ptr<Component>
+	{
+		return std::make_unique<CharacterEditor>();
 	});
 	ComponentFactory::Instance().Register("PlayerHealth", [](Entity&) -> std::unique_ptr<Component>
 	{

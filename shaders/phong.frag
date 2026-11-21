@@ -219,17 +219,17 @@ void main()
 
 	vec3 viewDirection = normalize(ViewPos - FragWorldPos);
 	vec3 baseColor = hasBaseTexture ? texture(baseTexture, materialTexCoord).rgb : vec3(0.20);
-	vec3 specularStrength = hasSpecularTexture ? texture(specularTexture, materialTexCoord).rgb : vec3(material.z);
+	// Materials without a specular map should not inherit Assimp's generic
+	// specular factor, which creates highlights on otherwise unconfigured meshes.
+	vec3 specularStrength = hasSpecularTexture ? texture(specularTexture, materialTexCoord).rgb : vec3(0.0);
 	// FBX roughness maps are commonly scalar maps stored in the red channel.
 	// Sampling green makes multi-submesh FBX materials appear to have arbitrary
 	// roughness when the unused channels contain unrelated or zero data.
-	float roughness = hasRoughnessTexture ? texture(roughnessTexture, materialTexCoord).r : 0.0;
+	float roughness = hasRoughnessTexture ? texture(roughnessTexture, materialTexCoord).r : 1.0;
 	// Roughness maps use the conventional [0, 1] range. Convert to the
 	// existing Phong exponent so roughness can be used without a full shader
 	// model rewrite: 0 is a tight highlight and 1 is a broad highlight.
-	float shininess = hasRoughnessTexture
-		? mix(128.0, 2.0, roughness * roughness)
-		: max(material.w, 1.0);
+	float shininess = mix(128.0, 2.0, roughness * roughness);
 
 	vec3 litColor = CalculateDirectionalLight(baseColor, specularStrength, shininess, vertexNormal, geometricNormal, viewDirection);
 	

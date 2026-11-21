@@ -7,6 +7,7 @@ endif()
 set(GAME_SOURCES
     "${AQUANACT_GAME_CODE_ROOT}/src/AIController.cpp"
     "${AQUANACT_GAME_CODE_ROOT}/src/AttackSphere.cpp"
+    "${AQUANACT_GAME_CODE_ROOT}/src/CharacterEditor.cpp"
     "${AQUANACT_GAME_CODE_ROOT}/src/GameManager.cpp"
     "${AQUANACT_GAME_CODE_ROOT}/src/Health.cpp"
     "${AQUANACT_GAME_CODE_ROOT}/src/PlayerAttack.cpp"

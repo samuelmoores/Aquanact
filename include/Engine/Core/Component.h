@@ -3,6 +3,7 @@
 #include <string>
 #include <type_traits>
 #include <vector>
+#include <glm/glm.hpp>
 
 // Convert a bindable's C++ type into the small set of value types understood by
 // editor binding controls. This keeps UI metadata consistent with the member or
@@ -146,6 +147,7 @@ struct BindableEvent
 	}
 
 class Entity;
+class Camera;
 
 class Component {
 public:
@@ -160,6 +162,10 @@ public:
 	virtual void startUp(Entity&) {}
 	virtual void Update(Entity&, float) {}
 	virtual void FirstFrame(Entity&) {}
+	virtual void DrawDebug(const Camera&) {}
+	virtual Camera* EditorPreviewCamera() { return nullptr; }
+	virtual Camera* RuntimeCameraOverride() { return nullptr; }
+	virtual bool GetEditorCameraPose(glm::vec3&, glm::vec3&, glm::vec3&) const { return false; }
 	// Components may override these hooks to react when their owning entity
 	// enters or exits a TriggerSphere.
 	virtual void OnTriggerEnter(Entity&) {}

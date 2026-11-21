@@ -11,7 +11,7 @@ class Camera;
 class GameGUICreator {
 public:
 	using MenuNavigationMode = GameGUIMenuNavigationMode;
-	enum class NewWidgetType { Button, Panel, Image, ProgressBar, Text };
+	enum class NewWidgetType { Button, Panel, Image, Icon, ProgressBar, Text };
 	GameGUICreator() = default;
 
 	// Lifecycle and frame flow
@@ -56,6 +56,7 @@ private:
 	// Widget creation and mutation helpers.
 	void AddButtonWidget();
 	bool AddImageWidget();
+	void AddIconWidget();
 	void AddProgressBarWidget();
 	void AddPanelWidget();
 	void AddTextWidget();
@@ -81,6 +82,7 @@ private:
 	void DrawCreateButtonPopup();
 	void DrawCreatePanelPopup();
 	void DrawCreateImagePopup();
+	void DrawCreateIconPopup();
 	void DrawCreateProgressBarPopup(); 
 	void DrawCreateTextPopup();
 	void DrawBindingPopup();
@@ -88,6 +90,7 @@ private:
 	void DrawButtonLaunchSceneField(GameGUIWidgetDef& widget);
 	void DrawPanelWidgetDetails(GameGUIAsset& asset, GameGUIWidgetDef& widget);
 	void DrawImageWidgetDetails(GameGUIAsset& asset, GameGUIWidgetDef& widget);
+	void DrawIconWidgetDetails(GameGUIAsset& asset, GameGUIWidgetDef& widget);
 	void DrawTextWidgetDetails(GameGUIAsset& asset, GameGUIWidgetDef& widget);
 	void DrawProgressBarWidgetDetails(GameGUICreator& creator, GameGUIAsset& asset, GameGUIWidgetDef& widget);
 
@@ -123,9 +126,13 @@ private:
 	bool m_newWidgetSolidWhiteBox = false;
 	int m_newWidgetImageWidth = 128;
 	int m_newWidgetImageHeight = 128;
+	int m_newWidgetIconIndex = 0;
 	bool m_cameraPreviewLookAtPlayer = true;
 	float m_cameraPreviewLookSensitivity = 0.08f;
 	bool m_cameraPreviewSensitivityInitialized = false;
+	std::string m_selectedCameraPoseKey = "scene-position";
+	bool m_sceneCameraPathMode = false;
+	bool m_sceneCameraPathPlaying = false;
 	GameGUIActionType m_newWidgetAction = GameGUIActionType::None;
 	std::string m_newWidgetLaunchLevel;
 	std::string m_newWidgetTargetPanel;

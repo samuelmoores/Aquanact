@@ -15,6 +15,7 @@
 #include "Engine/Core/SceneManager.h"
 #include "PlayerController.h"
 #include "PlayerAttack.h"
+#include "CharacterEditor.h"
 #include "Engine/Core/RenderManager.h"
 #include "AIController.h"
 #include "Engine/Core/ParticleSystem.h"
@@ -479,6 +480,21 @@ namespace ProjectStateSerializer {
 				{
 					AppendComponentLine(contents, projectPath, object, "gamecomponent");
 					contents += ";Health;" + std::to_string(health->MaxHealth()) + "\n";
+				}
+				else if (const CharacterEditor* characterEditor = dynamic_cast<const CharacterEditor*>(component))
+				{
+					AppendComponentLine(contents, projectPath, object, "gamecomponent");
+					const glm::vec2 playerOffset = characterEditor->PlayerPositionOffset();
+					const glm::vec3 cameraPosition = characterEditor->CameraPosition();
+					const glm::vec3 cameraRotation = characterEditor->CameraRotation();
+					contents += ";CharacterEditor;offset;" + std::to_string(playerOffset.x);
+					contents += ";" + std::to_string(playerOffset.y);
+					contents += ";camera;" + std::to_string(cameraPosition.x) + ";" + std::to_string(cameraPosition.y);
+					contents += ";" + std::to_string(cameraPosition.z) + ";rotation;" + std::to_string(cameraRotation.x);
+					contents += ";" + std::to_string(cameraRotation.y) + ";" + std::to_string(cameraRotation.z);
+					contents += ";" + std::to_string(characterEditor->ShowPositionDebugSphere() ? 1 : 0);
+					contents += ";" + std::to_string(characterEditor->ShowCameraDebugSphere() ? 1 : 0);
+					contents += ";" + std::to_string(characterEditor->PreviewEnabled() ? 1 : 0) + "\n";
 				}
 				else if (const TriggerSphere* trigger = dynamic_cast<const TriggerSphere*>(component))
 				{
@@ -1219,6 +1235,19 @@ namespace ProjectStateSerializer {
 						else if (component.componentClassName == "Health")
 						{
 							if (fields.size() > componentLayout.dataIndex + 1) component.healthMax = std::stof(fields[componentLayout.dataIndex + 1]);
+						}
+						else if (component.componentClassName == "CharacterEditor")
+						{
+							const std::size_t data = componentLayout.dataIndex + 1;
+			if (fields.size() > data + 2 && fields[data] == "offset")
+				component.characterEditorPlayerOffset = { std::stof(fields[data + 1]), std::stof(fields[data + 2]) };
+			if (fields.size() > data + 6 && fields[data + 3] == "camera")
+				component.characterEditorCameraPosition = { std::stof(fields[data + 4]), std::stof(fields[data + 5]), std::stof(fields[data + 6]) };
+			if (fields.size() > data + 10 && fields[data + 7] == "rotation")
+				component.characterEditorCameraRotation = { std::stof(fields[data + 8]), std::stof(fields[data + 9]), std::stof(fields[data + 10]) };
+			if (fields.size() > data + 11) component.characterEditorShowPositionSphere = fields[data + 11] == "1";
+			if (fields.size() > data + 12) component.characterEditorShowCameraSphere = fields[data + 12] == "1";
+			if (fields.size() > data + 13) component.characterEditorPreviewEnabled = fields[data + 13] == "1";
 						}
 						else if (component.componentClassName == "PlayerAttack")
 						{

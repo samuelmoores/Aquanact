@@ -2,6 +2,8 @@
 #include "Engine/UI/GameGUICreator.h"
 
 #include "Engine/Core/Camera.h"
+#include "Engine/Core/CameraPathData.h"
+#include "Engine/Core/EngineCamera.h"
 #include "Engine/Core/Debug.h"
 #include "Engine/Core/FrontEndManager.h"
 #include "Engine/Core/RenderManager.h"
@@ -17,6 +19,18 @@
 #include <algorithm>
 #include <cstdio>
 #include <functional>
+
+namespace
+{
+	struct EditorCameraPoseChoice
+	{
+		std::string key;
+		std::string label;
+		glm::vec3 position{0.0f};
+		glm::vec3 facing{0.0f, 0.0f, 1.0f};
+		glm::vec3 up{0.0f, 1.0f, 0.0f};
+	};
+}
 
 void GameGUICreatorView::DrawWidgetList(GameGUICreator& creator)
 {
@@ -152,6 +166,10 @@ void GameGUICreatorView::DrawWidgetDetails(GameGUICreator& creator)
 	{
 		creator.DrawImageWidgetDetails(asset, widget);
 	}
+	else if (widget.type == "Icon")
+	{
+		creator.DrawIconWidgetDetails(asset, widget);
+	}
 	else if (widget.type == "ProgressBar")
 	{
 		DrawProgressBarWidgetDetails(creator, asset, widget);
@@ -264,6 +282,10 @@ void GameGUICreatorView::Draw(GameGUICreator& creator, const Camera&)
 				{
 					creator.OpenCreateWidgetPopup(GameGUICreator::NewWidgetType::Image);
 					std::snprintf(creator.m_newWidgetTexture, sizeof(creator.m_newWidgetTexture), "textures/example.png");
+				}
+				if (ImGui::MenuItem("Create Icon"))
+				{
+					creator.OpenCreateWidgetPopup(GameGUICreator::NewWidgetType::Icon);
 				}
 				if (ImGui::MenuItem("Create Progress Bar"))
 				{
@@ -380,23 +402,97 @@ void GameGUICreatorView::Draw(GameGUICreator& creator, const Camera&)
 		ImGui::End();
 	}
 
-	const CameraPathData& cameraPath = Root::Current().FrontEnd().EditorGUI().CameraPath().Data();
+	Scene* activeScene = Root::Current().Scenes().ActiveLevel();
+	const CameraPathData& cameraPath = activeScene
+		? activeScene->CameraSystem().Path()
+		: Root::Current().FrontEnd().EditorGUI().CameraPath().Data();
 	if (creator.m_showCameraViewWindow)
 	{
 		if (ImGui::Begin("Camera View", &creator.m_showCameraViewWindow, ImGuiWindowFlags_AlwaysAutoResize))
 		{
-			if (cameraPath.points.empty())
-			{
-				ImGui::TextDisabled("Add a camera path point to configure camera view preview.");
-			}
-			else
-			{
 			PathedCamera& previewCamera = Root::Current().Render().GetPathedCamera();
 			EngineCamera& orientationCamera = Root::Current().Render().GetEngineCamera();
 			if (!creator.m_cameraPreviewSensitivityInitialized)
 			{
 				creator.m_cameraPreviewLookSensitivity = orientationCamera.LookSensitivity();
 				creator.m_cameraPreviewSensitivityInitialized = true;
+			}
+			std::vector<EditorCameraPoseChoice> cameraPoseChoices;
+			if (activeScene)
+			{
+				const PathedCamera& sceneCamera = activeScene->CameraSystem();
+				cameraPoseChoices.push_back({
+					"scene-position", "Scene camera position",
+					sceneCamera.GetPosition(), sceneCamera.GetFacing() });
+				for (std::size_t i = 0; i < cameraPath.points.size(); ++i)
+				{
+					const CameraPathPoint& point = cameraPath.points[i];
+					cameraPoseChoices.push_back({
+						"path-point:" + std::to_string(i),
+						"Camera path point " + std::to_string(i + 1),
+						point.position, point.facing });
+				}
+				for (std::size_t entityIndex = 0; entityIndex < activeScene->Objects().size(); ++entityIndex)
+				{
+					const std::unique_ptr<Entity>& entity = activeScene->Objects()[entityIndex];
+					if (!entity)
+						continue;
+					const std::vector<Component*> components = entity->Components();
+					for (std::size_t componentIndex = 0; componentIndex < components.size(); ++componentIndex)
+					{
+						const Component* component = components[componentIndex];
+						if (!component)
+							continue;
+						glm::vec3 position;
+						glm::vec3 facing;
+						glm::vec3 up;
+						if (component->GetEditorCameraPose(position, facing, up))
+							cameraPoseChoices.push_back({
+								"component:" + std::to_string(entityIndex) + ":" + std::to_string(componentIndex),
+								entity->Name() + " / " + component->Name(), position, facing, up });
+					}
+				}
+			}
+			glm::vec3 selectedPosition = previewCamera.GetPosition();
+			glm::vec3 selectedFacing = previewCamera.GetFacing();
+			glm::vec3 selectedUp(0.0f, 1.0f, 0.0f);
+			if (cameraPoseChoices.empty())
+			{
+				ImGui::TextDisabled("No camera transforms are defined in the active scene.");
+			}
+			else
+			{
+				auto selectedPose = std::find_if(cameraPoseChoices.begin(), cameraPoseChoices.end(),
+					[&creator](const EditorCameraPoseChoice& choice)
+					{ return choice.key == creator.m_selectedCameraPoseKey; });
+				if (selectedPose == cameraPoseChoices.end())
+				{
+					creator.m_selectedCameraPoseKey = cameraPoseChoices.front().key;
+					selectedPose = cameraPoseChoices.begin();
+				}
+				if (ImGui::BeginCombo("Scene camera transform", selectedPose->label.c_str()))
+				{
+					for (const EditorCameraPoseChoice& choice : cameraPoseChoices)
+					{
+						if (ImGui::Selectable(choice.label.c_str(), choice.key == creator.m_selectedCameraPoseKey))
+						{
+							creator.m_selectedCameraPoseKey = choice.key;
+							creator.m_sceneCameraPathMode = false;
+							creator.m_sceneCameraPathPlaying = false;
+							if (choice.key.rfind("component:", 0) == 0)
+								creator.m_cameraPreviewLookAtPlayer = false;
+						}
+					}
+					ImGui::EndCombo();
+				}
+				selectedPose = std::find_if(cameraPoseChoices.begin(), cameraPoseChoices.end(),
+					[&creator](const EditorCameraPoseChoice& choice)
+					{ return choice.key == creator.m_selectedCameraPoseKey; });
+				if (selectedPose == cameraPoseChoices.end())
+					selectedPose = cameraPoseChoices.begin();
+				selectedPosition = selectedPose->position;
+				selectedFacing = selectedPose->facing;
+				selectedUp = selectedPose->up;
 			}
 			ImGui::Checkbox("Look At Player", &creator.m_cameraPreviewLookAtPlayer);
 			if (!creator.m_cameraPreviewLookAtPlayer)
@@ -407,34 +503,38 @@ void GameGUICreatorView::Draw(GameGUICreator& creator, const Camera&)
 					0.001f, 0.001f, 1.0f, "%.3f");
 			}
 			Entity* playerTarget = nullptr;
-			if (Scene* activeScene = Root::Current().Scenes().ActiveLevel())
+			if (activeScene)
 			{
 				for (const std::unique_ptr<Entity>& object : activeScene->Objects())
-				{
 					if (object && object->GetComponent<PlayerController>())
 					{
 						playerTarget = object.get();
 						break;
 					}
+			}
+			const bool validScenePath = cameraPath.points.size() >= 2 && IsValidCameraPath(cameraPath);
+			if (validScenePath)
+			{
+				ImGui::Checkbox("Travel path", &creator.m_sceneCameraPathPlaying);
+				const Input::InputFrame& inputFrame = Root::Current().InputRef().Frame();
+				if (creator.m_sceneCameraPathPlaying)
+				{
+					creator.m_sceneCameraPathMode = true;
+					previewCamera.SetPlayerProgress(previewCamera.PlayerProgress() + inputFrame.deltaTime * 0.15f);
+					if (previewCamera.PlayerProgress() >= 1.0f)
+						previewCamera.SetPlayerProgress(0.0f);
 				}
-			}
-			if (cameraPath.points.size() < 2 || !IsValidCameraPath(cameraPath))
-			{
-				ImGui::TextDisabled("Add at least two camera path points to scrub the camera.");
-			}
-			else
-			{
 				float progress = previewCamera.PlayerProgress();
 				if (ImGui::SliderFloat("Path Position", &progress, 0.0f, 1.0f, "%.3f"))
 				{
+					creator.m_sceneCameraPathMode = true;
 					previewCamera.ClearOverridePosition();
 					previewCamera.SetPlayerProgress(progress);
 				}
 			}
-
-			previewCamera.ClearOverridePosition();
-			glm::vec3 pathPosition = cameraPath.points.front().position;
-			if (cameraPath.points.size() >= 2 && IsValidCameraPath(cameraPath))
+			glm::vec3 cameraPosition = selectedPosition;
+			glm::vec3 cameraFacing = selectedFacing;
+			if (validScenePath && creator.m_sceneCameraPathMode)
 			{
 				const std::size_t segmentCount = cameraPath.points.size() - 1;
 				const float pathCoordinate = glm::clamp(previewCamera.PlayerProgress(), 0.0f, 1.0f)
@@ -443,19 +543,21 @@ void GameGUICreatorView::Draw(GameGUICreator& creator, const Camera&)
 					static_cast<std::size_t>(pathCoordinate), segmentCount - 1);
 				const float segmentProgress = glm::clamp(
 					pathCoordinate - static_cast<float>(segment), 0.0f, 1.0f);
-				pathPosition = EvaluateCameraPathSegment(cameraPath, segment, segmentProgress);
+				cameraPosition = EvaluateCameraPathSegment(cameraPath, segment, segmentProgress);
+				const glm::vec3 interpolatedFacing = glm::mix(cameraPath.points[segment].facing,
+					cameraPath.points[segment + 1].facing, segmentProgress);
+				if (glm::dot(interpolatedFacing, interpolatedFacing) > 1e-8f)
+					cameraFacing = glm::normalize(interpolatedFacing);
 			}
-
-			glm::vec3 facing = previewCamera.GetFacing();
 			if (creator.m_cameraPreviewLookAtPlayer && playerTarget)
 			{
-				const glm::vec3 toPlayer = playerTarget->WorldCenterPosition() - pathPosition;
+				const glm::vec3 toPlayer = playerTarget->WorldCenterPosition() - cameraPosition;
 				if (glm::dot(toPlayer, toPlayer) > 1e-8f)
-					facing = glm::normalize(toPlayer);
+					cameraFacing = glm::normalize(toPlayer);
 			}
 			else if (!creator.m_cameraPreviewLookAtPlayer)
 			{
-				orientationCamera.SetPose(pathPosition, facing);
+				orientationCamera.SetPose(cameraPosition, cameraFacing);
 				const Input::InputFrame& inputFrame = Root::Current().InputRef().Frame();
 				if (inputFrame.lookActive && !inputFrame.lookBecameActive)
 				{
@@ -464,10 +566,12 @@ void GameGUICreatorView::Draw(GameGUICreator& creator, const Camera&)
 						* (creator.m_cameraPreviewLookSensitivity / engineSensitivity);
 					orientationCamera.FlyControl(scaledMouseDelta, glm::vec3(0.0f), inputFrame.deltaTime);
 				}
-				facing = orientationCamera.GetFacing();
+				cameraFacing = orientationCamera.GetFacing();
 			}
-			previewCamera.SetPose(pathPosition, facing);
-			}
+			if (glm::dot(selectedUp, selectedUp) <= 1e-8f)
+				selectedUp = glm::vec3(0.0f, 1.0f, 0.0f);
+			previewCamera.ClearOverridePosition();
+			previewCamera.SetPose(cameraPosition, cameraFacing, selectedUp);
 		}
 		ImGui::End();
 	}

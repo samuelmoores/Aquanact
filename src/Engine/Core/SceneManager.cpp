@@ -20,6 +20,7 @@
 #include "Engine/Core/SpawnManager.h"
 #include "AIController.h"
 #include "PlayerAttack.h"
+#include "CharacterEditor.h"
 
 #include <fstream>
 #include <algorithm>
@@ -669,6 +670,15 @@ void SceneManager::ApplyProjectState(
 						if (auto* health = dynamic_cast<Health*>(component.get()))
 						{
 							health->SetMaxHealth(pendingComponent.healthMax);
+						}
+						if (auto* characterEditor = dynamic_cast<CharacterEditor*>(component.get()))
+						{
+							characterEditor->SetPlayerPositionOffset(pendingComponent.characterEditorPlayerOffset);
+							characterEditor->SetCameraPosition(pendingComponent.characterEditorCameraPosition);
+							characterEditor->SetCameraRotation(pendingComponent.characterEditorCameraRotation);
+							characterEditor->SetShowPositionDebugSphere(pendingComponent.characterEditorShowPositionSphere);
+							characterEditor->SetShowCameraDebugSphere(pendingComponent.characterEditorShowCameraSphere);
+							characterEditor->SetPreviewEnabled(pendingComponent.characterEditorPreviewEnabled);
 						}
 						if (auto* attack = dynamic_cast<PlayerAttack*>(component.get()))
 						{

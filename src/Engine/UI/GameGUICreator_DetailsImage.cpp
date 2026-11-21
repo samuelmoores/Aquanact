@@ -251,4 +251,119 @@ void GameGUICreator::DrawImageWidgetDetails(GameGUIAsset& asset, GameGUIWidgetDe
 		SaveSelectedRoleGUI();
 	}
 
+	ImGui::Separator();
+	if (ImGui::Checkbox("Bind Visibility", &widget.bindingEnabled))
+	{
+		if (!widget.bindingEnabled)
+		{
+			widget.bindEntity.clear();
+			widget.bindComponent.clear();
+			widget.bindMember.clear();
+			widget.bindEvent.clear();
+		}
+		SyncRuntimePreview();
+		SaveSelectedRoleGUI();
+	}
+	if (widget.bindingEnabled)
+	{
+		Scene* activeLevel = Root::Current().Scenes().ActiveLevel();
+		if (GameGUICreatorHelpers::DrawValueBindingControls(widget, activeLevel))
+		{
+			SyncRuntimePreview();
+			SaveSelectedRoleGUI();
+		}
+		if (ImGui::Button("Clear Visibility Binding"))
+		{
+			widget.bindEntity.clear();
+			widget.bindComponent.clear();
+			widget.bindMember.clear();
+			widget.bindEvent.clear();
+			SyncRuntimePreview();
+			SaveSelectedRoleGUI();
+		}
+	}
+
+}
+
+void GameGUICreator::DrawIconWidgetDetails(GameGUIAsset& asset, GameGUIWidgetDef& widget)
+{
+	static const char* const iconSkins[] = {
+		"ButtonRightSkin", "ButtonLeftSkin", "ButtonUpSkin", "ButtonDownSkin"
+	};
+	static const char* const iconNames[] = { "Arrow Right", "Arrow Left", "Arrow Up", "Arrow Down" };
+	char nameBuffer[256] = {};
+	std::snprintf(nameBuffer, sizeof(nameBuffer), "%s", widget.name.c_str());
+	if (ImGui::InputText("Name", nameBuffer, sizeof(nameBuffer))
+		&& IsWidgetNameAvailable(asset, nameBuffer, &widget))
+	{
+		widget.name = nameBuffer;
+		SyncRuntimePreview();
+		SaveSelectedRoleGUI();
+	}
+	DrawWidgetParentPanelField(asset, widget);
+
+	int iconIndex = 0;
+	for (int i = 0; i < 4; ++i)
+		if (widget.skin == iconSkins[i])
+			iconIndex = i;
+	if (ImGui::Combo("Icon", &iconIndex, iconNames, IM_ARRAYSIZE(iconNames)))
+	{
+		widget.skin = iconSkins[iconIndex];
+		SyncRuntimePreview();
+		SaveSelectedRoleGUI();
+	}
+
+	int position[2] = {
+		widget.parentName.empty() ? widget.x + widget.width / 2 : widget.x,
+		widget.parentName.empty() ? widget.y + widget.height / 2 : widget.y };
+	if (ImGui::DragInt2(widget.parentName.empty() ? "Screen Position" : "Position in Parent", position, 1.0f))
+	{
+		widget.x = widget.parentName.empty() ? position[0] - widget.width / 2 : position[0];
+		widget.y = widget.parentName.empty() ? position[1] - widget.height / 2 : position[1];
+		SyncRuntimePreview();
+		SaveSelectedRoleGUI();
+	}
+	int size = std::max(1, widget.width);
+	if (ImGui::DragInt("Size", &size, 1.0f, 8, 1024))
+	{
+		const int centerX = widget.x + widget.width / 2;
+		const int centerY = widget.y + widget.height / 2;
+		widget.width = widget.height = widget.defaultWidth = widget.defaultHeight = std::max(8, size);
+		widget.x = centerX - widget.width / 2;
+		widget.y = centerY - widget.height / 2;
+		SyncRuntimePreview();
+		SaveSelectedRoleGUI();
+	}
+
+	ImGui::Separator();
+	if (ImGui::Checkbox("Bind Visibility", &widget.bindingEnabled))
+	{
+		if (!widget.bindingEnabled)
+		{
+			widget.bindEntity.clear();
+			widget.bindComponent.clear();
+			widget.bindMember.clear();
+			widget.bindEvent.clear();
+		}
+		SyncRuntimePreview();
+		SaveSelectedRoleGUI();
+	}
+	if (widget.bindingEnabled)
+	{
+		Scene* activeLevel = Root::Current().Scenes().ActiveLevel();
+		if (GameGUICreatorHelpers::DrawValueBindingControls(widget, activeLevel))
+		{
+			SyncRuntimePreview();
+			SaveSelectedRoleGUI();
+		}
+		if (ImGui::Button("Clear Visibility Binding"))
+		{
+			widget.bindEntity.clear();
+			widget.bindComponent.clear();
+			widget.bindMember.clear();
+			widget.bindEvent.clear();
+			SyncRuntimePreview();
+			SaveSelectedRoleGUI();
+		}
+	}
 }

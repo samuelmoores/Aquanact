@@ -83,6 +83,26 @@ bool GameGUICreator::AddImageWidget()
 	return true;
 }
 
+void GameGUICreator::AddIconWidget()
+{
+	static const char* const iconSkins[] = {
+		"ButtonRightSkin", "ButtonLeftSkin", "ButtonUpSkin", "ButtonDownSkin"
+	};
+	GameGUIAsset& asset = CurrentGameGUI();
+	GameGUIWidgetDef widget;
+	widget.type = "Icon";
+	widget.name = MakeUniqueWidgetName(asset, m_newWidgetName[0] != '\0' ? m_newWidgetName : "Icon");
+	widget.parentName = m_newWidgetParentPanel;
+	widget.skin = iconSkins[std::clamp(m_newWidgetIconIndex, 0, 3)];
+	widget.width = widget.defaultWidth = std::max(8, m_newWidgetImageWidth);
+	widget.height = widget.defaultHeight = std::max(8, m_newWidgetImageHeight);
+	widget.layer = "Main";
+	CenterWidget(widget);
+	asset.widgets.push_back(widget);
+	m_selectedWidgetIndex = static_cast<int>(asset.widgets.size() - 1);
+	SaveSelectedRoleGUI();
+}
+
 void GameGUICreator::AddProgressBarWidget()
 {
 	GameGUIAsset& asset = CurrentGameGUI();

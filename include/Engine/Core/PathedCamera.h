@@ -22,6 +22,7 @@ public:
 
 	// Pose and path authoring: directly set the camera pose or replace its path.
 	void SetPose(const glm::vec3& position, const glm::vec3& facing);
+	void SetPose(const glm::vec3& position, const glm::vec3& facing, const glm::vec3& up);
 	void SetPath(const CameraPathData& path);
 	const CameraPathData& Path() const { return m_path; }
 	CameraPathData& MutablePath() { return m_path; }

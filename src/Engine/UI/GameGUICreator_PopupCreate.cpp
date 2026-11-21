@@ -55,6 +55,9 @@ void GameGUICreator::DrawCreateWidgetPopup()
 	case NewWidgetType::Image:
 		DrawCreateImagePopup();
 		break;
+	case NewWidgetType::Icon:
+		DrawCreateIconPopup();
+		break;
 	case NewWidgetType::Text:
 		DrawCreateTextPopup();
 		break;
@@ -79,6 +82,12 @@ void GameGUICreator::OpenCreateWidgetPopup(NewWidgetType type)
 	m_newWidgetSolidWhiteBox = false;
 	m_newWidgetImageWidth = 128;
 	m_newWidgetImageHeight = 128;
+	m_newWidgetIconIndex = 0;
+	if (type == NewWidgetType::Icon)
+	{
+		m_newWidgetImageWidth = 40;
+		m_newWidgetImageHeight = 40;
+	}
 	if (type == NewWidgetType::Panel)
 	{
 		m_newWidgetParentPanel.clear();
@@ -359,6 +368,28 @@ void GameGUICreator::DrawCreateImagePopup()
 	}
 	ImGui::EndDisabled();
 
+	DrawCreateWidgetPopupFooter();
+}
+
+void GameGUICreator::DrawCreateIconPopup()
+{
+	static const char* const iconSkins[] = {
+		"ButtonRightSkin", "ButtonLeftSkin", "ButtonUpSkin", "ButtonDownSkin"
+	};
+	static const char* const iconNames[] = { "Arrow Right", "Arrow Left", "Arrow Up", "Arrow Down" };
+	DrawCreateWidgetPopupHeader("Create a static icon widget:");
+	DrawCreateParentPanelField();
+	ImGui::Combo("Icon", &m_newWidgetIconIndex, iconNames, IM_ARRAYSIZE(iconNames));
+	int size = std::max(1, m_newWidgetImageWidth);
+	if (ImGui::DragInt("Size", &size, 1.0f, 8, 512))
+		m_newWidgetImageWidth = m_newWidgetImageHeight = size;
+	if (ImGui::Button("Create"))
+	{
+		AddIconWidget();
+		SyncRuntimePreview();
+		Root::Current().Debugger().LogMessage("Create Icon requested");
+		ImGui::CloseCurrentPopup();
+	}
 	DrawCreateWidgetPopupFooter();
 }
 

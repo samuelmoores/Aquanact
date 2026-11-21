@@ -614,6 +614,18 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 			}
 		}
 	}
+	if (!suppressDebugSpheres)
+	{
+		const Scene* scene = Root::Current().Scenes().ActiveLevel();
+		if (scene)
+			for (const auto& entity : scene->Objects())
+			{
+				if (!entity) continue;
+				for (Component* component : entity->Components())
+					if (component)
+						component->DrawDebug(camera);
+			}
+	}
 	const Scene* activeScene = Root::Current().Scenes().ActiveLevel();
 	const bool showCutsceneCameraMarker = activeScene &&
 		Root::Current().Scenes().SceneKindFor(activeScene->Name()) == SceneManager::SceneKind::Cutscene &&

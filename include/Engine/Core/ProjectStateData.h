@@ -61,6 +61,12 @@ namespace ProjectStateData {
 		float hitboxActiveStart = 0.2f;
 		float hitboxActiveEnd = 0.65f;
 		float healthMax = 100.0f;
+		glm::vec2 characterEditorPlayerOffset{0.0f, 160.0f};
+		glm::vec3 characterEditorCameraPosition{-2650.0f, 290.0f, 403.0f};
+		glm::vec3 characterEditorCameraRotation{0.0f, -90.0f, 0.0f};
+		bool characterEditorShowPositionSphere = false;
+		bool characterEditorShowCameraSphere = false;
+		bool characterEditorPreviewEnabled = false;
 		std::string attackInstanceName;
 		float attackInstanceSpeed = 120.0f;
 		int attackLaunchFrame = 0;

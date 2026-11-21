@@ -255,11 +255,11 @@ namespace {
 			widget.bindEvent = readField("\"bindEvent\":", widgetPos);
 			const std::string bindingEnabledField = readField("\"bindingEnabled\":", widgetPos);
 			const bool isTextWidget = widget.type == "Text" || widget.type == "TextBox";
-			widget.bindingEnabled = isTextWidget && (bindingEnabledField.empty()
-				? (!widget.bindEntity.empty() || !widget.bindComponent.empty()
+			widget.bindingEnabled = bindingEnabledField.empty()
+				? (isTextWidget && (!widget.bindEntity.empty() || !widget.bindComponent.empty()
 					|| !widget.bindMember.empty() || !widget.bindEvent.empty()
-					|| readField("\"bindToggle\":", widgetPos).find("true") != std::string::npos)
-				: bindingEnabledField.find("true") != std::string::npos);
+					|| readField("\"bindToggle\":", widgetPos).find("true") != std::string::npos))
+				: bindingEnabledField.find("true") != std::string::npos;
 			widget.panelButtonFocusSound = readField("\"panelButtonFocusSound\":", widgetPos);
 			asset.widgets.push_back(widget);
 			widgetPos = contents.find("\"type\": \"", widgetPos + 1);

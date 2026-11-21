@@ -22,6 +22,7 @@
 #include "Health.h"
 #include "PlayerAttack.h"
 #include "PlayerController.h"
+#include "CharacterEditor.h"
 
 #include <imgui.h>
 #include <GLFW/glfw3.h>
@@ -427,7 +428,32 @@ bool EntityWindow::DrawStateMachineButton() const
 
 void EntityWindow::DrawComponentControls(Component& component) const
 {
-	if (ParticleSystem* particles = dynamic_cast<ParticleSystem*>(&component))
+	if (CharacterEditor* characterEditor = dynamic_cast<CharacterEditor*>(&component))
+	{
+		glm::vec2 playerOffset = characterEditor->PlayerPositionOffset();
+		if (ImGui::DragFloat2("Player Position Offset (Dresser Local X/Z)", &playerOffset.x, 1.0f))
+			characterEditor->SetPlayerPositionOffset(playerOffset);
+		bool showPositionSphere = characterEditor->ShowPositionDebugSphere();
+		if (ImGui::Checkbox("Draw Player Position Sphere", &showPositionSphere))
+			characterEditor->SetShowPositionDebugSphere(showPositionSphere);
+
+		ImGui::SeparatorText("Character Editor Camera");
+		glm::vec3 cameraPosition = characterEditor->CameraPosition();
+		if (ImGui::DragFloat3("Camera Position", &cameraPosition.x, 1.0f))
+			characterEditor->SetCameraPosition(cameraPosition);
+		glm::vec3 cameraRotation = characterEditor->CameraRotation();
+		if (ImGui::DragFloat3("Camera Rotation (Degrees)", &cameraRotation.x, 0.5f))
+			characterEditor->SetCameraRotation(cameraRotation);
+		bool showCameraSphere = characterEditor->ShowCameraDebugSphere();
+		if (ImGui::Checkbox("Draw Camera Position Sphere", &showCameraSphere))
+			characterEditor->SetShowCameraDebugSphere(showCameraSphere);
+		bool previewEnabled = characterEditor->PreviewEnabled();
+		if (ImGui::Checkbox("Preview Camera View", &previewEnabled))
+			characterEditor->SetPreviewEnabled(previewEnabled);
+		if (ImGui::Button("Set From Engine Camera View"))
+			characterEditor->CaptureEngineCameraView();
+	}
+	else if (ParticleSystem* particles = dynamic_cast<ParticleSystem*>(&component))
 	{
 		const ParticlePreset presets[] = {
 			ParticlePreset::Custom,

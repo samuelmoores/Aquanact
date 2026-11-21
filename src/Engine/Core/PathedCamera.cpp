@@ -6,6 +6,8 @@
 
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
+#include <glm/geometric.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <algorithm>
 #include <cmath>
 
@@ -53,6 +55,23 @@ void PathedCamera::SetPose(const glm::vec3& position, const glm::vec3& facing)
 	m_up = std::abs(glm::dot(m_facing, glm::vec3(0.0f, 1.0f, 0.0f))) > 0.999f
 		? glm::vec3(0.0f, 0.0f, 1.0f)
 		: glm::vec3(0.0f, 1.0f, 0.0f);
+	RebuildView();
+}
+
+void PathedCamera::SetPose(const glm::vec3& position, const glm::vec3& facing, const glm::vec3& up)
+{
+	m_position = position;
+	if (glm::dot(facing, facing) > 1e-8f)
+		m_facing = glm::normalize(facing);
+	else
+		m_facing = {0.0f, 0.0f, 1.0f};
+	glm::vec3 orthogonalUp = up - m_facing * glm::dot(up, m_facing);
+	if (glm::dot(orthogonalUp, orthogonalUp) > 1e-8f)
+		m_up = glm::normalize(orthogonalUp);
+	else
+		m_up = std::abs(glm::dot(m_facing, glm::vec3(0.0f, 1.0f, 0.0f))) > 0.999f
+			? glm::vec3(0.0f, 0.0f, 1.0f)
+			: glm::vec3(0.0f, 1.0f, 0.0f);
 	RebuildView();
 }
 
