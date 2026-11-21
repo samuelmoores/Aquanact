@@ -20,7 +20,13 @@
 
 void GameGUICreatorView::DrawWidgetList(GameGUICreator& creator)
 {
-	ImGui::Begin("Widget List", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+	if (!creator.m_showWidgetListWindow)
+		return;
+	if (!ImGui::Begin("Widget List", &creator.m_showWidgetListWindow, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		ImGui::End();
+		return;
+	}
 	GameGUIAsset& asset = creator.CurrentGameGUI();
 	creator.RefreshActiveEditingPanel();
 	if (!creator.CurrentGameGUI().widgets.empty())
@@ -98,7 +104,13 @@ void GameGUICreatorView::DrawWidgetList(GameGUICreator& creator)
 
 void GameGUICreatorView::DrawWidgetDetails(GameGUICreator& creator)
 {
-	ImGui::Begin("Widget Details", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+	if (!creator.m_showWidgetDetailsWindow)
+		return;
+	if (!ImGui::Begin("Widget Details", &creator.m_showWidgetDetailsWindow, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		ImGui::End();
+		return;
+	}
 	if (creator.CurrentGameGUI().widgets.empty())
 	{
 		ImGui::TextUnformatted("No widget selected.");
@@ -224,6 +236,24 @@ void GameGUICreatorView::Draw(GameGUICreator& creator, const Camera&)
 			}
 			ImGui::EndMenu();
 		}
+		if (ImGui::BeginMenu("View"))
+		{
+			ImGui::MenuItem("Widget List", nullptr, &creator.m_showWidgetListWindow);
+			ImGui::MenuItem("Widget Details", nullptr, &creator.m_showWidgetDetailsWindow);
+			ImGui::MenuItem("Navigation Mode", nullptr, &creator.m_showNavigationModeWindow);
+			ImGui::MenuItem("Camera View", nullptr, &creator.m_showCameraViewWindow);
+			ImGui::EndMenu();
+		}
+		if (ImGui::BeginMenu("Diagnostics"))
+		{
+			GameGUIManager& runtimeGUI = Root::Current().FrontEnd().RuntimeGUI();
+			bool showDiagnostics = runtimeGUI.ShowCreatorDiagnosticsWindow();
+			if (ImGui::MenuItem("GameGUI Platform Window", nullptr, showDiagnostics))
+			{
+				runtimeGUI.SetShowCreatorDiagnosticsWindow(!showDiagnostics);
+			}
+			ImGui::EndMenu();
+		}
 			if (ImGui::BeginMenu("Create"))
 			{
 				if (ImGui::MenuItem("Create Button"))
@@ -253,11 +283,13 @@ void GameGUICreatorView::Draw(GameGUICreator& creator, const Camera&)
 		ImGui::EndMainMenuBar();
 	}
 
-	ImGui::SetNextWindowSize(ImVec2(0.0f, 0.0f), ImGuiCond_Always);
-	if (ImGui::Begin("Navigation Mode", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+	if (creator.m_showNavigationModeWindow)
 	{
-		ImGui::TextUnformatted("Choose how the active menu button is shown.");
-		ImGui::Separator();
+		ImGui::SetNextWindowSize(ImVec2(0.0f, 0.0f), ImGuiCond_Always);
+		if (ImGui::Begin("Navigation Mode", &creator.m_showNavigationModeWindow, ImGuiWindowFlags_AlwaysAutoResize))
+		{
+			ImGui::TextUnformatted("Choose how the active menu button is shown.");
+			ImGui::Separator();
 
 		int mode = static_cast<int>(creator.m_menuNavigationMode);
 		if (ImGui::RadioButton("Pointer", mode == static_cast<int>(GameGUICreator::MenuNavigationMode::Pointer)))
@@ -319,7 +351,7 @@ void GameGUICreatorView::Draw(GameGUICreator& creator, const Camera&)
 				asset.pointerGap = creator.m_pointerGap;
 				creator.SyncRuntimePreview();
 			}
-			const char* pointerSkins[] = { "NavigationArrowRight1", "NavigationArrowRight2", "NavigationArrowRight3", "NavigationArrowRight4" };
+			const char* pointerSkins[] = { "ButtonRightSkin", "ButtonLeftSkin", "ButtonUpSkin", "ButtonDownSkin" };
 			if (ImGui::Combo("Pointer skin", &creator.m_pointerSkinIndex, pointerSkins, IM_ARRAYSIZE(pointerSkins)))
 			{
 				asset.pointerSkin = pointerSkins[creator.m_pointerSkinIndex];
@@ -344,14 +376,21 @@ void GameGUICreatorView::Draw(GameGUICreator& creator, const Camera&)
 				creator.SyncRuntimePreview();
 			}
 		}
+		}
+		ImGui::End();
 	}
-	ImGui::End();
 
 	const CameraPathData& cameraPath = Root::Current().FrontEnd().EditorGUI().CameraPath().Data();
-	if (!cameraPath.points.empty())
+	if (creator.m_showCameraViewWindow)
 	{
-		if (ImGui::Begin("Camera Path Preview", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+		if (ImGui::Begin("Camera View", &creator.m_showCameraViewWindow, ImGuiWindowFlags_AlwaysAutoResize))
 		{
+			if (cameraPath.points.empty())
+			{
+				ImGui::TextDisabled("Add a camera path point to configure camera view preview.");
+			}
+			else
+			{
 			PathedCamera& previewCamera = Root::Current().Render().GetPathedCamera();
 			EngineCamera& orientationCamera = Root::Current().Render().GetEngineCamera();
 			if (!creator.m_cameraPreviewSensitivityInitialized)
@@ -428,6 +467,7 @@ void GameGUICreatorView::Draw(GameGUICreator& creator, const Camera&)
 				facing = orientationCamera.GetFacing();
 			}
 			previewCamera.SetPose(pathPosition, facing);
+			}
 		}
 		ImGui::End();
 	}

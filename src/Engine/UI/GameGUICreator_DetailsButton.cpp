@@ -205,11 +205,14 @@ void GameGUICreator::DrawButtonWidgetDetails(GameGUIAsset& asset, GameGUIWidgetD
 		}
 
 		// Treat the stored position as the image center in the editor.
-		int buttonPosition[2] = { widget.x + widget.width / 2, widget.y + widget.height / 2 };
-		if (ImGui::DragInt2("Position", buttonPosition, 1.0f))
+		const char* positionLabel = widget.parentName.empty() ? "Screen Position" : "Position in Parent";
+		int buttonPosition[2] = {
+			widget.parentName.empty() ? widget.x + widget.width / 2 : widget.x,
+			widget.parentName.empty() ? widget.y + widget.height / 2 : widget.y };
+		if (ImGui::DragInt2(positionLabel, buttonPosition, 1.0f))
 		{
-			widget.x = buttonPosition[0] - widget.width / 2;
-			widget.y = buttonPosition[1] - widget.height / 2;
+			widget.x = widget.parentName.empty() ? buttonPosition[0] - widget.width / 2 : buttonPosition[0];
+			widget.y = widget.parentName.empty() ? buttonPosition[1] - widget.height / 2 : buttonPosition[1];
 			SyncRuntimePreview();
 		}
 

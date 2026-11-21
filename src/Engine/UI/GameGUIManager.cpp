@@ -157,7 +157,7 @@ namespace {
 		const std::string boxSkin = readAssetField("boxSkin");
 		const std::string pointerSkin = readAssetField("pointerSkin");
 		if (!boxSkin.empty()) asset.boxSkin = boxSkin;
-		if (pointerSkin == "NavigationArrowRight1" || pointerSkin == "NavigationArrowRight2" || pointerSkin == "NavigationArrowRight3" || pointerSkin == "NavigationArrowRight4") asset.pointerSkin = pointerSkin;
+		if (pointerSkin == "ButtonRightSkin" || pointerSkin == "ButtonLeftSkin" || pointerSkin == "ButtonUpSkin" || pointerSkin == "ButtonDownSkin") asset.pointerSkin = pointerSkin;
 		asset.boxPadding = ReadIntField(readAssetField("boxPadding"), asset.boxPadding);
 		asset.boxOffsetX = ReadIntField(readAssetField("boxOffsetX"), asset.boxOffsetX);
 		asset.boxOffsetY = ReadIntField(readAssetField("boxOffsetY"), asset.boxOffsetY);
@@ -253,6 +253,13 @@ namespace {
 			widget.bindComponent = readField("\"bindComponent\":", widgetPos);
 			widget.bindMember = readField("\"bindMember\":", widgetPos);
 			widget.bindEvent = readField("\"bindEvent\":", widgetPos);
+			const std::string bindingEnabledField = readField("\"bindingEnabled\":", widgetPos);
+			const bool isTextWidget = widget.type == "Text" || widget.type == "TextBox";
+			widget.bindingEnabled = isTextWidget && (bindingEnabledField.empty()
+				? (!widget.bindEntity.empty() || !widget.bindComponent.empty()
+					|| !widget.bindMember.empty() || !widget.bindEvent.empty()
+					|| readField("\"bindToggle\":", widgetPos).find("true") != std::string::npos)
+				: bindingEnabledField.find("true") != std::string::npos);
 			widget.panelButtonFocusSound = readField("\"panelButtonFocusSound\":", widgetPos);
 			asset.widgets.push_back(widget);
 			widgetPos = contents.find("\"type\": \"", widgetPos + 1);
@@ -738,6 +745,24 @@ void GameGUIManager::DrawDiagnosticsWindow()
 	}
 	ImGui::End();
 	m_showDiagnosticsWindow = open;
+}
+
+void GameGUIManager::DrawCreatorDiagnosticsWindow()
+{
+	if (m_runtime && m_showCreatorDiagnosticsWindow)
+	{
+		m_runtime->DrawCreatorDiagnosticsWindow(&m_showCreatorDiagnosticsWindow);
+	}
+}
+
+bool GameGUIManager::ShowCreatorDiagnosticsWindow() const
+{
+	return m_showCreatorDiagnosticsWindow;
+}
+
+void GameGUIManager::SetShowCreatorDiagnosticsWindow(bool show)
+{
+	m_showCreatorDiagnosticsWindow = show;
 }
 
 bool GameGUIManager::ShowDiagnosticsWindow() const

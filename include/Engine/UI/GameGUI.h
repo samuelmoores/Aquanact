@@ -6,6 +6,7 @@
 #include <functional>
 #include <utility>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <MYGUI/MyGUI_OpenGLImageLoader.h>
 #include <MYGUI/MyGUI_Colour.h>
@@ -31,6 +32,7 @@ public:
 	void shutDown();
 	void BeginFrame();
 	void Draw();
+	void DrawCreatorDiagnosticsWindow(bool* open) const;
 	void EndFrame();
 	bool IsInitialized() const { return m_initialized; }
 
@@ -57,7 +59,7 @@ public:
 
 	// Lookup
 	MyGUI::Widget* RuntimeWidget(const std::string& name) const;
-	void SetRuntimeWidgetVisible(const std::string& name, bool visible);
+	void SetRuntimeWidgetVisible(const std::string& name, bool visible, const std::string& source = "default");
 private:
 	// Widget creation
 	MyGUI::Widget* CreateWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* parent);
@@ -87,7 +89,7 @@ private:
 	void ApplyTextHighlight(MyGUI::Button* button, bool highlighted);
 	void BindProgressBarFromDef(const GameGUIWidgetDef& def, MyGUI::ProgressBar* progress);
 	void UpdateDeathOverlay();
-	void UpdateWorldAnchoredImages();
+	void UpdateWorldAnchoredWidgets();
 	void RefreshVisibleControllerButtons();
 	void FocusFirstControllerButtonInPanel(const std::string& panelName);
 
@@ -101,6 +103,7 @@ private:
 	std::vector<MyGUI::Widget*> m_runtimeWidgets;
 	std::unordered_map<std::string, MyGUI::Widget*> m_runtimeWidgetLookup;
 	std::unordered_map<std::string, bool> m_runtimeVisibilityOverrides;
+	std::unordered_map<std::string, std::unordered_set<std::string>> m_runtimeVisibilitySources;
 
 	// Controller navigation state
 	MyGUI::Button* m_testButton = nullptr;
@@ -121,7 +124,7 @@ private:
 	int m_boxOffsetX = 0;
 	int m_boxOffsetY = 0;
 	std::string m_boxSkin = "WindowFrameSkin";
-	std::string m_pointerSkin = "NavigationArrowRight1";
+	std::string m_pointerSkin = "ButtonRightSkin";
 	int m_pointerWidth = 40, m_pointerHeight = 40, m_pointerGap = 24;
 	MyGUI::Colour m_highlightColour = MyGUI::Colour(1.0f, 1.0f, 0.0f);
 	MyGUI::Colour m_selectedColour = MyGUI::Colour(1.0f, 1.0f, 1.0f);

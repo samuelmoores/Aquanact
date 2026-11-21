@@ -260,7 +260,7 @@ void GameGUICreator::LoadNavigationSettingsFromAsset()
 	const std::string boxSkins[] = { "WindowFrameSkin", "PanelSkin", "ButtonSkin", "ButtonEmptySkin", "TabPanelSkin", "ClientDefaultSkin" };
 	m_boxSkinIndex = 0;
 	for (int i = 0; i < 6; ++i) if (asset.boxSkin == boxSkins[i]) { m_boxSkinIndex = i; break; }
-	const std::string pointerSkins[] = { "NavigationArrowRight1", "NavigationArrowRight2", "NavigationArrowRight3", "NavigationArrowRight4" };
+	const std::string pointerSkins[] = { "ButtonRightSkin", "ButtonLeftSkin", "ButtonUpSkin", "ButtonDownSkin" };
 	m_pointerSkinIndex = 0;
 	for (int i = 0; i < 4; ++i) if (asset.pointerSkin == pointerSkins[i]) { m_pointerSkinIndex = i; break; }
 }

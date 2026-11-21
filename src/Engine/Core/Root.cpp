@@ -19,6 +19,7 @@
 #include "Engine/Core/Audio.h"
 #include "Engine/Core/GLHeaders.h"
 #include "Engine/Core/ComponentRegistry.h"
+#include "Engine/Core/BootLog.h"
 
 #include <chrono>
 #include <filesystem>
@@ -106,6 +107,7 @@ void Root::InitializeOwnedSystems()
 	m_inputManager = std::make_unique<InputManager>();
 	m_profiler = std::make_unique<FrameProfiler>();
 	m_spawnManager = std::make_unique<SpawnManager>();
+	BootLog::SetStage("owned systems initialized");
 }
 
 void Root::startUp(int argc, char** argv)
@@ -122,6 +124,7 @@ void Root::startUp(int argc, char** argv)
 #endif
 	m_editorLaunchedGameSession = false;
 
+	BootLog::SetStage("window startup");
 	// window
 	m_window->startUp();
 
@@ -129,10 +132,13 @@ void Root::startUp(int argc, char** argv)
 	m_targetFrameRate = m_window->RefreshRate();
 
 	//TODO: make an audiomanager and call its startUp function here
+	BootLog::SetStage("audio startup");
 	Audio::Init();
 
 	// render -> frontend -> input -> input -> debug -> files
+	BootLog::SetStage("RenderManager startup");
 	m_renderManager->startUp(*m_window);
+	BootLog::SetStage("FrontEndManager startup");
 	m_frontEndManager->startUp(*m_window);
 
 #ifdef AQUANACT_GAME
@@ -146,12 +152,16 @@ void Root::startUp(int argc, char** argv)
 	m_renderManager->PresentFrame(*m_window);
 #endif
 
+	BootLog::SetStage("input startup");
 	m_input->startUp(*m_window);
 	m_inputManager->startUp(*m_input);
+	BootLog::SetStage("debug startup");
 	m_debug->startUp();
+	BootLog::SetStage("file manager startup");
 	m_fileManager->startUp();
 
 	// TODO: put this into a startUp function for projectmanager
+	BootLog::SetStage("component registration");
 	RegisterGameComponents();
 #ifdef AQUANACT_GAME
 	const std::filesystem::path projectPath = DefaultProjectPath();
@@ -159,11 +169,13 @@ void Root::startUp(int argc, char** argv)
 #endif
 
 	// scene
+	BootLog::SetStage("scene startup");
 	m_sceneManager->startUp();
 
 	// launch game or editor
 	if (m_engineState.IsGameMode())
 	{
+		BootLog::SetStage("gameplay startup");
 		m_gameplayManager->startUp(*m_sceneManager, *m_frontEndManager, *m_debug, m_engineState);
 		m_gameplayManager->BootMainMenu(*m_frontEndManager, *m_debug);
 	}

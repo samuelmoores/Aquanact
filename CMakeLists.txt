@@ -40,7 +40,11 @@ set(AQUANACT_VCPKG_TARGET_TRIPLET "${VCPKG_TARGET_TRIPLET}")
 
 set(AQUANACT_STARTER_PROJECT_ROOT "${CMAKE_SOURCE_DIR}/projects/NewProject")
 set(AQUANACT_DEFAULT_PROJECT_ROOT "${AQUANACT_STARTER_PROJECT_ROOT}")
+if (EXISTS "${CMAKE_SOURCE_DIR}/projects/semesterlong/generated/GameSources.cmake")
+    set(AQUANACT_DEFAULT_PROJECT_ROOT "${CMAKE_SOURCE_DIR}/projects/semesterlong")
+endif()
 if (WIN32 AND EXISTS "C:/projects/semesterlong/project.aqua")
+    # Preserve the existing Windows developer checkout preference.
     set(AQUANACT_DEFAULT_PROJECT_ROOT "C:/projects/semesterlong")
 endif()
 
@@ -62,6 +66,7 @@ include("${AQUANACT_PROJECT_ROOT}/generated/GameSources.cmake")
 
 set(SOURCES
     "src/Engine/Core/main.cpp"
+    "src/Engine/Core/BootLog.cpp"
     "include/Engine/Core/ShaderProgram.h" "src/Engine/Core/ShaderProgram.cpp"
     "include/Engine/Core/StbImage.h" "src/Engine/Core/StbImage.cpp"
     "include/Engine/Core/Mesh.h" "src/Engine/Core/Mesh.cpp"

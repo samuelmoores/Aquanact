@@ -33,7 +33,6 @@ void GameGUICreator::DrawImageWidgetDetails(GameGUIAsset& asset, GameGUIWidgetDe
 	}
 	if (widget.worldAnchored)
 	{
-		ImGui::TextDisabled("Projected into the screen from this world position; it does not use depth occlusion.");
 		const char* anchorLabel = widget.worldAnchorEntity.empty()
 			? "<World Position>" : widget.worldAnchorEntity.c_str();
 		bool anchorChanged = false;
@@ -152,11 +151,6 @@ void GameGUICreator::DrawImageWidgetDetails(GameGUIAsset& asset, GameGUIWidgetDe
 				}
 			}
 		}
-		else if (!widget.worldAnchorEntity.empty())
-		{
-			ImGui::TextDisabled("Submesh anchoring requires a mesh object in the active scene.");
-		}
-
 		float worldPosition[3] = { widget.worldX, widget.worldY, widget.worldZ };
 		const char* worldPositionLabel = widget.worldAnchorEntity.empty() ? "World Position" : "World Offset";
 		if (ImGui::DragFloat3(worldPositionLabel, worldPosition, 1.0f, 0.0f, 0.0f, "%.2f"))
@@ -204,11 +198,7 @@ void GameGUICreator::DrawImageWidgetDetails(GameGUIAsset& asset, GameGUIWidgetDe
 			const bool validSelection = selectedTexture.empty()
 				|| GameGUICreatorHelpers::GetTextureDimensions(
 					GameGUICreatorHelpers::ResolveTexturePath(selectedTexture), textureWidth, textureHeight);
-			if (!validSelection)
-			{
-				ImGui::TextDisabled("That image could not be opened. The previous selection was kept.");
-			}
-			else
+			if (validSelection)
 			{
 				widget.texture = selectedTexture;
 				if (!selectedTexture.empty())
@@ -230,11 +220,14 @@ void GameGUICreator::DrawImageWidgetDetails(GameGUIAsset& asset, GameGUIWidgetDe
 	// Screen position is only used while the image is not anchored in the world.
 	if (!widget.worldAnchored)
 	{
-		int imagePosition[2] = { widget.x + widget.width / 2, widget.y + widget.height / 2 };
-		if (ImGui::DragInt2("Position", imagePosition, 1.0f))
+		const char* positionLabel = widget.parentName.empty() ? "Screen Position" : "Position in Parent";
+		int imagePosition[2] = {
+			widget.parentName.empty() ? widget.x + widget.width / 2 : widget.x,
+			widget.parentName.empty() ? widget.y + widget.height / 2 : widget.y };
+		if (ImGui::DragInt2(positionLabel, imagePosition, 1.0f))
 		{
-			widget.x = imagePosition[0] - widget.width / 2;
-			widget.y = imagePosition[1] - widget.height / 2;
+			widget.x = widget.parentName.empty() ? imagePosition[0] - widget.width / 2 : imagePosition[0];
+			widget.y = widget.parentName.empty() ? imagePosition[1] - widget.height / 2 : imagePosition[1];
 			SyncRuntimePreview();
 		}
 	}

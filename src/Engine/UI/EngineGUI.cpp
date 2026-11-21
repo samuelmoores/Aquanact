@@ -161,11 +161,8 @@ void EngineGUI::DrawBootImage() const
 	ImDrawList* drawList = ImGui::GetForegroundDrawList();
 	const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
 	drawList->AddRectFilled(ImVec2(0.0f, 0.0f), displaySize, IM_COL32(5, 5, 7, 255));
-	if (m_bootTexture == 0 || m_bootTextureWidth <= 0 || m_bootTextureHeight <= 0)
+	if (m_bootTexture != 0 && m_bootTextureWidth > 0 && m_bootTextureHeight > 0)
 	{
-		return;
-	}
-
 	const ImVec2 center(displaySize.x * 0.5f, displaySize.y * 0.5f);
 	const float imageAspect = static_cast<float>(m_bootTextureWidth) / static_cast<float>(m_bootTextureHeight);
 	const float maxImageWidth = displaySize.x * 0.195f;
@@ -186,6 +183,8 @@ void EngineGUI::DrawBootImage() const
 		imageMax,
 		ImVec2(0.0f, 0.0f),
 		ImVec2(1.0f, 1.0f));
+	}
+	Root::Current().Debugger().DrawProjectLoadOverlay();
 }
 
 void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManager& SceneManager, ProjectManager& projectManager)
@@ -247,6 +246,7 @@ void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManage
 				m_waitingForStartupProject = true;
 				m_bootImageTimeRemaining = 0.0f;
 				(void)m_menuBar.DrawStartupProjectWindow(context);
+				Root::Current().Debugger().DrawProjectLoadOverlay();
 				return;
 			}
 			m_forceProjectExplorer = false;

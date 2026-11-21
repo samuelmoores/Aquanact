@@ -10,6 +10,7 @@
 #include "Engine/Core/ProjectManager.h"
 #include "Engine/Core/Root.h"
 #include "Engine/Core/RenderManager.h"
+#include "Engine/Core/BootLog.h"
 #include <imgui.h>
 
 FrontEndManager::~FrontEndManager()
@@ -33,6 +34,7 @@ void FrontEndManager::startUp(Window& window)
 	{
 		m_engineGUI = std::make_unique<EngineGUI>();
 	}
+	BootLog::SetStage("EngineGUI startup");
 	m_engineGUI->startUp(window);
 
 	// only the editor needs the engine creator UI
@@ -42,6 +44,7 @@ void FrontEndManager::startUp(Window& window)
 		{
 			m_uiCreator = std::make_unique<GameGUICreator>();
 		}
+		BootLog::SetStage("GameGUICreator startup");
 		m_uiCreator->startUp(window);
 	}
 	else
@@ -51,6 +54,7 @@ void FrontEndManager::startUp(Window& window)
 	}
 
 	// both need the game ui
+	BootLog::SetStage("GameGUI startup");
 	m_gameGUI->startUp(window);
 }
 
@@ -112,6 +116,7 @@ void FrontEndManager::DrawRuntimePreviewGUI()
 	if (m_gameGUI && IsEditorMode() && m_mode == FrontEndMode::GameGUICreator)
 	{
 		m_gameGUI->Draw();
+		m_gameGUI->DrawCreatorDiagnosticsWindow();
 		m_gameGUI->DrawReturnButton();
 	}
 }

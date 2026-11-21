@@ -391,24 +391,36 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const SceneM
 
 bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager& SceneManager)
 {
+	Root::Current().Debugger().BeginProjectLoadLog(path);
 	if (!m_fileSystem)
 	{
+		Root::Current().Debugger().LogProjectLoadStatus("File system is unavailable");
+		Root::Current().Debugger().EndProjectLoadLog(false);
 		return false;
 	}
 
-	const std::string fileContents = m_fileSystem->ReadTextFile(path);
+	Root::Current().Debugger().LogProjectLoadStatus("Reading project file");
+	std::string fileContents = m_fileSystem->ReadTextFile(path);
 	if (fileContents.empty())
 	{
+		Root::Current().Debugger().LogProjectLoadStatus("Project file is empty or could not be read");
+		Root::Current().Debugger().EndProjectLoadLog(false);
 		return false;
 	}
+	// Windows-authored project files use CRLF. Normalize line endings before
+	// parsing so header and final field comparisons behave identically on macOS.
+	fileContents.erase(std::remove(fileContents.begin(), fileContents.end(), '\r'), fileContents.end());
 
 	std::istringstream file(fileContents);
 	std::string header;
 	std::getline(file, header);
 	if (header != "AquanactProject")
 	{
+		Root::Current().Debugger().LogProjectLoadStatus("Invalid project header");
+		Root::Current().Debugger().EndProjectLoadLog(false);
 		return false;
 	}
+	Root::Current().Debugger().LogProjectLoadStatus("Parsing project state");
 	std::vector<ProjectStateData::PendingLevel> pendingLevels;
 	std::vector<ProjectStateData::PendingController> pendingControllers;
 	std::vector<ProjectStateData::PendingComponent> pendingComponents;
@@ -422,6 +434,7 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 	const bool loaded = ProjectStateSerializer::LoadLevelState(path, file, pendingLevels, pendingControllers, pendingComponents, pendingInputActions, pendingGameGUIAssets, pendingGameGUIActions, pendingActiveGameGUIAsset, pendingGameGUINavigationMode, renderState, startupLevelName);
 	if (loaded) // broken boundary, no longer just I/O
 	{
+		Root::Current().Debugger().LogProjectLoadStatus("Project state parsed; preparing project assets");
 		// Legacy projects stored one global light rig. Give every materialized scene
 		// its own initial copy so subsequent edits and scene switches are isolated.
 		if (renderState.hasLegacyLighting && !renderState.hasSceneLighting)
@@ -439,8 +452,11 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 		m_currentProjectPath = path;
 		Root::Current().Files().SetRootDirectory(ProjectAssetsDirectory() / "models");
 		Root::Current().Spawns().ResetForProject();
+		Root::Current().Debugger().LogProjectLoadStatus("Loading spawn data");
 		Root::Current().Spawns().LoadProjectState(path);
+		Root::Current().Debugger().LogProjectLoadStatus("Creating scenes and entities");
 		MaterializePendingLevels(SceneManager, pendingLevels);
+		Root::Current().Debugger().LogProjectLoadStatus("Applying scene components");
 		SceneManager.ApplyProjectState(pendingLevels, pendingControllers, pendingComponents);
 		EnsureMainMenuLevel(SceneManager);
 		ApplyStartupLevel(SceneManager, startupLevelName, pendingLevels);
@@ -468,6 +484,7 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 		// SetTarget establishes the default orbit distance. Apply the saved camera
 		// pose and radius afterward so loading cannot replace that saved radius.
 		Root::Current().Render().ApplyProjectState(renderState);
+		Root::Current().Debugger().LogProjectLoadStatus("Applying editor and GUI state");
 		Root::Current().FrontEnd().ApplyProjectState(renderState.editorShowAxis, renderState.editorShowGrid, pendingGameGUIAssets, pendingGameGUIActions, pendingActiveGameGUIAsset, pendingGameGUINavigationMode, renderState.imguiLayout);
 		// New project files store camera points per scene. The legacy render-state
 		// application above still restores old files, so replace the editor view
@@ -511,6 +528,12 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 			}
 			Root::Current().InputActions().SetBindings(pendingAction.name, std::move(bindings));
 		}
+		Root::Current().Debugger().EndProjectLoadLog(true);
+	}
+	else
+	{
+		Root::Current().Debugger().LogProjectLoadStatus("Project state parser rejected the file");
+		Root::Current().Debugger().EndProjectLoadLog(false);
 	}
 	return loaded;
 }

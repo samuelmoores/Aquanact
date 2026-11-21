@@ -237,12 +237,6 @@ Scene* SceneManager::startUp()
 	// check for new game code
 	// load congiguration
 	std::filesystem::path pendingConfigurationPath = Root::Current().Projects().PendingClassConfigurationPath();
-	const std::filesystem::path legacyConfigurationPath = std::filesystem::current_path() / "NewClassConfiguration";
-	if (!std::filesystem::exists(pendingConfigurationPath)
-		&& std::filesystem::exists(legacyConfigurationPath))
-	{
-		pendingConfigurationPath = legacyConfigurationPath;
-	}
 	NewClassConfiguration configuration = loadConfiguration(pendingConfigurationPath.string());
 
 	Scene* activeLevel = m_activeLevel;

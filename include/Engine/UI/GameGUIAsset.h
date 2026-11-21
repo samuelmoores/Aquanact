@@ -97,6 +97,7 @@ struct GameGUIWidgetDef
 	std::string bindComponent;
 	std::string bindMember;
 	std::string bindEvent;
+	bool bindingEnabled = false;
 };
 
 struct GameGUIAsset
@@ -107,7 +108,7 @@ struct GameGUIAsset
 
 	// Main frame visuals
 	std::string boxSkin = "WindowFrameSkin";
-	std::string pointerSkin = "NavigationArrowRight1";
+	std::string pointerSkin = "ButtonRightSkin";
 	int boxPadding = 8;
 	int boxOffsetX = 0;
 	int boxOffsetY = 0;

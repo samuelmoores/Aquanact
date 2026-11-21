@@ -36,7 +36,8 @@ void GameGUICreatorView::DrawProgressBarWidgetDetails(GameGUICreator& creator, G
 
 	int position[2] = { widget.x, widget.y };
 	bool changed = false;
-	if (ImGui::DragInt2("Position", position, 1.0f))
+	const char* positionLabel = widget.parentName.empty() ? "Screen Position" : "Position in Parent";
+	if (ImGui::DragInt2(positionLabel, position, 1.0f))
 	{
 		widget.x = position[0];
 		widget.y = position[1];
@@ -60,7 +61,7 @@ void GameGUICreatorView::DrawProgressBarWidgetDetails(GameGUICreator& creator, G
 	ImGui::Separator();
 	ImGui::TextUnformatted("Progress source");
 	Scene* activeLevel = Root::Current().Scenes().ActiveLevel();
-	if (GameGUICreatorHelpers::DrawProgressBindingControls(widget, activeLevel))
+	if (GameGUICreatorHelpers::DrawValueBindingControls(widget, activeLevel))
 	{
 		creator.SyncRuntimePreview();
 		creator.SaveSelectedRoleGUI();

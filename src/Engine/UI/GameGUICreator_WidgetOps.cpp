@@ -24,6 +24,7 @@ void GameGUICreator::AddButtonWidget()
 	widget.action = m_newWidgetAction;
 	widget.launchLevel = m_newWidgetLaunchLevel;
 	widget.targetPanel = m_newWidgetTargetPanel;
+	CenterWidget(widget);
 	asset.widgets.push_back(widget);
 	if (!m_newWidgetParentPanel.empty())
 	{
@@ -37,6 +38,10 @@ void GameGUICreator::AddButtonWidget()
 			newButton.fontName = panel->panelButtonFontName;
 			newButton.fontSize = panel->panelButtonFontSize;
 			ApplyPanelButtonLayout(*panel);
+			if (!panel->uniformButtonSpacing)
+			{
+				CenterWidget(newButton);
+			}
 		}
 	}
 	m_newWidgetParentPanel.clear();
@@ -158,8 +163,8 @@ void GameGUICreator::CenterWidget(GameGUIWidgetDef& widget)
 		});
 		if (parent != asset.widgets.end())
 		{
-			widget.x = std::max(0, (parent->width - widget.width) / 2);
-			widget.y = std::max(0, (parent->height - widget.height) / 2);
+			widget.x = 0;
+			widget.y = 0;
 			return;
 		}
 	}
@@ -167,8 +172,8 @@ void GameGUICreator::CenterWidget(GameGUIWidgetDef& widget)
 	int framebufferWidth = 0;
 	int framebufferHeight = 0;
 	Root::Current().WindowRef().GetFramebufferSize(framebufferWidth, framebufferHeight);
-	widget.x = std::max(0, (framebufferWidth - widget.width) / 2);
-	widget.y = std::max(0, (framebufferHeight - widget.height) / 2);
+	widget.x = (framebufferWidth - widget.width) / 2;
+	widget.y = (framebufferHeight - widget.height) / 2;
 }
 
 bool GameGUICreator::IsWidgetNameAvailable(const GameGUIAsset& asset, const std::string& name, const GameGUIWidgetDef* ignoredWidget) const
@@ -248,8 +253,8 @@ void GameGUICreator::RefreshActiveEditingPanel()
 
 void GameGUICreator::DrawWidgetParentPanelField(GameGUIAsset& asset, GameGUIWidgetDef& widget)
 {
-	const char* parentLabel = widget.parentName.empty() ? "<No Panel>" : widget.parentName.c_str();
-	if (!ImGui::BeginCombo("Parent panel", parentLabel))
+	const char* parentLabel = widget.parentName.empty() ? "<No Parent>" : widget.parentName.c_str();
+	if (!ImGui::BeginCombo("Parent widget", parentLabel))
 	{
 		return;
 	}
@@ -258,6 +263,10 @@ void GameGUICreator::DrawWidgetParentPanelField(GameGUIAsset& asset, GameGUIWidg
 	{
 		const std::string previousParent = widget.parentName;
 		widget.parentName = parentName;
+		if (previousParent != parentName)
+		{
+			CenterWidget(widget);
+		}
 		if (widget.action == GameGUIActionType::SubPanel && widget.targetPanel == parentName)
 		{
 			widget.targetPanel.clear();
@@ -277,13 +286,13 @@ void GameGUICreator::DrawWidgetParentPanelField(GameGUIAsset& asset, GameGUIWidg
 		SaveSelectedRoleGUI();
 	};
 
-	if (ImGui::Selectable("<No Panel>", widget.parentName.empty()))
+	if (ImGui::Selectable("<No Parent>", widget.parentName.empty()))
 	{
 		selectParent({});
 	}
 	for (const GameGUIWidgetDef& candidate : asset.widgets)
 	{
-		if (candidate.type != "Panel")
+		if (candidate.name == widget.name || GameGUICreatorHelpers::WouldCreateParentCycle(asset, widget.name, candidate.name))
 		{
 			continue;
 		}
@@ -386,6 +395,11 @@ void GameGUICreator::ApplyPanelButtonLayout(GameGUIWidgetDef& panel)
 			button->x = (panel.width - button->width) / 2; 
 			button->y = y; y += button->height + gap; 
 		}
+	}
+	for (GameGUIWidgetDef* button : buttons)
+	{
+		button->x -= (panel.width - button->width) / 2;
+		button->y -= (panel.height - button->height) / 2;
 	}
 }
 

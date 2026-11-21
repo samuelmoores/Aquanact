@@ -113,6 +113,8 @@ private:
 	bool m_showBindingPopup = false;
 	bool m_showWidgetListWindow = true;
 	bool m_showWidgetDetailsWindow = true;
+	bool m_showNavigationModeWindow = false;
+	bool m_showCameraViewWindow = false;
 
 	// Widget creation defaults and edit buffers.
 	NewWidgetType m_newWidgetType = NewWidgetType::Button;

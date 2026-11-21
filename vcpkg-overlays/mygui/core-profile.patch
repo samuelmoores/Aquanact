@@ -1,0 +1,293 @@
+diff --git a/Platforms/OpenGL/OpenGLPlatform/include/MyGUI_OpenGLRenderManager.h b/Platforms/OpenGL/OpenGLPlatform/include/MyGUI_OpenGLRenderManager.h
+index 7b3c287..4b65b93 100644
+--- a/Platforms/OpenGL/OpenGLPlatform/include/MyGUI_OpenGLRenderManager.h
++++ b/Platforms/OpenGL/OpenGLPlatform/include/MyGUI_OpenGLRenderManager.h
+@@ -82,5 +82,7 @@
+ 	OpenGLImageLoader* mImageLoader{nullptr};
+ 	bool mPboIsSupported{false};
++	unsigned int mProgram{0};
++	unsigned int mVertexArray{0};
+ 
+ 	bool mIsInitialise{false};
+ 	};
+diff --git a/Platforms/OpenGL/OpenGLPlatform/src/MyGUI_OpenGLRenderManager.cpp b/Platforms/OpenGL/OpenGLPlatform/src/MyGUI_OpenGLRenderManager.cpp
+index 660db3a..dc8b212 100644
+--- a/Platforms/OpenGL/OpenGLPlatform/src/MyGUI_OpenGLRenderManager.cpp
++++ b/Platforms/OpenGL/OpenGLPlatform/src/MyGUI_OpenGLRenderManager.cpp
+@@ -11,8 +11,68 @@
+ #include "MyGUI_Timer.h"
+ 
+ #include <GL/glew.h>
++#if defined(__APPLE__)
++#define GLFW_INCLUDE_NONE
++#include <GLFW/glfw3.h>
++#endif
++#include <cstddef>
++#include <stdexcept>
++#include <string>
+ 
+ namespace MyGUI
+ {
++	namespace
++	{
++		GLuint CompileShader(GLenum type, const char* source)
++		{
++			const GLuint shader = glCreateShader(type);
++			glShaderSource(shader, 1, &source, nullptr);
++			glCompileShader(shader);
++			GLint compiled = GL_FALSE;
++			glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
++			if (compiled == GL_FALSE)
++			{
++				GLint length = 0;
++				glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &length);
++				std::string message(static_cast<size_t>(length > 1 ? length : 1), '\0');
++				glGetShaderInfoLog(shader, length, nullptr, message.data());
++				glDeleteShader(shader);
++				throw std::runtime_error("MyGUI core-profile shader compile failed: " + message);
++			}
++			return shader;
++		}
++
++		GLuint CreateCoreProfileProgram()
++		{
++			static const char* vertexSource =
++				"#version 150 core\n"
++				"in vec3 position; in vec4 colour; in vec2 texCoord;\n"
++				"out vec4 vertexColour; out vec2 vertexTexCoord;\n"
++				"void main() { gl_Position = vec4(position, 1.0); vertexColour = colour; vertexTexCoord = texCoord; }\n";
++			static const char* fragmentSource =
++				"#version 150 core\n"
++				"uniform sampler2D imageTexture; in vec4 vertexColour; in vec2 vertexTexCoord; out vec4 fragmentColour;\n"
++				"void main() { fragmentColour = texture(imageTexture, vertexTexCoord) * vertexColour; }\n";
++			const GLuint vertex = CompileShader(GL_VERTEX_SHADER, vertexSource);
++			const GLuint fragment = CompileShader(GL_FRAGMENT_SHADER, fragmentSource);
++			const GLuint program = glCreateProgram();
++			glAttachShader(program, vertex);
++			glAttachShader(program, fragment);
++			glBindAttribLocation(program, 0, "position");
++			glBindAttribLocation(program, 1, "colour");
++			glBindAttribLocation(program, 2, "texCoord");
++			glLinkProgram(program);
++			glDeleteShader(vertex);
++			glDeleteShader(fragment);
++			GLint linked = GL_FALSE;
++			glGetProgramiv(program, GL_LINK_STATUS, &linked);
++			if (linked == GL_FALSE)
++			{
++				glDeleteProgram(program);
++				throw std::runtime_error("MyGUI core-profile shader link failed");
++			}
++			return program;
++		}
++	}
+ 
+ 	OpenGLRenderManager& OpenGLRenderManager::getInstance()
+@@ -35,5 +90,35 @@ namespace MyGUI
+ 		mImageLoader = _loader;
+ 
+-		glewInit();
++		const GLenum glewStatus = glewInit();
++		if (glewStatus != GLEW_OK)
++		{
++			throw std::runtime_error(std::string("MyGUI GLEW initialization failed: ")
++				+ reinterpret_cast<const char*>(glewGetErrorString(glewStatus)));
++		}
++#if defined(__APPLE__)
++		// GLEW may leave the core-profile VAO entry points unset on macOS even
++		// though the current GLFW context supports them. Resolve these from the
++		// active context before making an indirect GLEW call.
++		if (!__glewGenVertexArrays)
++			__glewGenVertexArrays = reinterpret_cast<PFNGLGENVERTEXARRAYSPROC>(glfwGetProcAddress("glGenVertexArrays"));
++		if (!__glewBindVertexArray)
++			__glewBindVertexArray = reinterpret_cast<PFNGLBINDVERTEXARRAYPROC>(glfwGetProcAddress("glBindVertexArray"));
++		if (!__glewDeleteVertexArrays)
++			__glewDeleteVertexArrays = reinterpret_cast<PFNGLDELETEVERTEXARRAYSPROC>(glfwGetProcAddress("glDeleteVertexArrays"));
++#endif
++		mProgram = CreateCoreProfileProgram();
++		if (!__glewGenVertexArrays || !__glewBindVertexArray || !__glewDeleteVertexArrays)
++		{
++			glDeleteProgram(mProgram);
++			mProgram = 0;
++			throw std::runtime_error("MyGUI could not resolve OpenGL core-profile vertex array functions");
++		}
++		glGenVertexArrays(1, &mVertexArray);
++		if (mVertexArray == 0)
++		{
++			glDeleteProgram(mProgram);
++			mProgram = 0;
++			throw std::runtime_error("MyGUI could not create its core-profile vertex array");
++		}
+ 
+ 		mPboIsSupported = glewIsExtensionSupported("GL_EXT_pixel_buffer_object") != 0;
+@@ -47,6 +130,12 @@ namespace MyGUI
+ 		MYGUI_PLATFORM_ASSERT(mIsInitialise, getClassTypeName() << " is not initialised");
+ 		MYGUI_PLATFORM_LOG(Info, "* Shutdown: " << getClassTypeName());
+ 
+ 		destroyAllResources();
++		if (mVertexArray != 0)
++			glDeleteVertexArrays(1, &mVertexArray);
++		if (mProgram != 0)
++			glDeleteProgram(mProgram);
++		mVertexArray = 0;
++		mProgram = 0;
+ 
+ 		MYGUI_PLATFORM_LOG(Info, getClassTypeName() << " successfully shutdown");
+@@ -65,33 +154,30 @@ namespace MyGUI
+ 		if (_texture)
+ 		{
+ 			OpenGLTexture* texture = static_cast<OpenGLTexture*>(_texture);
+ 			texture_id = texture->getTextureId();
+ 			//MYGUI_PLATFORM_ASSERT(texture_id, "Texture is not created");
+ 		}
+ 
++		glUseProgram(mProgram);
++		glBindVertexArray(mVertexArray);
+ 		glBindTexture(GL_TEXTURE_2D, texture_id);
+ 
+ 		glBindBuffer(GL_ARRAY_BUFFER, buffer_id);
+ 
+-		// enable vertex arrays
+-		glEnableClientState(GL_VERTEX_ARRAY);
+-		glEnableClientState(GL_COLOR_ARRAY);
+-		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
++		glEnableVertexAttribArray(0);
++		glEnableVertexAttribArray(1);
++		glEnableVertexAttribArray(2);
+ 
+-		// before draw, specify vertex and index arrays with their offsets
+-		size_t offset = 0;
+-		glVertexPointer(3, GL_FLOAT, sizeof(Vertex), (void*)offset);
+-		offset += (sizeof(float) * 3);
+-		glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(Vertex), (void*)offset);
+-		offset += (4);
+-		glTexCoordPointer(2, GL_FLOAT, sizeof(Vertex), (void*)offset);
++		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, x)));
++		glVertexAttribPointer(1, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, colour)));
++		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, u)));
+ 
+ 		glDrawArrays(GL_TRIANGLES, 0, _count);
+ 
+-		glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+-		glDisableClientState(GL_COLOR_ARRAY);
+-		glDisableClientState(GL_VERTEX_ARRAY);
++		glDisableVertexAttribArray(2);
++		glDisableVertexAttribArray(1);
++		glDisableVertexAttribArray(0);
+ 
+ 		glBindBuffer(GL_ARRAY_BUFFER, 0);
+ 		glBindTexture(GL_TEXTURE_2D, 0);
+ 	}
+@@ -106,47 +186,24 @@ namespace MyGUI
+ 	void OpenGLRenderManager::begin()
+ 	{
+-		//save current attributes
+-		glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
+-		glPushAttrib(GL_ALL_ATTRIB_BITS);
+-
+-		glPolygonMode(GL_FRONT, GL_FILL);
+-		glMatrixMode(GL_PROJECTION);
+-		glPushMatrix();
+-		glLoadIdentity();
+-		glOrtho(-1, 1, -1, 1, -1, 1);
+-
+-		glMatrixMode(GL_MODELVIEW);
+-		glPushMatrix();
+-		glLoadIdentity();
+-
+-		glDisable(GL_LIGHTING);
++		glUseProgram(mProgram);
++		glUniform1i(glGetUniformLocation(mProgram, "imageTexture"), 0);
++		glBindVertexArray(mVertexArray);
++		glActiveTexture(GL_TEXTURE0);
+ 		glDisable(GL_DEPTH_TEST);
+-		glDisable(GL_FOG);
+-		glDisable(GL_TEXTURE_GEN_S);
+-		glDisable(GL_TEXTURE_GEN_T);
+-		glDisable(GL_TEXTURE_GEN_R);
+-
+-		//glFrontFace(GL_CW);
+-		//glCullFace(GL_BACK);
+-		//glEnable(GL_CULL_FACE);
++		glDisable(GL_CULL_FACE);
++		glDisable(GL_STENCIL_TEST);
++		glDisable(GL_SCISSOR_TEST);
+ 
+ 		glEnable(GL_BLEND);
+ 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+-
+-		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+-		glEnable(GL_TEXTURE_2D);
+ 	}
+ 
+ 	void OpenGLRenderManager::end()
+ 	{
+-		glPopMatrix();
+-		glMatrixMode(GL_PROJECTION);
+-		glPopMatrix();
+-		glMatrixMode(GL_MODELVIEW);
++		glBindVertexArray(0);
++		glUseProgram(0);
+ 
+-		//restore former attributes
+-		glPopAttrib();
+-		glPopClientAttrib();
++		glActiveTexture(GL_TEXTURE0);
+ 	}
+ 
+ 	const RenderTargetInfo& OpenGLRenderManager::getInfo() const
+
+diff --git a/Platforms/OpenGL/OpenGLPlatform/CMakeLists.txt b/Platforms/OpenGL/OpenGLPlatform/CMakeLists.txt
+index 1e834c6..888ab51 100644
+--- a/Platforms/OpenGL/OpenGLPlatform/CMakeLists.txt
++++ b/Platforms/OpenGL/OpenGLPlatform/CMakeLists.txt
+@@ -23,4 +23,8 @@ add_library(${PROJECTNAME} ${HEADER_FILES} ${SOURCE_FILES})
+ 
+ add_dependencies(${PROJECTNAME} MyGUIEngine)
++if (APPLE)
++	find_package(glfw3 CONFIG REQUIRED)
++	target_link_libraries(${PROJECTNAME} glfw)
++endif ()
+ 
+ if (APPLE OR WIN32)
+diff --git a/Platforms/OpenGL/OpenGLPlatform/src/MyGUI_OpenGLTexture.cpp b/Platforms/OpenGL/OpenGLPlatform/src/MyGUI_OpenGLTexture.cpp
+index 7f6d100..a12d6f1 100644
+--- a/Platforms/OpenGL/OpenGLPlatform/src/MyGUI_OpenGLTexture.cpp
++++ b/Platforms/OpenGL/OpenGLPlatform/src/MyGUI_OpenGLTexture.cpp
+@@ -122,11 +122,16 @@
+ 		if (_format == PixelFormat::L8)
+ 		{
+-			mInternalPixelFormat = GL_LUMINANCE8;
+-			mPixelFormat = GL_LUMINANCE;
++			// Luminance formats were removed from OpenGL core profiles. Store
++			// luminance in red and use texture swizzles to retain MyGUI's expected
++			// (L, L, L, 1) sampling behavior.
++			mInternalPixelFormat = GL_R8;
++			mPixelFormat = GL_RED;
+ 			mNumElemBytes = 1;
+ 		}
+ 		else if (_format == PixelFormat::L8A8)
+ 		{
+-			mInternalPixelFormat = GL_LUMINANCE8_ALPHA8;
+-			mPixelFormat = GL_LUMINANCE_ALPHA;
++			// Preserve the legacy (L, L, L, A) result with a core-profile RG
++			// texture and explicit swizzles.
++			mInternalPixelFormat = GL_RG8;
++			mPixelFormat = GL_RG;
+ 			mNumElemBytes = 2;
+@@ -173,1 +178,15 @@
++		if (_format == PixelFormat::L8)
++		{
++			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_R, GL_RED);
++			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_G, GL_RED);
++			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_B, GL_RED);
++			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_ONE);
++		}
++		else if (_format == PixelFormat::L8A8)
++		{
++			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_R, GL_RED);
++			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_G, GL_RED);
++			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_B, GL_RED);
++			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_GREEN);
++		}
+ 		glTexImage2D(

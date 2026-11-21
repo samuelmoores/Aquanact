@@ -35,13 +35,19 @@
 #include <MYGUI/MyGUI_ResourceManager.h>
 #include <MYGUI/MyGUI_SkinManager.h>
 #include <MYGUI/MyGUI_TextBox.h>
+#include <MYGUI/MyGUI_FontManager.h>
+#include <MYGUI/MyGUI_IFont.h>
+#include <MYGUI/MyGUI_ITexture.h>
+#include <MYGUI/MyGUI_OpenGLTexture.h>
 #include <MYGUI/MyGUI_OpenGLDataManager.h>
 #include <MYGUI/MyGUI_OpenGLPlatform.h>
 #include <MYGUI/MyGUI_LayerManager.h>
 #include <MYGUI/MyGUI_PointerManager.h>
 #include <MYGUI/MyGUI_OpenGLImageLoader.h>
+#include <imgui.h>
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -49,6 +55,7 @@
 #include <functional>
 #include <cctype>
 #include <unordered_map>
+#include <vector>
 #include "Engine/Core/Texture.h"
 
 namespace {
@@ -108,6 +115,162 @@ namespace {
 			}
 		}
 		return nullptr;
+	}
+
+	std::string InspectFontAtlasOnGPU(MyGUI::ITexture* atlas, const MyGUI::GlyphInfo* glyph)
+	{
+		const auto* glAtlas = dynamic_cast<MyGUI::OpenGLTexture*>(atlas);
+		if (!glAtlas)
+		{
+			return "gpuAtlas=not-an-OpenGL-texture";
+		}
+
+		const GLuint textureId = glAtlas->getTextureId();
+		const GLenum previousError = glGetError();
+		GLint previousBinding = 0;
+		glGetIntegerv(GL_TEXTURE_BINDING_2D, &previousBinding);
+		const GLenum bindingQueryError = glGetError();
+		glBindTexture(GL_TEXTURE_2D, textureId);
+		GLint boundTexture = 0;
+		glGetIntegerv(GL_TEXTURE_BINDING_2D, &boundTexture);
+		const GLenum bindAndStateQueryError = glGetError();
+
+		GLint storageWidth = 0;
+		GLint storageHeight = 0;
+		GLint internalFormat = 0;
+		glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &storageWidth);
+		const GLenum widthQueryError = glGetError();
+		glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &storageHeight);
+		const GLenum heightQueryError = glGetError();
+		glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &internalFormat);
+		const GLenum formatQueryError = glGetError();
+		GLint minFilter = 0;
+		GLint magFilter = 0;
+		GLint wrapS = 0;
+		GLint wrapT = 0;
+		GLint baseLevel = 0;
+		GLint maxLevel = 0;
+		glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, &minFilter);
+		const GLenum minFilterQueryError = glGetError();
+		glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, &magFilter);
+		const GLenum magFilterQueryError = glGetError();
+		glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, &wrapS);
+		const GLenum wrapSQueryError = glGetError();
+		glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, &wrapT);
+		const GLenum wrapTQueryError = glGetError();
+		glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, &baseLevel);
+		const GLenum baseLevelQueryError = glGetError();
+		glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, &maxLevel);
+		const GLenum maxLevelQueryError = glGetError();
+
+		std::ostringstream result;
+		result << "gpuAtlasId=" << textureId
+			<< ", gpuAtlasObject=" << (glIsTexture(textureId) ? "yes" : "no")
+			<< ", bindingBefore=" << previousBinding << ", bindingQueryGlError=0x" << std::hex << bindingQueryError << std::dec
+			<< ", bindingAfter=" << boundTexture << ", bindStateGlError=0x" << std::hex << bindAndStateQueryError << std::dec
+			<< ", myguiAtlas=" << atlas->getWidth() << 'x' << atlas->getHeight()
+			<< ", myguiFormat=" << atlas->getFormat().getValue() << ", myguiUsage=" << atlas->getUsage().getValue()
+			<< ", gpuStorage=" << storageWidth << 'x' << storageHeight
+			<< ", gpuInternalFormat=0x" << std::hex << internalFormat << std::dec
+			<< ", preexistingGlError=0x" << std::hex << previousError << std::dec
+			<< ", levelQueryErrors[width,height,format]=0x" << std::hex << widthQueryError << ",0x"
+			<< heightQueryError << ",0x" << formatQueryError << std::dec
+			<< ", textureParams[min,mag,wrapS,wrapT,base,max]=0x"
+			<< std::hex << minFilter << ",0x" << magFilter << ",0x" << wrapS << ",0x" << wrapT
+			<< std::dec << ',' << baseLevel << ',' << maxLevel
+			<< ", textureParamErrors[min,mag,wrapS,wrapT,base,max]=0x"
+			<< std::hex << minFilterQueryError << ",0x" << magFilterQueryError << ",0x" << wrapSQueryError
+			<< ",0x" << wrapTQueryError << ",0x" << baseLevelQueryError << ",0x" << maxLevelQueryError
+			<< std::dec;
+
+		if (glyph && widthQueryError == GL_NO_ERROR && heightQueryError == GL_NO_ERROR
+			&& storageWidth > 0 && storageHeight > 0
+			&& static_cast<std::uint64_t>(storageWidth) * static_cast<std::uint64_t>(storageHeight) <= 16'777'216)
+		{
+			std::vector<unsigned char> rgba(
+				static_cast<std::size_t>(storageWidth) * static_cast<std::size_t>(storageHeight) * 4);
+			GLint previousPackAlignment = 4;
+			GLint previousPackRowLength = 0;
+			GLint previousPackSkipRows = 0;
+			GLint previousPackSkipPixels = 0;
+			GLint previousPixelPackBuffer = 0;
+			glGetIntegerv(GL_PACK_ALIGNMENT, &previousPackAlignment);
+			glGetIntegerv(GL_PACK_ROW_LENGTH, &previousPackRowLength);
+			glGetIntegerv(GL_PACK_SKIP_ROWS, &previousPackSkipRows);
+			glGetIntegerv(GL_PACK_SKIP_PIXELS, &previousPackSkipPixels);
+			glGetIntegerv(GL_PIXEL_PACK_BUFFER_BINDING, &previousPixelPackBuffer);
+			glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+			glPixelStorei(GL_PACK_ALIGNMENT, 4);
+			glPixelStorei(GL_PACK_ROW_LENGTH, 0);
+			glPixelStorei(GL_PACK_SKIP_ROWS, 0);
+			glPixelStorei(GL_PACK_SKIP_PIXELS, 0);
+			glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+			const GLenum pixelReadError = glGetError();
+			glPixelStorei(GL_PACK_ALIGNMENT, previousPackAlignment);
+			glPixelStorei(GL_PACK_ROW_LENGTH, previousPackRowLength);
+			glPixelStorei(GL_PACK_SKIP_ROWS, previousPackSkipRows);
+			glPixelStorei(GL_PACK_SKIP_PIXELS, previousPackSkipPixels);
+			glBindBuffer(GL_PIXEL_PACK_BUFFER, static_cast<GLuint>(previousPixelPackBuffer));
+			result << ", atlasReadGlError=0x" << std::hex << pixelReadError << std::dec;
+			if (pixelReadError == GL_NO_ERROR)
+			{
+				const float minU = std::clamp(std::min(glyph->uvRect.left, glyph->uvRect.right), 0.0f, 1.0f);
+				const float maxU = std::clamp(std::max(glyph->uvRect.left, glyph->uvRect.right), 0.0f, 1.0f);
+				const float minV = std::clamp(std::min(glyph->uvRect.top, glyph->uvRect.bottom), 0.0f, 1.0f);
+				const float maxV = std::clamp(std::max(glyph->uvRect.top, glyph->uvRect.bottom), 0.0f, 1.0f);
+				const int x0 = std::clamp(static_cast<int>(std::floor(minU * storageWidth)), 0, storageWidth - 1);
+				const int x1 = std::clamp(static_cast<int>(std::ceil(maxU * storageWidth)), x0 + 1, storageWidth);
+				const int y0 = std::clamp(static_cast<int>(std::floor(minV * storageHeight)), 0, storageHeight - 1);
+				const int y1 = std::clamp(static_cast<int>(std::ceil(maxV * storageHeight)), y0 + 1, storageHeight);
+				unsigned int minimum[4] = { 255, 255, 255, 255 };
+				unsigned int maximum[4] = { 0, 0, 0, 0 };
+				std::uint64_t totals[4] = { 0, 0, 0, 0 };
+				std::size_t sampleCount = 0;
+				for (int y = y0; y < y1; ++y)
+				{
+					for (int x = x0; x < x1; ++x)
+					{
+						const std::size_t offset = (static_cast<std::size_t>(y) * storageWidth + x) * 4;
+						for (std::size_t channel = 0; channel < 4; ++channel)
+						{
+							const unsigned int value = rgba[offset + channel];
+							minimum[channel] = std::min(minimum[channel], value);
+							maximum[channel] = std::max(maximum[channel], value);
+							totals[channel] += value;
+						}
+						++sampleCount;
+					}
+				}
+				result << ", glyphAtlasRegion=" << x0 << ',' << y0 << ' ' << x1 - x0 << 'x' << y1 - y0
+					<< ", sampledRGBA[min/max/avg]=";
+				for (std::size_t channel = 0; channel < 4; ++channel)
+				{
+					if (channel != 0) result << ';';
+					result << minimum[channel] << '/' << maximum[channel] << '/'
+						<< (sampleCount ? static_cast<double>(totals[channel]) / sampleCount : 0.0);
+				}
+				result << ", glyphAtlasRGBA=";
+				const int loggedWidth = std::min(16, x1 - x0);
+				const int loggedHeight = std::min(16, y1 - y0);
+				for (int row = 0; row < loggedHeight; ++row)
+				{
+					if (row != 0) result << '|';
+					for (int column = 0; column < loggedWidth; ++column)
+					{
+						if (column != 0) result << ',';
+						const std::size_t offset =
+							(static_cast<std::size_t>(y0 + row) * storageWidth + x0 + column) * 4;
+						result << static_cast<unsigned int>(rgba[offset]) << '/'
+							<< static_cast<unsigned int>(rgba[offset + 1]) << '/'
+							<< static_cast<unsigned int>(rgba[offset + 2]) << '/'
+							<< static_cast<unsigned int>(rgba[offset + 3]);
+					}
+				}
+			}
+		}
+
+		glBindTexture(GL_TEXTURE_2D, static_cast<GLuint>(previousBinding));
+		return result.str();
 	}
 
 	Scene* FindNamedLevel(SceneManager& sceneManager, const std::string& levelName)
@@ -261,7 +424,7 @@ void GameGUI::SetButtonFocusState(MyGUI::Button* button, const GameGUIWidgetDef&
 void GameGUI::SetButtonLabel(MyGUI::Button* button, const GameGUIWidgetDef& def, int buttonWidth, int buttonHeight)
 {
 	// The label is a nested widget so we can control text and skin separately.
-	MyGUI::TextBox* label = button->createWidget<MyGUI::TextBox>("TextBox", 0, 0, buttonWidth, buttonHeight, MyGUI::Align::Stretch, def.name + "_label");
+	MyGUI::TextBox* label = button->createWidget<MyGUI::TextBox>("TextBoxSkin", 0, 0, buttonWidth, buttonHeight, MyGUI::Align::Stretch, def.name + "_label");
 	if (!label)
 	{
 		return;
@@ -392,8 +555,8 @@ void GameGUI::BindTextWidgetEvent(const GameGUIWidgetDef& def, MyGUI::TextBox* t
 
 void GameGUI::BindTextWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::TextBox* textWidget)
 {
-	// Text widgets can be driven by a value, an event caption, or both.
-	if (!textWidget)
+	// Text widget binding is opt-in through its Bindable setting.
+	if (!textWidget || !def.bindingEnabled)
 	{
 		return;
 	}
@@ -606,7 +769,7 @@ MyGUI::Button* GameGUI::CreateButtonWidget(const GameGUIWidgetDef& def, MyGUI::W
 
 MyGUI::TextBox* GameGUI::CreateTextWidget(const GameGUIWidgetDef& def, MyGUI::Widget* parent)
 {
-	const std::string skin = def.skin.empty() ? "TextBox" : def.skin;
+	const std::string skin = def.skin.empty() || def.skin == "TextBox" ? "TextBoxSkin" : def.skin;
 	LogSkinLookup(def.name, skin);
 	MyGUI::TextBox* text = CreateGuiWidget<MyGUI::TextBox>(m_gui, parent, skin, def.x, def.y, def.width, def.height, def.layer, def.name);
 
@@ -615,13 +778,25 @@ MyGUI::TextBox* GameGUI::CreateTextWidget(const GameGUIWidgetDef& def, MyGUI::Wi
 		return nullptr;
 	}
 
+	text->setFontName(def.fontName.empty() ? "Default" : def.fontName);
 	text->setCaption(def.text);
+	// Text widgets should draw glyphs without painting an opaque TextBox skin.
+	text->setColour(MyGUI::Colour::Zero);
 	text->setTextColour(ParseColour(def.textColor, MyGUI::Colour::Black));
+	text->setTextAlign(MyGUI::Align::Center);
 	if (def.fontSize > 0)
 	{
 		text->setFontHeight(def.fontSize);
 	}
-	FinalizeAndLogWidget(text, def, parent == nullptr, false, true);
+	if (parent)
+	{
+		// Nested text must render above its parent's skin, just like button labels.
+		MyGUI::LayerManager::getInstance().upLayerItem(text);
+		text->setNeedMouseFocus(false);
+		text->setNeedKeyFocus(false);
+		text->setInheritsPick(false);
+	}
+	FinalizeAndLogWidget(text, def, parent == nullptr, false, parent == nullptr);
 	return text;
 }
 
@@ -878,7 +1053,7 @@ void GameGUI::Draw()
 	}
 
 	UpdateDeathOverlay();
-	UpdateWorldAnchoredImages();
+	UpdateWorldAnchoredWidgets();
 
 	// MyGUI needs a per-frame tick so internal widget state and input-driven updates
 	// advance before the renderer submits the overlay.
@@ -900,10 +1075,432 @@ void GameGUI::Draw()
 	m_platform->getRenderManagerPtr()->drawOneFrame();
 }
 
-void GameGUI::UpdateWorldAnchoredImages()
+void GameGUI::DrawCreatorDiagnosticsWindow(bool* open) const
+{
+	if (!open || !*open || !m_initialized || !m_platform || !m_window)
+	{
+		return;
+	}
+
+	bool visible = *open;
+	ImGui::SetNextWindowSize(ImVec2(440.0f, 520.0f), ImGuiCond_FirstUseEver);
+	if (ImGui::Begin("GameGUI Platform Diagnostics", &visible))
+	{
+		const GLubyte* vendor = glGetString(GL_VENDOR);
+		const GLubyte* renderer = glGetString(GL_RENDERER);
+		const GLubyte* version = glGetString(GL_VERSION);
+		ImGui::Text("Platform: %s",
+#if defined(__APPLE__)
+			"macOS"
+#elif defined(_WIN32)
+			"Windows"
+#else
+			"Other"
+#endif
+		);
+		ImGui::Text("GL vendor: %s", vendor ? reinterpret_cast<const char*>(vendor) : "<unavailable>");
+		ImGui::Text("GL renderer: %s", renderer ? reinterpret_cast<const char*>(renderer) : "<unavailable>");
+		ImGui::Text("GL version: %s", version ? reinterpret_cast<const char*>(version) : "<unavailable>");
+
+		int windowWidth = 0;
+		int windowHeight = 0;
+		glfwGetWindowSize(m_window->GLFW(), &windowWidth, &windowHeight);
+		int framebufferWidth = 0;
+		int framebufferHeight = 0;
+		m_window->GetFramebufferSize(framebufferWidth, framebufferHeight);
+		const float scaleX = windowWidth > 0 ? static_cast<float>(framebufferWidth) / windowWidth : 0.0f;
+		const float scaleY = windowHeight > 0 ? static_cast<float>(framebufferHeight) / windowHeight : 0.0f;
+		ImGui::Text("Window logical size: %d x %d", windowWidth, windowHeight);
+		ImGui::Text("Framebuffer size: %d x %d (scale %.2f x %.2f)",
+			framebufferWidth, framebufferHeight, scaleX, scaleY);
+		const MyGUI::IntSize& myguiSize = m_platform->getRenderManagerPtr()->getViewSize();
+		ImGui::Text("MyGUI view size: %d x %d", myguiSize.width, myguiSize.height);
+		GLint viewport[4] = { 0, 0, 0, 0 };
+		glGetIntegerv(GL_VIEWPORT, viewport);
+		ImGui::Text("GL viewport: %d, %d  %d x %d", viewport[0], viewport[1], viewport[2], viewport[3]);
+		ImGui::Text("MyGUI initialized: yes | Active asset: %s",
+			m_loadedAsset.name.empty() ? "<none>" : m_loadedAsset.name.c_str());
+
+		GLint currentProgram = 0;
+		GLint vertexArray = 0;
+		GLint activeTexture = 0;
+		glGetIntegerv(GL_CURRENT_PROGRAM, &currentProgram);
+		glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &vertexArray);
+		glGetIntegerv(GL_ACTIVE_TEXTURE, &activeTexture);
+		ImGui::Separator();
+		ImGui::Text("Post-MyGUI state: program %d, VAO %d, active texture 0x%X",
+			currentProgram, vertexArray, activeTexture);
+		ImGui::Text("Definitions: %zu | live widgets: %zu",
+			m_loadedAsset.widgets.size(), m_runtimeWidgetLookup.size());
+		if (ImGui::Button("Write Snapshot to Runtime Log"))
+		{
+			auto& debugger = Root::Current().Debugger();
+			auto logValue = [&debugger](const std::string& label, const std::string& value)
+			{
+				debugger.LogTagged("GameGUI-Diagnostics", label + ": " + value);
+			};
+			logValue("Snapshot", "begin");
+			logValue("Platform",
+#if defined(__APPLE__)
+				"macOS"
+#elif defined(_WIN32)
+				"Windows"
+#else
+				"Other"
+#endif
+			);
+			logValue("GL vendor", vendor ? reinterpret_cast<const char*>(vendor) : "<unavailable>");
+			logValue("GL renderer", renderer ? reinterpret_cast<const char*>(renderer) : "<unavailable>");
+			logValue("GL version", version ? reinterpret_cast<const char*>(version) : "<unavailable>");
+			logValue("Window logical size", std::to_string(windowWidth) + " x " + std::to_string(windowHeight));
+			logValue("Framebuffer size and scale", std::to_string(framebufferWidth) + " x " +
+				std::to_string(framebufferHeight) + " (" + std::to_string(scaleX) + " x " + std::to_string(scaleY) + ")");
+			logValue("MyGUI view size", std::to_string(myguiSize.width) + " x " + std::to_string(myguiSize.height));
+			logValue("GL viewport", std::to_string(viewport[0]) + ", " + std::to_string(viewport[1]) + " " +
+				std::to_string(viewport[2]) + " x " + std::to_string(viewport[3]));
+			logValue("Active asset", m_loadedAsset.name.empty() ? "<none>" : m_loadedAsset.name);
+			logValue("Post-MyGUI GL state", "program=" + std::to_string(currentProgram) +
+				", VAO=" + std::to_string(vertexArray) + ", activeTexture=" + std::to_string(activeTexture));
+			logValue("Definitions and live widgets", std::to_string(m_loadedAsset.widgets.size()) + " / " +
+				std::to_string(m_runtimeWidgetLookup.size()));
+			for (const GameGUIWidgetDef& definition : m_loadedAsset.widgets)
+			{
+				const auto runtimeIt = m_runtimeWidgetLookup.find(definition.name);
+				const bool hasWidget = runtimeIt != m_runtimeWidgetLookup.end() && runtimeIt->second;
+				std::ostringstream details;
+				details << "type=" << definition.type
+					<< ", authoredVisible=" << (definition.visible ? "yes" : "no")
+					<< ", editorVisible=" << (definition.editorVisible ? "yes" : "no")
+					<< ", alpha=" << definition.alpha
+					<< ", authoredRect=" << definition.x << ',' << definition.y << ' '
+					<< definition.width << 'x' << definition.height
+					<< ", worldAnchored=" << (definition.worldAnchored ? "yes" : "no")
+					<< ", anchor=" << (definition.worldAnchorEntity.empty() ? "<none>" : definition.worldAnchorEntity)
+					<< ", submesh=" << definition.worldAnchorSubmeshIndex
+					<< ", runtimeWidget=" << (hasWidget ? "yes" : "no");
+				if (definition.type == "Image" || definition.type == "ImageBox")
+				{
+					const std::string skin = definition.solidWhiteBox ? "WhiteSkin"
+						: definition.skin.empty() ? "ImageBox" : definition.skin;
+					details << ", skin=" << skin
+						<< ", skinRegistered=" << (MyGUI::SkinManager::getInstance().isExist(skin) ? "yes" : "no")
+						<< ", image=" << (definition.solidWhiteBox ? "solid-white" :
+							(definition.texture.empty() ? "<none>" : definition.texture));
+					if (!definition.texture.empty())
+					{
+						const std::filesystem::path imagePath = ResolveGameGUIImagePath(definition.texture);
+						std::error_code error;
+						details << ", resolvedImage=" << imagePath.string()
+							<< ", imageExists=" << (std::filesystem::exists(imagePath, error) && !error ? "yes" : "no");
+					}
+				}
+				if (hasWidget)
+				{
+					const MyGUI::IntCoord actual = runtimeIt->second->getAbsoluteCoord();
+					details << ", runtimeVisible=" << (runtimeIt->second->getVisible() ? "yes" : "no")
+						<< ", runtimeRect=" << actual.left << ',' << actual.top << ' '
+						<< actual.width << 'x' << actual.height;
+					if (const auto* text = dynamic_cast<MyGUI::TextBox*>(runtimeIt->second))
+					{
+						const std::string runtimeFont(text->getFontName());
+						const std::string caption = text->getCaption().asUTF8();
+						const MyGUI::IntCoord textRegion = text->getTextRegion();
+						const MyGUI::IntSize measuredText = text->getTextSize();
+						const MyGUI::IntCoord local = text->getCoord();
+						const MyGUI::Colour& colour = text->getTextColour();
+						const std::string textSkin = definition.skin.empty() || definition.skin == "TextBox"
+							? "TextBoxSkin" : definition.skin;
+						const std::string& defaultFont = MyGUI::FontManager::getInstance().getDefaultFont();
+						const std::string requestedFont = definition.fontName.empty() ? defaultFont : definition.fontName;
+						details << ", savedCaption='" << definition.text << "'"
+							<< ", liveCaption='" << caption << "'"
+							<< ", captionMatchesSaved=" << (caption == definition.text ? "yes" : "no")
+							<< ", captionBytes=" << caption.size()
+							<< ", textSkin=" << textSkin
+							<< ", textSkinRegistered=" << (MyGUI::SkinManager::getInstance().isExist(textSkin) ? "yes" : "no")
+							<< ", requestedFont=" << requestedFont
+							<< ", requestedFontRegistered=" << (MyGUI::FontManager::getInstance().getByName(requestedFont) ? "yes" : "no")
+							<< ", font=" << (runtimeFont.empty() ? "<empty>" : runtimeFont)
+							<< ", fontRegistered=" << (!runtimeFont.empty() && MyGUI::FontManager::getInstance().getByName(runtimeFont) ? "yes" : "no")
+							<< ", fontHeight=" << text->getFontHeight()
+							<< ", localRect=" << local.left << ',' << local.top << ' ' << local.width << 'x' << local.height
+							<< ", textColour=" << colour.red << ' ' << colour.green << ' ' << colour.blue << ' ' << colour.alpha
+							<< ", textRegion=" << textRegion.left << ',' << textRegion.top << ' '
+							<< textRegion.width << 'x' << textRegion.height
+							<< ", measuredText=" << measuredText.width << 'x' << measuredText.height
+							<< ", inheritedVisible=" << (text->getInheritedVisible() ? "yes" : "no");
+					}
+				}
+				logValue("Widget " + definition.name, details.str());
+			}
+			logValue("Snapshot", "end");
+		}
+
+		if (ImGui::CollapsingHeader("Text Rendering Diagnostics"))
+		{
+			const std::string defaultFont = MyGUI::FontManager::getInstance().getDefaultFont();
+			ImGui::Text("MyGUI default font: %s (%s)", defaultFont.c_str(),
+				MyGUI::FontManager::getInstance().getByName(defaultFont) ? "registered" : "MISSING");
+			const std::filesystem::path runtimeLogPath =
+				Root::Current().FileSystemRef().ExecutableDirectory() / "logs" / "aquanact-runtime.txt";
+			ImGui::TextWrapped("Persistent log: %s", runtimeLogPath.string().c_str());
+			if (ImGui::Button("Write Text Diagnostics to Runtime Log"))
+			{
+				auto& debugger = Root::Current().Debugger();
+				debugger.LogTagged("GameGUI-Text", "Text diagnostics snapshot begin");
+				debugger.LogTagged("GameGUI-Text", "Active asset='" + m_loadedAsset.name +
+					"', defaultFont='" + defaultFont + "'");
+				GLint blendSource = 0;
+				GLint blendDestination = 0;
+				glGetIntegerv(GL_BLEND_SRC_ALPHA, &blendSource);
+				glGetIntegerv(GL_BLEND_DST_ALPHA, &blendDestination);
+				debugger.LogTagged("GameGUI-Text",
+					std::string("GL vendor='") + (vendor ? reinterpret_cast<const char*>(vendor) : "<unavailable>") +
+					"', renderer='" + (renderer ? reinterpret_cast<const char*>(renderer) : "<unavailable>") +
+					"', version='" + (version ? reinterpret_cast<const char*>(version) : "<unavailable>") +
+					"', blendEnabled=" + (glIsEnabled(GL_BLEND) ? "yes" : "no") +
+					", blendSrcAlpha=" + std::to_string(blendSource) +
+					", blendDstAlpha=" + std::to_string(blendDestination));
+				for (const GameGUIWidgetDef& definition : m_loadedAsset.widgets)
+				{
+					if (definition.type != "Text" && definition.type != "TextBox")
+						continue;
+					const auto runtimeIt = m_runtimeWidgetLookup.find(definition.name);
+					auto* text = runtimeIt == m_runtimeWidgetLookup.end()
+						? nullptr : dynamic_cast<MyGUI::TextBox*>(runtimeIt->second);
+					const std::string skin = definition.skin.empty() || definition.skin == "TextBox"
+						? "TextBoxSkin" : definition.skin;
+					const std::string requestedFont = definition.fontName.empty() ? defaultFont : definition.fontName;
+					std::ostringstream details;
+					details << "widget='" << definition.name << "', parent='"
+						<< (definition.parentName.empty() ? "<none>" : definition.parentName)
+						<< "', savedCaption='" << definition.text << "', savedRect="
+						<< definition.x << ',' << definition.y << ' ' << definition.width << 'x' << definition.height
+						<< ", skin='" << skin << "', skinRegistered="
+						<< (MyGUI::SkinManager::getInstance().isExist(skin) ? "yes" : "no")
+						<< ", requestedFont='" << requestedFont << "', requestedFontRegistered="
+						<< (MyGUI::FontManager::getInstance().getByName(requestedFont) ? "yes" : "no")
+						<< ", savedFontHeight=" << definition.fontSize;
+					if (text)
+					{
+						const std::string liveCaption = text->getCaption().asUTF8();
+						const std::string liveFont(text->getFontName());
+						const MyGUI::IntCoord local = text->getCoord();
+						const MyGUI::IntCoord absolute = text->getAbsoluteCoord();
+						const MyGUI::IntCoord textRegion = text->getTextRegion();
+						const MyGUI::IntSize measured = text->getTextSize();
+						const MyGUI::Colour& colour = text->getTextColour();
+						MyGUI::IFont* font = liveFont.empty()
+							? nullptr : MyGUI::FontManager::getInstance().getByName(liveFont);
+						const MyGUI::GlyphInfo* glyph = font
+							? font->getGlyphInfo(static_cast<MyGUI::Char>('e')) : nullptr;
+						MyGUI::ITexture* atlas = font ? font->getTextureFont() : nullptr;
+						details << ", liveCaption='" << liveCaption << "', captionMatchesSaved="
+							<< (liveCaption == definition.text ? "yes" : "no")
+							<< ", captionBytes=" << liveCaption.size()
+							<< ", liveFont='" << (liveFont.empty() ? "<empty>" : liveFont)
+							<< "', liveFontRegistered="
+							<< (!liveFont.empty() && MyGUI::FontManager::getInstance().getByName(liveFont) ? "yes" : "no")
+							<< ", liveFontHeight=" << text->getFontHeight()
+							<< ", fontResource=" << (font ? font->getResourceName() : "<missing>")
+							<< ", fontDefaultHeight=" << (font ? font->getDefaultHeight() : 0)
+							<< ", glyphE=";
+						if (glyph)
+						{
+							details << "codepoint=" << static_cast<unsigned int>(glyph->codePoint)
+								<< ", size=" << glyph->width << 'x' << glyph->height
+								<< ", advance=" << glyph->advance << ", uv=" << glyph->uvRect.left << ' '
+								<< glyph->uvRect.top << ' ' << glyph->uvRect.right << ' ' << glyph->uvRect.bottom;
+						}
+						else
+						{
+							details << "MISSING";
+						}
+						details << ", fontAtlas=";
+						if (atlas)
+						{
+							details << atlas->getName() << ' ' << atlas->getWidth() << 'x' << atlas->getHeight()
+								<< ", format=" << atlas->getFormat().getValue()
+								<< ", usage=" << atlas->getUsage().getValue()
+								<< ", locked=" << (atlas->isLocked() ? "yes" : "no");
+							if (const auto* glAtlas = dynamic_cast<MyGUI::OpenGLTexture*>(atlas))
+							{
+								details << ", glTextureId=" << glAtlas->getTextureId()
+									<< ", glTextureObject=" << (glIsTexture(glAtlas->getTextureId()) ? "yes" : "no");
+							}
+						}
+						else
+						{
+							details << "MISSING";
+						}
+						details << ", " << InspectFontAtlasOnGPU(atlas, glyph);
+						details << ", textColourRGBA=" << colour.red << ' ' << colour.green << ' ' << colour.blue << ' ' << colour.alpha
+							<< ", localRect=" << local.left << ',' << local.top << ' ' << local.width << 'x' << local.height
+							<< ", absoluteRect=" << absolute.left << ',' << absolute.top << ' ' << absolute.width << 'x' << absolute.height
+							<< ", textRegion=" << textRegion.left << ',' << textRegion.top << ' '
+							<< textRegion.width << 'x' << textRegion.height
+							<< ", measuredCaption=" << measured.width << 'x' << measured.height
+							<< ", visible=" << (text->getVisible() ? "yes" : "no")
+							<< ", inheritedVisible=" << (text->getInheritedVisible() ? "yes" : "no")
+							<< ", alpha=" << text->getAlpha();
+					}
+					else
+					{
+						details << ", runtimeTextBox=MISSING";
+					}
+					debugger.LogTagged("GameGUI-Text", details.str());
+				}
+				debugger.LogTagged("GameGUI-Text", "Text diagnostics snapshot end");
+			}
+			bool foundText = false;
+			for (const GameGUIWidgetDef& definition : m_loadedAsset.widgets)
+			{
+				if (definition.type != "Text" && definition.type != "TextBox")
+					continue;
+				foundText = true;
+				ImGui::PushID((definition.name + "##TextDiagnostic").c_str());
+				const auto runtimeIt = m_runtimeWidgetLookup.find(definition.name);
+				auto* text = runtimeIt == m_runtimeWidgetLookup.end()
+					? nullptr : dynamic_cast<MyGUI::TextBox*>(runtimeIt->second);
+				if (ImGui::TreeNode(definition.name.c_str(), "%s (parent: %s)%s",
+					definition.name.c_str(), definition.parentName.empty() ? "<none>" : definition.parentName.c_str(),
+					text ? "" : " [TextBox missing]"))
+				{
+					const std::string skin = definition.skin.empty() || definition.skin == "TextBox"
+						? "TextBoxSkin" : definition.skin;
+					const std::string authoredFont = definition.fontName.empty() ? defaultFont : definition.fontName;
+					ImGui::Text("Saved caption: '%s' | UTF-8 bytes: %zu", definition.text.c_str(), definition.text.size());
+					ImGui::Text("Requested skin: %s (%s)", skin.c_str(),
+						MyGUI::SkinManager::getInstance().isExist(skin) ? "registered" : "MISSING");
+					ImGui::Text("Requested font: %s (%s) | saved height: %d",
+						authoredFont.c_str(), MyGUI::FontManager::getInstance().getByName(authoredFont) ? "registered" : "MISSING",
+						definition.fontSize);
+					if (text)
+					{
+						const std::string liveCaption = text->getCaption().asUTF8();
+						const std::string liveFont(text->getFontName());
+						const MyGUI::IntCoord absolute = text->getAbsoluteCoord();
+						const MyGUI::IntCoord textRegion = text->getTextRegion();
+						const MyGUI::IntSize measured = text->getTextSize();
+						const MyGUI::Colour& colour = text->getTextColour();
+						MyGUI::IFont* font = liveFont.empty()
+							? nullptr : MyGUI::FontManager::getInstance().getByName(liveFont);
+						const MyGUI::GlyphInfo* glyph = font
+							? font->getGlyphInfo(static_cast<MyGUI::Char>('e')) : nullptr;
+						MyGUI::ITexture* atlas = font ? font->getTextureFont() : nullptr;
+						ImGui::Text("Live caption: '%s' | matches saved: %s | UTF-8 bytes: %zu",
+							liveCaption.c_str(), liveCaption == definition.text ? "yes" : "NO", liveCaption.size());
+						ImGui::Text("Live font: %s (%s) | height: %d",
+							liveFont.empty() ? "<empty>" : liveFont.c_str(),
+							MyGUI::FontManager::getInstance().getByName(liveFont) ? "registered" : "MISSING",
+							text->getFontHeight());
+						ImGui::Text("Font resource: %s | default height: %d",
+							font ? font->getResourceName().c_str() : "<missing>", font ? font->getDefaultHeight() : 0);
+						if (glyph)
+						{
+							ImGui::Text("Glyph U+0065: codepoint U+%04X | %.1f x %.1f | advance %.1f | UV %.4f %.4f %.4f %.4f",
+								static_cast<unsigned int>(glyph->codePoint), glyph->width, glyph->height, glyph->advance,
+								glyph->uvRect.left, glyph->uvRect.top, glyph->uvRect.right, glyph->uvRect.bottom);
+						}
+						else
+						{
+							ImGui::TextUnformatted("Glyph U+0065: MISSING");
+						}
+						if (atlas)
+						{
+							ImGui::Text("Font atlas: %s | %d x %d | format %d | usage %d | locked %s",
+								atlas->getName().c_str(), atlas->getWidth(), atlas->getHeight(),
+								atlas->getFormat().getValue(), atlas->getUsage().getValue(), atlas->isLocked() ? "yes" : "no");
+							if (const auto* glAtlas = dynamic_cast<MyGUI::OpenGLTexture*>(atlas))
+							{
+								ImGui::Text("Font atlas GL texture: id %u | object %s",
+									glAtlas->getTextureId(), glIsTexture(glAtlas->getTextureId()) ? "valid" : "MISSING");
+							}
+						}
+						else
+						{
+							ImGui::TextUnformatted("Font atlas: MISSING");
+						}
+						ImGui::Text("Text colour RGBA: %.2f %.2f %.2f %.2f",
+							colour.red, colour.green, colour.blue, colour.alpha);
+						ImGui::Text("Local rect: %d, %d  %d x %d | absolute rect: %d, %d  %d x %d",
+							text->getLeft(), text->getTop(), text->getWidth(), text->getHeight(),
+							absolute.left, absolute.top, absolute.width, absolute.height);
+						ImGui::Text("Text region: %d, %d  %d x %d | measured caption: %d x %d",
+							textRegion.left, textRegion.top, textRegion.width, textRegion.height,
+							measured.width, measured.height);
+						ImGui::Text("Visible: local %s / inherited %s | alpha %.2f",
+							text->getVisible() ? "yes" : "no", text->getInheritedVisible() ? "yes" : "no", text->getAlpha());
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+			if (!foundText)
+				ImGui::TextUnformatted("No text widgets in the active GameGUI asset.");
+		}
+
+		for (const GameGUIWidgetDef& definition : m_loadedAsset.widgets)
+		{
+			ImGui::PushID(definition.name.c_str());
+			const auto runtimeIt = m_runtimeWidgetLookup.find(definition.name);
+			const bool hasRuntimeWidget = runtimeIt != m_runtimeWidgetLookup.end() && runtimeIt->second;
+			const bool expanded = ImGui::TreeNode(definition.name.c_str(), "%s (%s)%s",
+				definition.name.c_str(), definition.type.c_str(), hasRuntimeWidget ? "" : " [not created]");
+			if (expanded)
+			{
+				ImGui::Text("Authored visible: %s | editor visible: %s | alpha: %.2f",
+					definition.visible ? "yes" : "no",
+					definition.editorVisible ? "yes" : "no", definition.alpha);
+				ImGui::Text("Authored rect: %d, %d  %d x %d | layer: %s",
+					definition.x, definition.y, definition.width, definition.height, definition.layer.c_str());
+				ImGui::Text("World anchored: %s | anchor: %s | submesh: %d",
+					definition.worldAnchored ? "yes" : "no",
+					definition.worldAnchorEntity.empty() ? "<none>" : definition.worldAnchorEntity.c_str(),
+					definition.worldAnchorSubmeshIndex);
+				if (definition.worldAnchored)
+				{
+					ImGui::Text("World offset: %.2f, %.2f, %.2f",
+						definition.worldX, definition.worldY, definition.worldZ);
+				}
+				if (definition.type == "Image" || definition.type == "ImageBox")
+				{
+					const std::string skin = definition.solidWhiteBox ? "WhiteSkin"
+						: definition.skin.empty() ? "ImageBox" : definition.skin;
+					ImGui::Text("MyGUI skin: %s (%s)", skin.c_str(),
+						MyGUI::SkinManager::getInstance().isExist(skin) ? "registered" : "MISSING");
+					ImGui::Text("Image: %s", definition.solidWhiteBox ? "solid white skin"
+						: definition.texture.empty() ? "<no texture>" : definition.texture.c_str());
+					if (!definition.texture.empty())
+					{
+						const std::filesystem::path resolved = ResolveGameGUIImagePath(definition.texture);
+						std::error_code error;
+						ImGui::Text("Resolved image: %s (%s)", resolved.string().c_str(),
+							std::filesystem::exists(resolved, error) && !error ? "exists" : "MISSING");
+					}
+				}
+				if (hasRuntimeWidget)
+				{
+					const MyGUI::IntCoord actual = runtimeIt->second->getAbsoluteCoord();
+					ImGui::Text("Runtime visible: %s | rect: %d, %d  %d x %d",
+						runtimeIt->second->getVisible() ? "yes" : "no",
+						actual.left, actual.top, actual.width, actual.height);
+				}
+				ImGui::TreePop();
+			}
+			ImGui::PopID();
+		}
+	}
+	ImGui::End();
+	*open = visible;
+}
+
+void GameGUI::UpdateWorldAnchoredWidgets()
 {
 	if (!m_window || m_runtimeWidgetLookup.empty())
 		return;
+	const bool creatorPreview = Root::Current().State().IsEditorMode()
+		&& Root::Current().FrontEnd().FrontEndModeValue() == FrontEndMode::GameGUICreator;
 
 	int viewportWidth = 0;
 	int viewportHeight = 0;
@@ -915,16 +1512,14 @@ void GameGUI::UpdateWorldAnchoredImages()
 	const glm::mat4 viewProjection = camera.GetProjectionMatrix() * camera.GetViewMatrix();
 	for (const GameGUIWidgetDef& definition : m_loadedAsset.widgets)
 	{
-		if (!definition.worldAnchored
-			|| (definition.type != "Image" && definition.type != "ImageBox"))
+		if (!definition.worldAnchored)
 			continue;
 
 		const auto widgetIt = m_runtimeWidgetLookup.find(definition.name);
 		if (widgetIt == m_runtimeWidgetLookup.end())
 			continue;
-		auto* image = dynamic_cast<MyGUI::ImageBox*>(widgetIt->second);
-		if (!image)
-			continue;
+		MyGUI::Widget* anchoredWidget = widgetIt->second;
+		auto* image = dynamic_cast<MyGUI::ImageBox*>(anchoredWidget);
 
 		glm::vec3 worldPosition(definition.worldX, definition.worldY, definition.worldZ);
 		if (!definition.worldAnchorEntity.empty())
@@ -940,9 +1535,11 @@ void GameGUI::UpdateWorldAnchoredImages()
 						if (definition.worldAnchorUseSubmesh)
 						{
 							Mesh* mesh = object->GetMesh();
-						if (!mesh || definition.worldAnchorSubmeshIndex < 0
-							|| definition.worldAnchorSubmeshIndex >= mesh->NumBuffers())
-							break;
+							if (!mesh || definition.worldAnchorSubmeshIndex < 0
+								|| definition.worldAnchorSubmeshIndex >= mesh->NumBuffers())
+							{
+								break;
+							}
 							const glm::vec3 localCenter =
 								(mesh->SubMeshMinBounds(definition.worldAnchorSubmeshIndex)
 									+ mesh->SubMeshMaxBounds(definition.worldAnchorSubmeshIndex)) * 0.5f;
@@ -956,7 +1553,12 @@ void GameGUI::UpdateWorldAnchoredImages()
 			}
 			if (!anchorFound)
 			{
-				image->setVisible(false);
+				Root::Current().Debugger().LogOnce(
+					"GameGUI-world-anchor-missing-" + definition.name,
+					"GameGUI world-anchored widget '" + definition.name +
+					"' is hidden because anchor '" + definition.worldAnchorEntity +
+					"' or submesh " + std::to_string(definition.worldAnchorSubmeshIndex) + " was not found.");
+				anchoredWidget->setVisible(false);
 				continue;
 			}
 		}
@@ -965,41 +1567,96 @@ void GameGUI::UpdateWorldAnchoredImages()
 			worldPosition, 1.0f);
 		if (!std::isfinite(clipPosition.w) || clipPosition.w <= 0.0f)
 		{
-			image->setVisible(false);
+			Root::Current().Debugger().LogOnce(
+				"GameGUI-world-anchor-behind-camera-" + definition.name,
+				"GameGUI world-anchored widget '" + definition.name + "' is behind the active camera.");
+			anchoredWidget->setVisible(false);
 			continue;
 		}
 
 		const glm::vec3 ndc = glm::vec3(clipPosition) / clipPosition.w;
-		const bool inView = std::isfinite(ndc.x) && std::isfinite(ndc.y) && std::isfinite(ndc.z)
-			&& ndc.x >= -1.0f && ndc.x <= 1.0f
-			&& ndc.y >= -1.0f && ndc.y <= 1.0f
+		const bool inDepthRange = std::isfinite(ndc.x) && std::isfinite(ndc.y) && std::isfinite(ndc.z)
 			&& ndc.z >= -1.0f && ndc.z <= 1.0f;
+		// Keep a nearby world marker visible when its anchor drifts just beyond
+		// the viewport edge. A generous limit still hides anchors far outside the
+		// camera's view instead of pinning every marker to the screen border.
+		constexpr float maximumEdgeOffsetNdc = 1.5f;
+		const bool nearViewport = std::abs(ndc.x) <= maximumEdgeOffsetNdc
+			&& std::abs(ndc.y) <= maximumEdgeOffsetNdc;
+		const bool inView = inDepthRange && nearViewport;
+		if (!inView)
+		{
+			Root::Current().Debugger().LogOnce(
+				"GameGUI-world-anchor-out-of-view-" + definition.name,
+				"GameGUI world-anchored widget '" + definition.name + "' is outside the visible edge range (NDC " +
+				std::to_string(ndc.x) + ", " + std::to_string(ndc.y) + ", " + std::to_string(ndc.z) + ").");
+		}
 		const auto visibilityOverride = m_runtimeVisibilityOverrides.find(definition.name);
-		const bool visible = visibilityOverride == m_runtimeVisibilityOverrides.end()
-			? definition.visible
-			: visibilityOverride->second;
-		image->setVisible(visible && inView);
+		const bool visible = creatorPreview
+			? definition.editorVisible
+			: visibilityOverride == m_runtimeVisibilityOverrides.end()
+				? definition.visible
+				: visibilityOverride->second;
+		anchoredWidget->setVisible(visible && inView);
+		if (visible && inView)
+		{
+			Root::Current().Debugger().LogOnce(
+				"GameGUI-world-anchor-visible-" + definition.name,
+				"GameGUI world-anchored widget '" + definition.name + "' projects onscreen at NDC " +
+				std::to_string(ndc.x) + ", " + std::to_string(ndc.y) + ", " + std::to_string(ndc.z) + ".");
+		}
 		if (!inView)
 			continue;
 
-		// World anchored UI is rendered as a screen overlay, so emulate the
-		// perspective size change it would have in the 3D scene. Always derive
-		// from the saved widget dimensions to avoid compounding scale each frame.
+		// Images emulate perspective size changes in the 2D overlay. Text keeps
+		// its authored bounds and font height so its resolution stays independent.
 		const float cameraDistance = glm::distance(camera.GetPosition(), worldPosition);
-		if (std::isfinite(cameraDistance) && cameraDistance > 0.001f)
+		if (image && std::isfinite(cameraDistance) && cameraDistance > 0.001f)
 		{
 			constexpr float referenceDistance = 5.0f;
-			const float distanceScale = std::clamp(referenceDistance / cameraDistance, 0.1f, 10.0f);
 			const int baseWidth = std::max(1, definition.width);
 			const int baseHeight = std::max(1, definition.height);
-			const int scaledWidth = std::max(1, static_cast<int>(std::round(baseWidth * distanceScale)));
-			const int scaledHeight = std::max(1, static_cast<int>(std::round(baseHeight * distanceScale)));
+			const float distanceScale = std::clamp(referenceDistance / cameraDistance, 0.1f, 10.0f);
+			// Keep the anchored image smaller than the viewport so its position
+			// bounds stay ordered even when the authored image is very large or the
+			// camera gets close to its anchor.
+			const float viewportFitScale = 0.98f * std::min(
+				static_cast<float>(viewportWidth) / baseWidth,
+				static_cast<float>(viewportHeight) / baseHeight);
+			const float fittedScale = std::min(distanceScale, viewportFitScale);
+			const int scaledWidth = std::max(1, static_cast<int>(std::round(baseWidth * fittedScale)));
+			const int scaledHeight = std::max(1, static_cast<int>(std::round(baseHeight * fittedScale)));
 			if (image->getWidth() != scaledWidth || image->getHeight() != scaledHeight)
 				image->setSize(scaledWidth, scaledHeight);
+			for (const GameGUIWidgetDef& childDefinition : m_loadedAsset.widgets)
+			{
+				if (childDefinition.parentName != definition.name || childDefinition.worldAnchored)
+					continue;
+				const auto childIt = m_runtimeWidgetLookup.find(childDefinition.name);
+				if (childIt == m_runtimeWidgetLookup.end() || !childIt->second)
+					continue;
+				childIt->second->setPosition(
+					(image->getWidth() - std::max(1, childDefinition.width)) / 2 + childDefinition.x,
+					(image->getHeight() - std::max(1, childDefinition.height)) / 2 + childDefinition.y);
+			}
 		}
 
-		const int screenX = static_cast<int>((ndc.x * 0.5f + 0.5f) * viewportWidth);
-		const int screenY = static_cast<int>((0.5f - ndc.y * 0.5f) * viewportHeight);
+		const float halfWidthNdc = static_cast<float>(anchoredWidget->getWidth()) / static_cast<float>(viewportWidth);
+		const float halfHeightNdc = static_cast<float>(anchoredWidget->getHeight()) / static_cast<float>(viewportHeight);
+		const float minScreenNdcX = std::min(-1.0f + halfWidthNdc, 0.0f);
+		const float maxScreenNdcX = std::max(1.0f - halfWidthNdc, 0.0f);
+		const float minScreenNdcY = std::min(-1.0f + halfHeightNdc, 0.0f);
+		const float maxScreenNdcY = std::max(1.0f - halfHeightNdc, 0.0f);
+		const float screenNdcX = std::clamp(ndc.x, minScreenNdcX, maxScreenNdcX);
+		const float screenNdcY = std::clamp(ndc.y, minScreenNdcY, maxScreenNdcY);
+		if (inView && (screenNdcX != ndc.x || screenNdcY != ndc.y))
+		{
+			Root::Current().Debugger().LogOnce(
+				"GameGUI-world-anchor-clamped-" + definition.name,
+				"GameGUI world-anchored widget '" + definition.name + "' was clamped to the viewport edge.");
+		}
+		const int screenX = static_cast<int>((screenNdcX * 0.5f + 0.5f) * viewportWidth);
+		const int screenY = static_cast<int>((0.5f - screenNdcY * 0.5f) * viewportHeight);
 		int parentOffsetX = 0;
 		int parentOffsetY = 0;
 		if (!definition.parentName.empty())
@@ -1012,8 +1669,8 @@ void GameGUI::UpdateWorldAnchoredImages()
 				parentOffsetY = parentCoord.top;
 			}
 		}
-		image->setPosition(screenX - image->getWidth() / 2 - parentOffsetX,
-			screenY - image->getHeight() / 2 - parentOffsetY);
+		anchoredWidget->setPosition(screenX - anchoredWidget->getWidth() / 2 - parentOffsetX,
+			screenY - anchoredWidget->getHeight() / 2 - parentOffsetY);
 	}
 }
 
@@ -1076,7 +1733,10 @@ void GameGUI::LoadUIAsset(const GameGUIAsset& asset)
 				continue;
 			}
 
-			MyGUI::Widget* createdWidget = CreateWidgetFromDef(widget, parentIt->second);
+			GameGUIWidgetDef runtimeDefinition = widget;
+			runtimeDefinition.x += (parentIt->second->getWidth() - std::max(1, widget.width)) / 2;
+			runtimeDefinition.y += (parentIt->second->getHeight() - std::max(1, widget.height)) / 2;
+			MyGUI::Widget* createdWidget = CreateWidgetFromDef(runtimeDefinition, parentIt->second);
 			if (createdWidget)
 			{
 				createdWidgets[widget.name] = createdWidget;
@@ -1172,6 +1832,7 @@ void GameGUI::ClearUI()
 		m_controllerButtons.clear();
 		m_runtimeWidgetLookup.clear();
 		m_runtimeVisibilityOverrides.clear();
+		m_runtimeVisibilitySources.clear();
 		m_buttonDefaultTextColours.clear();
 		m_buttonLabels.clear();
 		m_buttonFocusSounds.clear();
@@ -1206,6 +1867,7 @@ void GameGUI::ClearUI()
 	m_controllerButtons.clear();
 	m_runtimeWidgetLookup.clear();
 	m_runtimeVisibilityOverrides.clear();
+	m_runtimeVisibilitySources.clear();
 	m_focusedControllerButton = -1;
 	m_lastFocusSoundButton = nullptr;
 }
@@ -1555,14 +2217,32 @@ MyGUI::Widget* GameGUI::RuntimeWidget(const std::string& name) const
 	return it != m_runtimeWidgetLookup.end() ? it->second : nullptr;
 }
 
-void GameGUI::SetRuntimeWidgetVisible(const std::string& name, bool visible)
+void GameGUI::SetRuntimeWidgetVisible(const std::string& name, bool visible, const std::string& source)
 {
 	MyGUI::Widget* widget = RuntimeWidget(name);
 	if (!widget)
 		return;
 
-	m_runtimeVisibilityOverrides[name] = visible;
-	widget->setVisible(visible);
+	auto& activeSources = m_runtimeVisibilitySources[name];
+	if (visible)
+		activeSources.insert(source);
+	else
+		activeSources.erase(source);
+	const bool hasActiveSource = !activeSources.empty();
+	if (hasActiveSource)
+	{
+		m_runtimeVisibilityOverrides[name] = true;
+	}
+	else
+	{
+		m_runtimeVisibilitySources.erase(name);
+		m_runtimeVisibilityOverrides.erase(name);
+	}
+
+	const auto definitionIt = std::find_if(m_loadedAsset.widgets.begin(), m_loadedAsset.widgets.end(),
+		[&name](const GameGUIWidgetDef& definition) { return definition.name == name; });
+	const bool defaultVisible = definitionIt != m_loadedAsset.widgets.end() && definitionIt->visible;
+	widget->setVisible(hasActiveSource || defaultVisible);
 }
 
 void GameGUI::BindWidgetFromDef(const GameGUIWidgetDef& def, MyGUI::Widget* widget)

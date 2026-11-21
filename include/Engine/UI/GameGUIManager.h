@@ -41,6 +41,9 @@ public:
 	const std::vector<std::string>& SceneAssets() const;
 	void DrawEditorWindow();
 	void DrawDiagnosticsWindow();
+	void DrawCreatorDiagnosticsWindow();
+	bool ShowCreatorDiagnosticsWindow() const;
+	void SetShowCreatorDiagnosticsWindow(bool show);
 	bool ShowDiagnosticsWindow() const;
 	void SetShowDiagnosticsWindow(bool show);
 	void DrawReturnButton();
@@ -86,6 +89,7 @@ private:
 	int m_activeAssetIndex = -1;
 	bool m_showEditorWindow = false;
 	bool m_showDiagnosticsWindow = false;
+	bool m_showCreatorDiagnosticsWindow = false;
 	bool m_showRuntimeDebugWindow = true;
 	bool m_showInputDiagnostics = false;
 	UIMode m_mode = UIMode::MainMenu;

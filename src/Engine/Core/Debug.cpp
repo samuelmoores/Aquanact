@@ -355,6 +355,11 @@ void Debug::shutDown()
 		m_runtimeLog.flush();
 		m_runtimeLog.close();
 	}
+	if (m_projectLoadLog.is_open())
+	{
+		m_projectLoadLog.flush();
+		m_projectLoadLog.close();
+	}
 	if (m_convexCollisionLog.is_open())
 	{
 		m_convexCollisionLog.flush();
@@ -1961,6 +1966,69 @@ void Debug::LogDependencyHint(const std::string& dependency, const std::string& 
 {
 	// Keep dependency warnings visually distinct from normal build/runtime logs.
 	LogTagged(Severity::Warning, "Dependency", dependency + ": " + details);
+}
+
+void Debug::BeginProjectLoadLog(const std::filesystem::path& projectPath)
+{
+	m_projectLoadMessages.clear();
+	m_projectLoadActive = true;
+	try
+	{
+		const std::filesystem::path logDirectory =
+			Root::Current().FileSystemRef().ExecutableDirectory() / "logs";
+		std::filesystem::create_directories(logDirectory);
+		if (m_projectLoadLog.is_open()) m_projectLoadLog.close();
+		m_projectLoadLog.open(logDirectory / "project-load.txt", std::ios::out | std::ios::trunc);
+		if (m_projectLoadLog.is_open())
+		{
+			m_projectLoadLog << "Aquanact Project Load Log\nProject: "
+				<< projectPath.string() << '\n';
+			m_projectLoadLog.flush();
+		}
+	}
+	catch (...)
+	{
+		// A diagnostic file must never prevent project loading.
+	}
+	LogProjectLoadStatus("Opening " + projectPath.filename().string());
+}
+
+void Debug::LogProjectLoadStatus(const std::string& status)
+{
+	if (m_projectLoadMessages.size() >= 8) m_projectLoadMessages.erase(m_projectLoadMessages.begin());
+	m_projectLoadMessages.push_back(status);
+	LogTagged("ProjectLoad", status);
+	if (m_projectLoadLog.is_open())
+	{
+		m_projectLoadLog << status << '\n';
+		m_projectLoadLog.flush();
+	}
+}
+
+void Debug::EndProjectLoadLog(bool succeeded)
+{
+	LogProjectLoadStatus(succeeded ? "Project load complete" : "Project load failed");
+	m_projectLoadActive = false;
+}
+
+void Debug::DrawProjectLoadOverlay() const
+{
+	if (m_projectLoadMessages.empty()) return;
+	const ImGuiIO& io = ImGui::GetIO();
+	const float lineHeight = ImGui::GetTextLineHeightWithSpacing();
+	const float height = lineHeight * static_cast<float>(m_projectLoadMessages.size()) + 20.0f;
+	const ImVec2 min(16.0f, io.DisplaySize.y - height - 16.0f);
+	const ImVec2 max(io.DisplaySize.x - 16.0f, io.DisplaySize.y - 16.0f);
+	ImDrawList* drawList = ImGui::GetForegroundDrawList();
+	drawList->AddRectFilled(min, max, IM_COL32(8, 12, 18, 220), 5.0f);
+	drawList->AddText(ImVec2(min.x + 10.0f, min.y + 7.0f), IM_COL32(100, 205, 255, 255),
+		m_projectLoadActive ? "PROJECT LOADING" : "PROJECT LOAD STATUS");
+	float y = min.y + 7.0f + lineHeight;
+	for (const std::string& message : m_projectLoadMessages)
+	{
+		drawList->AddText(ImVec2(min.x + 10.0f, y), IM_COL32(235, 240, 245, 255), message.c_str());
+		y += lineHeight;
+	}
 }
 
 void Debug::SetGridSettings(float size)

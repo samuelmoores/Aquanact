@@ -12,6 +12,7 @@ vcpkg_from_github(
         fix-generation.patch
         Install-tools.patch
         opengl.patch
+        core-profile.patch
         sdl2-static.patch
 )
 

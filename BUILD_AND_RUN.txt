@@ -1,0 +1,44 @@
+Aquanact: Configure, Build, and Run
+==================================
+
+Run these commands from the Aquanact repository root.
+
+Prerequisites
+-------------
+- CMake and Ninja must be installed.
+- VCPKG_ROOT must point to the vcpkg checkout used for this project.
+- The Windows x64 preset expects Visual Studio 18 Community at the paths
+  configured in CMakePresets.json.
+
+macOS (Apple Silicon)
+---------------------
+
+Configure:
+  cmake --preset macos-arm64-debug
+
+Build the editor:
+  cmake --build out/build/macos-arm64-debug --target AquanactEngine
+
+Run the editor:
+  ./out/build/macos-arm64-debug/AquanactEngine
+
+Windows (x64, PowerShell)
+-------------------------
+
+Configure:
+  cmake --preset x64-debug
+
+Build the editor:
+  cmake --build out/build/x64-debug --config Debug --target AquanactEngine
+
+Run the editor:
+  .\out\build\x64-debug\AquanactEngine.exe
+
+Notes
+-----
+- These commands build the editor target used to open projects.
+- The Windows configure preset depends on Visual Studio and Ninja paths listed
+  in CMakePresets.json. If Visual Studio is installed elsewhere, those preset
+  paths need to be adjusted first.
+- For Release builds, replace macos-arm64-debug with macos-arm64-release, or
+  x64-debug with x64-release, in the configure and build directory paths.

@@ -144,33 +144,42 @@ namespace ProjectStateFormat {
 	{
 		if (sourcePath.empty()) return {};
 		if (Root::Current().FileSystemRef().Exists(sourcePath)) return sourcePath;
+		std::string normalized = sourcePath.generic_string();
+		std::replace(normalized.begin(), normalized.end(), '\\', '/');
+		const std::filesystem::path portableSource(normalized);
+		if (Root::Current().FileSystemRef().Exists(portableSource)) return portableSource;
 		// Projects created by older builds may contain an absolute development
 		// path such as C:/dev/Aquanact/assets/models/foo.fbx.  Preserve the
 		// assets-relative suffix when loading a packaged game.
-		const std::string normalized = sourcePath.generic_string();
+		const std::filesystem::path projectDir = projectPath.parent_path();
+		const std::filesystem::path projectRelative = projectDir / portableSource;
+		if (Root::Current().FileSystemRef().Exists(projectRelative)) return projectRelative;
 		const std::string assetsMarker = "/assets/";
-		const std::size_t assetsPos = normalized.find(assetsMarker);
-		if (assetsPos != std::string::npos)
+		std::size_t assetsPos = normalized.find(assetsMarker);
+		std::size_t suffixPos = assetsPos == std::string::npos ? std::string::npos : assetsPos + assetsMarker.size();
+		if (normalized.rfind("assets/", 0) == 0) suffixPos = std::string("assets/").size();
+		if (suffixPos != std::string::npos)
 		{
-			const std::filesystem::path remapped = AssetsRoot() /
-				std::filesystem::path(normalized.substr(assetsPos + assetsMarker.size()));
+			const std::filesystem::path suffix(normalized.substr(suffixPos));
+			const std::filesystem::path projectAsset = projectDir / "assets" / suffix;
+			if (Root::Current().FileSystemRef().Exists(projectAsset)) return projectAsset;
+			const std::filesystem::path remapped = AssetsRoot() / suffix;
 			if (Root::Current().FileSystemRef().Exists(remapped)) return remapped;
 		}
-		const std::filesystem::path projectDir = projectPath.parent_path();
-		const std::filesystem::path projectRelative = projectDir / sourcePath;
-		if (Root::Current().FileSystemRef().Exists(projectRelative)) return projectRelative;
-		const std::filesystem::path projectAssetsRelative = projectDir / "assets" / sourcePath;
+		const std::filesystem::path projectAssetsRelative = projectDir / "assets" / portableSource;
 		if (Root::Current().FileSystemRef().Exists(projectAssetsRelative)) return projectAssetsRelative;
-		const std::filesystem::path assetsRelative = AssetsRoot() / sourcePath;
+		const std::filesystem::path assetsRelative = AssetsRoot() / portableSource;
 		if (Root::Current().FileSystemRef().Exists(assetsRelative)) return assetsRelative;
-		const std::filesystem::path searchRoots[] = { ModelsRoot(), TexturesRoot(), ProjectsRoot() };
+		const std::filesystem::path searchRoots[] = {
+			projectDir / "assets" / "models", projectDir / "assets" / "textures",
+			projectDir / "assets" / "projects", ModelsRoot(), TexturesRoot(), ProjectsRoot() };
 		for (const auto& searchRoot : searchRoots)
 		{
 			if (!Root::Current().FileSystemRef().Exists(searchRoot) || !Root::Current().FileSystemRef().IsDirectory(searchRoot)) continue;
 			for (const auto& entry : Root::Current().FileSystemRef().ReadDirectoryRecursive(searchRoot))
 			{
 				if (!entry.is_regular_file()) continue;
-				if (entry.path().filename() == sourcePath.filename()) return entry.path();
+				if (entry.path().filename() == portableSource.filename()) return entry.path();
 			}
 		}
 		return projectRelative;

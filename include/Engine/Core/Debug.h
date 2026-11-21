@@ -2,6 +2,7 @@
 
 #include "glm/glm.hpp"
 #include <fstream>
+#include <filesystem>
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -112,6 +113,10 @@ public:
 	void VerifyDependencies();
 	// Emits a dependency-specific warning that explains what is missing or misconfigured.
 	void LogDependencyHint(const std::string& dependency, const std::string& details);
+	void BeginProjectLoadLog(const std::filesystem::path& projectPath);
+	void LogProjectLoadStatus(const std::string& status);
+	void EndProjectLoadLog(bool succeeded);
+	void DrawProjectLoadOverlay() const;
 	void SetGridSettings(float size);
 	float GridSize() const;
 	float GridSpacing() const;
@@ -268,6 +273,9 @@ private:
 	std::vector<std::string> m_logMessages;
 	std::vector<std::string> m_logOnceKeys;
 	std::ofstream m_runtimeLog;
+	std::ofstream m_projectLoadLog;
+	std::vector<std::string> m_projectLoadMessages;
+	bool m_projectLoadActive = false;
 	std::ofstream m_convexCollisionLog;
 };
 

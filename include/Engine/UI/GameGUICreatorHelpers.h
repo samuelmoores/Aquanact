@@ -40,7 +40,7 @@ namespace GameGUICreatorHelpers {
 	bool DrawTextureCombo(const char* label, std::string& texturePath, bool allowEmpty, const char* emptyLabel);
 
 	// Progress-bar binding editor
-	bool DrawProgressBindingControls(GameGUIWidgetDef& widget, Scene* scene);
+	bool DrawValueBindingControls(GameGUIWidgetDef& widget, Scene* scene);
 
 	// Asset loading
 	GameGUIAsset LoadAssetFile(const std::filesystem::path& assetPath);

@@ -439,7 +439,7 @@ namespace GameGUICreatorHelpers {
 		return changed;
 	}
 
-	bool DrawProgressBindingControls(GameGUIWidgetDef& widget, Scene* scene)
+	bool DrawValueBindingControls(GameGUIWidgetDef& widget, Scene* scene)
 	{
 		bool changed = false;
 
@@ -557,7 +557,6 @@ namespace GameGUICreatorHelpers {
 			{
 				for (const BindableMember& member : bindableMembers)
 				{
-					// Progress bars only bind to numeric members.
 					if (member.typeName != "int" && member.typeName != "float")
 					{
 						continue;
@@ -641,10 +640,10 @@ namespace GameGUICreatorHelpers {
 		}
 
 		const std::string pointerSkin = readField("\"pointerSkin\":", 0);
-		if (pointerSkin == "NavigationArrowRight1" ||
-			pointerSkin == "NavigationArrowRight2" ||
-			pointerSkin == "NavigationArrowRight3" ||
-			pointerSkin == "NavigationArrowRight4")
+		if (pointerSkin == "ButtonRightSkin" ||
+			pointerSkin == "ButtonLeftSkin" ||
+			pointerSkin == "ButtonUpSkin" ||
+			pointerSkin == "ButtonDownSkin")
 		{
 			asset.pointerSkin = pointerSkin;
 		}
@@ -736,6 +735,13 @@ namespace GameGUICreatorHelpers {
 			widget.bindComponent = readField("\"bindComponent\":", widgetPos);
 			widget.bindMember = readField("\"bindMember\":", widgetPos);
 			widget.bindEvent = readField("\"bindEvent\":", widgetPos);
+			const std::string bindingEnabledField = readField("\"bindingEnabled\":", widgetPos);
+			const bool isTextWidget = widget.type == "Text" || widget.type == "TextBox";
+			widget.bindingEnabled = isTextWidget && (bindingEnabledField.empty()
+				? (!widget.bindEntity.empty() || !widget.bindComponent.empty()
+					|| !widget.bindMember.empty() || !widget.bindEvent.empty()
+					|| ParseBoolField(readField("\"bindToggle\":", widgetPos)))
+				: ParseBoolField(bindingEnabledField));
 			widget.panelButtonFocusSound = readField("\"panelButtonFocusSound\":", widgetPos);
 
 			asset.widgets.push_back(widget);

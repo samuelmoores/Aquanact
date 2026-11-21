@@ -117,7 +117,7 @@ void GameGUICreator::SaveSelectedRoleGUI()
 	json << "  \"name\": \"" << asset.name << "\",\n";
 	json << "  \"navigationMode\": \"" << (m_menuNavigationMode == MenuNavigationMode::TextHighlight ? "TextHighlight" : m_menuNavigationMode == MenuNavigationMode::Boxed ? "Boxed" : "Pointer") << "\",\n";
 	json << "  \"boxSkin\": \"" << (m_boxSkinIndex == 0 ? "WindowFrameSkin" : m_boxSkinIndex == 1 ? "PanelSkin" : m_boxSkinIndex == 2 ? "ButtonSkin" : m_boxSkinIndex == 3 ? "ButtonEmptySkin" : m_boxSkinIndex == 4 ? "TabPanelSkin" : "ClientDefaultSkin") << "\",\n";
-	const char* pointerSkins[] = { "NavigationArrowRight1", "NavigationArrowRight2", "NavigationArrowRight3", "NavigationArrowRight4" };
+	const char* pointerSkins[] = { "ButtonRightSkin", "ButtonLeftSkin", "ButtonUpSkin", "ButtonDownSkin" };
 	asset.pointerSkin = pointerSkins[m_pointerSkinIndex];
 	json << "  \"pointerSkin\": \"" << pointerSkins[m_pointerSkinIndex] << "\",\n";
 	json << "  \"boxPadding\": " << asset.boxPadding << ",\n";
@@ -189,7 +189,8 @@ void GameGUICreator::SaveSelectedRoleGUI()
 		json << "      \"bindEntity\": \"" << widget.bindEntity << "\",\n";
 		json << "      \"bindComponent\": \"" << widget.bindComponent << "\",\n";
 		json << "      \"bindMember\": \"" << widget.bindMember << "\",\n";
-		json << "      \"bindEvent\": \"" << widget.bindEvent << "\"\n";
+		json << "      \"bindEvent\": \"" << widget.bindEvent << "\",\n";
+		json << "      \"bindingEnabled\": " << (widget.bindingEnabled ? "true" : "false") << "\n";
 		json << "    }" << (i + 1 < asset.widgets.size() ? "," : "") << "\n";
 	}
 	json << "  ]\n";
@@ -255,7 +256,7 @@ void GameGUICreator::LoadSelectedRoleGUI()
 	const std::string skins[] = { "WindowFrameSkin", "PanelSkin", "ButtonSkin", "ButtonEmptySkin", "TabPanelSkin", "ClientDefaultSkin" };
 	m_boxSkinIndex = 0;
 	for (int i = 0; i < 6; ++i) if (asset.boxSkin == skins[i]) { m_boxSkinIndex = i; break; }
-	const std::string pointerSkins[] = { "NavigationArrowRight1", "NavigationArrowRight2", "NavigationArrowRight3", "NavigationArrowRight4" };
+	const std::string pointerSkins[] = { "ButtonRightSkin", "ButtonLeftSkin", "ButtonUpSkin", "ButtonDownSkin" };
 	m_pointerSkinIndex = 0;
 	for (int i = 0; i < 4; ++i) if (asset.pointerSkin == pointerSkins[i]) { m_pointerSkinIndex = i; break; }
 	LoadNavigationSettingsFromAsset();
