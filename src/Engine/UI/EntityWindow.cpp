@@ -125,10 +125,15 @@ EntityWindowResult EntityWindow::Draw(const EngineGuiFrameContext& context, bool
 						break;
 					}
 			const bool cutscene = sceneManager.SceneKindFor(activeScene->Name()) == SceneManager::SceneKind::Cutscene;
-			if (ImGui::Button("Delete"))
-				ImGui::OpenPopup("Delete Entity##Confirm");
-			ImGui::SameLine();
-			DrawAddComponent(*componentOwner, cutscene, context);
+			if (!cutscene)
+			{
+				if (EntityStateMachine* stateMachine = componentOwner->GetEntityState())
+				{
+					result.stateMachineToDraw = stateMachine;
+					if (DrawStateMachineButton())
+						result.openStateMachine = true;
+				}
+			}
 
 			const unsigned int deletedEntityId = object.Id();
 			if (DrawDeletePopup(object) && activeScene->RemoveObject(&object))
@@ -147,23 +152,14 @@ EntityWindowResult EntityWindow::Draw(const EngineGuiFrameContext& context, bool
 			}
 			else
 			{
+				ImGui::Separator();
 				DrawTransform(object);
 				DrawSelectedSubmesh(object, context.selection->submeshIndex);
-				ImGui::Separator();
 				if (!cutscene)
 				{
-					if (EntityStateMachine* stateMachine = componentOwner->GetEntityState())
-					{
-						result.stateMachineToDraw = stateMachine;
-						if (DrawStateMachineButton())
-							result.openStateMachine = true;
-						ImGui::Separator();
-					}
 					DrawPhysics(object);
-					ImGui::Separator();
 				}
-				ImGui::TextUnformatted("Components");
-				ImGui::Separator();
+				ImGui::SeparatorText("Components");
 				const std::vector<Component*> components = componentOwner->Components();
 				for (std::size_t componentIndex = 0; componentIndex < components.size(); ++componentIndex)
 				{
@@ -183,6 +179,10 @@ EntityWindowResult EntityWindow::Draw(const EngineGuiFrameContext& context, bool
 					}
 					ImGui::PopID();
 				}
+				DrawAddComponent(*componentOwner, cutscene, context);
+				ImGui::Separator();
+				if (ImGui::Button("Delete"))
+					ImGui::OpenPopup("Delete Entity##Confirm");
 			}
 		}
 	}
@@ -194,7 +194,7 @@ void EntityWindow::DrawSelectedSubmesh(Entity& entity, int selectedSubmeshIndex)
 {
 	Mesh* mesh = entity.GetMesh();
 	if (!mesh || selectedSubmeshIndex < 0 || selectedSubmeshIndex >= mesh->NumBuffers()
-		|| !ImGui::CollapsingHeader("Submesh Settings", ImGuiTreeNodeFlags_DefaultOpen))
+		|| !ImGui::CollapsingHeader("Submesh Settings"))
 		return;
 
 	ImGui::Text("Model: %s", entity.SourcePath().empty() ? "Generated mesh" : entity.SourcePath().c_str());
@@ -241,7 +241,7 @@ void EntityWindow::DrawSelectedSubmesh(Entity& entity, int selectedSubmeshIndex)
 	drawTextureToggle("Height", mesh->HeightTextureEnabled(selectedIndex),
 		[mesh, selectedIndex](bool value) { mesh->SetHeightTextureEnabled(selectedIndex, value); });
 
-	if (ImGui::CollapsingHeader("Submesh Collider", ImGuiTreeNodeFlags_DefaultOpen))
+	if (ImGui::CollapsingHeader("Submesh Collider"))
 	{
 		const std::size_t submeshIndex = static_cast<std::size_t>(selectedIndex);
 		const SubmeshColliderSettings settings = entity.GetSubmeshColliderSettings(submeshIndex);
@@ -277,8 +277,10 @@ void EntityWindow::DrawSelectedSubmesh(Entity& entity, int selectedSubmeshIndex)
 
 void EntityWindow::DrawTransform(Entity& entity) const
 {
+	if (!ImGui::CollapsingHeader("Transform"))
+		return;
+
 	bool transformChanged = false;
-	ImGui::Separator();
 	ImGui::TextUnformatted("Position");
 	const glm::vec3 position = entity.Position();
 	const glm::vec3 defaultPosition = entity.DefaultPosition();
@@ -355,7 +357,7 @@ void EntityWindow::DrawPhysics(Entity& entity) const
 	{
 		return;
 	}
-	if (!ImGui::CollapsingHeader("Physics", ImGuiTreeNodeFlags_DefaultOpen))
+	if (!ImGui::CollapsingHeader("Physics"))
 	{
 		return;
 	}
@@ -778,7 +780,7 @@ EntityComponentHeaderResult EntityWindow::DrawComponentHeader(Component& compone
 		ImGui::TableSetupColumn("Remove", ImGuiTableColumnFlags_WidthFixed, removeButtonWidth);
 		ImGui::TableNextRow();
 		ImGui::TableSetColumnIndex(0);
-		result.expanded = ImGui::CollapsingHeader(label.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
+		result.expanded = ImGui::CollapsingHeader(label.c_str());
 		ImGui::TableSetColumnIndex(1);
 		result.removeRequested = ImGui::SmallButton("Remove");
 		ImGui::EndTable();
