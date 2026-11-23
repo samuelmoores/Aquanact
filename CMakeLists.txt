@@ -43,14 +43,30 @@ set(AQUANACT_DEFAULT_PROJECT_ROOT "${AQUANACT_STARTER_PROJECT_ROOT}")
 if (EXISTS "${CMAKE_SOURCE_DIR}/projects/semesterlong/generated/GameSources.cmake")
     set(AQUANACT_DEFAULT_PROJECT_ROOT "${CMAKE_SOURCE_DIR}/projects/semesterlong")
 endif()
-if (WIN32 AND EXISTS "C:/projects/semesterlong/project.aqua")
-    # Preserve the existing Windows developer checkout preference.
-    set(AQUANACT_DEFAULT_PROJECT_ROOT "C:/projects/semesterlong")
+
+# The editor records the project selected in Project Explorer here. Watching
+# the file makes the next `cmake --build` reconfigure against that project's
+# source and include directories.
+set(AQUANACT_PROJECT_ROOT_PREFERENCE_FILE "${CMAKE_BINARY_DIR}/aquanact_project_root.txt")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${AQUANACT_PROJECT_ROOT_PREFERENCE_FILE}")
+set(AQUANACT_PROJECT_ROOT_FROM_EXPLORER FALSE)
+if (EXISTS "${AQUANACT_PROJECT_ROOT_PREFERENCE_FILE}")
+    file(STRINGS "${AQUANACT_PROJECT_ROOT_PREFERENCE_FILE}" AQUANACT_SAVED_PROJECT_ROOT
+        LIMIT_COUNT 1)
+    string(STRIP "${AQUANACT_SAVED_PROJECT_ROOT}" AQUANACT_SAVED_PROJECT_ROOT)
+    if (AQUANACT_SAVED_PROJECT_ROOT)
+        set(AQUANACT_PROJECT_ROOT "${AQUANACT_SAVED_PROJECT_ROOT}" CACHE PATH
+            "Project directory containing src, include, and generated/GameSources.cmake" FORCE)
+        set(AQUANACT_PROJECT_ROOT_FROM_EXPLORER TRUE)
+    endif()
 endif()
 
 if (NOT AQUANACT_PROJECT_ROOT
-	OR AQUANACT_PROJECT_ROOT STREQUAL "${CMAKE_SOURCE_DIR}/projects/project"
-	OR AQUANACT_PROJECT_ROOT STREQUAL "${AQUANACT_STARTER_PROJECT_ROOT}")
+	OR (AQUANACT_PROJECT_ROOT STREQUAL "${CMAKE_SOURCE_DIR}/projects/project"
+		AND NOT AQUANACT_PROJECT_ROOT_FROM_EXPLORER)
+	OR (AQUANACT_PROJECT_ROOT STREQUAL "${AQUANACT_STARTER_PROJECT_ROOT}"
+        AND NOT AQUANACT_PROJECT_ROOT_FROM_EXPLORER))
     # Prefer the user's semesterlong project when it is present; otherwise use
     # the checked-in starter project.
     set(AQUANACT_PROJECT_ROOT "${AQUANACT_DEFAULT_PROJECT_ROOT}" CACHE PATH
@@ -180,6 +196,8 @@ add_executable (AquanactEngine ${SOURCES} ${AQUANACT_GRAPHICS_BACKEND_SOURCES} $
 target_compile_definitions(AquanactEngine PRIVATE AQUANACT_EDITOR)
 target_compile_definitions(AquanactEngine PRIVATE AQUANACT_GRAPHICS_BACKEND=${AQUANACT_GRAPHICS_BACKEND})
 target_compile_definitions(AquanactEngine PRIVATE AQUANACT_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
+target_compile_definitions(AquanactEngine PRIVATE
+    AQUANACT_PROJECT_ROOT_PREFERENCE_FILE="${AQUANACT_PROJECT_ROOT_PREFERENCE_FILE}")
 target_compile_definitions(AquanactEngine PRIVATE MYGUI_STATIC)
 target_compile_definitions(AquanactEngine PRIVATE AQUANACT_VCPKG_TARGET_TRIPLET="${AQUANACT_VCPKG_TARGET_TRIPLET}")
 target_compile_definitions(AquanactEngine PRIVATE AQUANACT_FREETYPE_LIBRARY="freetype")

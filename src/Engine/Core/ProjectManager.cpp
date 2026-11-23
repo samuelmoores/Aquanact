@@ -19,6 +19,42 @@
 #include <vector>
 
 namespace {
+	void SaveBuildProjectRootPreference(const std::filesystem::path& projectPath)
+	{
+#if defined(AQUANACT_PROJECT_ROOT_PREFERENCE_FILE) && !defined(AQUANACT_GAME)
+		if (!Root::HasCurrent() || !Root::Current().State().IsEditorMode() || projectPath.empty())
+		{
+			return;
+		}
+
+		std::error_code error;
+		const std::filesystem::path projectRoot =
+			std::filesystem::absolute(projectPath, error).parent_path().lexically_normal();
+		if (error)
+		{
+			return;
+		}
+
+		std::ofstream preferenceFile(AQUANACT_PROJECT_ROOT_PREFERENCE_FILE, std::ios::trunc);
+		if (preferenceFile.is_open())
+		{
+			preferenceFile << projectRoot.string() << '\n';
+			if (!preferenceFile)
+			{
+				Root::Current().Debugger().LogMessage(
+					"Could not save the selected project root for the next CMake build.");
+			}
+		}
+		else
+		{
+			Root::Current().Debugger().LogMessage(
+				"Could not open the selected project root preference for the next CMake build.");
+		}
+#else
+		(void)projectPath;
+#endif
+	}
+
 	void AppendCurrentCameraState(std::string& contents)
 	{
 		const PathedCamera& gameCamera = Root::Current().Render().GetPathedCamera();
@@ -384,6 +420,7 @@ bool ProjectManager::SaveProject(const std::filesystem::path& path, const SceneM
 	if (written)
 	{
 		m_currentProjectPath = path;
+		SaveBuildProjectRootPreference(m_currentProjectPath);
 		Root::Current().Files().SetRootDirectory(ProjectAssetsDirectory() / "models");
 	}
 	return written;
@@ -450,6 +487,7 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 		// Establish the project context before materializing assets and applying
 		// GUI/render state so every resolver points at this project's assets.
 		m_currentProjectPath = path;
+		SaveBuildProjectRootPreference(m_currentProjectPath);
 		Root::Current().Files().SetRootDirectory(ProjectAssetsDirectory() / "models");
 		Root::Current().Spawns().ResetForProject();
 		Root::Current().Debugger().LogProjectLoadStatus("Loading spawn data");
