@@ -139,8 +139,15 @@ public:
 	bool BlocksCameraView() const { return m_blocksCameraView; }
 	void SetRigidBody(bool enabled) { m_rigidBody = enabled; if (!enabled) m_linearVelocity = glm::vec3(0.0f); }
 	bool IsRigidBody() const { return m_rigidBody; }
+	float Mass() const { return m_mass; }
+	void SetMass(float mass) { m_mass = mass < 0.01f ? 0.01f : mass; }
 	const glm::vec3& LinearVelocity() const { return m_linearVelocity; }
 	void SetLinearVelocity(const glm::vec3& velocity) { m_linearVelocity = velocity; }
+	void ApplyImpulse(const glm::vec3& impulse)
+	{
+		if (m_rigidBody && !GetController())
+			m_linearVelocity += impulse / m_mass;
+	}
 	float LinearDamping() const { return m_linearDamping; }
 	void SetLinearDamping(float damping) { m_linearDamping = damping < 0.0f ? 0.0f : damping; }
 	// Launch enables non-controller rigid-body simulation and sets velocity in world units/second.
@@ -180,6 +187,7 @@ protected:
 	bool m_ignoreCameraCollision = false;
 	bool m_blocksCameraView = true;
 	bool m_rigidBody = false;
+	float m_mass = 1.0f;
 	glm::vec3 m_linearVelocity{ 0.0f };
 	float m_linearDamping = 0.0f;
 	bool m_showPhysicsBoundingBox = false;

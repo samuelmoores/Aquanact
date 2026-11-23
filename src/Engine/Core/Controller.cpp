@@ -16,6 +16,8 @@ namespace
 	constexpr float worldUnitsPerMeter = 100.0f;
 	constexpr float gravity = -9.81f * worldUnitsPerMeter;
 	constexpr float terminalFallSpeed = -55.0f * worldUnitsPerMeter;
+	constexpr float controllerPushMass = 10.0f;
+	constexpr float controllerPushRestitution = 0.05f;
 	// Keep grounded state through brief contact misses caused by collider seams
 	// or uneven ground while the controller is still moving across the surface.
 	constexpr float walkableGroundNormalY = 0.25f;
@@ -189,6 +191,27 @@ void Controller::MoveWithCollisions(Entity& owner, const glm::vec3& desiredMovem
 			resolvedMovement += remainingMovement;
 			break;
 		}
+
+		// The character remains kinematic for reliable slope and jump control,
+		// but contact with a dynamic body transfers momentum using a normal
+		// impulse. Static scenery and other controllers are unaffected.
+		if (hitEntity && hitCollider && hitEntity->IsRigidBody()
+			&& !hitEntity->GetController() && hitCollider->owner == hitEntity
+			&& glm::length(collision.normal) > 0.0001f)
+		{
+			const glm::vec3 pushDirection = -glm::normalize(collision.normal);
+			const glm::vec3 controllerVelocity = movementBeforeSweep / dt;
+			const float closingSpeed = glm::dot(
+				controllerVelocity - hitEntity->LinearVelocity(), pushDirection);
+			if (closingSpeed > 0.0f)
+			{
+				const float targetMass = hitEntity->Mass();
+				const float impulseMagnitude = (1.0f + controllerPushRestitution) * closingSpeed
+					/ (1.0f / controllerPushMass + 1.0f / targetMass);
+				hitEntity->ApplyImpulse(pushDirection * impulseMagnitude);
+			}
+		}
+
 		if (remainingMovement.y < 0.0f)
 		{
 			verticalSweepHit = true;

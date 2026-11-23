@@ -200,6 +200,8 @@ namespace {
 				object->SetBlocksCameraView(pendingObject.blocksCameraView);
 				object->SetShowPhysicsBoundingBox(pendingObject.showPhysicsBoundingBox);
 				object->SetRigidBody(pendingObject.rigidBody);
+				object->SetMass(pendingObject.mass);
+				object->SetLinearDamping(pendingObject.linearDamping);
 				object->SetPhysicsColliderShape(pendingObject.physicsColliderShape == 1
 					? PhysicsColliderShape::Capsule
 					: pendingObject.physicsColliderShape == 2 ? PhysicsColliderShape::Convex : PhysicsColliderShape::Box);

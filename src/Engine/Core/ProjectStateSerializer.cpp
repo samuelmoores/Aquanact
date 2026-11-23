@@ -1373,6 +1373,20 @@ namespace ProjectStateSerializer {
 				if (fields.size() >= 19)
 					object.rigidBody = fields[18] == "1" || fields[18] == "true" || fields[18] == "True";
 				for (std::size_t marker = 0; marker + 1 < fields.size(); ++marker)
+					if (fields[marker] == "mass")
+					{
+						try { object.mass = std::max(0.01f, std::stof(fields[marker + 1])); }
+						catch (...) { object.mass = 1.0f; }
+						break;
+					}
+				for (std::size_t marker = 0; marker + 1 < fields.size(); ++marker)
+					if (fields[marker] == "lineardamping")
+					{
+						try { object.linearDamping = std::max(0.0f, std::stof(fields[marker + 1])); }
+						catch (...) { object.linearDamping = 0.0f; }
+						break;
+					}
+				for (std::size_t marker = 0; marker + 1 < fields.size(); ++marker)
 					if (fields[marker] == "basecollider")
 					{
 						object.useBaseMeshCollider = fields[marker + 1] == "1" || fields[marker + 1] == "true" || fields[marker + 1] == "True";

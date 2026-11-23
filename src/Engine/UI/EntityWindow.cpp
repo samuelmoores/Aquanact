@@ -371,6 +371,15 @@ void EntityWindow::DrawPhysics(Entity& entity) const
 		entity.SetRigidBody(rigidBody);
 		PhysicsWorld::Instance().Update(entity);
 	}
+	if (rigidBody)
+	{
+		float mass = entity.Mass();
+		if (ImGui::DragFloat("Mass", &mass, 0.1f, 0.01f, 10000.0f, "%.2f"))
+			entity.SetMass(mass);
+		float linearDamping = entity.LinearDamping();
+		if (ImGui::DragFloat("Linear Damping", &linearDamping, 0.01f, 0.0f, 100.0f, "%.2f"))
+			entity.SetLinearDamping(linearDamping);
+	}
 	if (hasController)
 	{
 		ImGui::EndDisabled();

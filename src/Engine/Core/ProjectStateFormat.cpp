@@ -230,6 +230,8 @@ namespace ProjectStateFormat {
 				contents += object->BlocksCameraView() ? "1;" : "0;";
 				contents += EscapeField(object->Name()) + ";";
 				contents += object->IsRigidBody() ? "1" : "0";
+				contents += ";mass;" + std::to_string(object->Mass());
+				contents += ";lineardamping;" + std::to_string(object->LinearDamping());
 				contents += ";basecollider;" + std::to_string(object->UseBaseMeshCollider() ? 1 : 0);
 				contents += ";capsuleradius;" + std::to_string(object->CapsuleRadiusOverride());
 				const auto& submeshSettings = object->GetSubmeshColliderSettings();

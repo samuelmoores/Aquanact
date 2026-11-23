@@ -192,6 +192,8 @@ namespace ProjectStateData {
 			bool blocksCameraView = true;
 			bool showPhysicsBoundingBox = false;
 			bool rigidBody = false;
+			float mass = 1.0f;
+			float linearDamping = 0.0f;
 			int physicsColliderShape = 0;
 			float capsuleRadiusOverride = 0.0f;
 			bool useBaseMeshCollider = false;
