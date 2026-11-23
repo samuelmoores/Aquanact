@@ -31,6 +31,7 @@
 #include <cstdint>
 #include <algorithm>
 #include <cctype>
+#include <cstring>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -193,32 +194,32 @@ EntityWindowResult EntityWindow::Draw(const EngineGuiFrameContext& context, bool
 void EntityWindow::DrawSelectedSubmesh(Entity& entity, int selectedSubmeshIndex) const
 {
 	Mesh* mesh = entity.GetMesh();
-	if (!mesh || selectedSubmeshIndex < 0 || selectedSubmeshIndex >= mesh->NumBuffers()
-		|| !ImGui::CollapsingHeader("Submesh Settings"))
+	if (!mesh || selectedSubmeshIndex < 0 || selectedSubmeshIndex >= mesh->NumBuffers())
+		return;
+	ImGui::SetNextItemOpen(false, ImGuiCond_FirstUseEver);
+	if (!ImGui::CollapsingHeader("Submesh Settings"))
 		return;
 
 	ImGui::Text("Model: %s", entity.SourcePath().empty() ? "Generated mesh" : entity.SourcePath().c_str());
 	const int selectedIndex = selectedSubmeshIndex;
 	const SubMeshMaterial& material = mesh->GetMaterial(selectedIndex);
+	if (m_materialPathMesh != mesh || m_materialPathSubmesh != selectedIndex)
+	{
+		m_materialPathMesh = mesh;
+		m_materialPathSubmesh = selectedIndex;
+		m_materialPathError = false;
+		m_baseColorPathInput.fill('\0');
+		m_roughnessPathInput.fill('\0');
+		const std::string& basePath = mesh->ColorTextureOverridePath(selectedIndex);
+		const std::string& roughnessPath = mesh->RoughnessTextureOverridePath(selectedIndex);
+		std::memcpy(m_baseColorPathInput.data(), basePath.data(), std::min(basePath.size(), m_baseColorPathInput.size() - 1));
+		std::memcpy(m_roughnessPathInput.data(), roughnessPath.data(), std::min(roughnessPath.size(), m_roughnessPathInput.size() - 1));
+	}
 	const std::string& sourceName = mesh->SubMeshName(selectedIndex);
 	const std::string submeshLabel = sourceName.empty()
 		? "Submesh " + std::to_string(selectedIndex) : sourceName;
 	ImGui::Text("Submesh: %s", submeshLabel.c_str());
-	bool emissiveEnabled = material.emissiveEnabled;
-	if (ImGui::Checkbox("Emissive", &emissiveEnabled))
-		mesh->SetEmissiveEnabled(selectedIndex, emissiveEnabled);
-	glm::vec3 emissiveColor = material.emissiveColor;
-	if (ImGui::ColorEdit3("Emissive Color", &emissiveColor.x))
-		mesh->SetEmissiveColor(selectedIndex, emissiveColor);
-	float emissiveBlendFactor = material.emissiveBlendFactor;
-	if (ImGui::SliderFloat("Emissive Blend", &emissiveBlendFactor, 0.0f, 1.0f, "%.2f"))
-		mesh->SetEmissiveBlendFactor(selectedIndex, emissiveBlendFactor);
-	bool castsShadow = mesh->CastsShadow(selectedIndex);
-	if (ImGui::Checkbox("Casts Shadow", &castsShadow))
-		mesh->SetCastsShadow(selectedIndex, castsShadow);
-	ImGui::Text("Specular: %.2f", material.phong.z);
-	ImGui::Text("Shininess: %.2f", material.phong.w);
-	ImGui::TextUnformatted("Textures");
+	ImGui::SeparatorText("Material");
 
 	const auto drawTextureToggle = [&](const char* label, bool enabled, auto setEnabled)
 	{
@@ -226,21 +227,45 @@ void EntityWindow::DrawSelectedSubmesh(Entity& entity, int selectedSubmeshIndex)
 		if (ImGui::Checkbox(label, &value))
 			setEnabled(value);
 	};
-	drawTextureToggle("Color", mesh->ColorTextureEnabled(selectedIndex),
+	drawTextureToggle("Base Color", mesh->ColorTextureEnabled(selectedIndex),
 		[mesh, selectedIndex](bool value) { mesh->SetColorTextureEnabled(selectedIndex, value); });
-	ImGui::SameLine();
-	drawTextureToggle("Specular", mesh->SpecularTextureEnabled(selectedIndex),
-		[mesh, selectedIndex](bool value) { mesh->SetSpecularTextureEnabled(selectedIndex, value); });
 	ImGui::SameLine();
 	drawTextureToggle("Roughness", mesh->RoughnessTextureEnabled(selectedIndex),
 		[mesh, selectedIndex](bool value) { mesh->SetRoughnessTextureEnabled(selectedIndex, value); });
-	ImGui::SameLine();
-	drawTextureToggle("Normal", mesh->NormalTextureEnabled(selectedIndex),
-		[mesh, selectedIndex](bool value) { mesh->SetNormalTextureEnabled(selectedIndex, value); });
-	ImGui::SameLine();
-	drawTextureToggle("Height", mesh->HeightTextureEnabled(selectedIndex),
-		[mesh, selectedIndex](bool value) { mesh->SetHeightTextureEnabled(selectedIndex, value); });
+	if (!mesh->RoughnessTextureEnabled(selectedIndex) || !mesh->HasRoughnessTexture(selectedIndex))
+	{
+		float roughnessValue = mesh->RoughnessValue(selectedIndex);
+		if (ImGui::SliderFloat("Roughness Value", &roughnessValue, 0.0f, 1.0f, "%.2f"))
+			mesh->SetRoughnessValue(selectedIndex, roughnessValue);
+	}
+	ImGui::TextDisabled("Texture paths can be absolute or relative to the model folder (or its .fbm folder).");
+	ImGui::InputText("Base Color Path", m_baseColorPathInput.data(), m_baseColorPathInput.size());
+	if (ImGui::Button("Apply Base Color Path"))
+		m_materialPathError = !mesh->SetColorTextureFile(selectedIndex, m_baseColorPathInput.data());
+	ImGui::InputText("Roughness Path", m_roughnessPathInput.data(), m_roughnessPathInput.size());
+	if (ImGui::Button("Apply Roughness Path"))
+		m_materialPathError = !mesh->SetRoughnessTextureFile(selectedIndex, m_roughnessPathInput.data());
+	if (m_materialPathError)
+		ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.25f, 1.0f), "Could not load the texture path.");
 
+	ImGui::SetNextItemOpen(false, ImGuiCond_FirstUseEver);
+	if (ImGui::CollapsingHeader("Rendering"))
+	{
+		bool emissiveEnabled = material.emissiveEnabled;
+		if (ImGui::Checkbox("Emissive", &emissiveEnabled))
+			mesh->SetEmissiveEnabled(selectedIndex, emissiveEnabled);
+		glm::vec3 emissiveColor = material.emissiveColor;
+		if (ImGui::ColorEdit3("Emissive Color", &emissiveColor.x))
+			mesh->SetEmissiveColor(selectedIndex, emissiveColor);
+		float emissiveBlendFactor = material.emissiveBlendFactor;
+		if (ImGui::SliderFloat("Emissive Blend", &emissiveBlendFactor, 0.0f, 1.0f, "%.2f"))
+			mesh->SetEmissiveBlendFactor(selectedIndex, emissiveBlendFactor);
+		bool castsShadow = mesh->CastsShadow(selectedIndex);
+		if (ImGui::Checkbox("Casts Shadow", &castsShadow))
+			mesh->SetCastsShadow(selectedIndex, castsShadow);
+	}
+
+	ImGui::SetNextItemOpen(false, ImGuiCond_FirstUseEver);
 	if (ImGui::CollapsingHeader("Submesh Collider"))
 	{
 		const std::size_t submeshIndex = static_cast<std::size_t>(selectedIndex);

@@ -240,6 +240,12 @@ namespace {
 						mesh->SetNormalTextureEnabled(index, saved.normalTextureEnabled);
 						mesh->SetRoughnessTextureEnabled(index, saved.roughnessTextureEnabled);
 						mesh->SetHeightTextureEnabled(index, saved.heightTextureEnabled);
+						if (!saved.baseColorTexturePath.empty())
+							mesh->SetColorTextureFile(index, saved.baseColorTexturePath);
+						if (!saved.roughnessTexturePath.empty())
+							mesh->SetRoughnessTextureFile(index, saved.roughnessTexturePath);
+						if (saved.roughnessValue >= 0.0f)
+							mesh->SetRoughnessValue(index, saved.roughnessValue);
 					}
 				}
 				object->SetDefaultPosition(object->Position());

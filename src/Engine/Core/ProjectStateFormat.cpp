@@ -263,6 +263,17 @@ namespace ProjectStateFormat {
 							+ ";" + std::to_string(mesh->HeightTextureEnabled(submeshIndex) ? 1 : 0)
 							+ ";" + EscapeField(mesh->SubMeshName(submeshIndex));
 					}
+					contents += ";submeshtexturepaths;" + std::to_string(mesh->NumBuffers());
+					for (int submeshIndex = 0; submeshIndex < mesh->NumBuffers(); ++submeshIndex)
+					{
+						contents += ";" + EscapeField(mesh->SubMeshName(submeshIndex))
+							+ ";" + EscapeField(mesh->ColorTextureOverridePath(submeshIndex))
+							+ ";" + EscapeField(mesh->RoughnessTextureOverridePath(submeshIndex));
+					}
+					contents += ";submeshroughnessvalues;" + std::to_string(mesh->NumBuffers());
+					for (int submeshIndex = 0; submeshIndex < mesh->NumBuffers(); ++submeshIndex)
+						contents += ";" + EscapeField(mesh->SubMeshName(submeshIndex))
+							+ ";" + std::to_string(mesh->RoughnessValue(submeshIndex));
 				}
 				if (object->IsSubmeshComponentOwner())
 					contents += ";submeshcomponent;"

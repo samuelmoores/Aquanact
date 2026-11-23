@@ -3,6 +3,7 @@
 #include "Engine/UI/EngineGuiContext.h"
 
 #include <string>
+#include <array>
 
 class Entity;
 class Component;
@@ -40,4 +41,9 @@ public:
 	mutable std::string m_triggerCodeStatusMessage;
 	mutable unsigned int m_pendingTriggerEntityId = 0;
 	mutable bool m_openTriggerCodePopupRequested = false;
+	mutable const void* m_materialPathMesh = nullptr;
+	mutable int m_materialPathSubmesh = -1;
+	mutable std::array<char, 1024> m_baseColorPathInput{};
+	mutable std::array<char, 1024> m_roughnessPathInput{};
+	mutable bool m_materialPathError = false;
 };

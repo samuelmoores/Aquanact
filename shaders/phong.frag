@@ -62,18 +62,15 @@ uniform samplerCube pointShadowMap7;
 uniform bool pointShadowReady[8];
 uniform float pointShadowFarPlanes[8];
 
-const vec3 PointShadowSampleOffsets[20] = vec3[](
-	vec3(1.0, 1.0, 1.0), vec3(1.0, 1.0, -1.0),
-	vec3(1.0, -1.0, 1.0), vec3(1.0, -1.0, -1.0),
-	vec3(-1.0, 1.0, 1.0), vec3(-1.0, 1.0, -1.0),
-	vec3(-1.0, -1.0, 1.0), vec3(-1.0, -1.0, -1.0),
-	vec3(1.0, 1.0, 0.0), vec3(1.0, -1.0, 0.0),
-	vec3(-1.0, 1.0, 0.0), vec3(-1.0, -1.0, 0.0),
-	vec3(1.0, 0.0, 1.0), vec3(1.0, 0.0, -1.0),
-	vec3(-1.0, 0.0, 1.0), vec3(-1.0, 0.0, -1.0),
-	vec3(0.0, 1.0, 1.0), vec3(0.0, 1.0, -1.0),
-	vec3(0.0, -1.0, 1.0), vec3(0.0, -1.0, -1.0)
-);
+vec2 PointShadowSampleOffset(int sampleIndex)
+{
+	// A golden-angle disk distributes the filter taps without a repeating
+	// polygonal pattern on large, flat receivers.
+	float index = float(sampleIndex);
+	float radialDistance = sqrt((index + 0.5) / 20.0);
+	float angle = 2.39996323 * index;
+	return vec2(cos(angle), sin(angle)) * radialDistance;
+}
 
 float CalculateShadow(vec3 geometricNormal, vec3 lightDirection)
 {
@@ -142,21 +139,35 @@ float CalculatePointShadow(int lightIndex, PointLight light, vec3 geometricNorma
 	// Compare in world units so changing a point light's radius does not also
 	// change its effective shadow bias. Smooth each comparison to avoid the
 	// discrete binary-sample intensity steps that produced visible contours.
-	float bias = 0.05 + 0.35 * (1.0 - normalAlignment);
-	float filterWidth = max(currentDepth * 0.0015, 0.04);
+	float bias = 0.15 + 0.5 * (1.0 - normalAlignment);
+	float filterWidth = max(light.radius * 0.00075, 0.04);
 	// Spread the cubemap taps across a broader region to soften point-light
-	// shadow boundaries at the current 512x512 shadow-map resolution.
-	float sampleRadius = max(currentDepth * 0.025, 0.002);
+	// shadow boundaries at the current 512x512 shadow-map resolution. Using
+	// the light's range as a stable world-space proxy avoids shadows getting
+	// noticeably harder when a receiver moves close to the light.
+	float sampleRadius = max(light.radius * 0.01, 0.002);
+	vec3 sampleAxis = normalize(fragToLight);
+	vec3 referenceAxis = abs(sampleAxis.z) < 0.999
+		? vec3(0.0, 0.0, 1.0) : vec3(0.0, 1.0, 0.0);
+	vec3 tangent = normalize(cross(sampleAxis, referenceAxis));
+	vec3 bitangent = cross(sampleAxis, tangent);
+	float rotation = InterleavedGradientNoise(gl_FragCoord.xy + vec2(float(lightIndex) * 17.0, 31.0)) * 6.2831853;
+	float rotationCos = cos(rotation);
+	float rotationSin = sin(rotation);
 	float shadow = 0.0;
 	for (int sampleIndex = 0; sampleIndex < 20; ++sampleIndex)
 	{
+		vec2 localOffset = PointShadowSampleOffset(sampleIndex);
+		vec2 rotatedTangentOffset = vec2(
+			localOffset.x * rotationCos - localOffset.y * rotationSin,
+			localOffset.x * rotationSin + localOffset.y * rotationCos);
+		vec3 worldOffset = tangent * rotatedTangentOffset.x + bitangent * rotatedTangentOffset.y;
 		float closestDepth = SamplePointShadowMap(
 			lightIndex,
-			fragToLight + PointShadowSampleOffsets[sampleIndex] * sampleRadius) * farPlane;
+			fragToLight + worldOffset * sampleRadius) * farPlane;
 		float depthDifference = currentDepth - bias - closestDepth;
 		// Keep equal/self depth fully lit. A symmetric transition around zero
-		// partially shadowed the receiver itself, and its distance-scaled width
-		// showed up as faint concentric rings around the point light.
+		// can partially shadow the receiver itself and cause a visible halo.
 		shadow += smoothstep(0.0, filterWidth, depthDifference);
 	}
 	return shadow / 20.0;
@@ -221,17 +232,29 @@ void main()
 
 	vec3 viewDirection = normalize(ViewPos - FragWorldPos);
 	vec3 baseColor = hasBaseTexture ? texture(baseTexture, materialTexCoord).rgb : vec3(0.20);
-	// Materials without a specular map should not inherit Assimp's generic
-	// specular factor, which creates highlights on otherwise unconfigured meshes.
-	vec3 specularStrength = hasSpecularTexture ? texture(specularTexture, materialTexCoord).rgb : vec3(0.0);
+	// Keep the material's ordinary specular response when no specular mask is
+	// assigned. A specular map then modulates that response per fragment, just
+	// like the diffuse/specular map setup in LearnOpenGL's lighting chapter.
+	vec3 specularStrength = vec3(material.z);
+	if (hasSpecularTexture)
+		specularStrength *= texture(specularTexture, materialTexCoord).rgb;
 	// FBX roughness maps are commonly scalar maps stored in the red channel.
-	// Sampling green makes multi-submesh FBX materials appear to have arbitrary
-	// roughness when the unused channels contain unrelated or zero data.
-	float roughness = hasRoughnessTexture ? texture(roughnessTexture, materialTexCoord).r : 1.0;
-	// Roughness maps use the conventional [0, 1] range. Convert to the
-	// existing Phong exponent so roughness can be used without a full shader
-	// model rewrite: 0 is a tight highlight and 1 is a broad highlight.
-	float shininess = mix(128.0, 2.0, roughness * roughness);
+	// When the map is disabled, recover roughness from the imported Phong
+	// shininess value so the fallback slider controls specular energy as well.
+	float fallbackRoughness = sqrt(clamp(
+		(128.0 - clamp(material.w, 2.0, 128.0)) / 126.0, 0.0, 1.0));
+	float roughness = hasRoughnessTexture
+		? clamp(texture(roughnessTexture, materialTexCoord).r, 0.0, 1.0)
+		: fallbackRoughness;
+	// A roughness map is the inverse of a shininess map: black gives a tight
+	// specular highlight and white gives a broad one. Keep imported shininess as
+	// the fallback when no roughness map is connected.
+	float shininess = hasRoughnessTexture
+		? mix(128.0, 2.0, roughness * roughness)
+		: max(material.w, 1.0);
+	// Phong shininess alone still creates a broad highlight at full roughness.
+	// Fade its strength too, reaching zero for a completely rough surface.
+	specularStrength *= (1.0 - roughness) * (1.0 - roughness);
 
 	vec3 litColor = CalculateDirectionalLight(baseColor, specularStrength, shininess, vertexNormal, geometricNormal, viewDirection);
 	

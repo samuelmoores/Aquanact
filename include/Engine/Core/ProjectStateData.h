@@ -179,6 +179,9 @@ namespace ProjectStateData {
 				bool normalTextureEnabled = true;
 				bool roughnessTextureEnabled = true;
 				bool heightTextureEnabled = true;
+				std::string baseColorTexturePath;
+				std::string roughnessTexturePath;
+				float roughnessValue = -1.0f;
 				std::string name;
 			};
 			std::filesystem::path sourcePath;

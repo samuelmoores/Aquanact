@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <stdexcept>
 #include <filesystem>
+#include <system_error>
 
 #include "Engine/Core/GLHeaders.h"
 #include "Engine/Core/Debug.h"
@@ -59,6 +60,43 @@ namespace {
 		std::transform(filename.begin(), filename.end(), filename.begin(),
 			[](unsigned char character) { return static_cast<char>(std::tolower(character)); });
 		return filename.find("height") != std::string::npos;
+	}
+
+	std::filesystem::path NormalizeTextureOverridePath(const std::filesystem::path& texturePath)
+	{
+		std::string value = texturePath.string();
+		const auto isSpace = [](unsigned char character) { return std::isspace(character) != 0; };
+		value.erase(value.begin(), std::find_if_not(value.begin(), value.end(), isSpace));
+		value.erase(std::find_if_not(value.rbegin(), value.rend(), isSpace).base(), value.end());
+		if (value.size() >= 2 && (value.front() == '"' || value.front() == '\'') && value.back() == value.front())
+			value = value.substr(1, value.size() - 2);
+		return std::filesystem::path(value);
+	}
+
+	std::filesystem::path ResolveTextureOverridePath(const std::string& modelPath, const std::filesystem::path& requestedPath)
+	{
+		const std::filesystem::path texturePath = NormalizeTextureOverridePath(requestedPath);
+		if (texturePath.is_absolute())
+			return texturePath;
+		const std::filesystem::path modelDirectory = std::filesystem::path(modelPath).parent_path();
+		const std::filesystem::path directPath = modelDirectory / texturePath;
+		if (std::filesystem::exists(directPath))
+			return directPath;
+		const std::filesystem::path modelTextureDirectory = modelDirectory /
+			(std::filesystem::path(modelPath).stem().string() + ".fbm");
+		const std::filesystem::path modelTexturePath = modelTextureDirectory / texturePath;
+		if (std::filesystem::exists(modelTexturePath))
+			return modelTexturePath;
+		std::error_code error;
+		for (std::filesystem::directory_iterator it(modelDirectory, error), end; !error && it != end; it.increment(error))
+		{
+			if (!it->is_directory(error) || it->path().extension() != ".fbm")
+				continue;
+			const std::filesystem::path candidate = it->path() / texturePath;
+			if (std::filesystem::exists(candidate))
+				return candidate;
+		}
+		return {};
 	}
 
 }
@@ -495,11 +533,41 @@ bool Mesh::HasHeightTexture(int index) const
 	return index >= 0 && index < static_cast<int>(m_textureHeight.size()) && m_textureHeight[index] != 0;
 }
 
+float Mesh::RoughnessValue(int index) const
+{
+	if (index < 0 || index >= static_cast<int>(m_materials.size()))
+		return 1.0f;
+	const float shininess = glm::clamp(m_materials[index].phong.w, 2.0f, 128.0f);
+	return std::sqrt(glm::clamp((128.0f - shininess) / 126.0f, 0.0f, 1.0f));
+}
+
+void Mesh::SetRoughnessValue(int index, float roughness)
+{
+	if (index < 0 || index >= static_cast<int>(m_materials.size()))
+		return;
+	const float clampedRoughness = glm::clamp(roughness, 0.0f, 1.0f);
+	m_materials[index].phong.w = 128.0f - 126.0f * clampedRoughness * clampedRoughness;
+}
+
 const std::string& Mesh::ColorTexturePath(int index) const
 {
 	static const std::string empty;
 	return index >= 0 && index < static_cast<int>(m_colorTexturePaths.size())
 		? m_colorTexturePaths[index] : empty;
+}
+
+const std::string& Mesh::ColorTextureOverridePath(int index) const
+{
+	static const std::string empty;
+	return index >= 0 && index < static_cast<int>(m_colorTextureOverridePaths.size())
+		? m_colorTextureOverridePaths[index] : empty;
+}
+
+const std::string& Mesh::RoughnessTextureOverridePath(int index) const
+{
+	static const std::string empty;
+	return index >= 0 && index < static_cast<int>(m_roughnessTextureOverridePaths.size())
+		? m_roughnessTextureOverridePaths[index] : empty;
 }
 
 const std::string& Mesh::MaterialName(int index) const
@@ -654,17 +722,20 @@ void Mesh::SetTexture(const char* colorFile)
 
 bool Mesh::SetColorTextureFile(int index, const std::filesystem::path& texturePath)
 {
-	if (index < 0 || index >= static_cast<int>(m_textureColor.size()) || !std::filesystem::exists(texturePath))
+	if (index < 0 || index >= static_cast<int>(m_textureColor.size()))
 		return false;
+	const std::filesystem::path normalizedPath = NormalizeTextureOverridePath(texturePath);
+	const std::filesystem::path resolvedPath = ResolveTextureOverridePath(m_sourcePath, texturePath);
+	if (!std::filesystem::exists(resolvedPath)) return false;
 
-	const std::string key = std::filesystem::weakly_canonical(texturePath).string();
+	const std::string key = std::filesystem::weakly_canonical(resolvedPath).string();
 	auto cached = m_colorTextureOverrides.find(key);
 	if (cached == m_colorTextureOverrides.end())
 	{
 		try
 		{
 			StbImage image;
-			image.loadFromFile(texturePath.string().c_str());
+			image.loadFromFile(resolvedPath.string().c_str());
 			const uint32_t texture = CreateTextureFromPixels(
 				image.getWidth(), image.getHeight(), image.getData(), true);
 			cached = m_colorTextureOverrides.emplace(key, texture).first;
@@ -680,6 +751,42 @@ bool Mesh::SetColorTextureFile(int index, const std::filesystem::path& texturePa
 	if (index >= static_cast<int>(m_colorTexturePaths.size()))
 		m_colorTexturePaths.resize(static_cast<std::size_t>(index) + 1);
 	m_colorTexturePaths[index] = key;
+	SetColorTextureEnabled(index, true);
+	if (index >= static_cast<int>(m_colorTextureOverridePaths.size()))
+		m_colorTextureOverridePaths.resize(static_cast<std::size_t>(index) + 1);
+	m_colorTextureOverridePaths[index] = normalizedPath.string();
+	return true;
+}
+
+bool Mesh::SetRoughnessTextureFile(int index, const std::filesystem::path& texturePath)
+{
+	if (index < 0 || index >= static_cast<int>(m_textureRoughness.size())) return false;
+	const std::filesystem::path normalizedPath = NormalizeTextureOverridePath(texturePath);
+	const std::filesystem::path resolvedPath = ResolveTextureOverridePath(m_sourcePath, texturePath);
+	if (!std::filesystem::exists(resolvedPath)) return false;
+	const std::string key = std::filesystem::weakly_canonical(resolvedPath).string();
+	auto cached = m_roughnessTextureOverrides.find(key);
+	if (cached == m_roughnessTextureOverrides.end())
+	{
+		try
+		{
+			StbImage image;
+			image.loadFromFile(resolvedPath.string().c_str());
+			const uint32_t texture = CreateTextureFromPixels(image.getWidth(), image.getHeight(), image.getData(), true);
+			cached = m_roughnessTextureOverrides.emplace(key, texture).first;
+		}
+		catch (const std::exception& exception)
+		{
+			Root::Current().Debugger().LogTagged(Debug::Severity::Warning, "MaterialTexture",
+				"Could not load roughness override: " + resolvedPath.string() + " (" + exception.what() + ")");
+			return false;
+		}
+	}
+	m_textureRoughness[index] = cached->second;
+	SetRoughnessTextureEnabled(index, true);
+	if (index >= static_cast<int>(m_roughnessTextureOverridePaths.size()))
+		m_roughnessTextureOverridePaths.resize(static_cast<std::size_t>(index) + 1);
+	m_roughnessTextureOverridePaths[index] = normalizedPath.string();
 	return true;
 }
 

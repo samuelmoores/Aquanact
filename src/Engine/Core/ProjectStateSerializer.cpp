@@ -1464,14 +1464,16 @@ namespace ProjectStateSerializer {
 						}
 						continue;
 					}
-					if (fields[marker] == "submeshmaterials")
+					if (fields[marker] == "submeshmaterials" || fields[marker] == "submeshmaterials2")
 					{
 						try
 						{
-							const std::size_t count = std::min<std::size_t>(std::stoul(fields[marker + 1]), (fields.size() - marker - 2) / 12);
+							const bool simplified = fields[marker] == "submeshmaterials2";
+							const std::size_t recordSize = simplified ? 9 : 12;
+							const std::size_t count = std::min<std::size_t>(std::stoul(fields[marker + 1]), (fields.size() - marker - 2) / recordSize);
 							for (std::size_t i = 0; i < count; ++i)
 							{
-								const std::size_t offset = marker + 2 + i * 12;
+								const std::size_t offset = marker + 2 + i * recordSize;
 								PendingLevel::PendingObject::SubmeshMaterialData setting;
 								const auto isTrue = [&fields](std::size_t index)
 								{
@@ -1482,12 +1484,74 @@ namespace ProjectStateSerializer {
 								setting.emissiveBlendFactor = std::stof(fields[offset + 4]);
 								setting.castsShadow = isTrue(offset + 5);
 								setting.colorTextureEnabled = isTrue(offset + 6);
-								setting.specularTextureEnabled = isTrue(offset + 7);
-								setting.normalTextureEnabled = isTrue(offset + 8);
-								setting.roughnessTextureEnabled = isTrue(offset + 9);
-								setting.heightTextureEnabled = isTrue(offset + 10);
-								setting.name = ProjectStateFormat::UnescapeField(fields[offset + 11]);
+								if (simplified)
+								{
+									setting.roughnessTextureEnabled = isTrue(offset + 7);
+									setting.name = ProjectStateFormat::UnescapeField(fields[offset + 8]);
+								}
+								else
+								{
+									setting.specularTextureEnabled = isTrue(offset + 7);
+									setting.normalTextureEnabled = isTrue(offset + 8);
+									setting.roughnessTextureEnabled = isTrue(offset + 9);
+									setting.heightTextureEnabled = isTrue(offset + 10);
+									setting.name = ProjectStateFormat::UnescapeField(fields[offset + 11]);
+								}
 								object.submeshMaterialSettings.push_back(std::move(setting));
+							}
+						}
+						catch (...) { object.submeshMaterialSettings.clear(); }
+						continue;
+					}
+					if (fields[marker] == "submeshtexturepaths")
+					{
+						try
+						{
+							const std::size_t count = std::min<std::size_t>(std::stoul(fields[marker + 1]), (fields.size() - marker - 2) / 3);
+							for (std::size_t i = 0; i < count; ++i)
+							{
+								const std::size_t offset = marker + 2 + i * 3;
+								auto setting = std::find_if(object.submeshMaterialSettings.begin(), object.submeshMaterialSettings.end(),
+									[&fields, offset](const auto& candidate)
+									{ return candidate.name == ProjectStateFormat::UnescapeField(fields[offset]); });
+								if (setting == object.submeshMaterialSettings.end())
+								{
+									PendingLevel::PendingObject::SubmeshMaterialData data;
+									data.name = ProjectStateFormat::UnescapeField(fields[offset]);
+									data.baseColorTexturePath = ProjectStateFormat::UnescapeField(fields[offset + 1]);
+									data.roughnessTexturePath = ProjectStateFormat::UnescapeField(fields[offset + 2]);
+									object.submeshMaterialSettings.push_back(std::move(data));
+								}
+								else
+								{
+									setting->baseColorTexturePath = ProjectStateFormat::UnescapeField(fields[offset + 1]);
+									setting->roughnessTexturePath = ProjectStateFormat::UnescapeField(fields[offset + 2]);
+								}
+							}
+						}
+						catch (...) { object.submeshMaterialSettings.clear(); }
+						continue;
+					}
+					if (fields[marker] == "submeshroughnessvalues")
+					{
+						try
+						{
+							const std::size_t count = std::min<std::size_t>(std::stoul(fields[marker + 1]), (fields.size() - marker - 2) / 2);
+							for (std::size_t i = 0; i < count; ++i)
+							{
+								const std::size_t offset = marker + 2 + i * 2;
+								const std::string name = ProjectStateFormat::UnescapeField(fields[offset]);
+								auto setting = std::find_if(object.submeshMaterialSettings.begin(), object.submeshMaterialSettings.end(),
+									[&name](const auto& candidate) { return candidate.name == name; });
+								if (setting == object.submeshMaterialSettings.end())
+								{
+									PendingLevel::PendingObject::SubmeshMaterialData data;
+									data.name = name;
+									data.roughnessValue = std::stof(fields[offset + 1]);
+									object.submeshMaterialSettings.push_back(std::move(data));
+								}
+								else
+									setting->roughnessValue = std::stof(fields[offset + 1]);
 							}
 						}
 						catch (...) { object.submeshMaterialSettings.clear(); }
