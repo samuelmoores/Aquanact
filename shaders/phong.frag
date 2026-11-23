@@ -144,7 +144,9 @@ float CalculatePointShadow(int lightIndex, PointLight light, vec3 geometricNorma
 	// discrete binary-sample intensity steps that produced visible contours.
 	float bias = 0.05 + 0.35 * (1.0 - normalAlignment);
 	float filterWidth = max(currentDepth * 0.0015, 0.04);
-	float sampleRadius = max(currentDepth * 0.003, 0.002);
+	// Spread the cubemap taps across a broader region to soften point-light
+	// shadow boundaries at the current 512x512 shadow-map resolution.
+	float sampleRadius = max(currentDepth * 0.025, 0.002);
 	float shadow = 0.0;
 	for (int sampleIndex = 0; sampleIndex < 20; ++sampleIndex)
 	{
