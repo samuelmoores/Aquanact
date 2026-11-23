@@ -73,6 +73,9 @@ private:
 	bool m_insideDresserTrigger = false;
 	bool m_open = false;
 	bool m_previousEPressed = false;
+	bool m_previousUpPressed = false;
+	bool m_previousDownPressed = false;
+	int m_selectedShirtTexture = 0;
 	bool m_previousMovementLock = false;
 
 	glm::vec2 m_playerPositionOffset{0.0f, 160.0f};

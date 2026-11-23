@@ -157,6 +157,8 @@ public:
 		const glm::vec3& sweepNormal, const glm::vec3& velocity, bool grounded);
 	bool ShowPhysicsDiagnosticsWindow() const;
 	void SetShowPhysicsDiagnosticsWindow(bool show);
+	bool ShowMaterialsDiagnosticsWindow() const { return m_showMaterialsDiagnosticsWindow; }
+	void SetShowMaterialsDiagnosticsWindow(bool show) { m_showMaterialsDiagnosticsWindow = show; }
 	bool ShowLevelColliderDebugShapes() const;
 	void SetShowLevelColliderDebugShapes(bool show);
 	void SetSelectedLevelCollider(class LevelCollider* collider) { m_selectedLevelCollider = collider; }
@@ -214,6 +216,7 @@ private:
 	bool m_showTriggerSpheres = false;
 	bool m_showPointLightDebugSpheres = false;
 	bool m_showPhysicsDiagnosticsWindow = false;
+	bool m_showMaterialsDiagnosticsWindow = false;
 	bool m_showMotionDiagnostics = false;
 	bool m_showCameraDiagnostics = false;
 	bool m_showPathedCameraDiagnostics = false;

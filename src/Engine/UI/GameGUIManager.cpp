@@ -822,6 +822,7 @@ void GameGUIManager::DrawReturnButton()
 	bool showEntityStateDiagnostics = Root::Current().Debugger().ShowEntityStateDiagnosticsWindow();
 	bool showAnimationDiagnostics = Root::Current().Debugger().ShowAnimationDiagnosticsWindow();
 	bool showPhysicsDiagnostics = Root::Current().Debugger().ShowPhysicsDiagnosticsWindow();
+	bool showMaterialsDiagnostics = Root::Current().Debugger().ShowMaterialsDiagnosticsWindow();
 	bool showMotionDiagnostics = Root::Current().Debugger().ShowMotionDiagnostics();
 	bool showCameraDiagnostics = Root::Current().Debugger().ShowCameraDiagnostics();
 	bool showPathedCameraDiagnostics = Root::Current().Debugger().ShowPathedCameraDiagnostics();
@@ -837,6 +838,7 @@ void GameGUIManager::DrawReturnButton()
 	ImGui::Checkbox("Gameplay", &showGameplayDiagnostics);
 	ImGui::Checkbox("Level Colliders", &showLevelColliders);
 	ImGui::Checkbox("Motion", &showMotionDiagnostics);
+	ImGui::Checkbox("Materials", &showMaterialsDiagnostics);
 	ImGui::Checkbox("Pathed Camera", &showPathedCameraDiagnostics);
 	ImGui::Checkbox("Physics", &showPhysicsDiagnostics);
 	ImGui::Checkbox("Profiler", &profilerEnabled);
@@ -851,6 +853,7 @@ void GameGUIManager::DrawReturnButton()
 	Root::Current().Debugger().SetShowMotionDiagnostics(showMotionDiagnostics);
 	Root::Current().Debugger().SetShowPathedCameraDiagnostics(showPathedCameraDiagnostics);
 	Root::Current().Debugger().SetShowPhysicsDiagnosticsWindow(showPhysicsDiagnostics);
+	Root::Current().Debugger().SetShowMaterialsDiagnosticsWindow(showMaterialsDiagnostics);
 	Root::Current().Profiler().SetEnabled(profilerEnabled);
 	Root::Current().Debugger().SetShowStatsWindow(showRenderStats);
 	ImGui::End();

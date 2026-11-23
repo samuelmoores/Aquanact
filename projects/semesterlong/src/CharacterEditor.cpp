@@ -4,9 +4,11 @@
 #include "Engine/Core/Camera.h"
 #include "Engine/Core/EngineCamera.h"
 #include "Engine/Core/Line.h"
+#include "Engine/Core/Mesh.h"
 #include "Engine/Core/Input.h"
 #include "Engine/Core/PathedCamera.h"
 #include "Engine/Core/PhysicsWorld.h"
+#include "Engine/Core/ProjectManager.h"
 #include "Engine/Core/RenderManager.h"
 #include "Engine/Core/Root.h"
 #include "Engine/Core/Scene.h"
@@ -17,6 +19,7 @@
 #include <GLFW/glfw3.h>
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
 #include <vector>
 #include <glm/geometric.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -97,6 +100,12 @@ void CharacterEditor::Update(Entity& owner, float dt)
 	const bool ePressed = Root::Current().InputRef().KeyDown(GLFW_KEY_E);
 	const bool eJustPressed = ePressed && !m_previousEPressed;
 	m_previousEPressed = ePressed;
+	const bool upPressed = Root::Current().InputRef().KeyDown(GLFW_KEY_UP);
+	const bool downPressed = Root::Current().InputRef().KeyDown(GLFW_KEY_DOWN);
+	const bool upJustPressed = upPressed && !m_previousUpPressed;
+	const bool downJustPressed = downPressed && !m_previousDownPressed;
+	m_previousUpPressed = upPressed;
+	m_previousDownPressed = downPressed;
 
 	Scene* scene = Root::Current().Scenes().ActiveLevel();
 	if (!scene)
@@ -143,6 +152,21 @@ void CharacterEditor::Update(Entity& owner, float dt)
 
 	if (m_open)
 	{
+		if ((upJustPressed || downJustPressed) && m_player->GetMesh())
+		{
+			// Paths are relative to the loaded project's assets directory.
+			static const char* const shirtTextures[] = { "white_shirt", "black_shirt" };
+			// With two options, either direction toggles to the other look.
+			m_selectedShirtTexture = 1 - m_selectedShirtTexture;
+			const std::filesystem::path texturePath = Root::Current().Projects().ProjectAssetsDirectory()
+				/ "models" / "kyle_clothes" / shirtTextures[m_selectedShirtTexture]
+				/ "M_Kyle_Body_Base_color.png";
+			Mesh* mesh = m_player->GetMesh();
+			for (int submesh = 0; submesh < mesh->NumBuffers(); ++submesh)
+				if ((mesh->SubMeshName(submesh) == "longsleaveshirt" ||
+					mesh->SubMeshName(submesh) == "longsleaveshirt2") && mesh->HasColorTexture(submesh))
+					mesh->SetColorTextureFile(submesh, texturePath);
+		}
 		m_playerController->SetMovementLocked(true);
 		FacePlayerToCamera(*m_player);
 		ApplyEditorCamera();

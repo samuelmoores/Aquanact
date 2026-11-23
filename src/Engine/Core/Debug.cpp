@@ -33,6 +33,7 @@
 #include <chrono>
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <iomanip>
 #include <limits>
 #include <filesystem>
@@ -891,6 +892,56 @@ void Debug::drawGameModeInput(const Input& input)
 	if (m_showStatsWindow)
 	{
 		DrawRenderStatsWindow();
+	}
+	if (m_showMaterialsDiagnosticsWindow)
+	{
+		bool open = m_showMaterialsDiagnosticsWindow;
+		ImGui::Begin("Materials Diagnostics", &open);
+		const Scene* scene = Root::Current().Scenes().ActiveLevel();
+		if (!scene)
+			ImGui::TextDisabled("No active scene.");
+		else
+		{
+			for (const auto& entity : scene->Objects())
+			{
+				if (!entity)
+					continue;
+				Mesh* mesh = entity->GetMesh();
+				if (!ImGui::TreeNode(entity.get(), "%s  |  Mesh: %s", entity->Name().c_str(),
+					mesh ? entity->SourcePath().c_str() : "<none>"))
+					continue;
+				if (!mesh)
+					ImGui::TextDisabled("No mesh attached.");
+				else
+				{
+					for (int i = 0; i < mesh->NumBuffers(); ++i)
+					{
+						const SubMeshMaterial& material = mesh->GetMaterial(i);
+						const std::string label = "Submesh " + std::to_string(i) + ": " + mesh->SubMeshName(i);
+						if (ImGui::TreeNode(reinterpret_cast<void*>(static_cast<intptr_t>(i + 1)), "%s", label.c_str()))
+						{
+							ImGui::Text("Material: %s", mesh->MaterialName(i).empty() ? "<unnamed>" : mesh->MaterialName(i).c_str());
+							ImGui::Text("Base color texture: %s", mesh->HasColorTexture(i) ? mesh->ColorTexturePath(i).c_str() : "<none>");
+							ImGui::Text("Other maps: specular %s | normal %s | roughness %s | height %s",
+								mesh->HasSpecularTexture(i) ? "yes" : "no",
+								mesh->HasNormalTexture(i) ? "yes" : "no",
+								mesh->HasRoughnessTexture(i) ? "yes" : "no",
+								mesh->HasHeightTexture(i) ? "yes" : "no");
+							ImGui::Text("Base texture enabled: %s", mesh->ColorTextureEnabled(i) ? "yes" : "no");
+							ImGui::Text("Phong: %.3f, %.3f, %.3f, %.3f",
+								material.phong.x, material.phong.y, material.phong.z, material.phong.w);
+							ImGui::Text("Ambient: %.3f, %.3f, %.3f | Emissive: %s",
+								material.ambientColor.x, material.ambientColor.y, material.ambientColor.z,
+								material.emissiveEnabled ? "enabled" : "disabled");
+							ImGui::TreePop();
+						}
+					}
+				}
+				ImGui::TreePop();
+			}
+		}
+		ImGui::End();
+		m_showMaterialsDiagnosticsWindow = open;
 	}
 
 	if (m_showGameInputWindow)

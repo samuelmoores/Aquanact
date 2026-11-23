@@ -495,6 +495,20 @@ bool Mesh::HasHeightTexture(int index) const
 	return index >= 0 && index < static_cast<int>(m_textureHeight.size()) && m_textureHeight[index] != 0;
 }
 
+const std::string& Mesh::ColorTexturePath(int index) const
+{
+	static const std::string empty;
+	return index >= 0 && index < static_cast<int>(m_colorTexturePaths.size())
+		? m_colorTexturePaths[index] : empty;
+}
+
+const std::string& Mesh::MaterialName(int index) const
+{
+	static const std::string empty;
+	return index >= 0 && index < static_cast<int>(m_materialNames.size())
+		? m_materialNames[index] : empty;
+}
+
 namespace
 {
 	bool TextureEnabled(const std::vector<bool>& enabled, int index)
@@ -638,6 +652,37 @@ void Mesh::SetTexture(const char* colorFile)
 	LoadTextureFile(TextureSlot::Diffuse, colorFile);
 }
 
+bool Mesh::SetColorTextureFile(int index, const std::filesystem::path& texturePath)
+{
+	if (index < 0 || index >= static_cast<int>(m_textureColor.size()) || !std::filesystem::exists(texturePath))
+		return false;
+
+	const std::string key = std::filesystem::weakly_canonical(texturePath).string();
+	auto cached = m_colorTextureOverrides.find(key);
+	if (cached == m_colorTextureOverrides.end())
+	{
+		try
+		{
+			StbImage image;
+			image.loadFromFile(texturePath.string().c_str());
+			const uint32_t texture = CreateTextureFromPixels(
+				image.getWidth(), image.getHeight(), image.getData(), true);
+			cached = m_colorTextureOverrides.emplace(key, texture).first;
+		}
+		catch (const std::exception& exception)
+		{
+			Root::Current().Debugger().LogTagged(Debug::Severity::Warning, "MaterialTexture",
+				"Could not load base color override: " + texturePath.string() + " (" + exception.what() + ")");
+			return false;
+		}
+	}
+	m_textureColor[index] = cached->second;
+	if (index >= static_cast<int>(m_colorTexturePaths.size()))
+		m_colorTexturePaths.resize(static_cast<std::size_t>(index) + 1);
+	m_colorTexturePaths[index] = key;
+	return true;
+}
+
 std::vector<uint32_t>& Mesh::TexturesForSlot(TextureSlot slot)
 {
 	switch (slot)
@@ -753,6 +798,19 @@ aiReturn Mesh::GetMaterialTexturePath(aiMaterial* mat, aiTextureType textureType
 
 void Mesh::LoadMaterialTextures(aiMaterial* mat, int subMeshIndex)
 {
+	if (subMeshIndex >= static_cast<int>(m_materialNames.size()))
+	{
+		m_materialNames.resize(static_cast<std::size_t>(subMeshIndex) + 1);
+		m_colorTexturePaths.resize(static_cast<std::size_t>(subMeshIndex) + 1);
+	}
+	aiString diagnosticMaterialName;
+	mat->Get(AI_MATKEY_NAME, diagnosticMaterialName);
+	m_materialNames[subMeshIndex] = diagnosticMaterialName.C_Str();
+	aiString diagnosticColorPath;
+	if (mat->GetTexture(aiTextureType_DIFFUSE, 0, &diagnosticColorPath) != AI_SUCCESS)
+		mat->GetTexture(aiTextureType_BASE_COLOR, 0, &diagnosticColorPath);
+	m_colorTexturePaths[subMeshIndex] = diagnosticColorPath.length
+		? diagnosticColorPath.C_Str() : "<none>";
 	const auto texturePath = [mat](aiTextureType type)
 	{
 		aiString path;

@@ -66,6 +66,7 @@ class Mesh {
 		//getter setter
 		void SetBuffers(std::vector<Vertex3D> vertices, std::vector<uint32_t> faces);
 		void SetTexture(const char* colorFile);
+		bool SetColorTextureFile(int index, const std::filesystem::path& texturePath);
 		void LoadTexture(aiMaterial* mat, aiTextureType textureType);
 		const Skeleton& GetSkeleton() const;
 		Skeleton* GetSkeletonPtr();
@@ -82,6 +83,8 @@ class Mesh {
 		bool HasNormalTexture(int index) const;
 		bool HasRoughnessTexture(int index) const;
 		bool HasHeightTexture(int index) const;
+		const std::string& ColorTexturePath(int index) const;
+		const std::string& MaterialName(int index) const;
 		bool ColorTextureEnabled(int index) const;
 		bool SpecularTextureEnabled(int index) const;
 		bool NormalTextureEnabled(int index) const;
@@ -134,6 +137,9 @@ class Mesh {
 		std::vector<uint32_t> m_faces;
 		std::vector<uint32_t> m_vao;
 		std::vector<uint32_t> m_textureColor;
+		std::map<std::string, uint32_t> m_colorTextureOverrides;
+		std::vector<std::string> m_colorTexturePaths;
+		std::vector<std::string> m_materialNames;
 		std::vector<uint32_t> m_textureSpecular;
 		std::vector<uint32_t> m_textureNormal;
 		std::vector<uint32_t> m_textureRoughness;
