@@ -302,13 +302,22 @@ void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManage
 	else
 		m_selection.submeshComponentEntityId = 0;
 	if (m_selection.entityId != 0)
+	{
 		m_selection.pointLightIndex = -1;
+		m_selection.spotLightIndex = -1;
+	}
 	const std::size_t pointLightCount = Root::Current().Render().Lights().PointLights().size();
 	if (m_selection.pointLightIndex < 0 ||
 		m_selection.pointLightIndex >= static_cast<int>(pointLightCount))
 	{
 		m_selection.pointLightIndex = -1;
 	}
+	const std::size_t spotLightCount = Root::Current().Render().Lights().SpotLights().size();
+	if (m_selection.spotLightIndex < 0 ||
+		m_selection.spotLightIndex >= static_cast<int>(spotLightCount))
+		m_selection.spotLightIndex = -1;
+	if (m_selection.pointLightIndex >= 0)
+		m_selection.spotLightIndex = -1;
 
 	const EngineMenuBarResult viewResult =
 		m_menuBar.Draw(context, m_showAxis, m_showGrid, m_windowState, m_popupRequests);
@@ -371,7 +380,8 @@ void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManage
 	m_lightingWindow.Draw(
 		Root::Current().Render().Lights(),
 		m_windowState.showLightingWindow,
-		m_selection.pointLightIndex);
+		m_selection.pointLightIndex,
+		m_selection.spotLightIndex);
 
 	// Evaluate scene interaction after every editor window has been submitted so
 	// real UI ownership can be distinguished from ImGuizmo's next-frame mouse

@@ -738,6 +738,7 @@ void EngineMenuBar::DrawSceneMenu(
 			context.selection->submeshIndex = -1;
 			context.selection->submeshComponentEntityId = 0;
 			context.selection->pointLightIndex = -1;
+			context.selection->spotLightIndex = -1;
 			context.selection->levelColliderIndex = -1;
 			windowState.showEntityWindow = true;
 		}

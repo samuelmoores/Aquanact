@@ -150,6 +150,7 @@ void SceneWindow::Draw(
 					context.selection->submeshComponentEntityId = 0;
 					context.selection->levelColliderIndex = -1;
 					context.selection->pointLightIndex = -1;
+					context.selection->spotLightIndex = -1;
 					entityWindowOpen = true;
 				}
 				if (expanded && hasSubmeshes)
@@ -173,6 +174,7 @@ void SceneWindow::Draw(
 							pendingSubmeshIndex = submeshIndex;
 							context.selection->levelColliderIndex = -1;
 							context.selection->pointLightIndex = -1;
+							context.selection->spotLightIndex = -1;
 							entityWindowOpen = true;
 						}
 						ImGui::PopID();
@@ -224,6 +226,7 @@ void SceneWindow::DrawLevelColliderWindow(const EngineGuiFrameContext& context, 
 		context.selection->submeshIndex = -1;
 		context.selection->submeshComponentEntityId = 0;
 		context.selection->pointLightIndex = -1;
+		context.selection->spotLightIndex = -1;
 		if (added) PhysicsWorld::Instance().Add(*added);
 	}
 	ImGui::TextUnformatted("Gizmo Operations");
@@ -252,6 +255,7 @@ void SceneWindow::DrawLevelColliderWindow(const EngineGuiFrameContext& context, 
 			context.selection->submeshIndex = -1;
 			context.selection->submeshComponentEntityId = 0;
 			context.selection->pointLightIndex = -1;
+			context.selection->spotLightIndex = -1;
 		}
 	}
 	if (selected >= 0 && selected < static_cast<int>(scene->LevelColliders().size()))

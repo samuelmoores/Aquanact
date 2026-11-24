@@ -31,6 +31,22 @@ namespace ProjectStateData {
 		bool castsShadows = false;
 	};
 
+	struct SpotLightData {
+		glm::vec3 position{ 0.0f, 2.0f, 0.0f };
+		glm::vec3 direction{ 0.0f, -1.0f, 0.0f };
+		glm::vec3 color{ 1.0f };
+		float intensity = 1.0f;
+		float ambient = 0.0f;
+		float radius = 500.0f;
+		float radiusFade = 0.75f;
+		float innerAngle = 12.5f;
+		float outerAngle = 17.5f;
+		float constant = 1.0f;
+		float linear = 0.004f;
+		float quadratic = 0.000004f;
+		bool castsShadows = false;
+	};
+
 	struct PendingController {
 		std::filesystem::path sourcePath;
 		unsigned int entityId = 0;
@@ -167,6 +183,7 @@ namespace ProjectStateData {
 		bool hasSunLight = false;
 		DirectionalLightData sunLight;
 		std::vector<PointLightData> pointLights;
+		std::vector<SpotLightData> spotLights;
 		struct PendingObject {
 			struct SubmeshColliderData { bool enabled = true; int shape = 0; bool useEntityDefaultShape = true; std::string name; };
 			struct SubmeshMaterialData {
@@ -267,8 +284,10 @@ namespace ProjectStateData {
 		bool showPhysicsDiagnosticsWindow = false;
 		using DirectionalLightData = ProjectStateData::DirectionalLightData;
 		using PointLightData = ProjectStateData::PointLightData;
+		using SpotLightData = ProjectStateData::SpotLightData;
 		DirectionalLightData sunLight;
 		std::vector<PointLightData> pointLights;
+		std::vector<SpotLightData> spotLights;
 		bool hasLegacyLighting = false;
 		bool hasSceneLighting = false;
 		std::string imguiLayout;

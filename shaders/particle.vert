@@ -29,9 +29,24 @@ struct ParticlePointLight {
     float linear;
     float quadratic;
 };
+struct ParticleSpotLight {
+    vec3 position;
+    vec3 direction;
+    vec3 color;
+    float intensity;
+    float radius;
+    float radiusFade;
+    float innerCutoff;
+    float outerCutoff;
+    float constant;
+    float linear;
+    float quadratic;
+};
 uniform ParticleSunLight sunLight;
 uniform int pointLightCount;
 uniform ParticlePointLight pointLights[8];
+uniform int spotLightCount;
+uniform ParticleSpotLight spotLights[8];
 
 out vec4 particleColor;
 out float size;
@@ -63,6 +78,21 @@ void main()
             distanceToLight);
         float lightLuminance = dot(light.color, vec3(0.2126, 0.7152, 0.0722));
         brightness += lightLuminance * light.intensity * attenuation * radiusFactor;
+    }
+    for (int lightIndex = 0; lightIndex < 8; ++lightIndex)
+    {
+        if (lightIndex >= spotLightCount) break;
+        ParticleSpotLight light = spotLights[lightIndex];
+        vec3 fromLight = worldPosition - light.position;
+        float distanceToLight = length(fromLight);
+        float coneCosine = dot(normalize(fromLight), normalize(light.direction));
+        float coneFactor = smoothstep(light.outerCutoff, light.innerCutoff, coneCosine);
+        float attenuation = 1.0 / max(light.constant + light.linear * distanceToLight +
+            light.quadratic * distanceToLight * distanceToLight, 0.001);
+        float radiusFactor = 1.0 - smoothstep(light.radius * light.radiusFade,
+            light.radius, distanceToLight);
+        float lightLuminance = dot(light.color, vec3(0.2126, 0.7152, 0.0722));
+        brightness += lightLuminance * light.intensity * attenuation * radiusFactor * coneFactor;
     }
     // Lighting can only darken a splash. Bright areas preserve the authored
     // sprite color; shadow-like low-light areas reduce its brightness.

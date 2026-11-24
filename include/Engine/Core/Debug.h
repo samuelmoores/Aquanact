@@ -171,7 +171,7 @@ private:
 	// Rebuilds the axis/grid helpers when the grid configuration changes.
 	void RebuildGrid();
 	void RebuildAxis();
-	void RebuildPointLightDebugSpheres();
+	void RebuildLightDebugSpheres();
 	void ClearEntityBoundingBoxes();
 	void ClearHitboxDebugVolumes();
 	void DrawHitboxVolumes(const Camera& camera, bool drawRoundedVolumes = true);
@@ -180,7 +180,7 @@ private:
 
 	class Axis* m_axis = nullptr;
 	class Grid* m_grid = nullptr;
-	std::vector<class Line*> m_pointLightDebugSpheres;
+	std::vector<class Line*> m_lightDebugSpheres;
 	std::unordered_map<Entity*, class Line*> m_triggerSpheres;
 	std::unordered_map<Entity*, class Line*> m_playerAttackSpawnSpheres;
 	std::vector<class Line*> m_cameraPathSpheres;
@@ -199,7 +199,7 @@ private:
 	float m_selectedLevelColliderFaceDirection = 1.0f;
 	bool m_levelColliderFaceEditMode = false;
 	class Line* m_cameraCollisionSphere = nullptr;
-	std::vector<glm::vec3> m_pointLightDebugColors;
+	std::vector<glm::vec3> m_lightDebugColors;
 	float m_axisLength = 1200.0f;
 	float m_gridSize = 1200.0f;
 	float m_gridSpacing = 50.0f;

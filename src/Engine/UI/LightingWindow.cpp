@@ -9,7 +9,8 @@
 
 #include <string>
 
-void LightingWindow::Draw(LightingManager& lightingManager, bool& open, int& selectedPointLightIndex)
+void LightingWindow::Draw(LightingManager& lightingManager, bool& open,
+	int& selectedPointLightIndex, int& selectedSpotLightIndex)
 {
 	if (!open) return;
 
@@ -89,5 +90,52 @@ void LightingWindow::Draw(LightingManager& lightingManager, bool& open, int& sel
 		{
 			--selectedPointLightIndex;
 		}
+	}
+
+	ImGui::SeparatorText("Spot Lights");
+	std::vector<SpotLight>& spotLights = lightingManager.SpotLights();
+	if (spotLights.size() < static_cast<std::size_t>(LightingManager::MaxSpotLights)
+		&& ImGui::Button("Add Spot Light"))
+		lightingManager.AddSpotLight();
+	int spotLightToDelete = -1;
+	for (int i = 0; i < static_cast<int>(spotLights.size()); ++i)
+	{
+		SpotLight& spotLight = spotLights[i];
+		ImGui::PushID(1000 + i);
+		const std::string header = "Spot Light " + std::to_string(i + 1);
+		if (ImGui::CollapsingHeader(header.c_str()))
+		{
+			ImGui::DragFloat3("Position", &spotLight.position.x, 0.05f, -1000.0f, 1000.0f, "%.2f");
+			ImGui::DragFloat3("Direction", &spotLight.direction.x, 0.01f, -1.0f, 1.0f, "%.3f");
+			if (glm::length(spotLight.direction) < 0.001f)
+				spotLight.direction = glm::vec3(0.0f, -1.0f, 0.0f);
+			else
+				spotLight.direction = glm::normalize(spotLight.direction);
+			ImGui::ColorEdit3("Color", &spotLight.color.x);
+			ImGui::DragFloat("Intensity", &spotLight.intensity, 0.01f, 0.0f, 50.0f, "%.2f");
+			ImGui::DragFloat("Ambient", &spotLight.ambient, 0.001f, 0.0f, 1.0f, "%.3f");
+			ImGui::Checkbox("Casts Shadow", &spotLight.castsShadows);
+			float radius = spotLight.radius;
+			if (ImGui::DragFloat("Radius", &radius, 5.0f, 0.001f, 5000.0f, "%.2f"))
+				spotLight.SetRadius(radius);
+			ImGui::DragFloat("Radius Fade", &spotLight.radiusFade, 0.01f, 0.0f, 1.0f, "%.2f");
+			float innerAngle = spotLight.innerAngle;
+			float outerAngle = spotLight.outerAngle;
+			const bool innerAngleChanged = ImGui::SliderFloat("Inner Cone", &innerAngle, 0.1f, 88.0f, "%.1f deg");
+			const bool outerAngleChanged = ImGui::SliderFloat("Outer Cone", &outerAngle, 0.2f, 89.0f, "%.1f deg");
+			if (innerAngleChanged || outerAngleChanged)
+				spotLight.SetAngles(innerAngle, outerAngle);
+			if (ImGui::Button("Delete Spot Light"))
+				spotLightToDelete = i;
+		}
+		ImGui::PopID();
+	}
+	if (spotLightToDelete >= 0 && spotLightToDelete < static_cast<int>(spotLights.size()))
+	{
+		spotLights.erase(spotLights.begin() + spotLightToDelete);
+		if (selectedSpotLightIndex == spotLightToDelete)
+			selectedSpotLightIndex = -1;
+		else if (selectedSpotLightIndex > spotLightToDelete)
+			--selectedSpotLightIndex;
 	}
 }

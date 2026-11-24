@@ -15,6 +15,10 @@
 #ifdef AQUANACT_EDITOR
 #include "ImGuizmo.h"
 #include <glm/gtc/type_ptr.hpp>
+#ifndef GLM_ENABLE_EXPERIMENTAL
+#define GLM_ENABLE_EXPERIMENTAL
+#endif
+#include <glm/gtx/quaternion.hpp>
 #endif
 
 #include <glm/gtc/matrix_inverse.hpp>
@@ -184,6 +188,42 @@ bool EditorSceneInteraction::PickPointLight(
 	return pointLightIndex >= 0;
 }
 
+bool EditorSceneInteraction::PickSpotLight(
+	const glm::vec3& rayOrigin,
+	const glm::vec3& rayDirection,
+	int& spotLightIndex,
+	float& distance)
+{
+	spotLightIndex = -1;
+	distance = std::numeric_limits<float>::max();
+	if (!Root::Current().Debugger().ShowPointLightDebugSpheres())
+		return false;
+
+	const std::vector<SpotLight>& spotLights = Root::Current().Render().Lights().SpotLights();
+	for (std::size_t i = 0; i < spotLights.size(); ++i)
+	{
+		const SpotLight& spotLight = spotLights[i];
+		const float markerRadius = std::clamp(spotLight.radius * 0.03f, 15.0f, 80.0f);
+		const glm::vec3 originToCenter = rayOrigin - spotLight.position;
+		const float halfB = glm::dot(originToCenter, rayDirection);
+		const float c = glm::dot(originToCenter, originToCenter) - markerRadius * markerRadius;
+		const float discriminant = halfB * halfB - c;
+		if (discriminant < 0.0f)
+			continue;
+
+		const float root = std::sqrt(discriminant);
+		float hitDistance = -halfB - root;
+		if (hitDistance < 0.0f)
+			hitDistance = -halfB + root;
+		if (hitDistance < 0.0f || hitDistance >= distance)
+			continue;
+
+		distance = hitDistance;
+		spotLightIndex = static_cast<int>(i);
+	}
+	return spotLightIndex >= 0;
+}
+
 bool EditorSceneInteraction::PickCameraPathPoint(
 	const EngineGuiFrameContext& context, const glm::vec3& rayOrigin,
 	const glm::vec3& rayDirection, int& pointIndex, float& distance)
@@ -311,14 +351,21 @@ void EditorSceneInteraction::Draw(const EngineGuiFrameContext& context) const
 		}
 	Entity* selectedEntity = FindSelectedEntity(context);
 	PointLight* selectedPointLight = nullptr;
+	SpotLight* selectedSpotLight = nullptr;
 	LevelCollider* selectedLevelCollider = nullptr;
 	CameraPathPoint* selectedCameraPathPoint = nullptr;
 	bool selectedCameraPathTrigger = false;
 	std::vector<PointLight>& pointLights = Root::Current().Render().Lights().PointLights();
+	std::vector<SpotLight>& spotLights = Root::Current().Render().Lights().SpotLights();
 	if (context.selection->pointLightIndex >= 0 &&
 		context.selection->pointLightIndex < static_cast<int>(pointLights.size()))
 	{
 		selectedPointLight = &pointLights[static_cast<std::size_t>(context.selection->pointLightIndex)];
+	}
+	if (context.selection->spotLightIndex >= 0 &&
+		context.selection->spotLightIndex < static_cast<int>(spotLights.size()))
+	{
+		selectedSpotLight = &spotLights[static_cast<std::size_t>(context.selection->spotLightIndex)];
 	}
 	if (context.selection->levelColliderIndex >= 0 && context.sceneManager->ActiveLevel())
 	{
@@ -340,6 +387,7 @@ void EditorSceneInteraction::Draw(const EngineGuiFrameContext& context) const
 	{
 		selectedEntity = nullptr;
 		selectedPointLight = nullptr;
+		selectedSpotLight = nullptr;
 		selectedLevelCollider = nullptr;
 	}
 	Root::Current().Debugger().SetSelectedLevelCollider(selectedLevelCollider);
@@ -349,7 +397,7 @@ void EditorSceneInteraction::Draw(const EngineGuiFrameContext& context) const
 	bool gizmoOwnsMouse = false;
 
 #ifdef AQUANACT_EDITOR
-	if (!boxFaceDragMode && (selectedEntity || selectedPointLight || selectedLevelCollider || selectedCameraPathPoint))
+	if (!boxFaceDragMode && (selectedEntity || selectedPointLight || selectedSpotLight || selectedLevelCollider || selectedCameraPathPoint))
 	{
 		ImGuizmo::SetDrawlist(ImGui::GetBackgroundDrawList());
 		ImGuizmo::SetRect(0.0f, 0.0f, io.DisplaySize.x, io.DisplaySize.y);
@@ -358,6 +406,10 @@ void EditorSceneInteraction::Draw(const EngineGuiFrameContext& context) const
 			? selectedEntity->BuildModelMatrix()
 			: selectedPointLight
 			? glm::translate(glm::mat4(1.0f), selectedPointLight->position)
+			: selectedSpotLight
+			? glm::translate(glm::mat4(1.0f), selectedSpotLight->position) * glm::mat4_cast(glm::rotation(
+				glm::vec3(0.0f, 0.0f, -1.0f), glm::length(selectedSpotLight->direction) > 0.001f
+					? glm::normalize(selectedSpotLight->direction) : glm::vec3(0.0f, -1.0f, 0.0f)))
 			: selectedLevelCollider
 			? glm::translate(glm::mat4(1.0f), selectedLevelCollider->Position())
 			: glm::translate(glm::mat4(1.0f), selectedCameraPathTrigger
@@ -386,8 +438,8 @@ void EditorSceneInteraction::Draw(const EngineGuiFrameContext& context) const
 		const glm::mat4 projectionMatrix = context.camera->GetProjectionMatrix();
 		int gizmoOperationFlags = 0;
 		if (!context.gizmoTranslate || *context.gizmoTranslate) gizmoOperationFlags |= ImGuizmo::TRANSLATE;
-		if (!selectedCameraPathPoint && context.gizmoRotate && *context.gizmoRotate) gizmoOperationFlags |= ImGuizmo::ROTATE;
-		if (!selectedCameraPathPoint && context.gizmoScale && *context.gizmoScale) gizmoOperationFlags |= ImGuizmo::SCALE;
+		if (!selectedCameraPathPoint && !selectedPointLight && context.gizmoRotate && *context.gizmoRotate) gizmoOperationFlags |= ImGuizmo::ROTATE;
+		if (!selectedCameraPathPoint && !selectedPointLight && !selectedSpotLight && context.gizmoScale && *context.gizmoScale) gizmoOperationFlags |= ImGuizmo::SCALE;
 		const bool gizmoEnabled = gizmoOperationFlags != 0;
 		const bool manipulated = gizmoEnabled && ImGuizmo::Manipulate(
 			glm::value_ptr(viewMatrix),
@@ -419,6 +471,20 @@ void EditorSceneInteraction::Draw(const EngineGuiFrameContext& context) const
 			else if (selectedPointLight)
 			{
 				selectedPointLight->position = glm::vec3(gizmoMatrix[3]);
+			}
+			else if (selectedSpotLight)
+			{
+				selectedSpotLight->position = glm::vec3(gizmoMatrix[3]);
+				if (context.gizmoRotate && *context.gizmoRotate)
+				{
+					float translation[3];
+					float rotationDegrees[3];
+					float scaleValues[3];
+					ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(gizmoMatrix), translation, rotationDegrees, scaleValues);
+					const glm::quat orientation(glm::radians(
+						glm::vec3(rotationDegrees[0], rotationDegrees[1], rotationDegrees[2])));
+					selectedSpotLight->direction = glm::normalize(orientation * glm::vec3(0.0f, 0.0f, -1.0f));
+				}
 			}
 			else if (selectedLevelCollider)
 			{
@@ -477,6 +543,9 @@ void EditorSceneInteraction::Draw(const EngineGuiFrameContext& context) const
 	int pickedPointLightIndex = -1;
 	float pointLightDistance = std::numeric_limits<float>::max();
 	PickPointLight(rayOrigin, rayDirection, pickedPointLightIndex, pointLightDistance);
+	int pickedSpotLightIndex = -1;
+	float spotLightDistance = std::numeric_limits<float>::max();
+	PickSpotLight(rayOrigin, rayDirection, pickedSpotLightIndex, spotLightDistance);
 	int pickedLevelColliderIndex = -1;
 	float levelColliderDistance = std::numeric_limits<float>::max();
 	PickLevelCollider(context, rayOrigin, rayDirection, pickedLevelColliderIndex, levelColliderDistance);
@@ -533,37 +602,55 @@ void EditorSceneInteraction::Draw(const EngineGuiFrameContext& context) const
 				context.selection->submeshIndex = -1;
 				context.selection->submeshComponentEntityId = 0;
 				context.selection->pointLightIndex = -1;
+				context.selection->spotLightIndex = -1;
 				return;
 			}
 		}
 	}
 
 	if (pickedCameraPointIndex >= 0 && cameraPointDistance < entityDistance &&
-		cameraPointDistance < pointLightDistance && cameraPointDistance < levelColliderDistance)
+		cameraPointDistance < pointLightDistance && cameraPointDistance < spotLightDistance &&
+		cameraPointDistance < levelColliderDistance)
 	{
 		context.cameraPath->SelectPoint(pickedCameraPointIndex);
 		context.selection->entityId = 0;
 		context.selection->submeshIndex = -1;
 		context.selection->submeshComponentEntityId = 0;
 		context.selection->pointLightIndex = -1;
+		context.selection->spotLightIndex = -1;
 		context.selection->levelColliderIndex = -1;
 	}
-	else if (pickedLevelColliderIndex >= 0 && levelColliderDistance < entityDistance && levelColliderDistance < pointLightDistance)
+	else if (pickedLevelColliderIndex >= 0 && levelColliderDistance < entityDistance &&
+		levelColliderDistance < pointLightDistance && levelColliderDistance < spotLightDistance)
 	{
 		if (context.cameraPath) context.cameraPath->SelectPoint(-1);
 		context.selection->entityId = 0;
 		context.selection->submeshIndex = -1;
 		context.selection->submeshComponentEntityId = 0;
 		context.selection->pointLightIndex = -1;
+		context.selection->spotLightIndex = -1;
 		context.selection->levelColliderIndex = pickedLevelColliderIndex;
 	}
-	else if (pickedPointLightIndex >= 0 && pointLightDistance < entityDistance)
+	// Debug light markers are editor gizmos, so allow them to be picked through
+	// scene geometry. Compare light markers against each other to resolve overlap.
+	else if (pickedPointLightIndex >= 0 && pointLightDistance < spotLightDistance)
 	{
 		if (context.cameraPath) context.cameraPath->SelectPoint(-1);
 		context.selection->entityId = 0;
 		context.selection->submeshIndex = -1;
 		context.selection->submeshComponentEntityId = 0;
 		context.selection->pointLightIndex = pickedPointLightIndex;
+		context.selection->spotLightIndex = -1;
+		context.selection->levelColliderIndex = -1;
+	}
+	else if (pickedSpotLightIndex >= 0 && spotLightDistance < pointLightDistance)
+	{
+		if (context.cameraPath) context.cameraPath->SelectPoint(-1);
+		context.selection->entityId = 0;
+		context.selection->submeshIndex = -1;
+		context.selection->submeshComponentEntityId = 0;
+		context.selection->pointLightIndex = -1;
+		context.selection->spotLightIndex = pickedSpotLightIndex;
 		context.selection->levelColliderIndex = -1;
 	}
 	else
@@ -573,6 +660,7 @@ void EditorSceneInteraction::Draw(const EngineGuiFrameContext& context) const
 		context.selection->submeshIndex = -1;
 		context.selection->submeshComponentEntityId = 0;
 		context.selection->pointLightIndex = -1;
+		context.selection->spotLightIndex = -1;
 		context.selection->levelColliderIndex = -1;
 	}
 }

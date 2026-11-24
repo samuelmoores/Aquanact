@@ -63,6 +63,10 @@ private:
 	std::array<uint32_t, GraphicsDevice::FrameStats::MaxPointLights> m_pointShadowDepthTextures{};
 	std::array<float, LightingManager::MaxPointLights> m_pointShadowFarPlanes{};
 	std::array<bool, GraphicsDevice::FrameStats::MaxPointLights> m_pointShadowMapsReady{};
+	uint32_t m_spotShadowFramebuffer = 0;
+	uint32_t m_spotShadowDepthTextureArray = 0;
+	std::array<glm::mat4, LightingManager::MaxSpotLights> m_spotShadowMatrices{};
+	std::array<bool, LightingManager::MaxSpotLights> m_spotShadowMapsReady{};
 	glm::mat4 m_lightSpaceMatrix{ 1.0f };
 	bool m_shadowMapReady = false;
 	bool m_initialized = false;

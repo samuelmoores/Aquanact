@@ -29,9 +29,29 @@ struct PointLight {
 	void SetRadius(float newRadius);
 };
 
+struct SpotLight {
+	glm::vec3 position{ 0.0f, 2.0f, 0.0f };
+	glm::vec3 direction{ 0.0f, -1.0f, 0.0f };
+	glm::vec3 color{ 1.0f };
+	float intensity = 1.0f;
+	float ambient = 0.0f;
+	float radius = 500.0f;
+	float radiusFade = 0.75f;
+	float innerAngle = 12.5f;
+	float outerAngle = 17.5f;
+	float constant = 1.0f;
+	float linear = 0.004f;
+	float quadratic = 0.000004f;
+	bool castsShadows = false;
+
+	void SetRadius(float newRadius);
+	void SetAngles(float newInnerAngle, float newOuterAngle);
+};
+
 class LightingManager {
 public:
 	static constexpr int MaxPointLights = 8;
+	static constexpr int MaxSpotLights = 8;
 
 	void startUp();
 	void shutDown();
@@ -44,11 +64,15 @@ public:
 	PointLight& AddPointLight();
 	std::vector<PointLight>& PointLights();
 	const std::vector<PointLight>& PointLights() const;
+	SpotLight& AddSpotLight();
+	std::vector<SpotLight>& SpotLights();
+	const std::vector<SpotLight>& SpotLights() const;
 
 private:
 	DirectionalLight m_sun;
 	bool m_shadowsEnabled = true;
 	std::vector<PointLight> m_pointLights;
+	std::vector<SpotLight> m_spotLights;
 };
 
 

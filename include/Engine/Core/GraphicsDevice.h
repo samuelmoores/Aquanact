@@ -22,14 +22,17 @@ class GraphicsDevice {
 public:
 	struct FrameStats {
 		static constexpr std::size_t MaxPointLights = 8;
+		static constexpr std::size_t MaxSpotLights = 8;
 		std::size_t mainDrawCalls = 0;
 		std::size_t shadowDrawCalls = 0;
 		std::size_t directionalShadowDrawCalls = 0;
 		std::array<std::size_t, MaxPointLights> pointShadowDrawCalls{};
+		std::array<std::size_t, MaxSpotLights> spotShadowDrawCalls{};
 		std::uint64_t mainTriangles = 0;
 		std::uint64_t shadowTriangles = 0;
 		std::uint64_t directionalShadowTriangles = 0;
 		std::array<std::uint64_t, MaxPointLights> pointShadowTriangles{};
+		std::array<std::uint64_t, MaxSpotLights> spotShadowTriangles{};
 		double mainVisibilityTestMs = 0.0;
 		double shadowPassMs = 0.0;
 	};

@@ -9,6 +9,7 @@
 class Entity;
 class LevelCollider;
 struct PointLight;
+struct SpotLight;
 
 class EditorSceneInteraction
 {
@@ -38,6 +39,8 @@ private:
 		unsigned int& entityId, float& distance);
 	static bool PickPointLight(const glm::vec3& rayOrigin, const glm::vec3& rayDirection,
 		int& pointLightIndex, float& distance);
+	static bool PickSpotLight(const glm::vec3& rayOrigin, const glm::vec3& rayDirection,
+		int& spotLightIndex, float& distance);
 	static bool PickCameraPathPoint(const EngineGuiFrameContext& context,
 		const glm::vec3& rayOrigin, const glm::vec3& rayDirection,
 		int& pointIndex, float& distance);

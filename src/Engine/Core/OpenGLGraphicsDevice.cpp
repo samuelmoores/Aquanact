@@ -36,9 +36,11 @@ std::unique_ptr<GraphicsDevice> CreateGraphicsDevice(GraphicsBackend backend)
 namespace {
 	constexpr int DirectionalShadowMapResolution = 2048;
 	constexpr int PointShadowMapResolution = 512;
+	constexpr int SpotShadowMapResolution = 1024;
 	// Material roughness is bound to unit 3 by Mesh::Bind. Keep the directional
 	// depth map on its own unit so binding a material cannot replace it.
 	constexpr int DirectionalShadowTextureUnit = 12;
+	constexpr int SpotShadowTextureUnit = 14;
 	constexpr int FirstPointShadowTextureUnit = 4;
 	constexpr int SplashTextureUnit = 5;
 	int FirstBuffer(const RenderCommand& command)
@@ -349,6 +351,33 @@ void OpenGLGraphicsDevice::InitializeShadowMap()
 	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 	m_pointShadowFarPlanes.fill(1.0f);
 	m_pointShadowMapsReady.fill(false);
+
+	glGenFramebuffers(1, &m_spotShadowFramebuffer);
+	glGenTextures(1, &m_spotShadowDepthTextureArray);
+	glBindTexture(GL_TEXTURE_2D_ARRAY, m_spotShadowDepthTextureArray);
+	glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_DEPTH_COMPONENT24,
+		SpotShadowMapResolution, SpotShadowMapResolution, LightingManager::MaxSpotLights,
+		0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
+	glTexParameterfv(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BORDER_COLOR, borderColor);
+	glBindFramebuffer(GL_FRAMEBUFFER, m_spotShadowFramebuffer);
+	glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, m_spotShadowDepthTextureArray, 0, 0);
+	glDrawBuffer(GL_NONE);
+	glReadBuffer(GL_NONE);
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+	{
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		ReleaseShadowMap();
+		throw std::runtime_error("Failed to create spot-light shadow framebuffer");
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+	m_spotShadowMatrices.fill(glm::mat4(1.0f));
+	m_spotShadowMapsReady.fill(false);
 }
 
 void OpenGLGraphicsDevice::ReleaseShadowMap()
@@ -376,6 +405,16 @@ void OpenGLGraphicsDevice::ReleaseShadowMap()
 		glDeleteFramebuffers(1, &m_pointShadowFramebuffer);
 		m_pointShadowFramebuffer = 0;
 	}
+	if (m_spotShadowDepthTextureArray != 0)
+	{
+		glDeleteTextures(1, &m_spotShadowDepthTextureArray);
+		m_spotShadowDepthTextureArray = 0;
+	}
+	if (m_spotShadowFramebuffer != 0)
+	{
+		glDeleteFramebuffers(1, &m_spotShadowFramebuffer);
+		m_spotShadowFramebuffer = 0;
+	}
 	m_shadowShader.reset();
 	m_pointShadowShader.reset();
 	m_selectionOutlineShader.reset();
@@ -397,6 +436,8 @@ void OpenGLGraphicsDevice::ReleaseShadowMap()
 	m_shadowMapReady = false;
 	m_pointShadowMapsReady.fill(false);
 	m_pointShadowFarPlanes.fill(1.0f);
+	m_spotShadowMapsReady.fill(false);
+	m_spotShadowMatrices.fill(glm::mat4(1.0f));
 }
 
 void OpenGLGraphicsDevice::shutDown()
@@ -469,6 +510,7 @@ void OpenGLGraphicsDevice::RenderShadowMaps(const RenderCommand* commands, std::
 	const auto shadowPassStart = std::chrono::high_resolution_clock::now();
 	m_shadowMapReady = false;
 	m_pointShadowMapsReady.fill(false);
+	m_spotShadowMapsReady.fill(false);
 	if (!lightingManager.ShadowsEnabled() || !commands || commandCount == 0)
 	{
 		m_frameStats.shadowPassMs = 0.0;
@@ -588,6 +630,43 @@ void OpenGLGraphicsDevice::RenderShadowMaps(const RenderCommand* commands, std::
 			renderedAnyShadowMap = true;
 		}
 	}
+
+	if (m_pointShadowShader && m_spotShadowFramebuffer != 0 && m_spotShadowDepthTextureArray != 0)
+	{
+		const int spotLightCount = std::min(static_cast<int>(lightingManager.SpotLights().size()), LightingManager::MaxSpotLights);
+		for (int lightIndex = 0; lightIndex < spotLightCount; ++lightIndex)
+		{
+			const SpotLight& spotLight = lightingManager.SpotLights()[static_cast<std::size_t>(lightIndex)];
+			if (!spotLight.castsShadows || spotLight.intensity <= 0.0f)
+				continue;
+
+			const glm::vec3 direction = glm::length(spotLight.direction) > 0.001f
+				? glm::normalize(spotLight.direction) : glm::vec3(0.0f, -1.0f, 0.0f);
+			const glm::vec3 up = std::abs(glm::dot(direction, glm::vec3(0.0f, 1.0f, 0.0f))) > 0.98f
+				? glm::vec3(0.0f, 0.0f, 1.0f) : glm::vec3(0.0f, 1.0f, 0.0f);
+			const float farPlane = std::max(spotLight.radius, 1.0f);
+			const float fieldOfView = glm::radians(glm::clamp(spotLight.outerAngle * 2.0f, 1.0f, 178.0f));
+			const glm::mat4 projection = glm::perspective(fieldOfView, 1.0f, 0.1f, farPlane);
+			const glm::mat4 view = glm::lookAt(spotLight.position, spotLight.position + direction, up);
+			const glm::mat4 shadowMatrix = projection * view;
+			m_spotShadowMatrices[static_cast<std::size_t>(lightIndex)] = shadowMatrix;
+
+			glViewport(0, 0, SpotShadowMapResolution, SpotShadowMapResolution);
+			glBindFramebuffer(GL_FRAMEBUFFER, m_spotShadowFramebuffer);
+			glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+				m_spotShadowDepthTextureArray, 0, lightIndex);
+			glClear(GL_DEPTH_BUFFER_BIT);
+			m_pointShadowShader->activate();
+			m_pointShadowShader->setUniform("shadowMatrix", shadowMatrix);
+			m_pointShadowShader->setUniform("lightPosition", spotLight.position);
+			m_pointShadowShader->setUniform("farPlane", farPlane);
+			DrawShadowCasters(commands, commandCount, m_pointShadowShader.get(), &shadowMatrix,
+				m_frameStats.spotShadowDrawCalls[static_cast<std::size_t>(lightIndex)],
+				m_frameStats.spotShadowTriangles[static_cast<std::size_t>(lightIndex)]);
+			m_spotShadowMapsReady[static_cast<std::size_t>(lightIndex)] = true;
+			renderedAnyShadowMap = true;
+		}
+	}
 	glDisable(GL_POLYGON_OFFSET_FILL);
 	if (renderedAnyShadowMap)
 	{
@@ -604,6 +683,11 @@ void OpenGLGraphicsDevice::RenderShadowMaps(const RenderCommand* commands, std::
 	{
 		m_frameStats.shadowDrawCalls += m_frameStats.pointShadowDrawCalls[lightIndex];
 		m_frameStats.shadowTriangles += m_frameStats.pointShadowTriangles[lightIndex];
+	}
+	for (int lightIndex = 0; lightIndex < LightingManager::MaxSpotLights; ++lightIndex)
+	{
+		m_frameStats.shadowDrawCalls += m_frameStats.spotShadowDrawCalls[lightIndex];
+		m_frameStats.shadowTriangles += m_frameStats.spotShadowTriangles[lightIndex];
 	}
 	m_frameStats.shadowPassMs = std::chrono::duration<double, std::milli>(
 		std::chrono::high_resolution_clock::now() - shadowPassStart).count();
@@ -658,6 +742,27 @@ void OpenGLGraphicsDevice::DrawParticles(const ParticleRenderCommand* commands, 
 		m_particleShader->setUniform(prefix + "constant", pointLight.constant);
 		m_particleShader->setUniform(prefix + "linear", pointLight.linear);
 		m_particleShader->setUniform(prefix + "quadratic", pointLight.quadratic);
+	}
+	const int spotLightCount = static_cast<int>(std::min<std::size_t>(
+		lightingManager.SpotLights().size(), LightingManager::MaxSpotLights));
+	m_particleShader->setUniform("spotLightCount", spotLightCount);
+	for (int lightIndex = 0; lightIndex < spotLightCount; ++lightIndex)
+	{
+		const SpotLight& spotLight = lightingManager.SpotLights()[static_cast<std::size_t>(lightIndex)];
+		const std::string prefix = "spotLights[" + std::to_string(lightIndex) + "].";
+		const glm::vec3 direction = glm::length(spotLight.direction) > 0.001f
+			? glm::normalize(spotLight.direction) : glm::vec3(0.0f, -1.0f, 0.0f);
+		m_particleShader->setUniform(prefix + "position", spotLight.position);
+		m_particleShader->setUniform(prefix + "direction", direction);
+		m_particleShader->setUniform(prefix + "color", spotLight.color);
+		m_particleShader->setUniform(prefix + "intensity", spotLight.intensity);
+		m_particleShader->setUniform(prefix + "radius", spotLight.radius);
+		m_particleShader->setUniform(prefix + "radiusFade", spotLight.radiusFade);
+		m_particleShader->setUniform(prefix + "innerCutoff", glm::cos(glm::radians(spotLight.innerAngle)));
+		m_particleShader->setUniform(prefix + "outerCutoff", glm::cos(glm::radians(spotLight.outerAngle)));
+		m_particleShader->setUniform(prefix + "constant", spotLight.constant);
+		m_particleShader->setUniform(prefix + "linear", spotLight.linear);
+		m_particleShader->setUniform(prefix + "quadratic", spotLight.quadratic);
 	}
 
 	glBindVertexArray(m_particleVao);
@@ -787,6 +892,7 @@ void OpenGLGraphicsDevice::DrawInternal(const RenderCommand& command, const Came
 	command.shader->setUniform("roughnessTexture", 3);
 	command.shader->setUniform("heightTexture", 13);
 	command.shader->setUniform("shadowMap", DirectionalShadowTextureUnit);
+	command.shader->setUniform("spotShadowMap", SpotShadowTextureUnit);
 
 	command.shader->setUniform("model", command.modelMatrix);
 	command.shader->setUniform("view", camera.GetViewMatrix());
@@ -811,6 +917,16 @@ void OpenGLGraphicsDevice::DrawInternal(const RenderCommand& command, const Came
 
 		command.shader->setUniform("pointShadowFarPlanes[" + index + "]", m_pointShadowFarPlanes[lightIndex]);
 	}
+	for (int lightIndex = 0; lightIndex < LightingManager::MaxSpotLights; ++lightIndex)
+	{
+		const std::string index = std::to_string(lightIndex);
+		const bool lightCastsShadows = lightIndex < static_cast<int>(lightingManager.SpotLights().size()) &&
+			lightingManager.SpotLights()[static_cast<std::size_t>(lightIndex)].castsShadows;
+		command.shader->setUniform("spotShadowReady[" + index + "]",
+			lightingManager.ShadowsEnabled() && lightCastsShadows && m_spotShadowMapsReady[static_cast<std::size_t>(lightIndex)]);
+		command.shader->setUniform("spotLightSpaceMatrices[" + index + "]",
+			m_spotShadowMatrices[static_cast<std::size_t>(lightIndex)]);
+	}
 
 	lightingManager.ApplyToShader(command.shader);
 
@@ -823,6 +939,8 @@ void OpenGLGraphicsDevice::DrawInternal(const RenderCommand& command, const Came
 		glActiveTexture(GL_TEXTURE0 + FirstPointShadowTextureUnit + lightIndex);
 		glBindTexture(GL_TEXTURE_CUBE_MAP, m_pointShadowDepthTextures[lightIndex]);
 	}
+	glActiveTexture(GL_TEXTURE0 + SpotShadowTextureUnit);
+	glBindTexture(GL_TEXTURE_2D_ARRAY, m_spotShadowDepthTextureArray);
 
 	for (int j = FirstBuffer(command); j < BufferEnd(command); ++j) 
 	{
@@ -862,6 +980,8 @@ void OpenGLGraphicsDevice::DrawInternal(const RenderCommand& command, const Came
 		glActiveTexture(GL_TEXTURE0 + FirstPointShadowTextureUnit + lightIndex);
 		glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 	}
+	glActiveTexture(GL_TEXTURE0 + SpotShadowTextureUnit);
+	glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
 	glActiveTexture(GL_TEXTURE0);
 }
 

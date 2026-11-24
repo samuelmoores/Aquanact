@@ -151,6 +151,24 @@ namespace {
 				pointLight.quadratic = pointLightData.quadratic;
 				pointLight.castsShadows = pointLightData.castsShadows;
 			}
+			lighting.SpotLights().clear();
+			for (const ProjectStateData::SpotLightData& spotLightData : pendingLevel.spotLights)
+			{
+				SpotLight& spotLight = lighting.AddSpotLight();
+				spotLight.position = spotLightData.position;
+				spotLight.direction = glm::length(spotLightData.direction) > 0.001f
+					? glm::normalize(spotLightData.direction) : glm::vec3(0.0f, -1.0f, 0.0f);
+				spotLight.color = spotLightData.color;
+				spotLight.intensity = spotLightData.intensity;
+				spotLight.ambient = spotLightData.ambient;
+				spotLight.SetRadius(spotLightData.radius);
+				spotLight.radiusFade = spotLightData.radiusFade;
+				spotLight.SetAngles(spotLightData.innerAngle, spotLightData.outerAngle);
+				spotLight.constant = spotLightData.constant;
+				spotLight.linear = spotLightData.linear;
+				spotLight.quadratic = spotLightData.quadratic;
+				spotLight.castsShadows = spotLightData.castsShadows;
+			}
 			if (pendingLevel.isMainMenu)
 			{
 				SceneManager.SetSceneKind(pendingLevel.name, SceneManager::SceneKind::Cutscene);
@@ -489,6 +507,7 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 				pendingLevel.hasSunLight = true;
 				pendingLevel.sunLight = renderState.sunLight;
 				pendingLevel.pointLights = renderState.pointLights;
+				pendingLevel.spotLights = renderState.spotLights;
 			}
 		}
 

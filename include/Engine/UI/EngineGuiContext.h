@@ -19,6 +19,7 @@ struct EngineGuiSelection
 	// Point lights are stored in a fixed-capacity vector and are currently only
 	// appended, so their index is sufficient for editor selection. -1 is none.
 	int pointLightIndex = -1;
+	int spotLightIndex = -1;
 	// Index into the active scene's independent level-collider collection.
 	int levelColliderIndex = -1;
 };

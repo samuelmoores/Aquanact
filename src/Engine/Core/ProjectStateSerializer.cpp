@@ -586,6 +586,18 @@ namespace ProjectStateSerializer {
 				contents += std::to_string(pointLight.constant) + ";" + std::to_string(pointLight.linear) + ";" + std::to_string(pointLight.quadratic) + ";";
 				contents += (pointLight.castsShadows ? "1\n" : "0\n");
 			}
+			for (const SpotLight& spotLight : lighting.SpotLights())
+			{
+				contents += "scenespotlight;" + ProjectStateFormat::EscapeField(scene->Name()) + ";";
+				contents += std::to_string(spotLight.position.x) + ";" + std::to_string(spotLight.position.y) + ";" + std::to_string(spotLight.position.z) + ";";
+				contents += std::to_string(spotLight.direction.x) + ";" + std::to_string(spotLight.direction.y) + ";" + std::to_string(spotLight.direction.z) + ";";
+				contents += std::to_string(spotLight.color.x) + ";" + std::to_string(spotLight.color.y) + ";" + std::to_string(spotLight.color.z) + ";";
+				contents += std::to_string(spotLight.intensity) + ";" + std::to_string(spotLight.ambient) + ";";
+				contents += std::to_string(spotLight.radius) + ";" + std::to_string(spotLight.radiusFade) + ";";
+				contents += std::to_string(spotLight.innerAngle) + ";" + std::to_string(spotLight.outerAngle) + ";";
+				contents += std::to_string(spotLight.constant) + ";" + std::to_string(spotLight.linear) + ";" + std::to_string(spotLight.quadratic) + ";";
+				contents += spotLight.castsShadows ? "1\n" : "0\n";
+			}
 			contents += "cutscene;" + ProjectStateFormat::EscapeField(scene->Name()) + ";" + std::to_string(scene->Cutscene().duration) + "\n";
 			for (const CutsceneAnimationTrack& track : scene->Cutscene().animationTracks)
 			{
@@ -688,7 +700,34 @@ namespace ProjectStateSerializer {
 					}
 					continue;
 				}
-				if ((fields.size() == 3 && fields[0] == "enginecamera") || (fields.size() >= 7 && fields[0] == "gamecamera") || (fields.size() >= 11 && fields[0] == "scenecamera") || (fields.size() >= 2 && fields[0] == "camerapath") || (fields.size() >= 4 && fields[0] == "camerapathsettings") || (fields.size() == 3 && fields[0] == "editorview") || (fields.size() >= 3 && fields[0] == "debugwindows") || ((fields.size() >= 8 && fields.size() <= 11) && fields[0] == "sunlight") || ((fields.size() >= 12 && fields.size() <= 15) && fields[0] == "pointlight") || (fields.size() == 2 && fields[0] == "imguilayout"))
+				if (fields.size() >= 20 && fields[0] == "scenespotlight")
+				{
+					for (PendingLevel& pendingLevel : pendingLevels)
+					{
+						if (pendingLevel.name != fields[1]) continue;
+						ProjectStateData::SpotLightData spotLight;
+						spotLight.position = glm::vec3(std::stof(fields[2]), std::stof(fields[3]), std::stof(fields[4]));
+						spotLight.direction = glm::vec3(std::stof(fields[5]), std::stof(fields[6]), std::stof(fields[7]));
+						spotLight.color = glm::vec3(std::stof(fields[8]), std::stof(fields[9]), std::stof(fields[10]));
+						spotLight.intensity = std::stof(fields[11]);
+						spotLight.ambient = std::stof(fields[12]);
+						spotLight.radius = std::stof(fields[13]);
+						spotLight.radiusFade = std::stof(fields[14]);
+						spotLight.innerAngle = std::stof(fields[15]);
+						spotLight.outerAngle = std::stof(fields[16]);
+						spotLight.constant = std::stof(fields[17]);
+						spotLight.linear = std::stof(fields[18]);
+						spotLight.quadratic = std::stof(fields[19]);
+						if (fields.size() >= 21)
+							spotLight.castsShadows = fields[20] == "1" || fields[20] == "true" || fields[20] == "True";
+						if (pendingLevel.spotLights.size() < static_cast<std::size_t>(LightingManager::MaxSpotLights))
+							pendingLevel.spotLights.push_back(std::move(spotLight));
+						renderState.hasSceneLighting = true;
+						break;
+					}
+					continue;
+				}
+				if ((fields.size() == 3 && fields[0] == "enginecamera") || (fields.size() >= 7 && fields[0] == "gamecamera") || (fields.size() >= 11 && fields[0] == "scenecamera") || (fields.size() >= 2 && fields[0] == "camerapath") || (fields.size() >= 4 && fields[0] == "camerapathsettings") || (fields.size() == 3 && fields[0] == "editorview") || (fields.size() >= 3 && fields[0] == "debugwindows") || ((fields.size() >= 8 && fields.size() <= 11) && fields[0] == "sunlight") || ((fields.size() >= 12 && fields.size() <= 15) && fields[0] == "pointlight") || ((fields.size() == 19 || fields.size() == 20) && fields[0] == "spotlight") || (fields.size() == 2 && fields[0] == "imguilayout"))
 				{
 					if (fields.size() == 3 && fields[0] == "enginecamera")
 					{
@@ -914,6 +953,27 @@ namespace ProjectStateSerializer {
 							}
 						}
 						renderState.pointLights.push_back(std::move(pointLight));
+					}
+					else if ((fields.size() == 19 || fields.size() == 20) && fields[0] == "spotlight")
+					{
+						renderState.hasLegacyLighting = true;
+						RenderStateData::SpotLightData spotLight;
+						spotLight.position = glm::vec3(std::stof(fields[1]), std::stof(fields[2]), std::stof(fields[3]));
+						spotLight.direction = glm::vec3(std::stof(fields[4]), std::stof(fields[5]), std::stof(fields[6]));
+						spotLight.color = glm::vec3(std::stof(fields[7]), std::stof(fields[8]), std::stof(fields[9]));
+						spotLight.intensity = std::stof(fields[10]);
+						spotLight.ambient = std::stof(fields[11]);
+						spotLight.radius = std::stof(fields[12]);
+						spotLight.radiusFade = std::stof(fields[13]);
+						spotLight.innerAngle = std::stof(fields[14]);
+						spotLight.outerAngle = std::stof(fields[15]);
+						spotLight.constant = std::stof(fields[16]);
+						spotLight.linear = std::stof(fields[17]);
+						spotLight.quadratic = std::stof(fields[18]);
+						if (fields.size() >= 20)
+							spotLight.castsShadows = fields[19] == "1" || fields[19] == "true" || fields[19] == "True";
+						if (renderState.spotLights.size() < static_cast<std::size_t>(LightingManager::MaxSpotLights))
+							renderState.spotLights.push_back(std::move(spotLight));
 					}
 					else if (fields.size() == 2 && fields[0] == "imguilayout")
 					{

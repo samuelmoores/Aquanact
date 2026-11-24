@@ -20,6 +20,20 @@ struct PointLight {
 	float linear;
 	float quadratic;
 };
+struct SpotLight {
+	vec3 position;
+	vec3 direction;
+	vec3 color;
+	float intensity;
+	float ambient;
+	float radius;
+	float radiusFade;
+	float innerCutoff;
+	float outerCutoff;
+	float constant;
+	float linear;
+	float quadratic;
+};
 
 layout (location=0) out vec4 FragColor;
 
@@ -49,6 +63,8 @@ uniform bool hasHeightTexture;
 uniform DirectionalLight sunLight;
 uniform int pointLightCount;
 uniform PointLight pointLights[8];
+uniform int spotLightCount;
+uniform SpotLight spotLights[8];
 uniform sampler2D shadowMap;
 uniform bool directionalShadowEnabled;
 uniform samplerCube pointShadowMap0;
@@ -61,6 +77,9 @@ uniform samplerCube pointShadowMap6;
 uniform samplerCube pointShadowMap7;
 uniform bool pointShadowReady[8];
 uniform float pointShadowFarPlanes[8];
+uniform sampler2DArray spotShadowMap;
+uniform bool spotShadowReady[8];
+uniform mat4 spotLightSpaceMatrices[8];
 
 vec2 PointShadowSampleOffset(int sampleIndex)
 {
@@ -211,6 +230,61 @@ vec3 CalculatePointLight(int lightIndex, PointLight light, vec3 baseColor, vec3 
 	return (ambient + (1.0 - shadow) * (diffuse + specular)) * attenuation * radiusFade * light.intensity;
 }
 
+vec3 CalculateSpotLight(SpotLight light, vec3 baseColor, vec3 specularStrength,
+	float shininess, vec3 vertexNormal, vec3 geometricNormal, vec3 viewDirection, int lightIndex)
+{
+	vec3 lightOffset = light.position - FragWorldPos;
+	float lightDistance = length(lightOffset);
+	vec3 lightDir = normalize(lightOffset);
+	float coneCosine = dot(normalize(FragWorldPos - light.position), normalize(light.direction));
+	float coneFactor = smoothstep(light.outerCutoff, light.innerCutoff, coneCosine);
+	float radiusFadeStart = light.radius * clamp(light.radiusFade, 0.0, 1.0);
+	float radiusFactor = 1.0 - smoothstep(radiusFadeStart, light.radius, lightDistance);
+	float attenuation = 1.0 / max(light.constant + light.linear * lightDistance +
+		light.quadratic * lightDistance * lightDistance, 0.001);
+	float diffuseStrength = max(dot(vertexNormal, lightDir), 0.0);
+	vec3 reflectDirection = reflect(-lightDir, vertexNormal);
+	float spec = pow(max(dot(viewDirection, reflectDirection), 0.0), shininess);
+	vec3 ambient = baseColor * light.color * light.ambient;
+	vec3 diffuse = baseColor * light.color * diffuseStrength;
+	vec3 specular = specularStrength * light.color * spec;
+	float shadow = 0.0;
+	if (spotShadowReady[lightIndex])
+	{
+		vec4 lightSpacePosition = spotLightSpaceMatrices[lightIndex] * vec4(FragWorldPos, 1.0);
+		vec3 projected = lightSpacePosition.xyz / lightSpacePosition.w;
+		projected = projected * 0.5 + 0.5;
+		if (projected.z > 0.0 && projected.z < 1.0 && lightDistance < light.radius &&
+			projected.x >= 0.0 && projected.x <= 1.0 &&
+			projected.y >= 0.0 && projected.y <= 1.0)
+		{
+			float normalAlignment = clamp(dot(geometricNormal, lightDir), 0.0, 1.0);
+			float bias = 0.15 + 0.5 * (1.0 - normalAlignment);
+			float filterWidth = max(light.radius * 0.00075, 0.04);
+			vec2 texelSize = 1.0 / vec2(textureSize(spotShadowMap, 0).xy);
+			float coneTangent = max(tan(acos(clamp(light.outerCutoff, -1.0, 1.0))), 0.001);
+			float sampleRadius = clamp(light.radius * 0.01 /
+				(2.0 * max(lightDistance, 0.1) * coneTangent), texelSize.x * 1.5, 0.08);
+			float rotation = InterleavedGradientNoise(gl_FragCoord.xy +
+				vec2(float(lightIndex) * 17.0, 31.0)) * 6.2831853;
+			float rotationCos = cos(rotation);
+			float rotationSin = sin(rotation);
+			for (int sampleIndex = 0; sampleIndex < 20; ++sampleIndex)
+			{
+				vec2 localOffset = PointShadowSampleOffset(sampleIndex);
+				vec2 rotatedOffset = vec2(
+					localOffset.x * rotationCos - localOffset.y * rotationSin,
+					localOffset.x * rotationSin + localOffset.y * rotationCos);
+				float closestDepth = texture(spotShadowMap,
+					vec3(projected.xy + rotatedOffset * sampleRadius, float(lightIndex))).r * max(light.radius, 1.0);
+				shadow += smoothstep(0.0, filterWidth, lightDistance - bias - closestDepth);
+			}
+			shadow /= 20.0;
+		}
+	}
+	return (ambient + (1.0 - shadow) * (diffuse + specular)) * attenuation * radiusFactor * coneFactor * light.intensity;
+}
+
 void main()
 {
 	vec2 materialTexCoord = TexCoord;
@@ -261,6 +335,11 @@ void main()
 	for (int i = 0; i < pointLightCount; ++i)
 	{
 		litColor += CalculatePointLight(i, pointLights[i], baseColor, specularStrength, shininess, vertexNormal, geometricNormal, viewDirection);
+	}
+	for (int i = 0; i < spotLightCount; ++i)
+	{
+		litColor += CalculateSpotLight(spotLights[i], baseColor, specularStrength, shininess,
+			vertexNormal, geometricNormal, viewDirection, i);
 	}
 	if (emissiveEnabled)
 		litColor = mix(litColor, emissiveColor, clamp(emissiveBlendFactor, 0.0, 1.0));

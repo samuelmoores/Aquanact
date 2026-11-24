@@ -320,12 +320,12 @@ void Debug::shutDown()
 	m_axis = nullptr;
 	delete m_grid;
 	m_grid = nullptr;
-	for (Line* sphere : m_pointLightDebugSpheres)
+	for (Line* sphere : m_lightDebugSpheres)
 	{
 		delete sphere;
 	}
-	m_pointLightDebugSpheres.clear();
-	m_pointLightDebugColors.clear();
+	m_lightDebugSpheres.clear();
+	m_lightDebugColors.clear();
 	for (Line* sphere : m_cameraPathSpheres) delete sphere;
 	for (Line* sphere : m_cameraPathTriggerSpheres) delete sphere;
 	for (Line* segment : m_cameraPathSegments) delete segment;
@@ -554,21 +554,24 @@ void Debug::RebuildAxis()
 	m_axis = new Axis(m_axisLength);
 }
 
-void Debug::RebuildPointLightDebugSpheres()
+void Debug::RebuildLightDebugSpheres()
 {
-	for (Line* sphere : m_pointLightDebugSpheres)
+	for (Line* sphere : m_lightDebugSpheres)
 	{
 		delete sphere;
 	}
-	m_pointLightDebugSpheres.clear();
-	m_pointLightDebugColors.clear();
+	m_lightDebugSpheres.clear();
+	m_lightDebugColors.clear();
 
-	for (const PointLight& pointLight : Root::Current().Render().Lights().PointLights())
+	const LightingManager& lighting = Root::Current().Render().Lights();
+	const auto addLightSphere = [this](const glm::vec3& lightColor)
 	{
-		const glm::vec3 color = glm::clamp(pointLight.color, glm::vec3(0.0f), glm::vec3(1.0f));
-		m_pointLightDebugSpheres.push_back(new Line(MakeWireSphereVertices(color)));
-		m_pointLightDebugColors.push_back(color);
-	}
+		const glm::vec3 color = glm::clamp(lightColor, glm::vec3(0.0f), glm::vec3(1.0f));
+		m_lightDebugSpheres.push_back(new Line(MakeWireSphereVertices(color)));
+		m_lightDebugColors.push_back(color);
+	};
+	for (const PointLight& pointLight : lighting.PointLights()) addLightSphere(pointLight.color);
+	for (const SpotLight& spotLight : lighting.SpotLights()) addLightSphere(spotLight.color);
 }
 
 void Debug::draw(const Camera& camera, const EngineGUI& gui)
@@ -651,44 +654,53 @@ void Debug::draw(const Camera& camera, const EngineGUI& gui)
 
 	if (m_showPointLightDebugSpheres && !suppressDebugSpheres)
 	{
-		const std::vector<PointLight>& pointLights = Root::Current().Render().Lights().PointLights();
-		bool rebuildLightSpheres = m_pointLightDebugSpheres.size() != pointLights.size();
+		const LightingManager& lighting = Root::Current().Render().Lights();
+		const std::vector<PointLight>& pointLights = lighting.PointLights();
+		const std::vector<SpotLight>& spotLights = lighting.SpotLights();
+		const std::size_t totalLightCount = pointLights.size() + spotLights.size();
+		bool rebuildLightSpheres = m_lightDebugSpheres.size() != totalLightCount;
 		if (!rebuildLightSpheres)
 		{
 			for (std::size_t i = 0; i < pointLights.size(); ++i)
 			{
 				const glm::vec3 color = glm::clamp(pointLights[i].color, glm::vec3(0.0f), glm::vec3(1.0f));
-				if (m_pointLightDebugColors[i] != color)
+				if (m_lightDebugColors[i] != color)
 				{
 					rebuildLightSpheres = true;
 					break;
 				}
 			}
+			for (std::size_t i = 0; !rebuildLightSpheres && i < spotLights.size(); ++i)
+			{
+				const glm::vec3 color = glm::clamp(spotLights[i].color, glm::vec3(0.0f), glm::vec3(1.0f));
+				if (m_lightDebugColors[pointLights.size() + i] != color)
+					rebuildLightSpheres = true;
+			}
 		}
 
 		if (rebuildLightSpheres)
 		{
-			RebuildPointLightDebugSpheres();
+			RebuildLightDebugSpheres();
 		}
 
-		for (std::size_t i = 0; i < pointLights.size() && i < m_pointLightDebugSpheres.size(); ++i)
+		const auto drawLightSphere = [&](std::size_t sphereIndex, const glm::vec3& position, float radius)
 		{
-			Line* sphere = m_pointLightDebugSpheres[i];
+			if (sphereIndex >= m_lightDebugSpheres.size()) return;
+			Line* sphere = m_lightDebugSpheres[sphereIndex];
 			if (!sphere)
-			{
-				continue;
-			}
-
-			const PointLight& pointLight = pointLights[i];
-			const float markerRadius = std::clamp(pointLight.radius * 0.03f, 15.0f, 80.0f);
+				return;
+			const float markerRadius = std::clamp(radius * 0.03f, 15.0f, 80.0f);
 			const glm::mat4 model =
-				glm::translate(glm::mat4(1.0f), pointLight.position) *
+				glm::translate(glm::mat4(1.0f), position) *
 				glm::scale(glm::mat4(1.0f), glm::vec3(markerRadius));
-
 			sphere->UpdateProjection(projection);
 			glLineWidth(2.0f);
 			sphere->draw(view, model);
-		}
+		};
+		for (std::size_t i = 0; i < pointLights.size(); ++i)
+			drawLightSphere(i, pointLights[i].position, pointLights[i].radius);
+		for (std::size_t i = 0; i < spotLights.size(); ++i)
+			drawLightSphere(pointLights.size() + i, spotLights[i].position, spotLights[i].radius);
 	}
 
 	// Level-collider debug geometry follows the same overlay path as point-light

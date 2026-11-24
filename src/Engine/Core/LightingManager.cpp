@@ -1,6 +1,7 @@
 #include "Engine/Core/LightingManager.h"
 
 #include <algorithm>
+#include <cmath>
 #include <glm/common.hpp>
 #include <string>
 
@@ -10,6 +11,20 @@ void PointLight::SetRadius(float newRadius)
 	constant = 1.0f;
 	linear = 2.0f / radius;
 	quadratic = 1.0f / (radius * radius);
+}
+
+void SpotLight::SetRadius(float newRadius)
+{
+	radius = glm::max(newRadius, 0.001f);
+	constant = 1.0f;
+	linear = 2.0f / radius;
+	quadratic = 1.0f / (radius * radius);
+}
+
+void SpotLight::SetAngles(float newInnerAngle, float newOuterAngle)
+{
+	innerAngle = glm::clamp(newInnerAngle, 0.1f, 88.9f);
+	outerAngle = glm::clamp(newOuterAngle, innerAngle + 0.1f, 89.0f);
 }
 
 void LightingManager::startUp()
@@ -29,6 +44,7 @@ void LightingManager::ResetToDefaults()
 	m_sun = DirectionalLight{};
 	m_shadowsEnabled = true;
 	m_pointLights.clear();
+	m_spotLights.clear();
 }
 
 void LightingManager::ApplyToShader(const ShaderProgram* shader) const
@@ -53,6 +69,28 @@ void LightingManager::ApplyToShader(const ShaderProgram* shader) const
 		shader->setUniform(uniformPrefix + "constant", pointLight.constant);
 		shader->setUniform(uniformPrefix + "linear", pointLight.linear);
 		shader->setUniform(uniformPrefix + "quadratic", pointLight.quadratic);
+	}
+
+	const int spotLightCount = std::min(static_cast<int>(m_spotLights.size()), MaxSpotLights);
+	shader->setUniform("spotLightCount", spotLightCount);
+	for (int i = 0; i < spotLightCount; ++i)
+	{
+		const SpotLight& spotLight = m_spotLights[i];
+		const std::string uniformPrefix = "spotLights[" + std::to_string(i) + "].";
+		shader->setUniform(uniformPrefix + "position", spotLight.position);
+		const glm::vec3 direction = glm::length(spotLight.direction) > 0.001f
+			? glm::normalize(spotLight.direction) : glm::vec3(0.0f, -1.0f, 0.0f);
+		shader->setUniform(uniformPrefix + "direction", direction);
+		shader->setUniform(uniformPrefix + "color", spotLight.color);
+		shader->setUniform(uniformPrefix + "intensity", spotLight.intensity);
+		shader->setUniform(uniformPrefix + "ambient", spotLight.ambient);
+		shader->setUniform(uniformPrefix + "radius", spotLight.radius);
+		shader->setUniform(uniformPrefix + "radiusFade", spotLight.radiusFade);
+		shader->setUniform(uniformPrefix + "innerCutoff", std::cos(glm::radians(spotLight.innerAngle)));
+		shader->setUniform(uniformPrefix + "outerCutoff", std::cos(glm::radians(spotLight.outerAngle)));
+		shader->setUniform(uniformPrefix + "constant", spotLight.constant);
+		shader->setUniform(uniformPrefix + "linear", spotLight.linear);
+		shader->setUniform(uniformPrefix + "quadratic", spotLight.quadratic);
 	}
 }
 
@@ -95,5 +133,23 @@ std::vector<PointLight>& LightingManager::PointLights()
 const std::vector<PointLight>& LightingManager::PointLights() const
 {
 	return m_pointLights;
+}
+
+SpotLight& LightingManager::AddSpotLight()
+{
+	if (m_spotLights.size() >= static_cast<std::size_t>(MaxSpotLights))
+		return m_spotLights.back();
+	m_spotLights.emplace_back();
+	return m_spotLights.back();
+}
+
+std::vector<SpotLight>& LightingManager::SpotLights()
+{
+	return m_spotLights;
+}
+
+const std::vector<SpotLight>& LightingManager::SpotLights() const
+{
+	return m_spotLights;
 }
 
