@@ -12,7 +12,6 @@
 #include "Engine/UI/BuildGameWindow.h"
 #include "Engine/UI/AudioWindow.h"
 #include "Engine/UI/CameraWindow.h"
-#include "Engine/UI/LightingWindow.h"
 #include "Engine/UI/CutsceneWindow.h"
 #include "Engine/UI/FileExplorerWindow.h"
 #include "Engine/UI/EditorSceneInteraction.h"
@@ -47,7 +46,6 @@ public:
 	bool ShowGrid() const;
 	bool ShowLevelWindow() const;
 	bool ShowEntityWindow() const;
-	bool ShowLightingWindow() const;
 	bool ShowFileExplorer() const;
 	bool ShowInputMapWindow() const;
 	bool ShowInstanceManagerWindow() const;
@@ -56,7 +54,6 @@ public:
 	void SetShowGrid(bool showGrid);
 	void SetShowLevelWindow(bool showLevelWindow);
 	void SetShowEntityWindow(bool showEntityWindow);
-	void SetShowLightingWindow(bool showLightingWindow);
 	void SetShowFileExplorer(bool showFileExplorer);
 	void SetShowInputMapWindow(bool showInputMapWindow);
 	void SetShowCameraWindow(bool showCameraWindow);
@@ -109,7 +106,6 @@ private:
 	SpawnManagerWindow m_spawnManagerWindow;
 	ParticleSystemWindow m_particleSystemWindow;
 	ShaderWindow m_shaderWindow;
-	LightingWindow m_lightingWindow;
 	CutsceneWindow m_cutsceneWindow;
 	FileExplorerWindow m_fileExplorerWindow;
 };

@@ -123,7 +123,6 @@ set(SOURCES
     "include/Engine/UI/SpawnManagerWindow.h" "src/Engine/UI/SpawnManagerWindow.cpp"
     "include/Engine/UI/ParticleSystemWindow.h" "src/Engine/UI/ParticleSystemWindow.cpp"
     "include/Engine/UI/ShaderWindow.h" "src/Engine/UI/ShaderWindow.cpp"
-    "include/Engine/UI/LightingWindow.h" "src/Engine/UI/LightingWindow.cpp"
     "include/Engine/UI/FileExplorerWindow.h" "src/Engine/UI/FileExplorerWindow.cpp"
     "include/Engine/UI/EntityStateMachineWindow.h"
     "src/Engine/UI/EntityStateMachineWindow.cpp"

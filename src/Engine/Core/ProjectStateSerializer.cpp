@@ -575,7 +575,8 @@ namespace ProjectStateSerializer {
 			contents += std::to_string(sunLight.color.x) + ";" + std::to_string(sunLight.color.y) + ";" + std::to_string(sunLight.color.z) + ";";
 			contents += std::to_string(sunLight.intensity) + ";" + std::to_string(sunLight.ambient) + ";";
 			contents += (lighting.ShadowsEnabled() ? "1;" : "0;");
-			contents += (sunLight.castsShadows ? "1\n" : "0\n");
+			contents += (sunLight.castsShadows ? "1;" : "0;");
+			contents += ProjectStateFormat::EscapeField(sunLight.name) + "\n";
 			for (const PointLight& pointLight : lighting.PointLights())
 			{
 				contents += "scenepointlight;" + ProjectStateFormat::EscapeField(scene->Name()) + ";";
@@ -584,7 +585,8 @@ namespace ProjectStateSerializer {
 				contents += std::to_string(pointLight.intensity) + ";" + std::to_string(pointLight.ambient) + ";";
 				contents += std::to_string(pointLight.radius) + ";" + std::to_string(pointLight.radiusFade) + ";";
 				contents += std::to_string(pointLight.constant) + ";" + std::to_string(pointLight.linear) + ";" + std::to_string(pointLight.quadratic) + ";";
-				contents += (pointLight.castsShadows ? "1\n" : "0\n");
+				contents += (pointLight.castsShadows ? "1;" : "0;");
+				contents += ProjectStateFormat::EscapeField(pointLight.name) + "\n";
 			}
 			for (const SpotLight& spotLight : lighting.SpotLights())
 			{
@@ -596,7 +598,8 @@ namespace ProjectStateSerializer {
 				contents += std::to_string(spotLight.radius) + ";" + std::to_string(spotLight.radiusFade) + ";";
 				contents += std::to_string(spotLight.innerAngle) + ";" + std::to_string(spotLight.outerAngle) + ";";
 				contents += std::to_string(spotLight.constant) + ";" + std::to_string(spotLight.linear) + ";" + std::to_string(spotLight.quadratic) + ";";
-				contents += spotLight.castsShadows ? "1\n" : "0\n";
+				contents += spotLight.castsShadows ? "1;" : "0;";
+				contents += ProjectStateFormat::EscapeField(spotLight.name) + "\n";
 			}
 			contents += "cutscene;" + ProjectStateFormat::EscapeField(scene->Name()) + ";" + std::to_string(scene->Cutscene().duration) + "\n";
 			for (const CutsceneAnimationTrack& track : scene->Cutscene().animationTracks)
@@ -670,6 +673,8 @@ namespace ProjectStateSerializer {
 						pendingLevel.sunLight.ambient = std::stof(fields[9]);
 						pendingLevel.sunLight.shadowsEnabled = fields[10] == "1" || fields[10] == "true" || fields[10] == "True";
 						pendingLevel.sunLight.castsShadows = fields[11] == "1" || fields[11] == "true" || fields[11] == "True";
+						if (fields.size() >= 13)
+							pendingLevel.sunLight.name = fields[12];
 						renderState.hasSceneLighting = true;
 						break;
 					}
@@ -691,6 +696,8 @@ namespace ProjectStateSerializer {
 						pointLight.linear = std::stof(fields[13]);
 						pointLight.quadratic = std::stof(fields[14]);
 						pointLight.castsShadows = fields[15] == "1" || fields[15] == "true" || fields[15] == "True";
+						if (fields.size() >= 17)
+							pointLight.name = fields[16];
 						if (pendingLevel.pointLights.size() < static_cast<std::size_t>(LightingManager::MaxPointLights))
 						{
 							pendingLevel.pointLights.push_back(std::move(pointLight));
@@ -720,6 +727,8 @@ namespace ProjectStateSerializer {
 						spotLight.quadratic = std::stof(fields[19]);
 						if (fields.size() >= 21)
 							spotLight.castsShadows = fields[20] == "1" || fields[20] == "true" || fields[20] == "True";
+						if (fields.size() >= 22)
+							spotLight.name = fields[21];
 						if (pendingLevel.spotLights.size() < static_cast<std::size_t>(LightingManager::MaxSpotLights))
 							pendingLevel.spotLights.push_back(std::move(spotLight));
 						renderState.hasSceneLighting = true;
@@ -727,7 +736,7 @@ namespace ProjectStateSerializer {
 					}
 					continue;
 				}
-				if ((fields.size() == 3 && fields[0] == "enginecamera") || (fields.size() >= 7 && fields[0] == "gamecamera") || (fields.size() >= 11 && fields[0] == "scenecamera") || (fields.size() >= 2 && fields[0] == "camerapath") || (fields.size() >= 4 && fields[0] == "camerapathsettings") || (fields.size() == 3 && fields[0] == "editorview") || (fields.size() >= 3 && fields[0] == "debugwindows") || ((fields.size() >= 8 && fields.size() <= 11) && fields[0] == "sunlight") || ((fields.size() >= 12 && fields.size() <= 15) && fields[0] == "pointlight") || ((fields.size() == 19 || fields.size() == 20) && fields[0] == "spotlight") || (fields.size() == 2 && fields[0] == "imguilayout"))
+				if ((fields.size() == 3 && fields[0] == "enginecamera") || (fields.size() >= 7 && fields[0] == "gamecamera") || (fields.size() >= 11 && fields[0] == "scenecamera") || (fields.size() >= 2 && fields[0] == "camerapath") || (fields.size() >= 4 && fields[0] == "camerapathsettings") || (fields.size() == 3 && fields[0] == "editorview") || (fields.size() >= 3 && fields[0] == "debugwindows") || ((fields.size() >= 8 && fields.size() <= 11) && fields[0] == "sunlight") || ((fields.size() >= 12 && fields.size() <= 16) && fields[0] == "pointlight") || ((fields.size() >= 19 && fields.size() <= 21) && fields[0] == "spotlight") || (fields.size() == 2 && fields[0] == "imguilayout"))
 				{
 					if (fields.size() == 3 && fields[0] == "enginecamera")
 					{
@@ -885,7 +894,6 @@ namespace ProjectStateSerializer {
 						renderState.showFileExplorer = readBool(3, renderState.showFileExplorer);
 						renderState.showLevelWindow = readBool(4, renderState.showLevelWindow);
 						renderState.showEntityWindow = readBool(5, renderState.showEntityWindow);
-						renderState.showLightingWindow = readBool(6, renderState.showLightingWindow);
 						renderState.showInputMapWindow = readBool(7, renderState.showInputMapWindow);
 						renderState.showCameraWindow = readBool(8, renderState.showCameraWindow);
 						renderState.showGameInputWindow = readBool(9, renderState.showGameInputWindow);
@@ -915,7 +923,7 @@ namespace ProjectStateSerializer {
 							renderState.sunLight.castsShadows = fields[10] == "1" || fields[10] == "true" || fields[10] == "True";
 						}
 					}
-					else if (fields.size() >= 12 && fields.size() <= 15 && fields[0] == "pointlight")
+					else if (fields.size() >= 12 && fields.size() <= 16 && fields[0] == "pointlight")
 					{
 						renderState.hasLegacyLighting = true;
 						RenderStateData::PointLightData pointLight;
@@ -934,6 +942,8 @@ namespace ProjectStateSerializer {
 							{
 								pointLight.castsShadows = fields[14] == "1" || fields[14] == "true" || fields[14] == "True";
 							}
+							if (fields.size() >= 16)
+								pointLight.name = fields[15];
 						}
 						else
 						{
@@ -954,7 +964,7 @@ namespace ProjectStateSerializer {
 						}
 						renderState.pointLights.push_back(std::move(pointLight));
 					}
-					else if ((fields.size() == 19 || fields.size() == 20) && fields[0] == "spotlight")
+					else if (fields.size() >= 19 && fields.size() <= 21 && fields[0] == "spotlight")
 					{
 						renderState.hasLegacyLighting = true;
 						RenderStateData::SpotLightData spotLight;
@@ -972,6 +982,8 @@ namespace ProjectStateSerializer {
 						spotLight.quadratic = std::stof(fields[18]);
 						if (fields.size() >= 20)
 							spotLight.castsShadows = fields[19] == "1" || fields[19] == "true" || fields[19] == "True";
+						if (fields.size() >= 21)
+							spotLight.name = fields[20];
 						if (renderState.spotLights.size() < static_cast<std::size_t>(LightingManager::MaxSpotLights))
 							renderState.spotLights.push_back(std::move(spotLight));
 					}
@@ -1720,7 +1732,6 @@ namespace ProjectStateSerializer {
 		const bool showFileExplorer = Root::Current().FrontEnd().EditorGUI().ShowFileExplorer();
 		const bool showLevelWindow = Root::Current().FrontEnd().EditorGUI().ShowLevelWindow();
 		const bool showEntityWindow = Root::Current().FrontEnd().EditorGUI().ShowEntityWindow();
-		const bool showLightingWindow = Root::Current().FrontEnd().EditorGUI().ShowLightingWindow();
 		const bool showInputMapWindow = Root::Current().FrontEnd().EditorGUI().ShowInputMapWindow();
 		const bool showCameraWindow = Root::Current().FrontEnd().EditorGUI().ShowCameraWindow();
 		const bool showGameInputWindow = Root::Current().Debugger().ShowGameInputWindow();
@@ -1740,7 +1751,8 @@ namespace ProjectStateSerializer {
 		contents += ";";
 		contents += showEntityWindow ? "1" : "0";
 		contents += ";";
-		contents += showLightingWindow ? "1" : "0";
+		// Keep the retired Lighting Window field in place for older layout readers.
+		contents += "0";
 		contents += ";";
 		contents += showInputMapWindow ? "1" : "0";
 		contents += ";";

@@ -201,7 +201,8 @@ void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManage
 		&m_gizmoScale,
 		&m_boxFaceDragMode,
 		&m_cameraPathCreator,
-		&m_showCameraPath };
+		&m_showCameraPath,
+		&m_windowState.showEntityWindow };
 
 	if (m_waitingForStartupProject)
 	{
@@ -305,6 +306,7 @@ void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManage
 	{
 		m_selection.pointLightIndex = -1;
 		m_selection.spotLightIndex = -1;
+		m_selection.directionalLightSelected = false;
 	}
 	const std::size_t pointLightCount = Root::Current().Render().Lights().PointLights().size();
 	if (m_selection.pointLightIndex < 0 ||
@@ -317,7 +319,14 @@ void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManage
 		m_selection.spotLightIndex >= static_cast<int>(spotLightCount))
 		m_selection.spotLightIndex = -1;
 	if (m_selection.pointLightIndex >= 0)
+	{
 		m_selection.spotLightIndex = -1;
+		m_selection.directionalLightSelected = false;
+	}
+	if (m_selection.spotLightIndex >= 0)
+		m_selection.directionalLightSelected = false;
+	if (m_selection.levelColliderIndex >= 0)
+		m_selection.directionalLightSelected = false;
 
 	const EngineMenuBarResult viewResult =
 		m_menuBar.Draw(context, m_showAxis, m_showGrid, m_windowState, m_popupRequests);
@@ -377,12 +386,6 @@ void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManage
 		}
 	}
 
-	m_lightingWindow.Draw(
-		Root::Current().Render().Lights(),
-		m_windowState.showLightingWindow,
-		m_selection.pointLightIndex,
-		m_selection.spotLightIndex);
-
 	// Evaluate scene interaction after every editor window has been submitted so
 	// real UI ownership can be distinguished from ImGuizmo's next-frame mouse
 	// capture request.
@@ -401,10 +404,6 @@ void EngineGUI::Draw(const Camera& camera, FileManager& fileManager, SceneManage
 	if (viewResult.showEntityWindow)
 	{
 		m_windowState.showEntityWindow = *viewResult.showEntityWindow;
-	}
-	if (viewResult.showLightingWindow)
-	{
-		m_windowState.showLightingWindow = *viewResult.showLightingWindow;
 	}
 	if (viewResult.showCutsceneWindow)
 	{
@@ -438,11 +437,6 @@ bool EngineGUI::ShowLevelWindow() const
 bool EngineGUI::ShowEntityWindow() const
 {
 	return m_windowState.showEntityWindow;
-}
-
-bool EngineGUI::ShowLightingWindow() const
-{
-	return m_windowState.showLightingWindow;
 }
 
 bool EngineGUI::ShowFileExplorer() const
@@ -483,11 +477,6 @@ void EngineGUI::SetShowLevelWindow(bool showLevelWindow)
 void EngineGUI::SetShowEntityWindow(bool showEntityWindow)
 {
 	m_windowState.showEntityWindow = showEntityWindow;
-}
-
-void EngineGUI::SetShowLightingWindow(bool showLightingWindow)
-{
-	m_windowState.showLightingWindow = showLightingWindow;
 }
 
 void EngineGUI::SetShowFileExplorer(bool showFileExplorer)

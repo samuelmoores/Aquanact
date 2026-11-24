@@ -126,12 +126,34 @@ void SceneWindow::Draw(
 		if (activeScene)
 		{
 			const std::vector<std::unique_ptr<Entity>>& objects = activeScene->Objects();
+			Entity* gameManager = nullptr;
+			for (const auto& object : objects)
+				if (object && object->Name() == "GameManager")
+				{
+					gameManager = object.get();
+					break;
+				}
+			if (gameManager && ImGui::Selectable("GameManager##SceneWindow",
+				selectedEntityId == gameManager->Id() && context.selection->submeshIndex < 0))
+			{
+				selectedEntityId = gameManager->Id();
+				context.selection->submeshIndex = -1;
+				context.selection->submeshComponentEntityId = 0;
+				context.selection->levelColliderIndex = -1;
+				context.selection->pointLightIndex = -1;
+				context.selection->spotLightIndex = -1;
+				context.selection->directionalLightSelected = false;
+				entityWindowOpen = true;
+			}
 			ImGui::Separator();
+			ImGui::SetNextItemOpen(false, ImGuiCond_FirstUseEver);
+			if (ImGui::CollapsingHeader("Scene Objects"))
+			{
 			bool hasSceneObject = false;
 			for (std::size_t i = 0; i < objects.size(); ++i)
 			{
 				const std::unique_ptr<Entity>& object = objects[i];
-				if (object && object->IsSubmeshComponentOwner()) continue;
+				if (object && (object->IsSubmeshComponentOwner() || object->Name() == "GameManager")) continue;
 				hasSceneObject = true;
 				const std::string label = object ? object->Name() : "<null>";
 				const std::string visibleLabel = label.empty() ? "<unnamed>" : label;
@@ -151,6 +173,7 @@ void SceneWindow::Draw(
 					context.selection->levelColliderIndex = -1;
 					context.selection->pointLightIndex = -1;
 					context.selection->spotLightIndex = -1;
+					context.selection->directionalLightSelected = false;
 					entityWindowOpen = true;
 				}
 				if (expanded && hasSubmeshes)
@@ -175,6 +198,7 @@ void SceneWindow::Draw(
 							context.selection->levelColliderIndex = -1;
 							context.selection->pointLightIndex = -1;
 							context.selection->spotLightIndex = -1;
+							context.selection->directionalLightSelected = false;
 							entityWindowOpen = true;
 						}
 						ImGui::PopID();
@@ -185,7 +209,66 @@ void SceneWindow::Draw(
 			}
 			if (!hasSceneObject)
 			{
-				ImGui::TextUnformatted("No entities in this Scene.");
+				ImGui::TextUnformatted("No scene objects.");
+			}
+			}
+
+			LightingManager& lighting = activeScene->Lights();
+			ImGui::SetNextItemOpen(false, ImGuiCond_FirstUseEver);
+			if (ImGui::CollapsingHeader("Lights"))
+			{
+			const bool sunSelected = context.selection->directionalLightSelected;
+			const std::string sunLabel = lighting.SunLight().name.empty()
+				? "Directional Light" : lighting.SunLight().name;
+			if (ImGui::Selectable((sunLabel + "##DirectionalLight").c_str(), sunSelected))
+			{
+				context.selection->entityId = 0;
+				context.selection->submeshIndex = -1;
+				context.selection->submeshComponentEntityId = 0;
+				context.selection->pointLightIndex = -1;
+				context.selection->spotLightIndex = -1;
+				context.selection->levelColliderIndex = -1;
+				context.selection->directionalLightSelected = true;
+				entityWindowOpen = true;
+			}
+
+			for (int lightIndex = 0; lightIndex < static_cast<int>(lighting.PointLights().size()); ++lightIndex)
+			{
+				const PointLight& light = lighting.PointLights()[static_cast<std::size_t>(lightIndex)];
+				const std::string label = light.name.empty()
+					? "Point Light " + std::to_string(lightIndex + 1) : light.name;
+				if (ImGui::Selectable((label + "##PointLight" + std::to_string(lightIndex)).c_str(),
+					context.selection->pointLightIndex == lightIndex))
+				{
+					context.selection->entityId = 0;
+					context.selection->submeshIndex = -1;
+					context.selection->submeshComponentEntityId = 0;
+					context.selection->pointLightIndex = lightIndex;
+					context.selection->spotLightIndex = -1;
+					context.selection->levelColliderIndex = -1;
+					context.selection->directionalLightSelected = false;
+					entityWindowOpen = true;
+				}
+			}
+
+			for (int lightIndex = 0; lightIndex < static_cast<int>(lighting.SpotLights().size()); ++lightIndex)
+			{
+				const SpotLight& light = lighting.SpotLights()[static_cast<std::size_t>(lightIndex)];
+				const std::string label = light.name.empty()
+					? "Spot Light " + std::to_string(lightIndex + 1) : light.name;
+				if (ImGui::Selectable((label + "##SpotLight" + std::to_string(lightIndex)).c_str(),
+					context.selection->spotLightIndex == lightIndex))
+				{
+					context.selection->entityId = 0;
+					context.selection->submeshIndex = -1;
+					context.selection->submeshComponentEntityId = 0;
+					context.selection->pointLightIndex = -1;
+					context.selection->spotLightIndex = lightIndex;
+					context.selection->levelColliderIndex = -1;
+					context.selection->directionalLightSelected = false;
+					entityWindowOpen = true;
+				}
+			}
 			}
 			if (pendingSubmeshParentId != 0 && pendingSubmeshIndex >= 0)
 			{
@@ -227,6 +310,7 @@ void SceneWindow::DrawLevelColliderWindow(const EngineGuiFrameContext& context, 
 		context.selection->submeshComponentEntityId = 0;
 		context.selection->pointLightIndex = -1;
 		context.selection->spotLightIndex = -1;
+		context.selection->directionalLightSelected = false;
 		if (added) PhysicsWorld::Instance().Add(*added);
 	}
 	ImGui::TextUnformatted("Gizmo Operations");
@@ -256,6 +340,7 @@ void SceneWindow::DrawLevelColliderWindow(const EngineGuiFrameContext& context, 
 			context.selection->submeshComponentEntityId = 0;
 			context.selection->pointLightIndex = -1;
 			context.selection->spotLightIndex = -1;
+			context.selection->directionalLightSelected = false;
 		}
 	}
 	if (selected >= 0 && selected < static_cast<int>(scene->LevelColliders().size()))

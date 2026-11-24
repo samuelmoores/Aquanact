@@ -129,6 +129,8 @@ namespace {
 			LightingManager& lighting = Scene->Lights();
 			if (pendingLevel.hasSunLight)
 			{
+				if (!pendingLevel.sunLight.name.empty())
+					lighting.SunLight().name = pendingLevel.sunLight.name;
 				lighting.SunLight().direction = pendingLevel.sunLight.direction;
 				lighting.SunLight().color = pendingLevel.sunLight.color;
 				lighting.SunLight().intensity = pendingLevel.sunLight.intensity;
@@ -140,6 +142,8 @@ namespace {
 			for (const ProjectStateData::PointLightData& pointLightData : pendingLevel.pointLights)
 			{
 				PointLight& pointLight = lighting.AddPointLight();
+				if (!pointLightData.name.empty())
+					pointLight.name = pointLightData.name;
 				pointLight.position = pointLightData.position;
 				pointLight.color = pointLightData.color;
 				pointLight.intensity = pointLightData.intensity;
@@ -155,6 +159,8 @@ namespace {
 			for (const ProjectStateData::SpotLightData& spotLightData : pendingLevel.spotLights)
 			{
 				SpotLight& spotLight = lighting.AddSpotLight();
+				if (!spotLightData.name.empty())
+					spotLight.name = spotLightData.name;
 				spotLight.position = spotLightData.position;
 				spotLight.direction = glm::length(spotLightData.direction) > 0.001f
 					? glm::normalize(spotLightData.direction) : glm::vec3(0.0f, -1.0f, 0.0f);
@@ -566,7 +572,6 @@ bool ProjectManager::LoadProject(const std::filesystem::path& path, SceneManager
 		Root::Current().FrontEnd().EditorGUI().SetShowFileExplorer(renderState.showFileExplorer);
 		Root::Current().FrontEnd().EditorGUI().SetShowLevelWindow(renderState.showLevelWindow);
 		Root::Current().FrontEnd().EditorGUI().SetShowEntityWindow(renderState.showEntityWindow);
-		Root::Current().FrontEnd().EditorGUI().SetShowLightingWindow(renderState.showLightingWindow);
 		Root::Current().FrontEnd().EditorGUI().SetShowInputMapWindow(renderState.showInputMapWindow);
 		Root::Current().FrontEnd().EditorGUI().SetShowCameraWindow(renderState.showCameraWindow);
 		Root::Current().Debugger().SetShowGameInputWindow(renderState.showGameInputWindow);

@@ -1,11 +1,13 @@
 #pragma once
 
 #include <iostream>
+#include <string>
 #include <vector>
 #include <glm/glm.hpp>
 #include "Engine/Core/ShaderProgram.h"
 
 struct DirectionalLight {
+	std::string name = "Directional Light";
 	glm::vec3 direction = glm::vec3(-0.3f, -1.0f, 0.2f);
 	glm::vec3 color = glm::vec3(1.0f);
 	float intensity = 1.0f;
@@ -14,6 +16,7 @@ struct DirectionalLight {
 };
 
 struct PointLight {
+	std::string name = "Point Light";
 	glm::vec3 position = glm::vec3(0.0f, 2.0f, 0.0f);
 	glm::vec3 color = glm::vec3(1.0f);
 	float intensity = 1.0f;
@@ -30,6 +33,7 @@ struct PointLight {
 };
 
 struct SpotLight {
+	std::string name = "Spot Light";
 	glm::vec3 position{ 0.0f, 2.0f, 0.0f };
 	glm::vec3 direction{ 0.0f, -1.0f, 0.0f };
 	glm::vec3 color{ 1.0f };

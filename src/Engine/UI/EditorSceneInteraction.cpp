@@ -603,6 +603,7 @@ void EditorSceneInteraction::Draw(const EngineGuiFrameContext& context) const
 				context.selection->submeshComponentEntityId = 0;
 				context.selection->pointLightIndex = -1;
 				context.selection->spotLightIndex = -1;
+				context.selection->directionalLightSelected = false;
 				return;
 			}
 		}
@@ -619,6 +620,7 @@ void EditorSceneInteraction::Draw(const EngineGuiFrameContext& context) const
 		context.selection->pointLightIndex = -1;
 		context.selection->spotLightIndex = -1;
 		context.selection->levelColliderIndex = -1;
+		context.selection->directionalLightSelected = false;
 	}
 	else if (pickedLevelColliderIndex >= 0 && levelColliderDistance < entityDistance &&
 		levelColliderDistance < pointLightDistance && levelColliderDistance < spotLightDistance)
@@ -630,6 +632,7 @@ void EditorSceneInteraction::Draw(const EngineGuiFrameContext& context) const
 		context.selection->pointLightIndex = -1;
 		context.selection->spotLightIndex = -1;
 		context.selection->levelColliderIndex = pickedLevelColliderIndex;
+		context.selection->directionalLightSelected = false;
 	}
 	// Debug light markers are editor gizmos, so allow them to be picked through
 	// scene geometry. Compare light markers against each other to resolve overlap.
@@ -642,6 +645,8 @@ void EditorSceneInteraction::Draw(const EngineGuiFrameContext& context) const
 		context.selection->pointLightIndex = pickedPointLightIndex;
 		context.selection->spotLightIndex = -1;
 		context.selection->levelColliderIndex = -1;
+		context.selection->directionalLightSelected = false;
+		if (context.entityWindowOpen) *context.entityWindowOpen = true;
 	}
 	else if (pickedSpotLightIndex >= 0 && spotLightDistance < pointLightDistance)
 	{
@@ -652,6 +657,8 @@ void EditorSceneInteraction::Draw(const EngineGuiFrameContext& context) const
 		context.selection->pointLightIndex = -1;
 		context.selection->spotLightIndex = pickedSpotLightIndex;
 		context.selection->levelColliderIndex = -1;
+		context.selection->directionalLightSelected = false;
+		if (context.entityWindowOpen) *context.entityWindowOpen = true;
 	}
 	else
 	{
@@ -662,5 +669,6 @@ void EditorSceneInteraction::Draw(const EngineGuiFrameContext& context) const
 		context.selection->pointLightIndex = -1;
 		context.selection->spotLightIndex = -1;
 		context.selection->levelColliderIndex = -1;
+		context.selection->directionalLightSelected = false;
 	}
 }

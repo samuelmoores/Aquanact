@@ -20,6 +20,7 @@ struct EngineGuiSelection
 	// appended, so their index is sufficient for editor selection. -1 is none.
 	int pointLightIndex = -1;
 	int spotLightIndex = -1;
+	bool directionalLightSelected = false;
 	// Index into the active scene's independent level-collider collection.
 	int levelColliderIndex = -1;
 };
@@ -30,7 +31,6 @@ struct EngineGuiWindowState
 	bool showSceneWindow = true;
 	bool showLevelColliderWindow = false;
 	bool showEntityWindow = false;
-	bool showLightingWindow = false;
 	bool showFileExplorer = false;
 	bool showInputMapWindow = false;
 	bool showCameraWindow = false;
@@ -66,4 +66,5 @@ struct EngineGuiFrameContext
 	bool* boxFaceDragMode = nullptr;
 	CameraPathCreator* cameraPath = nullptr;
 	bool* showCameraPath = nullptr;
+	bool* entityWindowOpen = nullptr;
 };

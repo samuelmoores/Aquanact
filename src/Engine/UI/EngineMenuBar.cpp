@@ -631,11 +631,6 @@ EngineMenuBarResult EngineMenuBar::DrawViewMenu(
 		result.showFileExplorer = showFileExplorer;
 	}
 	EngineGuiWidgets::ToggleMenuItem("Level Colliders Window", windowState.showLevelColliderWindow);
-	bool showLightingWindow = windowState.showLightingWindow;
-	if (EngineGuiWidgets::ToggleMenuItem("Lighting Window", showLightingWindow))
-	{
-		result.showLightingWindow = showLightingWindow;
-	}
 	EngineGuiWidgets::ToggleMenuItem("Cutscene Timeline", windowState.showCutsceneWindow);
 
 	bool showLogWindow = Root::Current().Debugger().ShowLogWindow();
@@ -727,6 +722,30 @@ void EngineMenuBar::DrawSceneMenu(
 	if (ImGui::MenuItem("Add Point Light", nullptr, false, canAddPointLight))
 	{
 		activeScene->Lights().AddPointLight();
+		if (context.selection)
+		{
+			context.selection->entityId = 0;
+			context.selection->pointLightIndex = static_cast<int>(activeScene->Lights().PointLights().size()) - 1;
+			context.selection->spotLightIndex = -1;
+			context.selection->directionalLightSelected = false;
+			context.selection->levelColliderIndex = -1;
+		}
+		if (context.entityWindowOpen) *context.entityWindowOpen = true;
+	}
+	const bool canAddSpotLight = activeScene &&
+		activeScene->Lights().SpotLights().size() < LightingManager::MaxSpotLights;
+	if (ImGui::MenuItem("Add Spot Light", nullptr, false, canAddSpotLight))
+	{
+		activeScene->Lights().AddSpotLight();
+		if (context.selection)
+		{
+			context.selection->entityId = 0;
+			context.selection->pointLightIndex = -1;
+			context.selection->spotLightIndex = static_cast<int>(activeScene->Lights().SpotLights().size()) - 1;
+			context.selection->directionalLightSelected = false;
+			context.selection->levelColliderIndex = -1;
+		}
+		if (context.entityWindowOpen) *context.entityWindowOpen = true;
 	}
 	if (ImGui::MenuItem("Add Entity", nullptr, false, activeScene != nullptr))
 	{
@@ -739,6 +758,7 @@ void EngineMenuBar::DrawSceneMenu(
 			context.selection->submeshComponentEntityId = 0;
 			context.selection->pointLightIndex = -1;
 			context.selection->spotLightIndex = -1;
+			context.selection->directionalLightSelected = false;
 			context.selection->levelColliderIndex = -1;
 			windowState.showEntityWindow = true;
 		}

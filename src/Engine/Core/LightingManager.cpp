@@ -122,6 +122,7 @@ PointLight& LightingManager::AddPointLight()
 	}
 
 	m_pointLights.emplace_back();
+	m_pointLights.back().name = "Point Light " + std::to_string(m_pointLights.size());
 	return m_pointLights.back();
 }
 
@@ -140,6 +141,7 @@ SpotLight& LightingManager::AddSpotLight()
 	if (m_spotLights.size() >= static_cast<std::size_t>(MaxSpotLights))
 		return m_spotLights.back();
 	m_spotLights.emplace_back();
+	m_spotLights.back().name = "Spot Light " + std::to_string(m_spotLights.size());
 	return m_spotLights.back();
 }
 

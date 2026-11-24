@@ -28,7 +28,6 @@ EngineGUI
   |-- AudioWindow
   |-- CameraWindow
   |     `-- uses EngineGUI-owned CameraPathCreator
-  |-- LightingWindow
   `-- FileExplorerWindow
 
 Supporting types:
@@ -154,8 +153,10 @@ SceneWindow
   Header: include/Engine/UI/SceneWindow.h
   Source: src/Engine/UI/SceneWindow.cpp
 
-Draw(context, open, entityWindowOpen) lists entities in the active scene. A
-selection updates context.selection and opens the Entity window.
+Draw(context, open, entityWindowOpen) lists entities and lights in the active
+scene, separated into their own sections. Selecting a light updates
+context.selection and opens the Entity window; point and spot lights can also
+be added from this panel.
 
 DrawNewLevelPopup(sceneManager, requested) owns the New Scene modal, scene-name
 normalization, creation status, and its draft name buffer.
@@ -165,9 +166,10 @@ EntityWindow
   Header: include/Engine/UI/EntityWindow.h
   Source: src/Engine/UI/EntityWindow.cpp
 
-Draw(context, open) inspects the selected entity and returns EntityWindowResult.
-It owns transform controls, physics controls, component add/remove UI, entity
-deletion confirmation, and component-specific controls.
+Draw(context, open) inspects the selected entity or light and returns
+EntityWindowResult. It owns transform controls, physics controls, component
+add/remove UI, entity deletion confirmation, component-specific controls, and
+directional, point, and spot light settings.
 
 EntityWindowResult communicates events without giving EntityWindow ownership
 of other windows:
@@ -281,15 +283,6 @@ selection, and point position capture from the editor camera.
 
 CameraWindow does not own CameraPathCreator because project serialization and
 debug rendering need access through EngineGUI::CameraPath().
-
-
-LightingWindow
-  Header: include/Engine/UI/LightingWindow.h
-  Source: src/Engine/UI/LightingWindow.cpp
-
-Edits a supplied LightingManager. It owns controls for global shadow enablement,
-sun direction/color/intensity/ambient/shadow casting, sun reset, and all point
-light properties. It does not own lighting data.
 
 
 FileExplorerWindow

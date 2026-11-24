@@ -14,6 +14,7 @@
 #include "Engine/Core/SpawnManager.h"
 #include "Engine/Core/EntityStateMachine.h"
 #include "Engine/Core/PhysicsWorld.h"
+#include "Engine/Core/LightingManager.h"
 #include "Engine/Core/ProjectManager.h"
 #include "Engine/Core/ParticleSystem.h"
 #include "Engine/UI/EngineGuiWidgets.h"
@@ -103,9 +104,117 @@ EntityWindowResult EntityWindow::Draw(const EngineGuiFrameContext& context, bool
 
 	if (ImGui::Begin("Entity", &open, ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_AlwaysAutoResize))
 	{
-		if (selectedEntityId == 0)
+		LightingManager& lighting = activeScene->Lights();
+		std::string* selectedLightName = nullptr;
+		if (context.selection->directionalLightSelected)
+			selectedLightName = &lighting.SunLight().name;
+		else if (context.selection->pointLightIndex >= 0
+			&& context.selection->pointLightIndex < static_cast<int>(lighting.PointLights().size()))
+			selectedLightName = &lighting.PointLights()[static_cast<std::size_t>(context.selection->pointLightIndex)].name;
+		else if (context.selection->spotLightIndex >= 0
+			&& context.selection->spotLightIndex < static_cast<int>(lighting.SpotLights().size()))
+			selectedLightName = &lighting.SpotLights()[static_cast<std::size_t>(context.selection->spotLightIndex)].name;
+		if (selectedLightName)
 		{
-			ImGui::TextUnformatted("No entity selected.");
+			std::array<char, 256> nameInput{};
+			const std::size_t copyLength = std::min(selectedLightName->size(), nameInput.size() - 1);
+			std::memcpy(nameInput.data(), selectedLightName->data(), copyLength);
+			if (ImGui::InputText("Name", nameInput.data(), nameInput.size()))
+				*selectedLightName = nameInput.data();
+		}
+		const bool hasSelectedLight = context.selection->directionalLightSelected
+			|| context.selection->pointLightIndex >= 0 || context.selection->spotLightIndex >= 0;
+		if (hasSelectedLight)
+		{
+			ImGui::SeparatorText("Lighting");
+			bool shadowsEnabled = lighting.ShadowsEnabled();
+			if (ImGui::Checkbox("Enable Shadows", &shadowsEnabled))
+				lighting.SetShadowsEnabled(shadowsEnabled);
+			bool showDebugSpheres = Root::Current().Debugger().ShowPointLightDebugSpheres();
+			if (ImGui::Checkbox("Show Point Light Debug Spheres", &showDebugSpheres))
+				Root::Current().Debugger().SetShowPointLightDebugSpheres(showDebugSpheres);
+			ImGui::Separator();
+		}
+		if (context.selection->directionalLightSelected)
+		{
+			DirectionalLight& light = lighting.SunLight();
+			ImGui::TextUnformatted("Directional Light");
+			ImGui::Separator();
+			ImGui::DragFloat3("Direction", &light.direction.x, 0.01f, -1.0f, 1.0f, "%.2f");
+			if (glm::length(light.direction) < 0.001f)
+				light.direction = glm::vec3(-0.3f, -1.0f, 0.2f);
+			ImGui::ColorEdit3("Color", &light.color.x);
+			ImGui::DragFloat("Intensity", &light.intensity, 0.001f, 0.0f, 10.0f, "%.3f");
+			ImGui::DragFloat("Ambient", &light.ambient, 0.001f, 0.0f, 1.0f, "%.3f");
+			ImGui::Checkbox("Casts Shadow", &light.castsShadows);
+			if (ImGui::Button("Reset Directional Light"))
+			{
+				light.direction = glm::vec3(-0.3f, -1.0f, 0.2f);
+				light.color = glm::vec3(1.0f);
+				light.intensity = 1.0f;
+				light.ambient = 0.5f;
+				light.castsShadows = true;
+			}
+		}
+		else if (context.selection->pointLightIndex >= 0
+			&& context.selection->pointLightIndex < static_cast<int>(lighting.PointLights().size()))
+		{
+			const int lightIndex = context.selection->pointLightIndex;
+			PointLight& light = lighting.PointLights()[static_cast<std::size_t>(lightIndex)];
+			ImGui::Text("Point Light %d", lightIndex + 1);
+			ImGui::Separator();
+			ImGui::DragFloat3("Position", &light.position.x, 0.05f, -1000.0f, 1000.0f, "%.2f");
+			ImGui::ColorEdit3("Color", &light.color.x);
+			ImGui::DragFloat("Intensity", &light.intensity, 0.01f, 0.0f, 50.0f, "%.2f");
+			ImGui::DragFloat("Ambient", &light.ambient, 0.001f, 0.0f, 1.0f, "%.3f");
+			ImGui::Checkbox("Casts Shadow", &light.castsShadows);
+			float radius = light.radius;
+			if (ImGui::DragFloat("Radius", &radius, 5.0f, 0.001f, 5000.0f, "%.2f"))
+				light.SetRadius(radius);
+			ImGui::DragFloat("Radius Fade", &light.radiusFade, 0.01f, 0.0f, 1.0f, "%.2f");
+			if (ImGui::Button("Delete Point Light"))
+			{
+				lighting.PointLights().erase(lighting.PointLights().begin() + lightIndex);
+				context.selection->pointLightIndex = -1;
+				context.selection->directionalLightSelected = false;
+			}
+		}
+		else if (context.selection->spotLightIndex >= 0
+			&& context.selection->spotLightIndex < static_cast<int>(lighting.SpotLights().size()))
+		{
+			const int lightIndex = context.selection->spotLightIndex;
+			SpotLight& light = lighting.SpotLights()[static_cast<std::size_t>(lightIndex)];
+			ImGui::Text("Spot Light %d", lightIndex + 1);
+			ImGui::Separator();
+			ImGui::DragFloat3("Position", &light.position.x, 0.05f, -1000.0f, 1000.0f, "%.2f");
+			ImGui::DragFloat3("Direction", &light.direction.x, 0.01f, -1.0f, 1.0f, "%.3f");
+			if (glm::length(light.direction) < 0.001f)
+				light.direction = glm::vec3(0.0f, -1.0f, 0.0f);
+			else
+				light.direction = glm::normalize(light.direction);
+			ImGui::ColorEdit3("Color", &light.color.x);
+			ImGui::DragFloat("Intensity", &light.intensity, 0.01f, 0.0f, 50.0f, "%.2f");
+			ImGui::DragFloat("Ambient", &light.ambient, 0.001f, 0.0f, 1.0f, "%.3f");
+			ImGui::Checkbox("Casts Shadow", &light.castsShadows);
+			float radius = light.radius;
+			if (ImGui::DragFloat("Radius", &radius, 5.0f, 0.001f, 5000.0f, "%.2f"))
+				light.SetRadius(radius);
+			ImGui::DragFloat("Radius Fade", &light.radiusFade, 0.01f, 0.0f, 1.0f, "%.2f");
+			float innerAngle = light.innerAngle;
+			float outerAngle = light.outerAngle;
+			const bool innerAngleChanged = ImGui::SliderFloat("Inner Cone", &innerAngle, 0.1f, 88.0f, "%.1f deg");
+			const bool outerAngleChanged = ImGui::SliderFloat("Outer Cone", &outerAngle, 0.2f, 89.0f, "%.1f deg");
+			if (innerAngleChanged || outerAngleChanged)
+				light.SetAngles(innerAngle, outerAngle);
+			if (ImGui::Button("Delete Spot Light"))
+			{
+				lighting.SpotLights().erase(lighting.SpotLights().begin() + lightIndex);
+				context.selection->spotLightIndex = -1;
+			}
+		}
+		else if (selectedEntityId == 0)
+		{
+			ImGui::TextUnformatted("No scene object or light selected.");
 		}
 		else if (!objects[selectedIndex])
 		{
