@@ -302,6 +302,9 @@ namespace {
 				return entity->GetComponentByName(def.bindComponent);
 			}
 		}
+		if (def.bindEntity == "GameManager")
+			if (Entity* gameManager = activeLevel->GameManagerEntity())
+				return gameManager->GetComponentByName(def.bindComponent);
 		return nullptr;
 	}
 

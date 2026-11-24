@@ -32,6 +32,9 @@ public:
 	Entity* AddObject(std::unique_ptr<Entity> entity);
 	bool RemoveObject(Entity* entity);
 	Entity* FindObjectByName(const std::string& name) const;
+	std::string GameManagerEntityName() const;
+	Entity* GameManagerEntity() const;
+	bool IsGameManagerEntity(const Entity& entity) const;
 	LevelCollider* AddLevelCollider(std::unique_ptr<LevelCollider> collider);
 	bool RemoveLevelCollider(LevelCollider* collider);
 	const std::vector<std::unique_ptr<Entity>>& Entities() const { return m_entities; }

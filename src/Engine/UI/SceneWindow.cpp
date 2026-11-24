@@ -126,14 +126,8 @@ void SceneWindow::Draw(
 		if (activeScene)
 		{
 			const std::vector<std::unique_ptr<Entity>>& objects = activeScene->Objects();
-			Entity* gameManager = nullptr;
-			for (const auto& object : objects)
-				if (object && object->Name() == "GameManager")
-				{
-					gameManager = object.get();
-					break;
-				}
-			if (gameManager && ImGui::Selectable("GameManager##SceneWindow",
+			Entity* gameManager = activeScene->GameManagerEntity();
+			if (gameManager && ImGui::Selectable((gameManager->Name() + "##SceneWindow").c_str(),
 				selectedEntityId == gameManager->Id() && context.selection->submeshIndex < 0))
 			{
 				selectedEntityId = gameManager->Id();
@@ -153,7 +147,7 @@ void SceneWindow::Draw(
 			for (std::size_t i = 0; i < objects.size(); ++i)
 			{
 				const std::unique_ptr<Entity>& object = objects[i];
-				if (object && (object->IsSubmeshComponentOwner() || object->Name() == "GameManager")) continue;
+				if (object && (object->IsSubmeshComponentOwner() || activeScene->IsGameManagerEntity(*object))) continue;
 				hasSceneObject = true;
 				const std::string label = object ? object->Name() : "<null>";
 				const std::string visibleLabel = label.empty() ? "<unnamed>" : label;

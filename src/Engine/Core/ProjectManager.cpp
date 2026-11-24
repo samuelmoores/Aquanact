@@ -183,14 +183,21 @@ namespace {
 			bool loadedGameManager = false;
 			for (const auto& pendingObject : pendingLevel.objects)
 			{
-				// Older project saves accumulated copies of the scene's manager
-				// entity. Keep the first authored instance in this scene and ignore
-				// the historical duplicates while materializing the project.
-				if (pendingObject.name == "GameManager")
+				// Scenes own a generated, non-rendering GameManager entity. Reuse it
+				// for persisted manager records so serialized component IDs still
+				// resolve, and collapse duplicates from older project saves.
+				if (pendingObject.name == "GameManager"
+					|| pendingObject.name == Scene->GameManagerEntityName())
 				{
 					if (loadedGameManager)
 						continue;
 					loadedGameManager = true;
+					if (Entity* gameManager = Scene->GameManagerEntity())
+					{
+						if (pendingObject.id != 0)
+							gameManager->SetId(pendingObject.id);
+						continue;
+					}
 				}
 
 				Root::Current().Debugger().LogTagged("ProjectLoad", "Creating object from source: " + pendingObject.sourcePath.string() + " in scene: " + pendingLevel.name);

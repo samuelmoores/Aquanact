@@ -350,6 +350,9 @@ void EditorSceneInteraction::Draw(const EngineGuiFrameContext& context) const
 			return;
 		}
 	Entity* selectedEntity = FindSelectedEntity(context);
+	if (selectedEntity && context.sceneManager->ActiveLevel()
+		&& context.sceneManager->ActiveLevel()->IsGameManagerEntity(*selectedEntity))
+		selectedEntity = nullptr;
 	PointLight* selectedPointLight = nullptr;
 	SpotLight* selectedSpotLight = nullptr;
 	LevelCollider* selectedLevelCollider = nullptr;

@@ -305,9 +305,12 @@ Scene* SceneManager::startUp()
 	{
 		for (const std::unique_ptr<Entity>& entity : activeLevel->Objects())
 		{
-			if (!entity || (configuration.targetEntityId != 0
-				? entity->Id() != configuration.targetEntityId
-				: entity->Name() != configuration.targetEntityName))
+			const bool matchesTarget = entity && (configuration.targetEntityId != 0
+				? entity->Id() == configuration.targetEntityId
+				: entity->Name() == configuration.targetEntityName
+					|| (configuration.targetEntityName == "GameManager"
+						&& activeLevel->IsGameManagerEntity(*entity)));
+			if (!matchesTarget)
 			{
 				continue;
 			}

@@ -223,6 +223,12 @@ EntityWindowResult EntityWindow::Draw(const EngineGuiFrameContext& context, bool
 		else
 		{
 			Entity& object = *objects[selectedIndex];
+			const bool isGameManager = activeScene->IsGameManagerEntity(object);
+			if (isGameManager)
+			{
+				ImGui::TextUnformatted("Game Mode");
+				ImGui::TextDisabled("%s", object.Name().c_str());
+			}
 			Entity* componentOwner = &object;
 			if (context.selection->submeshIndex >= 0)
 				for (const auto& candidate : activeScene->Objects())
@@ -246,7 +252,7 @@ EntityWindowResult EntityWindow::Draw(const EngineGuiFrameContext& context, bool
 			}
 
 			const unsigned int deletedEntityId = object.Id();
-			if (DrawDeletePopup(object) && activeScene->RemoveObject(&object))
+			if (!isGameManager && DrawDeletePopup(object) && activeScene->RemoveObject(&object))
 			{
 				for (std::size_t childIndex = activeScene->Objects().size(); childIndex > 0; --childIndex)
 				{
@@ -263,7 +269,8 @@ EntityWindowResult EntityWindow::Draw(const EngineGuiFrameContext& context, bool
 			else
 			{
 				ImGui::Separator();
-				DrawTransform(object);
+				if (!isGameManager)
+					DrawTransform(object);
 				DrawSelectedSubmesh(object, context.selection->submeshIndex);
 				if (!cutscene)
 				{
@@ -291,7 +298,7 @@ EntityWindowResult EntityWindow::Draw(const EngineGuiFrameContext& context, bool
 				}
 				DrawAddComponent(*componentOwner, cutscene, context);
 				ImGui::Separator();
-				if (ImGui::Button("Delete"))
+				if (!isGameManager && ImGui::Button("Delete"))
 					ImGui::OpenPopup("Delete Entity##Confirm");
 			}
 		}

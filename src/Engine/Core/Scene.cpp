@@ -4,6 +4,7 @@
 #include "Engine/Core/RenderManager.h"
 #include "Engine/Core/PathedCamera.h"
 #include "Engine/Core/PhysicsWorld.h"
+#include "Engine/Core/ComponentFactory.h"
 
 #include <iostream>
 #include <algorithm>
@@ -12,13 +13,20 @@ Scene::Scene(std::string name)
 	: m_name(std::move(name))
 	, m_cameraSystem(std::make_unique<PathedCamera>())
 {
+	auto gameManager = std::make_unique<Entity>(GameManagerEntityName(), false);
+	if (std::unique_ptr<Component> component = ComponentFactory::Instance().Create("GameManager", *gameManager))
+		gameManager->AddComponent(std::move(component));
+	m_entities.push_back(std::move(gameManager));
 }
 
 Scene::~Scene() = default;
 
 void Scene::SetName(std::string name)
 {
+	Entity* gameManager = GameManagerEntity();
 	m_name = std::move(name);
+	if (gameManager)
+		gameManager->SetName(GameManagerEntityName());
 }
 
 void Scene::startUp()
@@ -115,6 +123,21 @@ Entity* Scene::FindObjectByName(const std::string& name) const
 			return entity.get();
 	}
 	return nullptr;
+}
+
+std::string Scene::GameManagerEntityName() const
+{
+	return "GameManager" + m_name;
+}
+
+Entity* Scene::GameManagerEntity() const
+{
+	return FindObjectByName(GameManagerEntityName());
+}
+
+bool Scene::IsGameManagerEntity(const Entity& entity) const
+{
+	return GameManagerEntity() == &entity;
 }
 
 LevelCollider* Scene::AddLevelCollider(std::unique_ptr<LevelCollider> collider)
