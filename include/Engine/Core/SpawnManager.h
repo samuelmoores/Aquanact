@@ -32,6 +32,8 @@ struct InstanceDefinition
 	bool blocksCameraView = true;
 	bool showPhysicsBoundingBox = false;
 	bool rigidBody = false;
+	int rigidBodyPreset = 0;
+	int rollingPreset = 0;
 	int physicsColliderShape = 0;
 	float capsuleRadiusOverride = 0.0f;
 	bool useBaseMeshCollider = false;

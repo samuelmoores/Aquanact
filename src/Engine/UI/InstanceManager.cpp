@@ -99,9 +99,10 @@ void InstanceManager::SyncComponentPreview()
 		m_componentPreview->SetBlocksCameraView(m_blocksCameraView);
 		m_componentPreview->SetShowPhysicsBoundingBox(m_showPhysicsBoundingBox);
 		m_componentPreview->SetRigidBody(m_rigidBody);
-		m_componentPreview->SetPhysicsColliderShape(m_physicsColliderShape == 1
-			? PhysicsColliderShape::Capsule
-			: m_physicsColliderShape == 2 ? PhysicsColliderShape::Convex : PhysicsColliderShape::Box);
+		m_componentPreview->SetRigidBodyPreset(static_cast<RigidBodyPreset>(std::clamp(m_rigidBodyPreset, 0, 4)));
+		m_componentPreview->SetRollingPreset(static_cast<RollingPreset>(std::clamp(m_rollingPreset, 0, 3)));
+		m_componentPreview->SetPhysicsColliderShape(static_cast<PhysicsColliderShape>(
+			std::clamp(m_physicsColliderShape, 0, 3)));
 		if (TriggerSphere* trigger = m_componentPreview->GetComponent<TriggerSphere>())
 		{
 			trigger->SetRadius(m_triggerRadius);
@@ -130,9 +131,10 @@ void InstanceManager::SyncComponentPreview()
 	m_componentPreview->SetBlocksCameraView(m_blocksCameraView);
 	m_componentPreview->SetShowPhysicsBoundingBox(m_showPhysicsBoundingBox);
 	m_componentPreview->SetRigidBody(m_rigidBody);
-	m_componentPreview->SetPhysicsColliderShape(m_physicsColliderShape == 1
-		? PhysicsColliderShape::Capsule
-		: m_physicsColliderShape == 2 ? PhysicsColliderShape::Convex : PhysicsColliderShape::Box);
+	m_componentPreview->SetRigidBodyPreset(static_cast<RigidBodyPreset>(std::clamp(m_rigidBodyPreset, 0, 4)));
+	m_componentPreview->SetRollingPreset(static_cast<RollingPreset>(std::clamp(m_rollingPreset, 0, 3)));
+	m_componentPreview->SetPhysicsColliderShape(static_cast<PhysicsColliderShape>(
+		std::clamp(m_physicsColliderShape, 0, 3)));
 	if (TriggerSphere* trigger = m_componentPreview->GetComponent<TriggerSphere>())
 	{
 		trigger->SetRadius(m_triggerRadius);
@@ -266,6 +268,8 @@ void BeginInstanceEdit(
 	bool& blocksCameraView,
 	bool& showPhysicsBoundingBox,
 	bool& rigidBody,
+	int& rigidBodyPreset,
+	int& rollingPreset,
 	int& physicsColliderShape,
 	bool& triggerVolume,
 	float& triggerRadius,
@@ -281,6 +285,8 @@ void BeginInstanceEdit(
 	blocksCameraView = definition.blocksCameraView;
 	showPhysicsBoundingBox = definition.showPhysicsBoundingBox;
 	rigidBody = definition.rigidBody;
+	rigidBodyPreset = definition.rigidBodyPreset;
+	rollingPreset = definition.rollingPreset;
 	physicsColliderShape = definition.physicsColliderShape;
 	triggerVolume = definition.triggerVolume;
 	triggerRadius = definition.triggerRadius;
@@ -380,6 +386,8 @@ InstanceManagerResult InstanceManager::Draw(SceneManager& scenes, bool& open)
 			m_componentTypes = { "TriggerSphere" };
 			m_physicsColliderShape = 0;
 			m_rigidBody = false;
+			m_rigidBodyPreset = 0;
+			m_rollingPreset = 0;
 		}
 	}
 	ImGui::TextDisabled(m_triggerVolume
@@ -492,6 +500,8 @@ InstanceManagerResult InstanceManager::Draw(SceneManager& scenes, bool& open)
 		m_blocksCameraView = m_componentPreview->BlocksCameraView();
 		m_showPhysicsBoundingBox = m_componentPreview->ShowPhysicsBoundingBox();
 		m_rigidBody = m_componentPreview->IsRigidBody();
+		m_rigidBodyPreset = static_cast<int>(m_componentPreview->GetRigidBodyPreset());
+		m_rollingPreset = static_cast<int>(m_componentPreview->GetRollingPreset());
 		m_physicsColliderShape = static_cast<int>(m_componentPreview->GetPhysicsColliderShape());
 	}
 	else
@@ -522,6 +532,8 @@ InstanceManagerResult InstanceManager::Draw(SceneManager& scenes, bool& open)
 			definition.blocksCameraView = m_blocksCameraView;
 			definition.showPhysicsBoundingBox = m_showPhysicsBoundingBox;
 			definition.rigidBody = m_rigidBody;
+			definition.rigidBodyPreset = m_rigidBodyPreset;
+			definition.rollingPreset = m_rollingPreset;
 			definition.physicsColliderShape = m_physicsColliderShape;
 			if (!m_editingDefinitionName.empty())
 			{
@@ -570,6 +582,7 @@ InstanceManagerResult InstanceManager::Draw(SceneManager& scenes, bool& open)
 			BeginInstanceEdit(entry.second, m_models, m_selectedModel, m_entityName, sizeof(m_entityName),
 				m_attachToEntityName, m_componentTypes, m_blocksCollision, m_ignoreCameraCollision,
 				m_blocksCameraView, m_showPhysicsBoundingBox, m_rigidBody,
+				m_rigidBodyPreset, m_rollingPreset,
 				m_physicsColliderShape, m_triggerVolume, m_triggerRadius,
 				m_triggerPositionOffset, m_editingDefinitionName);
 		ImGui::SameLine();

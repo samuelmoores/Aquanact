@@ -224,14 +224,13 @@ namespace ProjectStateFormat {
 				contents += (object->BlocksCollision() ? "1;" : "0;");
 				contents += (object->IgnoreCameraCollision() ? "1;" : "0;");
 				contents += (object->ShowPhysicsBoundingBox() ? "1;" : "0;");
-				const int colliderShape = object->GetPhysicsColliderShape() == PhysicsColliderShape::Capsule ? 1
-					: object->GetPhysicsColliderShape() == PhysicsColliderShape::Convex ? 2 : 0;
+				const int colliderShape = static_cast<int>(object->GetPhysicsColliderShape());
 				contents += std::to_string(colliderShape) + ";";
 				contents += object->BlocksCameraView() ? "1;" : "0;";
 				contents += EscapeField(object->Name()) + ";";
 				contents += object->IsRigidBody() ? "1" : "0";
-				contents += ";mass;" + std::to_string(object->Mass());
-				contents += ";lineardamping;" + std::to_string(object->LinearDamping());
+				contents += ";rigidbodypreset;" + std::to_string(static_cast<int>(object->GetRigidBodyPreset()));
+				contents += ";rollingpreset;" + std::to_string(static_cast<int>(object->GetRollingPreset()));
 				contents += ";basecollider;" + std::to_string(object->UseBaseMeshCollider() ? 1 : 0);
 				contents += ";capsuleradius;" + std::to_string(object->CapsuleRadiusOverride());
 				const auto& submeshSettings = object->GetSubmeshColliderSettings();

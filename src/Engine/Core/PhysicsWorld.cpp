@@ -1010,8 +1010,10 @@ Physics::SweepCollision PhysicsWorld::Sweep(
 
 	// Initialize Capsule
 	const bool useCapsule = moving.shape == PhysicsColliderShape::Capsule;
+	const bool useSphere = moving.shape == PhysicsColliderShape::Sphere && moving.sphereRadius > 0.0f;
 	glm::vec3 capsuleBase;
 	glm::vec3 capsuleTip;
+	const glm::vec3 sphereCenter = (minBounds + maxBounds) * 0.5f;
 
 	if (useCapsule)
 	{
@@ -1058,15 +1060,26 @@ Physics::SweepCollision PhysicsWorld::Sweep(
 
 		// The broadphase passed, so now dispatch to the candidate's narrow phase.
 		Physics::SweepCollision hit;
-		if (candidate.shape == PhysicsColliderShape::Convex)
+		if (useSphere && candidate.shape == PhysicsColliderShape::Sphere
+			&& candidate.sphereRadius > 0.0f)
+		{
+			const glm::vec3 candidateCenter = (candidate.minBounds + candidate.maxBounds) * 0.5f;
+			hit = Physics::GetSphereSphereSweep(sphereCenter, moving.sphereRadius,
+				movement, candidateCenter, candidate.sphereRadius);
+		}
+		else if (candidate.shape == PhysicsColliderShape::Convex)
 		{
 			if (candidate.convexPlanes.empty() && candidate.convexParts.empty())
 			{
-				hit = useCapsule
-					? Physics::GetCapsuleAABBSweep(
+				if (useSphere)
+					hit = Physics::GetSphereAABBSweep(sphereCenter, moving.sphereRadius,
+						movement, candidate.minBounds, candidate.maxBounds);
+				else if (useCapsule)
+					hit = Physics::GetCapsuleAABBSweep(
 						capsuleBase, capsuleTip, moving.capsuleRadius, movement,
-						candidate.minBounds, candidate.maxBounds)
-					: Physics::GetAABBSweep(
+						candidate.minBounds, candidate.maxBounds);
+				else
+					hit = Physics::GetAABBSweep(
 						minBounds, maxBounds, movement,
 						candidate.minBounds, candidate.maxBounds);
 			}
@@ -1076,7 +1089,7 @@ Physics::SweepCollision PhysicsWorld::Sweep(
 				// The convex sweep receives a point moving through expanded planes.
 				// The point is the moving shape's center, while its support distance
 				// accounts for the moving shape's size.
-				const glm::vec3 movingCenter = useCapsule
+				const glm::vec3 movingCenter = useSphere ? sphereCenter : useCapsule
 					? (capsuleBase + capsuleTip) * 0.5f
 					: (minBounds + maxBounds) * 0.5f;
 				const glm::vec3 movingHalfExtents = (maxBounds - minBounds) * 0.5f;
@@ -1099,7 +1112,7 @@ Physics::SweepCollision PhysicsWorld::Sweep(
 					std::vector<Physics::ConvexPlane> expandedPlanes = *planeSet;
 					for (Physics::ConvexPlane& plane : expandedPlanes)
 					{
-						const float support = useCapsule
+						const float support = useSphere ? moving.sphereRadius : useCapsule
 							? moving.capsuleRadius + capsuleHalfLength * std::abs(plane.normal.y)
 							: glm::dot(glm::abs(plane.normal), movingHalfExtents);
 						plane.distance += support;
@@ -1137,10 +1150,24 @@ Physics::SweepCollision PhysicsWorld::Sweep(
 				movement, candidateBase, candidateTip,
 				candidate.levelOwner ? candidate.capsuleRadii : glm::vec3(candidate.capsuleRadius));
 		}
+		else if (useSphere && candidate.shape == PhysicsColliderShape::Capsule)
+		{
+			const glm::vec3 candidateCenter = (candidate.minBounds + candidate.maxBounds) * 0.5f;
+			const glm::vec3 candidateBase = candidateCenter - candidate.capsuleAxis * candidate.capsuleHalfLength;
+			const glm::vec3 candidateTip = candidateCenter + candidate.capsuleAxis * candidate.capsuleHalfLength;
+			hit = Physics::GetSphereCapsuleSweep(sphereCenter, moving.sphereRadius,
+				movement, candidateBase, candidateTip, candidate.capsuleRadius);
+		}
 		else if (useCapsule)
 		{
 			hit = Physics::GetCapsuleAABBSweep(
 				capsuleBase, capsuleTip, moving.capsuleRadius, movement,
+				candidate.minBounds, candidate.maxBounds);
+		}
+		else if (useSphere)
+		{
+			hit = Physics::GetSphereAABBSweep(
+				sphereCenter, moving.sphereRadius, movement,
 				candidate.minBounds, candidate.maxBounds);
 		}
 		else
@@ -1641,8 +1668,14 @@ PhysicsCollider PhysicsWorld::BuildSubmeshCollider(
 	}
 	else if (collider.shape == PhysicsColliderShape::Sphere)
 	{
-		const glm::vec3 center = (collider.minBounds + collider.maxBounds) * 0.5f;
-		collider.sphereRadius = glm::length((collider.maxBounds - collider.minBounds) * 0.5f);
+		const glm::vec3 worldScale(
+			glm::length(glm::vec3(model[0])),
+			glm::length(glm::vec3(model[1])),
+			glm::length(glm::vec3(model[2])));
+		const glm::vec3 localHalfExtents = (localMax - localMin) * 0.5f;
+		const glm::vec3 center = glm::vec3(model * glm::vec4((localMin + localMax) * 0.5f, 1.0f));
+		collider.sphereRadius = std::max(localHalfExtents.x * worldScale.x,
+			std::max(localHalfExtents.y * worldScale.y, localHalfExtents.z * worldScale.z));
 		collider.minBounds = center - glm::vec3(collider.sphereRadius);
 		collider.maxBounds = center + glm::vec3(collider.sphereRadius);
 	}
@@ -1869,51 +1902,233 @@ void PhysicsWorld::SimulateRigidBody(Entity& entity, float dt)
 	constexpr float terminalFallSpeed = 5500.0f;
 	constexpr float collisionSkin = 0.1f;
 	constexpr int maxSlideIterations = 4;
+	const PhysicsCollider& bodyCollider = m_colliders[collider];
+	const bool sphereBody = bodyCollider.shape == PhysicsColliderShape::Sphere
+		&& bodyCollider.sphereRadius > 0.0f;
+	const float radius = sphereBody ? bodyCollider.sphereRadius : 0.0f;
+	const glm::vec3 initialCenter = (bodyCollider.minBounds + bodyCollider.maxBounds) * 0.5f;
 	glm::vec3 velocity = entity.LinearVelocity();
+	glm::vec3 angularVelocity = entity.AngularVelocity();
 	velocity.y = std::max(velocity.y - gravity * dt, -terminalFallSpeed);
-	glm::vec3 remainingMovement = velocity * dt;
+	float remainingTime = dt;
+	glm::vec3 remainingMovement = velocity * remainingTime;
 	glm::vec3 resolvedMovement(0.0f);
+	bool hasRollingContact = false;
+	glm::vec3 rollingContactNormal(0.0f);
+	const auto integrateAngularRotation = [&entity, &angularVelocity](float stepDt)
+	{
+		const float angularSpeed = glm::length(angularVelocity);
+		if (stepDt > 0.0f && angularSpeed > 0.0001f)
+			entity.RotateAroundWorldAxis(angularVelocity, angularSpeed * stepDt);
+	};
 
 	for (int iteration = 0; iteration < maxSlideIterations; ++iteration)
 	{
-		if (glm::length(remainingMovement) <= 0.0001f)
+		if (remainingTime <= 0.000001f || glm::length(remainingMovement) <= 0.0001f)
 			break;
 
+		Entity* hitEntity = nullptr;
+		const PhysicsCollider* hitCollider = nullptr;
+		const glm::vec3 velocityBeforeImpact = velocity;
+		const glm::vec3 angularBeforeImpact = angularVelocity;
 		const Physics::SweepCollision collision = SweepEntity(
-			entity, remainingMovement, resolvedMovement);
+			entity, remainingMovement, resolvedMovement, &hitEntity, &hitCollider);
 		if (!collision.hit)
 		{
 			resolvedMovement += remainingMovement;
+			integrateAngularRotation(remainingTime);
+			remainingTime = 0.0f;
 			break;
 		}
 
 		const glm::vec3 normal = glm::normalize(collision.normal);
 		const float hitTime = glm::clamp(collision.time, 0.0f, 1.0f);
+		const float timeToImpact = remainingTime * hitTime;
+		const float frameHitTime = (dt - remainingTime + timeToImpact) / dt;
+		integrateAngularRotation(timeToImpact);
 		resolvedMovement += remainingMovement * hitTime;
-		remainingMovement *= 1.0f - hitTime;
+		remainingTime *= 1.0f - hitTime;
+		const glm::vec3 centerAtImpact = initialCenter + resolvedMovement;
+		const glm::vec3 contactPoint = sphereBody
+			? centerAtImpact - normal * radius
+			: centerAtImpact - normal * glm::length((bodyCollider.maxBounds - bodyCollider.minBounds) * 0.5f);
+		if (sphereBody)
+		{
+			const glm::vec3 radiusA = contactPoint - centerAtImpact;
+			const bool dynamicTarget = hitEntity && hitEntity->IsRigidBody() && !hitEntity->GetController();
+			const float inverseMassA = 1.0f;
+			const float inverseMassB = dynamicTarget ? 1.0f : 0.0f;
+			const float inverseInertiaA = 2.5f / (radius * radius);
+			const bool targetSphere = dynamicTarget && hitCollider
+				&& hitCollider->shape == PhysicsColliderShape::Sphere && hitCollider->sphereRadius > 0.0f;
+			const float targetRadius = targetSphere ? hitCollider->sphereRadius : 0.0f;
+			const float inverseInertiaB = targetSphere
+				? 2.5f / (targetRadius * targetRadius) : 0.0f;
+			const glm::vec3 radiusB = targetSphere ? normal * targetRadius : glm::vec3(0.0f);
+			const glm::vec3 targetLinearVelocity = dynamicTarget ? hitEntity->LinearVelocity() : glm::vec3(0.0f);
+			const glm::vec3 targetAngularVelocity = targetSphere ? hitEntity->AngularVelocity() : glm::vec3(0.0f);
+			const glm::vec3 targetContactVelocity = targetLinearVelocity
+				+ glm::cross(targetAngularVelocity, radiusB);
+			glm::vec3 relativeContactVelocity = velocity
+				+ glm::cross(angularVelocity, radiusA) - targetContactVelocity;
+			const float normalSpeed = glm::dot(relativeContactVelocity, normal);
+			const glm::vec3 slipBefore = relativeContactVelocity - normal * normalSpeed;
+			float normalImpulseMagnitude = 0.0f;
+			glm::vec3 frictionImpulse(0.0f);
+			const float materialRestitution = hitEntity
+				? 0.5f * (entity.Restitution() + hitEntity->Restitution())
+				: entity.Restitution();
+			// Suppress only very small resting-contact rebounds. Bouncy materials
+			// retain restitution at lower impact speeds than hard materials.
+			const float restitution = normalSpeed > -entity.MinimumBounceSpeed()
+				? 0.0f : materialRestitution;
+			const float friction = hitEntity
+				? std::sqrt(entity.Friction() * hitEntity->Friction()) : entity.Friction();
 
-		const float velocityIntoSurface = glm::dot(velocity, normal);
-		if (velocityIntoSurface < 0.0f)
-			velocity -= normal * velocityIntoSurface;
+			if (normalSpeed < 0.0f)
+			{
+				const glm::vec3 angularMassA = glm::cross(
+					glm::cross(radiusA, normal) * inverseInertiaA, radiusA);
+				const glm::vec3 angularMassB = glm::cross(
+					glm::cross(radiusB, normal) * inverseInertiaB, radiusB);
+				const float normalMass = inverseMassA + inverseMassB
+					+ glm::dot(normal, angularMassA + angularMassB);
+				if (normalMass > 1e-8f)
+					normalImpulseMagnitude = -(1.0f + restitution) * normalSpeed / normalMass;
+				const glm::vec3 normalImpulse = normal * normalImpulseMagnitude;
+				velocity += normalImpulse * inverseMassA;
+				angularVelocity += glm::cross(radiusA, normalImpulse) * inverseInertiaA;
+				if (dynamicTarget)
+				{
+					hitEntity->SetLinearVelocity(hitEntity->LinearVelocity() - normalImpulse * inverseMassB);
+					if (targetSphere)
+						hitEntity->SetAngularVelocity(hitEntity->AngularVelocity()
+							- glm::cross(radiusB, normalImpulse) * inverseInertiaB);
+				}
 
-		const float movementIntoSurface = glm::dot(remainingMovement, normal);
-		if (movementIntoSurface < 0.0f)
-			remainingMovement -= normal * movementIntoSurface;
+				relativeContactVelocity = velocity + glm::cross(angularVelocity, radiusA)
+					- (dynamicTarget ? hitEntity->LinearVelocity()
+						+ glm::cross(targetSphere ? hitEntity->AngularVelocity() : glm::vec3(0.0f), radiusB)
+						: glm::vec3(0.0f));
+				const glm::vec3 tangentVelocity = relativeContactVelocity
+					- normal * glm::dot(relativeContactVelocity, normal);
+				const float tangentSpeed = glm::length(tangentVelocity);
+				if (tangentSpeed > 0.0001f)
+				{
+					const glm::vec3 tangent = tangentVelocity / tangentSpeed;
+					const glm::vec3 tangentMassA = glm::cross(
+						glm::cross(radiusA, tangent) * inverseInertiaA, radiusA);
+					const glm::vec3 tangentMassB = glm::cross(
+						glm::cross(radiusB, tangent) * inverseInertiaB, radiusB);
+					const float tangentMass = inverseMassA + inverseMassB
+						+ glm::dot(tangent, tangentMassA + tangentMassB);
+					if (tangentMass > 1e-8f)
+					{
+						const float unconstrainedImpulse = -tangentSpeed / tangentMass;
+						const float constrainedImpulse = glm::clamp(unconstrainedImpulse,
+							-friction * normalImpulseMagnitude, friction * normalImpulseMagnitude);
+						frictionImpulse = tangent * constrainedImpulse;
+						velocity += frictionImpulse * inverseMassA;
+						angularVelocity += glm::cross(radiusA, frictionImpulse) * inverseInertiaA;
+						if (dynamicTarget)
+						{
+							hitEntity->SetLinearVelocity(hitEntity->LinearVelocity()
+								- frictionImpulse * inverseMassB);
+							if (targetSphere)
+								hitEntity->SetAngularVelocity(hitEntity->AngularVelocity()
+									- glm::cross(radiusB, frictionImpulse) * inverseInertiaB);
+						}
+					}
+				}
+			}
 
-		if (normal.y >= 0.65f && velocity.y <= 0.0f)
-			velocity.y = 0.0f;
+			const glm::vec3 postTargetLinear = dynamicTarget ? hitEntity->LinearVelocity() : glm::vec3(0.0f);
+			const glm::vec3 postTargetAngular = targetSphere ? hitEntity->AngularVelocity() : glm::vec3(0.0f);
+			const glm::vec3 relativeAfter = velocity + glm::cross(angularVelocity, radiusA)
+				- postTargetLinear - glm::cross(postTargetAngular, radiusB);
+			const glm::vec3 slipAfter = relativeAfter - normal * glm::dot(relativeAfter, normal);
+			const float relativeNormalSpeed = glm::dot(velocity - postTargetLinear, normal);
+			if (normal.y >= 0.65f && relativeNormalSpeed <= 5.0f)
+			{
+				hasRollingContact = true;
+				rollingContactNormal = normal;
+			}
+			Root::Current().Debugger().LogRigidBodyCollision(
+				entity.Name(), hitEntity ? hitEntity->Name() : "static/level",
+				dt, frameHitTime, restitution, friction, centerAtImpact, radius, contactPoint, normal,
+				velocityBeforeImpact, angularBeforeImpact, velocity, angularVelocity,
+				targetLinearVelocity, targetAngularVelocity, postTargetLinear, postTargetAngular,
+				normalImpulseMagnitude, frictionImpulse, slipBefore, slipAfter);
+		}
+		else
+		{
+			const float normalSpeed = glm::dot(velocity, normal);
+			if (normalSpeed < 0.0f)
+			{
+				const float restitution = normalSpeed > -entity.MinimumBounceSpeed()
+					? 0.0f : entity.Restitution();
+				const glm::vec3 normalVelocity = normal * normalSpeed;
+				glm::vec3 tangentVelocity = velocity - normalVelocity;
+				const float tangentSpeed = glm::length(tangentVelocity);
+				if (tangentSpeed > 0.0001f)
+				{
+					const float tangentLoss = std::min(tangentSpeed,
+						entity.Friction() * (1.0f + restitution) * -normalSpeed);
+					tangentVelocity *= (tangentSpeed - tangentLoss) / tangentSpeed;
+				}
+				velocity = tangentVelocity - normalVelocity * restitution;
+			}
+			const float movementIntoSurface = glm::dot(remainingMovement, normal);
+			if (movementIntoSurface < 0.0f)
+				remainingMovement -= normal * movementIntoSurface;
+			if (normal.y >= 0.65f && velocity.y < 5.0f)
+			{
+				hasRollingContact = true;
+				rollingContactNormal = normal;
+				velocity.y = 0.0f;
+			}
+		}
 		resolvedMovement += normal * collisionSkin;
+		remainingMovement = velocity * remainingTime;
 	}
+	if (remainingTime > 0.0f)
+		integrateAngularRotation(remainingTime);
 
 	entity.Move(resolvedMovement);
-	// Exponential damping is stable across frame rates. A small rest threshold
-	// prevents residual motion from making a landed body slide forever.
-	const float damping = std::max(0.0f, entity.LinearDamping());
-	if (damping > 0.0f)
-		velocity *= std::exp(-damping * dt);
-	if (glm::length(velocity) < 5.0f)
-		velocity = glm::vec3(0.0f);
+	if (sphereBody && hasRollingContact)
+	{
+		const glm::vec3 tangentVelocity = velocity
+			- rollingContactNormal * glm::dot(velocity, rollingContactNormal);
+		const glm::vec3 radiusToContact = -rollingContactNormal * radius;
+		const glm::vec3 contactSlip = tangentVelocity
+			+ glm::cross(angularVelocity, radiusToContact);
+		if (glm::length(contactSlip) < 5.0f)
+		{
+			const float rollingDecay = std::exp(-entity.RollingResistance() * dt);
+			const float normalSpeed = glm::dot(velocity, rollingContactNormal);
+			velocity = rollingContactNormal * normalSpeed
+				+ tangentVelocity * rollingDecay;
+			const glm::vec3 rollingAngularVelocity = angularVelocity
+				- rollingContactNormal * glm::dot(angularVelocity, rollingContactNormal);
+			angularVelocity = rollingAngularVelocity * rollingDecay
+				+ rollingContactNormal * glm::dot(angularVelocity, rollingContactNormal)
+					* std::exp(-entity.AngularDamping() * dt);
+			if (std::abs(normalSpeed) < 5.0f)
+				velocity -= rollingContactNormal * normalSpeed;
+		}
+	}
+	else
+	{
+		velocity *= std::exp(-entity.LinearDamping() * dt);
+		angularVelocity *= std::exp(-entity.AngularDamping() * dt);
+	}
+	entity.SetAngularVelocity(angularVelocity);
 	entity.SetLinearVelocity(velocity);
+	const glm::vec3 finalCenter = initialCenter + resolvedMovement;
+	Root::Current().Debugger().SetRigidBodyMotionDiagnostics(
+		entity.Name(), velocity, resolvedMovement / dt, angularVelocity,
+		hasRollingContact ? rollingContactNormal : glm::vec3(0.0f),
+		finalCenter, radius, sphereBody);
 	Update(entity);
 }
 

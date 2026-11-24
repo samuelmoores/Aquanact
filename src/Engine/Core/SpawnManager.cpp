@@ -68,6 +68,8 @@ namespace
 	definition.blocksCameraView = entity.BlocksCameraView();
 	definition.showPhysicsBoundingBox = entity.ShowPhysicsBoundingBox();
 	definition.rigidBody = entity.IsRigidBody();
+	definition.rigidBodyPreset = static_cast<int>(entity.GetRigidBodyPreset());
+	definition.rollingPreset = static_cast<int>(entity.GetRollingPreset());
 	definition.physicsColliderShape = static_cast<int>(entity.GetPhysicsColliderShape());
 	definition.useBaseMeshCollider = entity.UseBaseMeshCollider();
 	definition.capsuleRadiusOverride = entity.CapsuleRadiusOverride();
@@ -252,6 +254,8 @@ void SpawnManager::AppendProjectState(std::string& contents, const std::filesyst
 		contents += ";" + std::to_string(definition.showPhysicsBoundingBox ? 1 : 0);
 		contents += ";" + std::to_string(definition.physicsColliderShape);
 		contents += ";" + std::to_string(definition.rigidBody ? 1 : 0);
+		contents += ";rigidbodypreset;" + std::to_string(definition.rigidBodyPreset);
+		contents += ";rollingpreset;" + std::to_string(definition.rollingPreset);
 		if (definition.triggerVolume)
 		{
 			contents += ";volume;sphere;" + std::to_string(definition.triggerRadius);
@@ -389,6 +393,16 @@ void SpawnManager::LoadProjectState(const std::filesystem::path& projectPath)
 				if (index < fields.size())
 					definition.rigidBody = std::stoi(fields.at(index++)) != 0;
 			}
+			if (index + 1 < fields.size() && fields[index] == "rigidbodypreset")
+			{
+				++index;
+				definition.rigidBodyPreset = std::clamp(std::stoi(fields.at(index++)), 0, 4);
+			}
+			if (index + 1 < fields.size() && fields[index] == "rollingpreset")
+			{
+				++index;
+				definition.rollingPreset = std::clamp(std::stoi(fields.at(index++)), 0, 3);
+			}
 			if (index < fields.size() && fields[index] == "volume")
 			{
 				++index;
@@ -483,9 +497,12 @@ Entity* SpawnManager::SpawnInstance(Scene& scene, const std::string& definitionN
 	instance->SetBlocksCameraView(definition->second.blocksCameraView);
 	instance->SetShowPhysicsBoundingBox(definition->second.showPhysicsBoundingBox);
 	instance->SetRigidBody(definition->second.rigidBody);
-	instance->SetPhysicsColliderShape(definition->second.physicsColliderShape == 1
-		? PhysicsColliderShape::Capsule
-		: definition->second.physicsColliderShape == 2 ? PhysicsColliderShape::Convex : PhysicsColliderShape::Box);
+	instance->SetRigidBodyPreset(static_cast<RigidBodyPreset>(
+		std::clamp(definition->second.rigidBodyPreset, 0, 4)));
+	instance->SetRollingPreset(static_cast<RollingPreset>(
+		std::clamp(definition->second.rollingPreset, 0, 3)));
+	instance->SetPhysicsColliderShape(static_cast<PhysicsColliderShape>(
+		std::clamp(definition->second.physicsColliderShape, 0, 3)));
 	instance->SetUseBaseMeshCollider(definition->second.useBaseMeshCollider);
 	instance->SetCapsuleRadiusOverride(definition->second.capsuleRadiusOverride);
 	for (std::size_t savedIndex = 0; savedIndex < definition->second.submeshColliderSettings.size(); ++savedIndex)

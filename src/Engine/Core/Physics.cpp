@@ -377,6 +377,47 @@ Physics::SweepCollision Physics::GetSphereCapsuleSweep(
 	return result;
 }
 
+Physics::SweepCollision Physics::GetSphereSphereSweep(
+	const glm::vec3& centerA, float radiusA,
+	const glm::vec3& movementA,
+	const glm::vec3& centerB, float radiusB)
+{
+	SweepCollision result;
+	const glm::vec3 relativeStart = centerA - centerB;
+	const float combinedRadius = std::max(radiusA + radiusB, 0.0f);
+	const float a = glm::dot(movementA, movementA);
+	const float c = glm::dot(relativeStart, relativeStart) - combinedRadius * combinedRadius;
+	if (c <= 0.0f)
+	{
+		if (c >= -1e-6f && glm::dot(relativeStart, movementA) >= 0.0f)
+			return result;
+		result.hit = true;
+		result.time = 0.0f;
+		result.normal = glm::length2(relativeStart) > 1e-10f
+			? glm::normalize(relativeStart)
+			: glm::length2(movementA) > 1e-10f
+				? glm::normalize(-movementA) : glm::vec3(0.0f, 1.0f, 0.0f);
+		return result;
+	}
+	if (a <= 1e-10f)
+		return result;
+
+	const float b = glm::dot(relativeStart, movementA);
+	const float discriminant = b * b - a * c;
+	if (discriminant < 0.0f)
+		return result;
+	const float time = (-b - std::sqrt(discriminant)) / a;
+	if (time < 0.0f || time > 1.0f)
+		return result;
+	const glm::vec3 separation = relativeStart + movementA * time;
+	if (glm::length2(separation) <= 1e-10f)
+		return result;
+	result.hit = true;
+	result.time = time;
+	result.normal = glm::normalize(separation);
+	return result;
+}
+
 bool Physics::CapsuleAABBOverlap(
 	const glm::vec3& capBase, const glm::vec3& capTip, float radius,
 	const glm::vec3& boxMin, const glm::vec3& boxMax)

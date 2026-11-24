@@ -37,6 +37,7 @@
 #include <iomanip>
 #include <limits>
 #include <filesystem>
+#include <random>
 #include <sstream>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -51,6 +52,21 @@
 #endif
 
 namespace {
+	using RigidBodyClock = std::chrono::steady_clock;
+	struct RigidBodyFollowupSchedule
+	{
+		RigidBodyClock::time_point collisionTime{};
+		RigidBodyClock::time_point due[3]{};
+		int nextSample = 0;
+		glm::vec3 normal{ 0.0f };
+		glm::vec3 contactPoint{ 0.0f };
+		float radius = 0.0f;
+	};
+	std::unordered_map<std::string, RigidBodyFollowupSchedule> g_rigidBodyFollowups;
+	std::unordered_map<std::string, RigidBodyClock::time_point> g_lastRigidBodyCollisionLog;
+	std::mt19937 g_rigidBodyRandom{ 0xA91B23u };
+	std::uint64_t g_rigidBodyFrameNumber = 0;
+
 	std::vector<LineVertex3D> MakeBoxFaceVertices(const glm::vec3& minimum, const glm::vec3& maximum, int axis, float direction, const glm::vec3& color)
 	{
 		const float coordinate = direction > 0.0f ? maximum[axis] : minimum[axis];
@@ -274,6 +290,9 @@ namespace {
 
 void Debug::startUp()
 {
+	g_rigidBodyFollowups.clear();
+	g_lastRigidBodyCollisionLog.clear();
+	g_rigidBodyFrameNumber = 0;
 	// Packaged games do not expose editor diagnostics windows, so retain a
 	// persistent log beside the executable for runtime investigation.
 	try
@@ -282,6 +301,17 @@ void Debug::startUp()
 			Root::Current().FileSystemRef().ExecutableDirectory() / "logs";
 		std::filesystem::create_directories(logDirectory);
 		m_runtimeLog.open(logDirectory / "aquanact-runtime.txt", std::ios::out | std::ios::trunc);
+		m_rigidBodyMotionLog.open(
+			logDirectory / "aquanact-rigidbody-motion.txt", std::ios::out | std::ios::trunc);
+		if (m_rigidBodyMotionLog.is_open())
+		{
+			m_rigidBodyMotionLog << "Aquanact Rigid Body Motion Log\n"
+				<< "Velocities use world units per second and radians per second.\n"
+				<< "Body mass is fixed to one; solid-sphere inertia uses I = 2/5 m R^2.\n"
+				<< "Collision impulses are recorded at contact; three randomized follow-up frames are recorded afterward.\n"
+				<< "Periodic state samples are rate-limited to one per body per second.\n";
+			m_rigidBodyMotionLog.flush();
+		}
 		m_convexCollisionLog.open(
 			logDirectory / "aquanact-convex-collision.txt", std::ios::out | std::ios::trunc);
 		if (m_convexCollisionLog.is_open())
@@ -355,6 +385,11 @@ void Debug::shutDown()
 	{
 		m_runtimeLog.flush();
 		m_runtimeLog.close();
+	}
+	if (m_rigidBodyMotionLog.is_open())
+	{
+		m_rigidBodyMotionLog.flush();
+		m_rigidBodyMotionLog.close();
 	}
 	if (m_projectLoadLog.is_open())
 	{
@@ -1013,6 +1048,20 @@ void Debug::drawGameModeInput(const Input& input)
 		ImGui::Text("Last object: %s", m_physicsCollisionObject.empty() ? "<none>" : m_physicsCollisionObject.c_str());
 		ImGui::Text("Normal: %.3f, %.3f, %.3f", m_physicsCollisionNormal.x, m_physicsCollisionNormal.y, m_physicsCollisionNormal.z);
 		ImGui::Text("Penetration: %.3f", m_physicsPenetration);
+		ImGui::Separator();
+		ImGui::TextUnformatted("Rigid Body Motion (last simulated body)");
+		ImGui::Text("Object: %s", m_rigidBodyDiagnosticObject.empty() ? "<none>" : m_rigidBodyDiagnosticObject.c_str());
+		ImGui::Text("Linear velocity: %.3f, %.3f, %.3f", m_rigidBodyLinearVelocity.x, m_rigidBodyLinearVelocity.y, m_rigidBodyLinearVelocity.z);
+		ImGui::Text("Resolved velocity: %.3f, %.3f, %.3f", m_rigidBodyResolvedVelocity.x, m_rigidBodyResolvedVelocity.y, m_rigidBodyResolvedVelocity.z);
+		ImGui::Text("Angular velocity (rad/s): %.3f, %.3f, %.3f", m_rigidBodyAngularVelocity.x, m_rigidBodyAngularVelocity.y, m_rigidBodyAngularVelocity.z);
+		ImGui::Text("No-slip angular velocity: %.3f, %.3f, %.3f", m_rigidBodyExpectedAngularVelocity.x,
+			m_rigidBodyExpectedAngularVelocity.y, m_rigidBodyExpectedAngularVelocity.z);
+		ImGui::Text("Ground normal: %.3f, %.3f, %.3f", m_rigidBodyContactNormal.x, m_rigidBodyContactNormal.y, m_rigidBodyContactNormal.z);
+		ImGui::Text("Center: %.3f, %.3f, %.3f | radius: %.3f | sphere: %s",
+			m_rigidBodyCenter.x, m_rigidBodyCenter.y, m_rigidBodyCenter.z,
+			m_rigidBodyRadius, m_rigidBodyIsSphere ? "yes" : "no");
+		ImGui::Text("Contact slip: %.3f, %.3f, %.3f", m_rigidBodyContactSlip.x,
+			m_rigidBodyContactSlip.y, m_rigidBodyContactSlip.z);
 		if (ImGui::CollapsingHeader("Convex Collision", ImGuiTreeNodeFlags_DefaultOpen))
 		{
 			const std::vector<PhysicsCollider>& colliders = PhysicsWorld::Instance().Colliders();
@@ -1653,6 +1702,165 @@ void Debug::SetPhysicsDiagnostics(const glm::vec3& cameraPosition, const glm::ve
 			" cameraY=" + std::to_string(cameraPosition.y) +
 			" desiredY=" + std::to_string(desiredPosition.y) +
 			" resolvedY=" + std::to_string(resolvedPosition.y));
+	}
+}
+
+void Debug::SetRigidBodyMotionDiagnostics(const std::string& objectName,
+	const glm::vec3& linearVelocity, const glm::vec3& resolvedVelocity,
+	const glm::vec3& angularVelocity, const glm::vec3& contactNormal,
+	const glm::vec3& center, float radius, bool sphere)
+{
+	m_rigidBodyDiagnosticObject = objectName;
+	m_rigidBodyLinearVelocity = linearVelocity;
+	m_rigidBodyResolvedVelocity = resolvedVelocity;
+	m_rigidBodyAngularVelocity = angularVelocity;
+	m_rigidBodyContactNormal = contactNormal;
+	m_rigidBodyCenter = center;
+	m_rigidBodyRadius = radius;
+	m_rigidBodyIsSphere = sphere;
+	m_rigidBodyContactSlip = glm::vec3(0.0f);
+	if (sphere && glm::dot(contactNormal, contactNormal) > 0.5f)
+	{
+		const glm::vec3 contactVelocity = linearVelocity
+			+ glm::cross(angularVelocity, -radius * contactNormal);
+		m_rigidBodyContactSlip = contactVelocity
+			- contactNormal * glm::dot(contactVelocity, contactNormal);
+	}
+	const glm::vec3 tangentVelocity = linearVelocity
+		- contactNormal * glm::dot(linearVelocity, contactNormal);
+	m_rigidBodyExpectedAngularVelocity = sphere && radius > 0.0001f
+		? glm::cross(contactNormal, tangentVelocity) / radius : glm::vec3(0.0f);
+	if (!m_rigidBodyMotionLog.is_open())
+		return;
+
+	using Clock = std::chrono::steady_clock;
+	++g_rigidBodyFrameNumber;
+	auto followup = g_rigidBodyFollowups.find(objectName);
+	if (followup != g_rigidBodyFollowups.end())
+	{
+		auto& schedule = followup->second;
+		while (schedule.nextSample < 3 && Clock::now() >= schedule.due[schedule.nextSample])
+		{
+			const int sampleIndex = schedule.nextSample++;
+			const glm::vec3 followupContactVelocity = linearVelocity
+				+ glm::cross(angularVelocity, -schedule.radius * schedule.normal);
+			const glm::vec3 contactSlip = sphere
+				? followupContactVelocity - schedule.normal
+					* glm::dot(followupContactVelocity, schedule.normal)
+				: glm::vec3(0.0f);
+			const glm::vec3 followupTangentVelocity = linearVelocity
+				- schedule.normal * glm::dot(linearVelocity, schedule.normal);
+			const glm::vec3 expectedAngularVelocity = sphere && schedule.radius > 0.0001f
+				? glm::cross(schedule.normal, followupTangentVelocity) / schedule.radius
+				: glm::vec3(0.0f);
+			const auto sinceCollision = std::chrono::duration_cast<std::chrono::milliseconds>(
+				Clock::now() - schedule.collisionTime).count();
+			m_rigidBodyMotionLog << "[frame=" << g_rigidBodyFrameNumber << " followup=" << sampleIndex + 1
+				<< " sinceCollision=" << sinceCollision << "ms] object=" << objectName
+				<< " center=(" << center.x << ',' << center.y << ',' << center.z << ')'
+				<< " radius=" << schedule.radius
+				<< " linearVelocity=(" << linearVelocity.x << ',' << linearVelocity.y << ',' << linearVelocity.z << ')'
+				<< " resolvedVelocity=(" << resolvedVelocity.x << ',' << resolvedVelocity.y << ',' << resolvedVelocity.z << ')'
+				<< " angularVelocityRadPerSec=(" << angularVelocity.x << ',' << angularVelocity.y << ',' << angularVelocity.z << ')'
+				<< " expectedAngularVelocity=(" << expectedAngularVelocity.x << ',' << expectedAngularVelocity.y << ',' << expectedAngularVelocity.z << ')'
+				<< " contactNormal=(" << schedule.normal.x << ',' << schedule.normal.y << ',' << schedule.normal.z << ')'
+				<< " contactPoint=(" << schedule.contactPoint.x << ',' << schedule.contactPoint.y << ',' << schedule.contactPoint.z << ')'
+				<< " slipVelocity=(" << contactSlip.x << ',' << contactSlip.y << ',' << contactSlip.z << ')'
+				<< '\n';
+			m_rigidBodyMotionLog.flush();
+		}
+		if (schedule.nextSample >= 3)
+			g_rigidBodyFollowups.erase(followup);
+	}
+
+	static std::unordered_map<std::string, Clock::time_point> lastWriteByBody;
+	static const Clock::time_point start = Clock::now();
+	const Clock::time_point now = Clock::now();
+	const auto previous = lastWriteByBody.find(objectName);
+	if (previous != lastWriteByBody.end()
+		&& now - previous->second < std::chrono::seconds(1))
+		return;
+	lastWriteByBody[objectName] = now;
+
+	const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+		now - start).count();
+	m_rigidBodyMotionLog << "[frame=" << g_rigidBodyFrameNumber << " " << elapsed << " ms] object=" << objectName
+		<< " center=(" << center.x << ',' << center.y << ',' << center.z << ')'
+		<< " radius=" << radius
+		<< " linearVelocity=(" << linearVelocity.x << ',' << linearVelocity.y << ',' << linearVelocity.z << ')'
+		<< " resolvedVelocity=(" << resolvedVelocity.x << ',' << resolvedVelocity.y << ',' << resolvedVelocity.z << ')'
+		<< " angularVelocityRadPerSec=(" << angularVelocity.x << ',' << angularVelocity.y << ',' << angularVelocity.z << ')'
+		<< " expectedAngularVelocity=(" << m_rigidBodyExpectedAngularVelocity.x << ',' << m_rigidBodyExpectedAngularVelocity.y << ',' << m_rigidBodyExpectedAngularVelocity.z << ')'
+		<< " contactNormal=(" << contactNormal.x << ',' << contactNormal.y << ',' << contactNormal.z << ')'
+		<< " contactSlip=(" << m_rigidBodyContactSlip.x << ',' << m_rigidBodyContactSlip.y << ',' << m_rigidBodyContactSlip.z << ')'
+		<< '\n';
+	m_rigidBodyMotionLog.flush();
+}
+
+void Debug::LogRigidBodyCollision(const std::string& objectName, const std::string& targetName,
+	float dt, float hitTime, float restitution, float friction,
+	const glm::vec3& center, float radius, const glm::vec3& contactPoint, const glm::vec3& normal,
+	const glm::vec3& linearBefore, const glm::vec3& angularBefore,
+	const glm::vec3& linearAfter, const glm::vec3& angularAfter,
+	const glm::vec3& targetLinearBefore, const glm::vec3& targetAngularBefore,
+	const glm::vec3& targetLinearAfter, const glm::vec3& targetAngularAfter,
+	float normalImpulse, const glm::vec3& frictionImpulse,
+	const glm::vec3& slipBefore, const glm::vec3& slipAfter)
+{
+	if (!m_rigidBodyMotionLog.is_open())
+		return;
+
+	using Clock = std::chrono::steady_clock;
+	const Clock::time_point now = Clock::now();
+	const glm::vec3 tangentAfter = linearAfter - normal * glm::dot(linearAfter, normal);
+	const glm::vec3 expectedAngularAfter = radius > 0.0001f
+		? glm::cross(normal, tangentAfter) / radius : glm::vec3(0.0f);
+	const auto previous = g_lastRigidBodyCollisionLog.find(objectName);
+	if (previous == g_lastRigidBodyCollisionLog.end()
+		|| now - previous->second >= std::chrono::milliseconds(50))
+	{
+		g_lastRigidBodyCollisionLog[objectName] = now;
+		m_rigidBodyMotionLog << "[frame=" << g_rigidBodyFrameNumber + 1 << " collision] object=" << objectName
+			<< " target=" << targetName
+			<< " dt=" << dt << " hitTime=" << hitTime
+			<< " restitution=" << restitution << " friction=" << friction
+			<< " center=(" << center.x << ',' << center.y << ',' << center.z << ')'
+			<< " radius=" << radius
+			<< " contactPoint=(" << contactPoint.x << ',' << contactPoint.y << ',' << contactPoint.z << ')'
+			<< " normal=(" << normal.x << ',' << normal.y << ',' << normal.z << ')'
+			<< " linearBefore=(" << linearBefore.x << ',' << linearBefore.y << ',' << linearBefore.z << ')'
+			<< " angularBefore=(" << angularBefore.x << ',' << angularBefore.y << ',' << angularBefore.z << ')'
+			<< " linearAfter=(" << linearAfter.x << ',' << linearAfter.y << ',' << linearAfter.z << ')'
+			<< " angularAfter=(" << angularAfter.x << ',' << angularAfter.y << ',' << angularAfter.z << ')'
+			<< " targetLinearBefore=(" << targetLinearBefore.x << ',' << targetLinearBefore.y << ',' << targetLinearBefore.z << ')'
+			<< " targetAngularBefore=(" << targetAngularBefore.x << ',' << targetAngularBefore.y << ',' << targetAngularBefore.z << ')'
+			<< " targetLinearAfter=(" << targetLinearAfter.x << ',' << targetLinearAfter.y << ',' << targetLinearAfter.z << ')'
+			<< " targetAngularAfter=(" << targetAngularAfter.x << ',' << targetAngularAfter.y << ',' << targetAngularAfter.z << ')'
+			<< " expectedAngularAfter=(" << expectedAngularAfter.x << ',' << expectedAngularAfter.y << ',' << expectedAngularAfter.z << ')'
+			<< " normalImpulse=" << normalImpulse
+			<< " frictionImpulse=(" << frictionImpulse.x << ',' << frictionImpulse.y << ',' << frictionImpulse.z << ')'
+			<< " slipBefore=(" << slipBefore.x << ',' << slipBefore.y << ',' << slipBefore.z << ')'
+			<< " slipAfter=(" << slipAfter.x << ',' << slipAfter.y << ',' << slipAfter.z << ')'
+			<< '\n';
+		m_rigidBodyMotionLog.flush();
+	}
+
+	auto scheduleIt = g_rigidBodyFollowups.find(objectName);
+	if (scheduleIt == g_rigidBodyFollowups.end()
+		|| scheduleIt->second.nextSample >= 3)
+	{
+		std::uniform_real_distribution<float> firstDelay(0.10f, 0.30f);
+		std::uniform_real_distribution<float> secondDelay(0.40f, 0.90f);
+		std::uniform_real_distribution<float> thirdDelay(1.20f, 2.00f);
+		RigidBodyFollowupSchedule schedule;
+		schedule.collisionTime = now;
+		schedule.normal = normal;
+		schedule.contactPoint = contactPoint;
+		schedule.radius = radius;
+		schedule.due[0] = now + std::chrono::duration_cast<Clock::duration>(std::chrono::duration<float>(firstDelay(g_rigidBodyRandom)));
+		schedule.due[1] = now + std::chrono::duration_cast<Clock::duration>(std::chrono::duration<float>(secondDelay(g_rigidBodyRandom)));
+		schedule.due[2] = now + std::chrono::duration_cast<Clock::duration>(std::chrono::duration<float>(thirdDelay(g_rigidBodyRandom)));
+		g_rigidBodyFollowups[objectName] = schedule;
 	}
 }
 

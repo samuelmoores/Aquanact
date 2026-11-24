@@ -7,6 +7,7 @@
 #include "Engine/Core/FileSystem.h"
 #include "Engine/Core/FileManager.h"
 #include "Engine/Core/SceneManager.h"
+#include "Engine/Core/Entity.h"
 #include "Engine/Core/ProjectStateSerializer.h"
 #include "Engine/Core/SpawnManager.h"
 #include "Engine/Core/FrameProfiler.h"
@@ -231,11 +232,10 @@ namespace {
 				object->SetBlocksCameraView(pendingObject.blocksCameraView);
 				object->SetShowPhysicsBoundingBox(pendingObject.showPhysicsBoundingBox);
 				object->SetRigidBody(pendingObject.rigidBody);
-				object->SetMass(pendingObject.mass);
-				object->SetLinearDamping(pendingObject.linearDamping);
-				object->SetPhysicsColliderShape(pendingObject.physicsColliderShape == 1
-					? PhysicsColliderShape::Capsule
-					: pendingObject.physicsColliderShape == 2 ? PhysicsColliderShape::Convex : PhysicsColliderShape::Box);
+				object->SetRigidBodyPreset(static_cast<RigidBodyPreset>(pendingObject.rigidBodyPreset));
+				object->SetRollingPreset(static_cast<RollingPreset>(pendingObject.rollingPreset));
+				object->SetPhysicsColliderShape(static_cast<PhysicsColliderShape>(
+					std::clamp(pendingObject.physicsColliderShape, 0, 3)));
 				object->SetUseBaseMeshCollider(pendingObject.useBaseMeshCollider);
 				object->SetCapsuleRadiusOverride(pendingObject.capsuleRadiusOverride);
 				if (pendingObject.isSubmeshComponentEntity)

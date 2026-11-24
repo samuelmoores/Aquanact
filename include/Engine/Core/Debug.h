@@ -149,6 +149,18 @@ public:
 	void DrawCameraCollisionDebug(const Camera& camera);
 	void DrawPhysicsBoundingVolumes(const Camera& camera);
 	void SetPhysicsDiagnostics(const glm::vec3& cameraPosition, const glm::vec3& desiredPosition, const glm::vec3& resolvedPosition, float colliderRadius, int collisionCount, const glm::vec3& collisionNormal, float penetration, const std::string& collisionObject);
+	void SetRigidBodyMotionDiagnostics(const std::string& objectName, const glm::vec3& linearVelocity,
+		const glm::vec3& resolvedVelocity, const glm::vec3& angularVelocity,
+		const glm::vec3& contactNormal, const glm::vec3& center, float radius, bool sphere);
+	void LogRigidBodyCollision(const std::string& objectName, const std::string& targetName,
+		float dt, float hitTime, float restitution, float friction,
+		const glm::vec3& center, float radius, const glm::vec3& contactPoint, const glm::vec3& normal,
+		const glm::vec3& linearBefore, const glm::vec3& angularBefore,
+		const glm::vec3& linearAfter, const glm::vec3& angularAfter,
+		const glm::vec3& targetLinearBefore, const glm::vec3& targetAngularBefore,
+		const glm::vec3& targetLinearAfter, const glm::vec3& targetAngularAfter,
+		float normalImpulse, const glm::vec3& frictionImpulse,
+		const glm::vec3& slipBefore, const glm::vec3& slipAfter);
 	void RecordGroundedTransition(const std::string& objectName, bool grounded, bool rawGrounded,
 		bool mainGroundContact, bool probeGroundContact, const glm::vec3& collisionNormal,
 		const glm::vec3& position, const glm::vec3& velocity, float groundedLossTimer, float dt);
@@ -229,6 +241,16 @@ private:
 	float m_physicsPenetration = 0.0f;
 	int m_physicsCollisionCount = 0;
 	std::string m_physicsCollisionObject;
+	std::string m_rigidBodyDiagnosticObject;
+	glm::vec3 m_rigidBodyLinearVelocity{ 0.0f };
+	glm::vec3 m_rigidBodyResolvedVelocity{ 0.0f };
+	glm::vec3 m_rigidBodyAngularVelocity{ 0.0f };
+	glm::vec3 m_rigidBodyExpectedAngularVelocity{ 0.0f };
+	glm::vec3 m_rigidBodyContactNormal{ 0.0f };
+	glm::vec3 m_rigidBodyCenter{ 0.0f };
+	glm::vec3 m_rigidBodyContactSlip{ 0.0f };
+	float m_rigidBodyRadius = 0.0f;
+	bool m_rigidBodyIsSphere = false;
 	int m_groundedTrueCount = 0;
 	int m_groundedFalseCount = 0;
 	std::string m_lastGroundedTransition;
@@ -276,6 +298,7 @@ private:
 	std::vector<std::string> m_logMessages;
 	std::vector<std::string> m_logOnceKeys;
 	std::ofstream m_runtimeLog;
+	std::ofstream m_rigidBodyMotionLog;
 	std::ofstream m_projectLoadLog;
 	std::vector<std::string> m_projectLoadMessages;
 	bool m_projectLoadActive = false;

@@ -1444,18 +1444,33 @@ namespace ProjectStateSerializer {
 					object.name = ProjectStateFormat::UnescapeField(fields[17]);
 				if (fields.size() >= 19)
 					object.rigidBody = fields[18] == "1" || fields[18] == "true" || fields[18] == "True";
+				bool hasRigidBodyPreset = false;
 				for (std::size_t marker = 0; marker + 1 < fields.size(); ++marker)
-					if (fields[marker] == "mass")
+					if (fields[marker] == "rigidbodypreset")
 					{
-						try { object.mass = std::max(0.01f, std::stof(fields[marker + 1])); }
-						catch (...) { object.mass = 1.0f; }
+						try { object.rigidBodyPreset = std::clamp(std::stoi(fields[marker + 1]), 0, 4); }
+						catch (...) { object.rigidBodyPreset = 0; }
+						hasRigidBodyPreset = true;
 						break;
 					}
+				// Older project files stored an unconstrained damping/friction value.
+				// Convert it to the nearest useful preset when no preset is present.
+				if (!hasRigidBodyPreset)
+					for (std::size_t marker = 0; marker + 1 < fields.size(); ++marker)
+						if (fields[marker] == "friction" || fields[marker] == "lineardamping")
+						{
+							float legacyFriction = 0.0f;
+							try { legacyFriction = std::max(0.0f, std::stof(fields[marker + 1])); }
+							catch (...) {}
+							object.rigidBodyPreset = legacyFriction <= 0.001f ? 3
+								: legacyFriction <= 1.0f ? 0 : 2;
+							break;
+						}
 				for (std::size_t marker = 0; marker + 1 < fields.size(); ++marker)
-					if (fields[marker] == "lineardamping")
+					if (fields[marker] == "rollingpreset")
 					{
-						try { object.linearDamping = std::max(0.0f, std::stof(fields[marker + 1])); }
-						catch (...) { object.linearDamping = 0.0f; }
+						try { object.rollingPreset = std::clamp(std::stoi(fields[marker + 1]), 0, 3); }
+						catch (...) { object.rollingPreset = 0; }
 						break;
 					}
 				for (std::size_t marker = 0; marker + 1 < fields.size(); ++marker)
@@ -1503,7 +1518,7 @@ namespace ProjectStateSerializer {
 					{
 						const std::size_t physicsOffset = fields.size() >= 17 ? 1 : 0;
 						const int colliderShape = std::stoi(fields[14 + physicsOffset]);
-						object.physicsColliderShape = colliderShape == 1 ? 1 : colliderShape == 2 ? 2 : 0;
+						object.physicsColliderShape = std::clamp(colliderShape, 0, 3);
 					}
 					catch (...)
 					{

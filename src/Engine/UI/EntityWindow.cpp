@@ -392,18 +392,16 @@ void EntityWindow::DrawSelectedSubmesh(Entity& entity, int selectedSubmeshIndex)
 			entity.SetSubmeshColliderEnabled(submeshIndex, collisionEnabled);
 			PhysicsWorld::Instance().Update(entity);
 		}
-		const char* colliderShapes[] = { "Box", "Capsule", "Convex" };
-		int colliderShape = settings.shape == PhysicsColliderShape::Capsule ? 1
-			: settings.shape == PhysicsColliderShape::Convex ? 2 : 0;
+		const char* colliderShapes[] = { "Box", "Capsule", "Convex", "Sphere" };
+		int colliderShape = static_cast<int>(settings.shape);
 		if (entity.UseBaseMeshCollider())
 			ImGui::BeginDisabled();
 		if (!collisionEnabled)
 			ImGui::BeginDisabled();
 		if (ImGui::Combo("Collision Shape", &colliderShape, colliderShapes, IM_ARRAYSIZE(colliderShapes)))
 		{
-			entity.SetSubmeshColliderShape(submeshIndex, colliderShape == 1
-				? PhysicsColliderShape::Capsule
-				: colliderShape == 2 ? PhysicsColliderShape::Convex : PhysicsColliderShape::Box);
+			entity.SetSubmeshColliderShape(submeshIndex,
+				static_cast<PhysicsColliderShape>(colliderShape));
 			PhysicsWorld::Instance().Update(entity);
 		}
 		if (!collisionEnabled)
@@ -507,19 +505,25 @@ void EntityWindow::DrawPhysics(Entity& entity) const
 	const bool hasController = entity.GetController() != nullptr;
 	if (hasController)
 		ImGui::BeginDisabled();
-	if (ImGui::Checkbox("Rigid Body", &rigidBody))
+	if (ImGui::Checkbox("Rigid Body Simulation", &rigidBody))
 	{
 		entity.SetRigidBody(rigidBody);
 		PhysicsWorld::Instance().Update(entity);
 	}
 	if (rigidBody)
 	{
-		float mass = entity.Mass();
-		if (ImGui::DragFloat("Mass", &mass, 0.1f, 0.01f, 10000.0f, "%.2f"))
-			entity.SetMass(mass);
-		float linearDamping = entity.LinearDamping();
-		if (ImGui::DragFloat("Linear Damping", &linearDamping, 0.01f, 0.0f, 100.0f, "%.2f"))
-			entity.SetLinearDamping(linearDamping);
+		const char* presets[] = { "Default", "Bouncy", "Hard", "Slippery", "Rubber" };
+		int preset = static_cast<int>(entity.GetRigidBodyPreset());
+		if (ImGui::Combo("Material Preset", &preset, presets, IM_ARRAYSIZE(presets)))
+			entity.SetRigidBodyPreset(static_cast<RigidBodyPreset>(preset));
+		if (ImGui::IsItemHovered())
+			ImGui::SetTooltip("Sets bounce, contact friction, and linear/angular air damping.");
+		const char* rollingPresets[] = { "Natural", "Fast", "Long Roll", "Quick Stop" };
+		int rollingPreset = static_cast<int>(entity.GetRollingPreset());
+		if (ImGui::Combo("Rolling Preset", &rollingPreset, rollingPresets, IM_ARRAYSIZE(rollingPresets)))
+			entity.SetRollingPreset(static_cast<RollingPreset>(rollingPreset));
+		if (ImGui::IsItemHovered())
+			ImGui::SetTooltip("Controls rolling resistance. While in contact, spin follows the no-slip relation and is not tuned independently. Tuned mainly for spheres.");
 	}
 	if (hasController)
 	{
@@ -527,16 +531,15 @@ void EntityWindow::DrawPhysics(Entity& entity) const
 		ImGui::TextDisabled("Controller entities use controller movement and gravity.");
 	}
 
-	const char* colliderShapes[] = { "Box", "Capsule", "Convex" };
-	int colliderShape = entity.GetPhysicsColliderShape() == PhysicsColliderShape::Capsule ? 1
-		: entity.GetPhysicsColliderShape() == PhysicsColliderShape::Convex ? 2 : 0;
+	const char* colliderShapes[] = { "Box", "Capsule", "Convex", "Sphere" };
+	int colliderShape = static_cast<int>(entity.GetPhysicsColliderShape());
 	if (ImGui::Combo("Collision Shape", &colliderShape, colliderShapes, IM_ARRAYSIZE(colliderShapes)))
 	{
-		entity.SetPhysicsColliderShape(colliderShape == 1
-			? PhysicsColliderShape::Capsule
-			: colliderShape == 2 ? PhysicsColliderShape::Convex : PhysicsColliderShape::Box);
+		entity.SetPhysicsColliderShape(static_cast<PhysicsColliderShape>(colliderShape));
 		PhysicsWorld::Instance().Update(entity);
 	}
+	if (ImGui::IsItemHovered())
+		ImGui::SetTooltip("Choose Sphere for sphere-specific contact impulses and rolling inertia.");
 	bool useBaseMeshCollider = entity.UseBaseMeshCollider();
 	if (ImGui::Checkbox("Base Mesh Collision", &useBaseMeshCollider))
 	{

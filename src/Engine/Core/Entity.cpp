@@ -14,6 +14,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/euler_angles.hpp>
+#include <glm/gtx/quaternion.hpp>
 #include <glm/gtx/matrix_decompose.hpp>
 #undef GLM_ENABLE_EXPERIMENTAL
 #include <utility>
@@ -420,6 +421,27 @@ glm::mat4 Entity::BuildModelMatrix()
 }
 
 void Entity::Rotate(glm::vec3 delta) { m_rotation += delta; }
+void Entity::RotateAroundWorldAxis(const glm::vec3& axis, float angle)
+{
+	const float axisLength = glm::length(axis);
+	if (axisLength <= 0.0001f || std::abs(angle) <= 0.000001f)
+		return;
+
+	// Build the same Y-X-Z orientation used by BuildModelMatrix, then apply an
+	// axis-angle delta as a quaternion. Adding the axis directly to Euler angles
+	// causes the apparent roll axis to drift as the object turns.
+	const glm::quat currentOrientation =
+		glm::angleAxis(m_rotation.y, glm::vec3(0.0f, 1.0f, 0.0f))
+		* glm::angleAxis(m_rotation.x, glm::vec3(1.0f, 0.0f, 0.0f))
+		* glm::angleAxis(m_rotation.z, glm::vec3(0.0f, 0.0f, 1.0f));
+	const glm::quat delta = glm::angleAxis(angle, axis / axisLength);
+	const glm::mat4 updatedOrientation = glm::mat4_cast(delta * currentOrientation);
+	float yaw = 0.0f;
+	float pitch = 0.0f;
+	float roll = 0.0f;
+	glm::extractEulerAngleYXZ(updatedOrientation, yaw, pitch, roll);
+	m_rotation = glm::vec3(pitch, yaw, roll);
+}
 void Entity::Move(glm::vec3 delta) { m_position += delta; updateMeshAABB(delta); }
 void Entity::Translate(glm::vec3 delta) { m_position += delta; updateMeshAABB(delta); }
 void Entity::Scale(glm::vec3 delta) { m_scale += delta; }

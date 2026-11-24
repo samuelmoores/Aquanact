@@ -11,6 +11,23 @@
 #include <utility>
 #include <vector>
 
+enum class RigidBodyPreset : int
+{
+	Default = 0,
+	Bouncy = 1,
+	Hard = 2,
+	Slippery = 3,
+	Rubber = 4
+};
+
+enum class RollingPreset : int
+{
+	Natural = 0,
+	Fast = 1,
+	LongRoll = 2,
+	QuickStop = 3
+};
+
 class EntityStateMachine;
 class CutsceneAnimator;
 class Controller;
@@ -89,6 +106,7 @@ public:
 	void UpdateNonControllerComponents(float dt);
 	glm::mat4 BuildModelMatrix();
 	void Rotate(glm::vec3 delta);
+	void RotateAroundWorldAxis(const glm::vec3& axis, float angle);
 	void Move(glm::vec3 delta);
 	void Translate(glm::vec3 delta);
 	void Scale(glm::vec3 delta);
@@ -137,19 +155,92 @@ public:
 	bool BlocksCollision() const { return m_blocksCollision; }
 	void SetBlocksCameraView(bool blocks) { m_blocksCameraView = blocks; }
 	bool BlocksCameraView() const { return m_blocksCameraView; }
-	void SetRigidBody(bool enabled) { m_rigidBody = enabled; if (!enabled) m_linearVelocity = glm::vec3(0.0f); }
+	void SetRigidBody(bool enabled)
+	{
+		m_rigidBody = enabled;
+		if (!enabled)
+		{
+			m_linearVelocity = glm::vec3(0.0f);
+			m_angularVelocity = glm::vec3(0.0f);
+		}
+	}
 	bool IsRigidBody() const { return m_rigidBody; }
-	float Mass() const { return m_mass; }
-	void SetMass(float mass) { m_mass = mass < 0.01f ? 0.01f : mass; }
+	RigidBodyPreset GetRigidBodyPreset() const { return m_rigidBodyPreset; }
+	void SetRigidBodyPreset(RigidBodyPreset preset) { m_rigidBodyPreset = preset; }
+	float Restitution() const
+	{
+		switch (m_rigidBodyPreset)
+		{
+		case RigidBodyPreset::Bouncy: return 0.85f;
+		case RigidBodyPreset::Hard: return 0.10f;
+		case RigidBodyPreset::Slippery: return 0.05f;
+		case RigidBodyPreset::Rubber: return 0.70f;
+		default: return 0.35f;
+		}
+	}
+	float MinimumBounceSpeed() const
+	{
+		switch (m_rigidBodyPreset)
+		{
+		case RigidBodyPreset::Bouncy: return 5.0f;
+		case RigidBodyPreset::Rubber: return 10.0f;
+		default: return 50.0f;
+		}
+	}
+	float Friction() const
+	{
+		switch (m_rigidBodyPreset)
+		{
+		case RigidBodyPreset::Bouncy: return 0.35f;
+		case RigidBodyPreset::Hard: return 0.40f;
+		case RigidBodyPreset::Slippery: return 0.03f;
+		case RigidBodyPreset::Rubber: return 0.90f;
+		default: return 0.50f;
+		}
+	}
+	float LinearDamping() const
+	{
+		switch (m_rigidBodyPreset)
+		{
+		case RigidBodyPreset::Bouncy: return 0.01f;
+		case RigidBodyPreset::Hard: return 0.08f;
+		case RigidBodyPreset::Slippery: return 0.005f;
+		case RigidBodyPreset::Rubber: return 0.05f;
+		default: return 0.02f;
+		}
+	}
+	float AngularDamping() const
+	{
+		switch (m_rigidBodyPreset)
+		{
+		case RigidBodyPreset::Bouncy: return 0.01f;
+		case RigidBodyPreset::Hard: return 0.10f;
+		case RigidBodyPreset::Slippery: return 0.005f;
+		case RigidBodyPreset::Rubber: return 0.08f;
+		default: return 0.02f;
+		}
+	}
+	RollingPreset GetRollingPreset() const { return m_rollingPreset; }
+	void SetRollingPreset(RollingPreset preset) { m_rollingPreset = preset; }
+	float RollingResistance() const
+	{
+		switch (m_rollingPreset)
+		{
+		case RollingPreset::Fast: return 0.01f;
+		case RollingPreset::LongRoll: return 0.002f;
+		case RollingPreset::QuickStop: return 2.0f;
+		default: return 0.05f;
+		}
+	}
 	const glm::vec3& LinearVelocity() const { return m_linearVelocity; }
 	void SetLinearVelocity(const glm::vec3& velocity) { m_linearVelocity = velocity; }
+	const glm::vec3& AngularVelocity() const { return m_angularVelocity; }
+	void SetAngularVelocity(const glm::vec3& velocity) { m_angularVelocity = velocity; }
 	void ApplyImpulse(const glm::vec3& impulse)
 	{
 		if (m_rigidBody && !GetController())
-			m_linearVelocity += impulse / m_mass;
+			m_linearVelocity += impulse;
 	}
-	float LinearDamping() const { return m_linearDamping; }
-	void SetLinearDamping(float damping) { m_linearDamping = damping < 0.0f ? 0.0f : damping; }
 	// Launch enables non-controller rigid-body simulation and sets velocity in world units/second.
 	void Launch(const glm::vec3& velocity)
 	{
@@ -187,9 +278,10 @@ protected:
 	bool m_ignoreCameraCollision = false;
 	bool m_blocksCameraView = true;
 	bool m_rigidBody = false;
-	float m_mass = 1.0f;
+	RigidBodyPreset m_rigidBodyPreset = RigidBodyPreset::Default;
+	RollingPreset m_rollingPreset = RollingPreset::Natural;
 	glm::vec3 m_linearVelocity{ 0.0f };
-	float m_linearDamping = 0.0f;
+	glm::vec3 m_angularVelocity{ 0.0f };
 	bool m_showPhysicsBoundingBox = false;
 	PhysicsColliderShape m_physicsColliderShape = PhysicsColliderShape::Box;
 	float m_capsuleRadiusOverride = 0.0f;

@@ -46,6 +46,8 @@ private:
 	bool m_blocksCameraView = true;
 	bool m_showPhysicsBoundingBox = false;
 	bool m_rigidBody = false;
+	int m_rigidBodyPreset = 0;
+	int m_rollingPreset = 0;
 	int m_physicsColliderShape = 0;
 	std::string m_editingDefinitionName;
 	EntityWindow m_entityWindow;

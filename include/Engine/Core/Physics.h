@@ -62,6 +62,11 @@ public:
 		const glm::vec3& capsuleBase, const glm::vec3& capsuleTip,
 		float capsuleRadius);
 
+	static SweepCollision GetSphereSphereSweep(
+		const glm::vec3& centerA, float radiusA,
+		const glm::vec3& movementA,
+		const glm::vec3& centerB, float radiusB);
+
 	static Collision GetSphereAABBCollision(
 		const glm::vec3& center, float radius,
 		const glm::vec3& boxMin, const glm::vec3& boxMax,

@@ -205,7 +205,7 @@ void Controller::MoveWithCollisions(Entity& owner, const glm::vec3& desiredMovem
 				controllerVelocity - hitEntity->LinearVelocity(), pushDirection);
 			if (closingSpeed > 0.0f)
 			{
-				const float targetMass = hitEntity->Mass();
+				constexpr float targetMass = 1.0f;
 				const float impulseMagnitude = (1.0f + controllerPushRestitution) * closingSpeed
 					/ (1.0f / controllerPushMass + 1.0f / targetMass);
 				hitEntity->ApplyImpulse(pushDirection * impulseMagnitude);
